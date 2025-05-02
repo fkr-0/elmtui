@@ -1,0 +1,185 @@
+* elmtui.lisp Professional Implementation Roadmap
+
+** 1. Advanced Event & Message Layer
+   - [x] Implement robust message and command types with validation and error signaling.
+   - [x] Provide extensible message dispatch (custom handlers, priorities).
+   - [x] Document message contracts and provide usage examples.
+   - [x] Integrate tracing/logging for all message flows.
+   - [PARTIAL] Richer message contract registration and enforcement (dynamic, runtime, and macro-based).
+   - [PARTIAL] Advanced message priorities (priority queues, handler ordering, preemption).
+   - [PARTIAL] Message type introspection/reflection.
+   - [PARTIAL] Message serialization/deserialization.
+   - [PARTIAL] Message filtering and replay.
+   - [PARTIAL] Message deduplication.
+   - [PARTIAL] Message lifecycle hooks (before/after send, receive, handle).
+
+** 2. Event Loop & Async Interpreter
+   - [x] Implement a production-grade event loop with:
+     - [x] Subscriber management (add/remove, priorities, error isolation).
+     - [x] Graceful shutdown and restart.
+     - [x] Instrumentation hooks for debugging and profiling.
+   - [x] Implement a flexible async command interpreter:
+     - [x] Support for custom command types.
+     - [x] Error handling and recovery for async tasks.
+     - [x] Integration with Common Lisp conditions and restarts.
+   - [x] Provide comprehensive documentation and usage patterns.
+   - [PARTIAL] Dynamic subscriber removal (unsubscribe API, token-based).
+   - [PARTIAL] Event loop error isolation (per-handler error boundaries, recovery).
+   - [PARTIAL] Advanced instrumentation hooks (event timing, metrics, tracing).
+   - [PARTIAL] Event loop pausing/resuming.
+   - [PARTIAL] Event queue inspection and replay.
+   - [PARTIAL] Event deduplication and filtering.
+   - [PARTIAL] Event loop lifecycle hooks (before/after dispatch, shutdown).
+   - [PARTIAL] Async task cancellation API.
+   - [PARTIAL] Async task progress reporting.
+
+** 3. State Management & Elm Integration
+   - [x] Integrate transactional, observable, thread-safe state (statelib) as core API.
+     - Core `application-state` struct manages data, lock, transaction logs, and observers.
+     - Thread-safety provided via mutex (`application-state-lock`).
+     - Transactionality provided via `with-transaction` macro.
+     - Basic observer mechanism implemented (`add/remove/notify-observers`).
+   - [x] Rewire defmodel macro:
+     - [x] Generate schema/slot definitions for application-state hash-table.
+       - Models are defined as schemas, instances are stored as plists in the central `application-state` hash-table, keyed by the model name symbol.
+     - [x] Provide contract-based slot validation and defaulting.
+       - `:type`, `:initform`, and `:validate` options implemented in the generated `make-<model-name>` constructor.
+     - [x] Optionally auto-generate observer hooks for model fields.
+       - `:observe t` flag in slot definition triggers registration via `ut.state:add-observer` in the `initialize-<model-name>-state` helper function.
+       - Observers watch the top-level model plist; the callback filters for changes to the specific slot.
+     - [x] Document idiomatic usage with application-state.
+       - Docstrings updated to reflect schema-based approach, plist storage, accessors, and mandatory use of `defupdate` for modifications.
+   - [x] Rewire defmsg macro:
+     - [x] Register allowed message variants for runtime validation.
+       - Variants registered in `*message-schemas*`.
+       - `make-<variant>-<type>` constructor functions generated for each variant, performing basic type checks on arguments. Recommended usage.
+       - `message-variant-p` provides basic keyword validation.
+     - [ ] Integrate with observer/dispatcher for fine-grained subscriptions.
+       - Placeholder comments added; requires further integration, potentially with `clevelib.ems`.
+     - [x] Document message variant usage and anti-patterns.
+       - Docstrings updated, emphasizing use of generated constructors.
+   - [x] Rewire defupdate macro:
+     - [x] Ensure all updates are performed transactionally on application-state.
+       - Body wrapped in `ut.state:with-transaction`.
+       - Mandatory local `set-state!` macro ensures changes call `ut.state:record-change`.
+     - [PARTIAL] Provide macroexpansion-time error reporting for side-effects.
+       - Basic heuristic warning implemented for direct use of `setf`, `setq`, etc. Not full static analysis.
+     - [x] Support undo/redo and time-travel via transaction history.
+       - Implemented in `statelib` via `undo-last-transaction`, `redo-last-transaction`, using `transaction-history` and `undone-history` lists.
+     - [x] Document update patterns for idiomatic Elm-style workflows.
+       - Docstrings updated to explain transactional updates via `set-state!`.
+   - [PARTIAL] Provide usage patterns and documentation for new state workflow.
+     - Docstrings in macros updated. Requires consolidated usage guide.
+     - *** New State Workflow Summary: ***
+       1. Define models using `defmodel` (specifies schema, generates constructor/accessors).
+       2. Define messages using `defmsg` (specifies variants, generates constructors).
+       3. Initialize `application-state` (using `ut.state:make-application-state`).
+       4. Create initial model state plists using `make-<model-name>`.
+       5. Add initial state to app-state and register observers using `initialize-<model-name>-state`.
+       6. Define update logic using `defupdate`, modifying state *only* via the local `set-state!` macro.
+       7. Create messages using `make-<variant>-<type>` constructors.
+       8. Dispatch messages to the appropriate `defupdate`-defined function.
+       9. Access state using `state-ref` or generated model accessors (`<slot-name>`).
+       10. Use `ut.state:undo-last-transaction` / `ut.state:redo-last-transaction` for history navigation.
+   - [ ] Add tests for transactional updates, observer notifications, and undo/redo.
+     - Formal test suite still required.
+
+** 4. View System & Layout
+   - [ ] Implement a declarative, composable view DSL using macros.
+   - [ ] Support for dynamic view updates and partial re-rendering.
+   - [PARTIAL] Advanced layout primitives (flex, grid, stack, overlay). (Flexbox refactored for styled nodes, Grid TBD)
+   - [ ] Accessibility hooks and testable view trees.
+   - [ ] Document best practices for view composition.
+   - [*NEW*] Integrate `cl-styles` for styling `ui-node`s:
+     - [PARTIAL] Define `ui-node` (or a wrapper class) as `cl-styles:stylable`. (`styled-ui-node` implemented)
+       - Implement `stylable-id`, `classes` (read from `props`), `parents-of` methods.
+     - [PARTIAL] Implement a styling pass in the view pipeline (View -> Style -> Layout -> Render). (`apply-stylesheet-to-tree` implemented)
+       - This pass takes the raw `ui-node` tree and a `stylesheet`.
+       - It traverses the tree, applying the stylesheet using `query-stylesheet` for each node.
+       - It produces a *styled* `ui-node` tree where each node contains its computed `style-set`.
+     - [PARTIAL] Modify layout functions (`layout-box`, `ui-node->flex-item`) to read computed styles. (`layout-flex-children`, `styled-node->flex-item` implemented)
+       - Replace direct `(getf props ...)` lookups for layout properties with `(style-value styled-node :property default)`.
+     - [*NEW*] Define mechanisms for managing stylesheets (e.g., global themes, component-specific styles).
+       - Stylesheets could be part of the application Model, allowing theme switching via Messages/Updates.
+     - [*NEW*] Document the styling workflow and how to define custom styles and rules.
+ - [PARTIAL] Implement top-level recursive `layout-tree` function. (Structure defined, details TBD)
+ - [x] Refactor `layout-box` to operate on styled nodes (`layout-flex-children`).
+ - [x] Refactor `ui-node->flex-item` to `styled-node->flex-item`, reading only computed styles.
+ - [PARTIAL] Implement basic block/inline layout in `layout-tree`. (Block layout and content-rect calculation implemented, inline TBD)
+ - [ ] Refactor `grid.lisp` to remove helper classes and focus `layout-grid-container` on `styled-ui-node`s.
+ - [ ] Implement full CSS Grid layout algorithm in `grid.lisp`.
+
+** 5. Widget Library
+   - [PARTIAL] Expand primitive and composite widgets: (Basic render methods for label, button, form, list implemented; basic button update implemented)
+     - [*NEW*] Implement widget state management (e.g., input value/cursor, list scroll/selection).
+     - [*NEW*] Implement focus management and keyboard navigation system.
+     - [*NEW*] Implement detailed input handling for `input-widget`.
+     - [*NEW*] Implement scrolling logic for `list-widget` and other containers.
+     - [*NEW*] Implement message delegation for composite widgets.
+     - [ ] Implement accessibility features.
+     - [ ] Refine widget lifecycle hooks (init, mount, update, destroy).
+     - [ ] Implement widget registry for dynamic extension.
+   - [ ] Provide a widget test harness and property-based tests.
+   - [ ] Document widget authoring guidelines.
+
+** 6. Styling & Theming
+   - [PARTIAL] Deep integration with cl-styles: (Styling pass, computed style reading implemented)
+     - [ ] Dynamic theme switching at runtime.
+     - [PARTIAL] Custom style properties and selectors. (Flexbox/layout props defined)
+     - [ ] Style inheritance, specificity, and conflict resolution.
+   - [ ] Live style reloading for development.
+   - [ ] Document style system extensibility.
+
+** 7. Platform Integration
+   - [ ] Robust input/output adapters:
+     - [ ] Terminal abstraction for portability (xterm, Windows, etc.).
+     - [ ] Pluggable backends (ncurses, cl-charms, etc.).
+     - [ ] Input event normalization and mapping.
+   - [ ] Output rendering optimizations (diffing, batching, double-buffering).
+   - [ ] Document platform extension points.
+
+** 8. Runtime & Application Assembly
+   - [ ] Macro for idiomatic app definition (def-elm-app):
+     - [ ] Automatic wiring of model, update, view, subscriptions.
+     - [ ] Support for hot-reloading and live code updates.
+     - [ ] Clean shutdown and resource management.
+   - [ ] Provide a REPL-driven development workflow.
+   - [ ] Document application lifecycle and extension.
+
+** 9. Developer Experience & Tooling
+   - [ ] Interactive dev module:
+     - [ ] Live reload, inspect, and hot-swap components.
+     - [ ] Integration with SLIME/SLY and editor plugins.
+     - [ ] Automated test runner and coverage reporting.
+   - [ ] Rich error messages, stack traces, and debugging tools.
+   - [ ] Comprehensive, literate documentation (examples, diagrams).
+
+** 10. Testing, CI, and Deployment
+   - [ ] Unit, integration, and property-based tests for all modules.
+   - [ ] Continuous integration setup (GitHub Actions, etc.).
+   - [ ] Automated documentation and code quality checks.
+   - [ ] Packaging for Quicklisp/Ultralisp and binary deployment.
+
+** 11. Idiomatic Common Lisp Patterns
+   - [ ] Use CLOS for extensibility and dynamic dispatch.
+   - [ ] Employ conditions, restarts, and handler-bind for robust error handling.
+   - [x] Prefer macros for declarative APIs and DSLs (used in defmodel, defmsg, defupdate).
+   - [x] Leverage packages for strict modularity and API boundaries (used in statelib).
+   - [ ] Document idiomatic CL patterns and anti-patterns.
+
+** 12. Performance & Profiling
+   - [ ] Benchmark core event loop, rendering, and widget updates.
+   - [ ] Optimize for minimal GC pressure and fast redraws.
+   - [ ] Provide hooks for user profiling and instrumentation.
+
+** 13. Final Review & Professional Polish
+   - [ ] Code review for clarity, idiomatic style, and maintainability.
+   - [ ] API documentation and contract verification.
+   - [ ] Example applications and usage guides.
+   - [ ] Prepare for public release and community feedback.
+
+*Checklist:*
+- [ ] All modules strictly separated, with clear contracts and documentation.
+- [ ] Dynamic, idiomatic, and extensible Common Lisp codebase.
+- [ ] Professional developer experience and robust test coverage.
+- [ ] Ready for production use and open-source contribution.
