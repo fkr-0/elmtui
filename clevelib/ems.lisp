@@ -56,11 +56,30 @@
 (defclass ems ()
   ((root :initform nil :accessor ems-root-acc :initarg :root)
     (message-loop :initform nil
-      :accessor ems-message-loop
-      :documentation "The message loop for this relay")
-    (pool :initform (make-thread-pool)
-      :accessor ems-pool
-      :documentation "A thread pool to handle asyncronicity."))
+       :accessor ems-message-loop
+       :documentation "The message loop for this relay")
+     (pool :initform (make-thread-pool)
+       :accessor ems-pool
+       :documentation "A thread pool to handle asyncronicity.")
+     (message-filter :initform nil :initarg :message-filter :accessor ems-message-filter
+       :documentation "A function (predicate) called with a message. If it returns NIL, the message is dropped.")
+     (enable-logging :initform nil :initarg :enable-logging :accessor ems-enable-logging
+       :documentation "If T, processed messages are stored in message-log.")
+     (message-log :initform (make-array 0 :adjustable t :fill-pointer 0) :accessor ems-message-log
+       :documentation "Vector storing logged messages if enable-logging is T.")
+     (enable-deduplication :initform nil :initarg :enable-deduplication :accessor ems-enable-deduplication
+       :documentation "If T, attempts to filter duplicate messages.")
+     (dedup-table :initform (make-hash-table :test 'equal) :accessor ems-dedup-table
+       :documentation "Hash table storing recent message keys and timestamps for deduplication.")
+     (dedup-window :initform 1.0 :initarg :dedup-window :accessor ems-dedup-window
+       :documentation "Time window (in seconds) for message deduplication.")
+     ;; Lifecycle Hooks
+     (before-dispatch-hook :initform nil :initarg :before-dispatch-hook :accessor ems-before-dispatch-hook
+       :documentation "Function called with (ems message) before relaying.")
+     (after-dispatch-hook :initform nil :initarg :after-dispatch-hook :accessor ems-after-dispatch-hook
+       :documentation "Function called with (ems message) after relaying (if not filtered/deduped).")
+     (on-shutdown-hook :initform nil :initarg :on-shutdown-hook :accessor ems-on-shutdown-hook
+       :documentation "Function called with (ems) when stop is called."))
   (:documentation "Event Management System"))
 
 (defmethod relay-message ((propagating-message-system ems) propagating-message &rest args &key &allow-other-keys)
@@ -110,12 +129,50 @@
   (declare (ignorable args))
   (setf (ems-root-acc ems) new-value))
 
-(defmethod initialize-instance :after ((relay ems) &key)
-  (setf (ems-message-loop relay)
-    (make-instance 'clevelib.event-loop:event-loop
-      :wait t
-      :fps 10
-      :loop-fun (lambda (m) (relay-message relay m)))))
+ ;; Helper for deduplication
+ (defun get-message-key (msg)
+   "Generates a key for message deduplication (simple version)."
+   (sxhash (cons (message-type msg) (message-data msg)))) ; Hash based on type and data
+
+ (defmethod initialize-instance :after ((relay ems) &key)
+   (setf (ems-message-loop relay)
+     (make-instance 'clevelib.event-loop:event-loop
+       :wait t
+       :fps 10
+       :loop-fun (let ((filter (ems-message-filter relay))
+                       (dedup-enabled (ems-enable-deduplication relay))
+                       (dedup-table (ems-dedup-table relay))
+                       (dedup-window-internal (* (ems-dedup-window relay) internal-time-units-per-second)))
+                   (lambda (msg)
+                     (when msg ; Ignore nil dequeued events
+                       (let ((is-duplicate nil))
+                         ;; 1. Deduplication Check
+                         (when dedup-enabled
+                           (let* ((key (get-message-key msg))
+                                  (now (get-internal-real-time))
+                                  (last-seen (gethash key dedup-table 0)))
+                             (if (<= (- now last-seen) dedup-window-internal)
+                                 (progn
+                                   (setf is-duplicate t)
+                                   (log-debug "Duplicate message detected: ~S" msg))
+                                 (setf (gethash key dedup-table) now)))) ; Update timestamp
+
+                         (unless is-duplicate
+                           ;; 2. Filtering Check
+                        (if (or (not filter) (funcall filter msg)) ; Check filter
+                            (progn
+                              ;; 3. Before Dispatch Hook
+                              (when (ems-before-dispatch-hook relay)
+                                (funcall (ems-before-dispatch-hook relay) relay msg))
+                              ;; 4. Logging
+                              (when (ems-enable-logging relay)
+                                (vector-push-extend msg (ems-message-log relay)))
+                              ;; 5. Relay
+                              (relay-message relay msg)
+                              ;; 6. After Dispatch Hook
+                              (when (ems-after-dispatch-hook relay)
+                                (funcall (ems-after-dispatch-hook relay) relay msg)))
+                            (log-debug "Message filtered out: ~S" msg))))))))) ; End filter check
 
 (defmethod translate-event-to-message ((ems ems) (e event) &rest args)
   ""
@@ -172,12 +229,28 @@ and sending it to the message bus."
 (defmethod running-p ((ems ems))
   (clevelib.event-loop:event-loop-active-p (ems-message-loop ems)))
 
-(defmethod stop ((ems ems))
-  (clevelib.event-loop:stop-loop (ems-message-loop ems)))
+ (defmethod stop ((ems ems))
+   (clevelib.event-loop:stop-loop (ems-message-loop ems))
+   ;; Call shutdown hook
+   (when (ems-on-shutdown-hook ems)
+     (funcall (ems-on-shutdown-hook ems) ems)))
+
+ ;; Message Log / Replay Functions
+ (defun get-message-log (ems)
+   "Returns the current message log (as a vector)."
+   (copy-seq (ems-message-log ems)))
+
+ (defun clear-message-log (ems)
+   "Clears the message log."
+   (setf (fill-pointer (ems-message-log ems)) 0))
+
+ (defun replay-messages (ems messages-to-replay)
+   "Enqueues a sequence of messages for replay."
+   (log-info "Replaying ~D messages..." (length messages-to-replay))
+   (map nil (lambda (msg) (enqueue-message ems msg)) messages-to-replay))
 
 
-
-(defclass messenger ()
+ (defclass messenger ()
   ((name :initarg :name :accessor messenger-name :documentation "The name of the entity." :initform (symbol-name (gensym)))
     (parent :initform nil :accessor messenger-parent :documentation "The parent entity." :initarg :parent)
     (handlers :initform (make-hash-table :test #'equal) :accessor entity-handlers :documentation "A hash table of message handlers.")
@@ -209,4 +282,3 @@ and sending it to the message bus."
 (defmethod add-child ((entity messenger) child)
   (push child (messenger-children entity))
   (setf (messenger-parent child) entity))
-

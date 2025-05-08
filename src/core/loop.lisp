@@ -54,7 +54,8 @@
 
 (defun publish (event)
   "Publish EVENT to all subscribers of its type. Handles subscriber-handler-error."
-  (let ((handlers (gethash (event-type event) *subscribers*)))
+  ;; Use the imported message-type function
+  (let ((handlers (gethash (clevelib.message:message-type event) *subscribers*)))
     (dolist (handler handlers)
       (elmtui.core.conditions:with-recovery (elmtui.core.conditions:subscriber-handler-error)
         (handler-case

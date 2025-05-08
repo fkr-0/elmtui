@@ -1,19 +1,21 @@
 ;;;===============================================================
 ;;; File: src/view/styled.lisp
-;;; UI Node Style Integration with cl-styles
+;;; UI Node Style Integration with elmtui.style-lib
 ;;;===============================================================
 (uiop:define-package :elmtui.view.styled
   (:use :cl)
   (:import-from :elmtui.view.core
                 :ui-node :make-ui-node :copy-ui-node
                 :ui-node-type :ui-node-props :ui-node-children)
-  ;; Import relevant symbols from cl-styles API and implementation details
-  ;; Assuming cl-styles.api exports these based on the provided files
-  (:import-from :cl-styles.api
-                :stylable :stylable-id :classes :parents-of :styles :dirty :dirty-p
-                :style-set :query-stylesheet :value-of :copy-set)
-  ;; Import default style set if needed (adjust package if necessary)
-  (:import-from :cl-styles.style-set #:*default-style-set*)
+  ;; Import relevant symbols from elmtui.style-lib API and implementation details
+  ;; Assuming elmtui.style-lib.api exports these based on the provided files
+  (:import-from :elmtui.style-lib.api
+                #:stylable #:stylable-id #:classes #:parents-of #:styles #:dirty #:dirty-p
+                #:style-set) ; Removed query-stylesheet, copy-set
+  ;; Import default style set, value-of, and copy-set from style-set package
+  (:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set) ; Added copy-set
+  ;; Import query-stylesheet from sheet package
+  (:import-from :elmtui.style-lib.sheet #:query-stylesheet)
   (:export
    :styled-ui-node
    :make-styled-node       ; Constructor
@@ -28,13 +30,13 @@
 ;;;-----------------------------------------------------------------------------
 
 (defclass styled-ui-node (ui-node stylable)
-  ;; No extra slots needed if cl-styles:stylable provides id, classes, parents, styles, dirty
+  ;; No extra slots needed if elmtui.style-lib:stylable provides id, classes, parents, styles, dirty
   ()
   (:documentation
-   "A UI node that can be styled via cl-styles.
+   "A UI node that can be styled via elmtui.style-lib.
     - Inherits node structure from ui-node.
-    - Adds styling capabilities from cl-styles:stylable.
-    - Assumes cl-styles:stylable provides slots/accessors for:
+    - Adds styling capabilities from elmtui.style-lib:stylable.
+    - Assumes elmtui.style-lib:stylable provides slots/accessors for:
       id, classes, parents, styles, dirty."))
 
 ;; Methods implementing the stylable interface for styled-ui-node
@@ -49,13 +51,13 @@
           ((listp cls) cls)
           (t (list cls))))) ; Wrap single class in a list
 
-;; parents-of is assumed to be an accessor provided by cl-styles:stylable.
+;; parents-of is assumed to be an accessor provided by elmtui.style-lib:stylable.
 ;; It will be set during the apply-stylesheet-to-tree traversal via :parents initarg.
 
-;; styles is assumed to be an accessor provided by cl-styles:stylable.
+;; styles is assumed to be an accessor provided by elmtui.style-lib:stylable.
 ;; It will be set by query-stylesheet.
 
-;; dirty/dirty-p are assumed to be accessor/method provided by cl-styles:stylable.
+;; dirty/dirty-p are assumed to be accessor/method provided by elmtui.style-lib:stylable.
 
 ;;;-----------------------------------------------------------------------------
 ;;; Node Creation / Copying
@@ -75,8 +77,8 @@
                               :classes (cond ((null classes) nil)
                                              ((listp classes) classes)
                                              (t (list classes)))
-                              ;; Pass parent list for cl-styles:stylable init
-                              ;; This assumes cl-styles uses the :parents initarg
+                              ;; Pass parent list for elmtui.style-lib:stylable init
+                              ;; This assumes elmtui.style-lib uses the :parents initarg
                               ;; and handles building the full ancestor list if needed,
                               ;; or that selectors only need the direct parent.
                               :parents (when parent (list parent))
@@ -194,11 +196,11 @@
                             collect value)
                     ,props-var))
        ;; Update stylable info directly if :id or :classes changed
-       ;; This assumes cl-styles.stylable uses these slot names directly
+       ;; This assumes elmtui.style-lib.stylable uses these slot names directly
        (when (find :id attributes)
-         (setf (slot-value ,styled-node-var 'cl-styles.api::id) (getf (ui-node-props ,styled-node-var) :id)))
+         (setf (slot-value ,styled-node-var 'elmtui.style-lib.api::id) (getf (ui-node-props ,styled-node-var) :id)))
        (when (find :classes attributes)
-         (setf (slot-value ,styled-node-var 'cl-styles.api::classes) (getf (ui-node-props ,styled-node-var) :classes)))
+         (setf (slot-value ,styled-node-var 'elmtui.style-lib.api::classes) (getf (ui-node-props ,styled-node-var) :classes)))
        ;; Mark dirty as attributes potentially affecting style selection changed
        (setf (dirty ,styled-node-var) t)
        ,styled-node-var)))

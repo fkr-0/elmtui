@@ -3,13 +3,13 @@
 ;;; Top-Level Layout Pass & Flexbox/Block Layout
 ;;;===============================================================
 (uiop:define-package :elmtui.view.layout
-  (:use :cl
-        :elmtui.view.core) ; Keep core for ui-node structure access
+  (:use :cl :elmtui.view.core) ; Keep core for ui-node structure access
   ;; Import necessary symbols
   (:import-from :elmtui.view.geo
                 #:rectangle #:pos #:size #:h #:w #:x #:y
                 #:make-rectangle #:make-pos #:make-size
-                #:rectangle-pos #:rectangle-size #:copy-rectangle)
+                #:rectangle-pos #:rectangle-size #:copy-rectangle
+                #:clamp) ; Import clamp if not already available
   (:import-from :elmtui.view.layout.flex
                 #:flex-item #:flex-container #:layout-flex-container
                 #:flex-item-children #:main-axis #:flex-wrap #:justify-content
@@ -17,14 +17,15 @@
                 #:flex-basis #:align-self)
   (:import-from :elmtui.view.styled
                 #:styled-ui-node #:style-value #:apply-stylesheet-to-tree
-                #:copy-styled-node) ; Assuming this exists
-  ;; Import grid layout function (adjust if package name changes)
-  (:import-from :elmtui.view.layout.grid #:layout-grid-container)
+                #:copy-styled-node)
+  ;; Grid layout function will be called via generic dispatch
+  ;; (:import-from :elmtui.view.layout.grid #:layout-grid-container) ; Removed import
   (:export :layout-tree ; New top-level function
-           ;; Keep old exports for now, maybe deprecate later
-           :layout-vbox
+           :dispatch-layout ; Export the generic function
+   ;; Keep old exports for now, maybe deprecate later
+   :layout-vbox
            :layout-hbox
-           :layout-grid))
+   :layout-grid))
 (in-package :elmtui.view.layout)
 
 ;;;-----------------------------------------------------------------------------
@@ -133,9 +134,9 @@
          (content-x (+ (x parent-content-rect) pad-left border-left))
          (content-y (+ (y parent-content-rect) pad-top border-top))
          (content-w (max 0 (- (w parent-content-rect)
-                               pad-left border-left pad-right border-right)))
+                              pad-left border-left pad-right border-right)))
          (content-h (max 0 (- (h parent-content-rect)
-                               pad-top border-top pad-bottom border-bottom))))
+                              pad-top border-top pad-bottom border-bottom))))
     (make-rectangle :pos (make-pos :x content-x :y content-y)
                     :size (make-size :w content-w :h content-h))))
 
@@ -176,16 +177,23 @@
             max-child-width))) ; Max width used by children
 
 ;;;-----------------------------------------------------------------------------
-;;; Top-Level Recursive Layout Function
+;;; Top-Level Recursive Layout Function & Dispatch
 ;;;-----------------------------------------------------------------------------
 
-(defgeneric layout-node (node available-rect)
-  (:documentation "Calculate layout for a single styled node within available-rect.
-                   Handles layout of children based on display type.
-                   Returns a new node with layout information."))
+(defgeneric dispatch-layout (display node available-rect)
+  (:documentation "Dispatch layout calculation based on display type.
+                   Returns a list of laid-out children and their collective width/height."))
 
-(defmethod layout-node ((node styled-ui-node) available-rect)
-  "Layout a styled node."
+(defun layout-node (node available-rect)
+  "Calculate layout for a single styled node within available-rect.
+   Handles layout of children by dispatching based on display type.
+   Returns a new node with layout information."
+  (unless (typep node 'styled-ui-node)
+    (warn "layout-node called on non-styled-node: ~A" node)
+    (return-from layout-node nil)) ; Or handle appropriately
+  (unless (typep available-rect 'rectangle)
+     (error "layout-node requires a valid available-rect."))
+
   (let* ((display (style-value node :display :block))
          ;; Calculate rect available *for this node* (initially same as available-rect)
          ;; Position will be adjusted by parent's layout logic later.
@@ -196,17 +204,9 @@
          (children-height 0)
          (children-width 0))
 
-    ;; 1. Layout Children based on display type
+    ;; 1. Layout Children using generic dispatch
     (multiple-value-bind (result-children height width)
-        (case display
-          (:flex (values (layout-flex-children node content-rect) (h content-rect) (w content-rect))) ; Flex determines size
-          (:grid (values (layout-grid-container node content-rect) (h content-rect) (w content-rect))) ; Grid determines size
-          (:block (layout-block-children node content-rect))
-          (:inline (progn (warn ":inline layout not implemented") ; TODO: Implement inline layout
-                          (values nil 0 0)))
-          (:none (values nil 0 0)) ; No children layout for display:none
-          ;; Default acts like block for now
-          (otherwise (layout-block-children node content-rect)))
+        (dispatch-layout display node content-rect)
       (setf laid-out-children result-children)
       (setf children-height height)
       (setf children-width width))
@@ -227,8 +227,11 @@
                           ((eq styled-w :auto)
                            (case display
                              (:block (w available-rect)) ; Block usually takes available width
-                             (:flex children-width) ; Flex width determined by children layout
-                             (:grid children-width) ; Grid width determined by children layout
+                             ;; For flex/grid, width is often determined by the container/available space
+                             ;; unless items dictate otherwise (which isn't fully handled here yet).
+                             ;; Use children-width as a fallback guess.
+                             (:flex children-width)
+                             (:grid children-width)
                              (t (max children-width horizontal-padding)))) ; Basic shrink-to-fit guess
                           (t (w available-rect)))) ; Default fallback
 
@@ -240,9 +243,9 @@
 
       ;; Apply min/max constraints
       (setf final-w (clamp final-w (style-value node :min-width 0)
-                             (style-value node :max-width most-positive-fixnum)))
+                           (style-value node :max-width most-positive-fixnum)))
       (setf final-h (clamp final-h (style-value node :min-height 0)
-                             (style-value node :max-height most-positive-fixnum)))
+                           (style-value node :max-height most-positive-fixnum)))
 
       ;; 3. Determine Self Position (Relative to parent's content-rect)
       ;; The actual final position is set by the PARENT's layout logic.
@@ -261,11 +264,40 @@
             (setf (getf (ui-node-props new-node) :y) final-y)
             (setf (getf (ui-node-props new-node) :width) final-w)
             (setf (getf (ui-node-props new-node) :height) final-h)
-            new-node)))))
+            new-node))))))
 
-(defmethod layout-node ((node null) available-rect)
-  (declare (ignore available-rect))
-  nil)
+;; --- Default layout method (handles unknown display types like block) ---
+(defmethod dispatch-layout (display node available-rect)
+  (declare (ignore display)) ; Treat unknown as block
+  (layout-block-children node available-rect))
+
+;; --- Flex layout method ---
+(defmethod dispatch-layout ((display (eql :flex)) node available-rect)
+  (values (layout-flex-children node available-rect)
+          (h available-rect) ; Flex height determined by container for now
+          (w available-rect))) ; Flex width determined by container for now
+
+;; --- Block layout method ---
+(defmethod dispatch-layout ((display (eql :block)) node available-rect)
+  (layout-block-children node available-rect))
+
+;; --- Inline layout method (stub) ---
+(defmethod dispatch-layout ((display (eql :inline)) node available-rect)
+  (declare (ignore node available-rect))
+  (warn ":inline layout not implemented")
+  (values nil 0 0))
+
+;; --- None layout method ---
+(defmethod dispatch-layout ((display (eql :none)) node available-rect)
+  (declare (ignore node available-rect))
+  (values nil 0 0))
+
+;; --- Grid layout method will be defined in grid.lisp ---
+
+
+;;;-----------------------------------------------------------------------------
+;;; Top-Level Entry Point
+;;;-----------------------------------------------------------------------------
 
 (defun layout-tree (styled-root-node screen-rect)
   "Top-level entry point for layout. Takes the root of the styled node tree
@@ -295,6 +327,6 @@
 
 (defun layout-grid (nodes rows cols container-rect &key gap)
   "DEPRECATED: Use stylesheets and :display :grid."
-   (declare (ignore nodes rows cols container-rect gap))
+  (declare (ignore nodes rows cols container-rect gap))
   (warn "layout-grid is deprecated. Use stylesheets and grid display properties.")
   nil)

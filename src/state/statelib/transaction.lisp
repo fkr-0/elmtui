@@ -1,4 +1,4 @@
-(uiop:define-package :uncharming-tui.state.transaction
+(uiop:define-package :elmtui.statelib.transaction
   (:use :cl :log4cl :ut.state.state)
   (:import-from :ut.state.observe #:notify-observers) ; Import the real notify-observers
   (:nicknames :ut.state.transaction)

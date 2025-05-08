@@ -1,15 +1,17 @@
 ;;; ─────────────────────────── 0. Dependencies ───────────────────────────
-(uiop:define-package :cl-styles.util
+(uiop:define-package :elmtui.style-lib.util
   (:use :cl)
   (:import-from :str :split :join :upcase)
-  (:import-from :cl-styles.types :stylable)
-  (:import-from :cl-styles.api :property :value :style)
-  (:import-from :cl-styles.styles :=?)
-  (:import-from :cl-styles.selector :selects)
-  (:export :=? :string-ci= :hash-table-keys
-   :kw-split :kw-join :ensure-list))
+  ;; (:import-from :elmtui.style-lib.types :stylable)
+  (:import-from :elmtui.style-lib.api :ordered-styles)
+  ;; (:import-from :elmtui.style-lib.selector :selects)
+  (:export :=? :string-ci= :hash-table-keys :hash-table-values
+           :keyword-split :keyword-concat
+           :pad-fill-char :margin-fill-char
+           :kw-split :kw-join :ensure-list
+   :apply-after )) ; Export new functions
 
-(in-package :cl-styles.util)
+(in-package :elmtui.style-lib.util)
 
 (defun string-ci= (a b) (string= (string a) (string b)))
 
@@ -25,7 +27,10 @@
               (hash-table-keys a))))
 
 (defun hash-table-keys (ht) (loop for k being the hash-keys of ht collect k))
-
+(defun hash-table-values (hash-table)
+  "Return a list of the values in HASH-TABLE."
+  (loop for key being the hash-keys of hash-table
+        collect (gethash key hash-table)))
 (defun ensure-list (x) (if (listp x) x (list x)))
 
 
@@ -78,3 +83,15 @@ returns the first keyword. Otherwise, returns the keyword at POS."
   (:method ((a null) (b t))
     nil)
   (:documentation "A generic equality function that compares two objects for equality."))
+
+;; Define stub/placeholder functions for apply-after and ordered-styles
+(defmethod apply-after (style-key context)
+  "Placeholder: Determines application order. Returns :non-decorating, :top, :box, etc."
+  (declare (ignore style-key context))
+  ;; Default behavior: assume non-decorating unless specified otherwise elsewhere
+  :non-decorating)
+
+(defmethod ordered-styles (style-key-list)
+  "Placeholder: Sorts a list of style keys based on application order."
+  ;; Default behavior: return the list as is
+  style-key-list)

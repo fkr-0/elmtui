@@ -17,5 +17,6 @@
 (defun render-frame (ui-tree)
   "Render UI-TREE to the terminal.
    Contract: consume styled + laid-out ui-node and draw to terminal."
+  (declare (ignore ui-tree)) ; Ignore unused variable (stub function)
   ;; stub
   )

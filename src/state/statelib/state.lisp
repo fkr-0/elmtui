@@ -1,4 +1,4 @@
-(uiop:define-package :uncharming-tui.state.state (:use :cl :log4cl)
+(uiop:define-package :elmtui.statelib.state (:use :cl :log4cl)
   (:nicknames :ut.state.state)
   (:export :make-application-state :state-ref :get-state
     :set-state :application-state

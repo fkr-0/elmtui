@@ -8,7 +8,7 @@
 (:asd "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 (:asd "elmtui-tests.asd")
 (:asd "../clevelib/clevelib.asd")
-(:asd "../cl-styles/cl-styles.asd")
+
 (:asd "elmtui.asd")
 
 (:github "sly" :path "joaotavora/sly" :branch "master")
@@ -29,7 +29,7 @@
 (:system "flexi-streams")
 (:system "asdf-package-system" :source "quicklisp")
 (:system "clevelib")
-(:system "cl-styles")
+
 (:system "bordeaux-threads")
 (:system "slynk")
 (:system "str" :source "quicklisp")

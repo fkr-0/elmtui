@@ -21,6 +21,7 @@
      1. *model* var initialized via defmodel defaults
      2. (start-reader) & (start-loop) & subscription to render on every Msg
      3. (run-platform) entrypoint"
+  (declare (ignore name model msg update view)) ; Ignore unused variables (stub macro)
   `(progn
      ;; stub: define *model* var, initialize *msg-chan*
      ;; stub: call run-platform

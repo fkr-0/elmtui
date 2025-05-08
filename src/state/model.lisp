@@ -4,9 +4,10 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.state.model
   (:use :cl :alexandria :log4cl) ; Added log4cl
-  (:import-from :ut.state.state #:application-state #:state-ref)
-  (:import-from :ut.state #:add-observer) ; Import add-observer from main state package
-  (:export :defmodel :make-model :model-slot-value)) ; Exporting helpers might be useful
+  (:import-from :elmtui.statelib.state #:application-state #:state-ref)
+  (:import-from :elmtui.statelib #:add-observer) ; Import add-observer from main state package
+  (:import-from :elmtui.core.globals :*app-sender*) ; Import *app-sender* from globals
+  (:export :defmodel :make-model :model-slot-value :initialize-model-state)) ; Export initializer
 (in-package :elmtui.state.model)
 
 (defvar *model-schemas* (make-hash-table :test 'eq)
@@ -154,7 +155,7 @@
                              (var (gensym (symbol-name (slot-definition-name slot)))))
                          `(let ((,var ,slot-name)) ; Bind the keyword arg/default
                             ;; 1. Type Check
-                            (check-type ,var ,(slot-definition-type slot))
+                            ,(check-type ,var ,(slot-definition-type slot))
                             ;; 2. Validation Check
                             ,(when (slot-definition-validator slot)
                                `(unless (funcall ,(slot-definition-validator slot) ,var)
@@ -176,23 +177,28 @@
          ;; Register observers for slots marked with :observe t
          ,@(loop for slot in slots
                  when (slot-definition-observe slot)
-                 collect `(progn
-                            (log:info "Registering observer for ~S slot ~S" ',name ',(slot-definition-name slot))
-                            (add-observer app-state
-                                          ;; The key observed is the main model key
-                                          ',schema-name
-                                          ;; The callback needs to handle plist changes
-                                          (lambda (key old-plist new-plist)
-                                            (declare (ignore key)) ; Key is always the model name symbol
-                                            (let ((slot-key ,(slot-definition-initarg slot)) ; Keyword for the specific slot
-                                                  (old-slot-val (getf old-plist slot-key :%not-present%))
-                                                  (new-slot-val (getf new-plist slot-key :%not-present%)))
-                                              ;; Only call the user's callback if the specific slot value changed
-                                              (unless (equal old-slot-val new-slot-val)
-                                                (funcall ',observe-changes-default-callback
-                                                         slot-key ; Pass the specific slot keyword as the "key"
-                                                         old-slot-val
-                                                         new-slot-val)))))))
+                   collect `(progn
+                              (log:info "Registering observer for ~S slot ~S" ',name ',(slot-definition-name slot))
+                              (add-observer app-state
+                                            ;; The key observed is the main model key
+                                            ',schema-name
+                                            ;; The callback needs to handle plist changes
+                                            ;; Elm-style Observer: Dispatch a message instead of calling a direct callback.
+                                            (lambda (model-key old-plist new-plist)
+                                              (declare (ignore model-key)) ; Key observed is the top-level model symbol
+                                              (let ((slot-key ,(slot-definition-initarg slot)) ; Keyword for the specific slot
+                                                    (old-slot-val (getf old-plist slot-key :%not-present%))
+                                                    (new-slot-val (getf new-plist slot-key :%not-present%)))
+                                                ;; If the specific slot value changed, dispatch a message
+                                                (unless (equal old-slot-val new-slot-val)
+                                                  (log:debug "Observed change in ~S -> ~S. Dispatching message." ',name slot-key)
+                                                  ;; Assumes a message like (:state-changed :model <model-name> :slot <slot-key> :value <new-val>)
+                                                  ;; and *app-sender* is dynamically bound.
+                                                  (funcall *app-sender*
+                                                           `(:state-changed
+                                                             :model ',schema-name
+                                                             :slot ,slot-key
+                                                             :value ,new-slot-val))))))))
          initial-plist) ; Return the initial plist
 
        ;; Define Accessors
@@ -229,7 +235,7 @@
     (unless schema
       (error "Unknown model name: ~S" model-name))
     (unless (fboundp initializer-name)
-       (error "Initializer function ~S not found for model ~S." initializer-name model-name))
+      (error "Initializer function ~S not found for model ~S." initializer-name model-name))
     (funcall initializer-name app-state initial-plist)))
 
 

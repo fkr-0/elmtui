@@ -348,9 +348,9 @@
    Includes content size plus padding and margins."
   (let* ((rect (rectangle item))
          (content-size (case axis
-                        (:row (w rect))
-                        (:column (h rect))
-                        (otherwise (error "Unsupported axis: ~a" axis))))
+                         (:row (w rect))
+                         (:column (h rect))
+                         (otherwise (error "Unsupported axis: ~a" axis))))
          (start-space (get-item-space item axis :start))
          (end-space (get-item-space item axis :end)))
     (+ content-size start-space end-space)))
@@ -358,14 +358,14 @@
 (defun get-flex-item-cross-size (item axis)
   "Return the cross size of ITEM based on AXIS (:row or :column).
    Includes content size plus padding and margins."
-   (let* ((rect (rectangle item))
-          (content-size (case axis
+  (let* ((rect (rectangle item))
+         (content-size (case axis
                          (:row (h rect))
                          (:column (w rect))
                          (otherwise (error "Unsupported axis: ~a" axis))))
-          (start-space (get-item-space item axis :start))
-          (end-space (get-item-space item axis :end)))
-     (+ content-size start-space end-space)))
+         (start-space (get-item-space item axis :start))
+         (end-space (get-item-space item axis :end)))
+    (+ content-size start-space end-space)))
 
 (defmethod flex-direction ((container flex-container))
   "Return the flex-direction keyword based on the container's main-axis."
@@ -403,19 +403,19 @@
       (otherwise (error "Unsupported axis: ~a" axis)))))
 
 (defun set-flex-item-cross-size (item size axis)
-    "Set the cross size of ITEM's rectangle (clamped) along AXIS."
-    (let ((int-size (round size))
-          (rect (rectangle item)))
-      (case axis
-        (:row (setf (h rect) (clamp int-size (min-height item) (max-height item)))) ; Main axis row -> Cross axis H
-        (:column (setf (w rect) (clamp int-size (min-width item) (max-width item)))) ; Main axis column -> Cross axis W
-        (otherwise (error "Unsupported axis: ~a" axis)))))
+  "Set the cross size of ITEM's rectangle (clamped) along AXIS."
+  (let ((int-size (round size))
+        (rect (rectangle item)))
+    (case axis
+      (:row (setf (h rect) (clamp int-size (min-height item) (max-height item)))) ; Main axis row -> Cross axis H
+      (:column (setf (w rect) (clamp int-size (min-width item) (max-width item)))) ; Main axis column -> Cross axis W
+      (otherwise (error "Unsupported axis: ~a" axis)))))
 
 ;; Generic size accessors based on axis (useful internally)
 (defun get-main-size (entity main-axis)
   "Return the main-size slot value of ENTITY (flex-item or flex-line)."
-   (declare (ignore main-axis)) ; Main-size slot is independent of axis
-   (main-size entity))
+  (declare (ignore main-axis)) ; Main-size slot is independent of axis
+  (main-size entity))
 
 (defun set-main-size (entity size main-axis)
   "Set ENTITY's main-size slot."
@@ -442,13 +442,13 @@
       (otherwise 0))))
 
 (defun derive-available-cross-size (container)
-    "Return the container's available size along its cross-axis from its rectangle."
-    (let ((axis (main-axis container))
-          (rect (rectangle container)))
-      (case axis
-        ((:row :row-reverse) (h rect)) ; Cross axis is height for row
-        ((:column :column-reverse) (w rect)) ; Cross axis is width for column
-        (otherwise 0))))
+  "Return the container's available size along its cross-axis from its rectangle."
+  (let ((axis (main-axis container))
+        (rect (rectangle container)))
+    (case axis
+      ((:row :row-reverse) (h rect)) ; Cross axis is height for row
+      ((:column :column-reverse) (w rect)) ; Cross axis is width for column
+      (otherwise 0))))
 
 (defun axis->direction (axis)
   "Map :x to :row and :y to :column, or return valid flex direction."
@@ -549,7 +549,7 @@
                                                         (reduce #'max current-line-items :key (lambda (it) (get-cross-size it main-axis)))
                                                         0))
                          lines))
-                 (return (reverse lines))))))) ; Return lines in logical order
+                 (return (reverse lines)))))) ; Return lines in logical order
 
 ;;; ----------------------------------------------------------------------------
 ;;; 3. MAIN AXIS ALIGNMENT (Justify Content)
@@ -644,7 +644,7 @@
 
     ;; Ensure cross sizes are non-negative after potential stretching
     (dolist (line lines)
-      (setf (cross-size line) (max 0.0 (cross-size line)))))
+      (setf (cross-size line) (max 0.0 (cross-size line))))))
 
 (defun align-items-in-line (line line-cross-pos line-cross-size container main-axis)
   "Align items within a single flex line on the cross axis."
@@ -774,11 +774,11 @@
       ;; 6. Finalize container's own cross-size based on lines (if wrapping)
       ;; This might be redundant if the container's size is fixed, but useful if it's content-sized.
       (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
-          (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
-             ;; Decide if we should update the container's rectangle height/width
-             ;; For now, assume container size is fixed by parent layout or initial state.
-             ;; (set-flex-item-cross-size container total-lines-cross-size main-axis)
-             ))
+        (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
+          ;; Decide if we should update the container's rectangle height/width
+          ;; For now, assume container size is fixed by parent layout or initial state.
+          ;; (set-flex-item-cross-size container total-lines-cross-size main-axis)
+          ))
 
       ;; 7. Add container's own position offset to all children
       (let ((offset-x (x container))
@@ -787,4 +787,4 @@
           (dx! (rectangle item) offset-x)
           (dy! (rectangle item) offset-y)))
 
-      container)))) ; Return the laid-out container
+      container))) ; Return the laid-out container

@@ -3,11 +3,10 @@
 ;;; Composite Widgets
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.composite
-  (:use :cl
-        :elmtui.ui.base
-        :elmtui.view.core) ; For ui-node
+  (:use :cl :elmtui.ui.base :elmtui.view.core) ; Keep :use for elm-widget class
+  (:import-from :elmtui.ui.base #:widget-id #:widget-props #:widget-children #:widget-render) ; Explicitly import accessors/generics
   (:export :form-widget
-           :list-widget))
+   :list-widget))
 (in-package :elmtui.ui.composite)
 
 ;;;---------------------------------------------------------------
@@ -20,7 +19,7 @@
    Contract: implements init/update/render per base API.
    Renders its children within a container. Layout is determined by styles."))
 
-(defmethod widget-render ((w form-widget))
+(defmethod widget-render ((w form-widget) &key &allow-other-keys)
   "Renders the form by rendering its children within a container node.
    Adds a 'form' class for styling."
   (let ((child-nodes (mapcar #'widget-render (widget-children w))))
@@ -28,7 +27,7 @@
                   :props (list* :class "form" :widget-id (widget-id w) (widget-props w))
                   :children child-nodes)))
 
-(defmethod widget-update ((w form-widget) msg)
+(defmethod widget-update ((w form-widget) msg &key &allow-other-keys)
   "Handles messages, potentially delegating to children.
    Succinct version: Does nothing for now."
   (declare (ignore msg))
@@ -48,7 +47,7 @@
    Contract: implements init/update/render per base API.
    Renders its children (items) within a container. Scrollability requires platform support."))
 
-(defmethod widget-render ((w list-widget))
+(defmethod widget-render ((w list-widget) &key &allow-other-keys)
   "Renders the list by rendering its children within a container node.
    Adds a 'list' class for styling. Assumes children are widgets."
   (let ((item-nodes (mapcar #'widget-render (widget-children w))))
@@ -57,7 +56,7 @@
                   :props (list* :class "list" :widget-id (widget-id w) (widget-props w))
                   :children item-nodes)))
 
-(defmethod widget-update ((w list-widget) msg)
+(defmethod widget-update ((w list-widget) msg &key &allow-other-keys)
   "Handles messages, potentially for selection, scrolling.
    Succinct version: Does nothing for now."
   (declare (ignore msg))

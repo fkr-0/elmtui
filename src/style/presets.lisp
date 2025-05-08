@@ -3,18 +3,18 @@
 ;;; Style Presets (Themes)
 (uiop:define-package :elmtui.style.presets
   (:use :cl
-        :cl-styles.styles   ;; default-styles generic
-        :cl-styles.sheet)   ;; defstylesheet macro
+   :elmtui.style-lib.api
+   )   ;; defstylesheet macro
   (:export :dark-theme
-           :light-theme))
+   :light-theme))
 (in-package :elmtui.style.presets)
 
 (defparameter dark-theme
   (make-instance 'stylesheet
-    :rules (default-styles :dark))
+                 :rules '())
   "Predefined dark theme style rules.")
 
 (defparameter light-theme
   (make-instance 'stylesheet
-    :rules (default-styles :light))
+                 :rules '())
   "Predefined light theme style rules.")

@@ -1,6 +1,6 @@
 ;;; ───────────────────────── 2. Selector Engine ──────────────────────────
-(uiop:define-package :cl-styles.selector
-  (:use :cl :cl-styles.util :cl-styles.types)
+(uiop:define-package :elmtui.style-lib.selector
+  (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types :elmtui.style-lib.api)
   (:export
    ;; selector classes
    :selector :class-selector :id-selector :lisp-class-selector
@@ -10,7 +10,7 @@
    ;; API
    :selects :specificity))
 
-(in-package :cl-styles.selector)
+(in-package :elmtui.style-lib.selector)
 
 (defclass selector () ())
 

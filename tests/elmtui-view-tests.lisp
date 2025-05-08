@@ -74,5 +74,5 @@
     (is (= (style-value child :font-size) 12))))
 
 ;;; Run all tests
-#-asdf
-(run! 'view-tests)
+;;; #-asdf
+;;; (run! 'view-tests) ; Now handled by elmtui-all-tests:run-all-elmtui-tests

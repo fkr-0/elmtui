@@ -10,7 +10,14 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (uiop:define-package :elmtui.dev
     (:use :cl :elmtui.core.events :elmtui.core.conditions :elmtui.view.core
-          :elmtui.view.layout :elmtui.view.styled :elmtui.view.layout.grid)))
+          :elmtui.view.layout :elmtui.view.styled :elmtui.view.layout.grid
+          :elmtui.view.geo) ; Added :elmtui.view.geo
+    (:export :example-flexbox-layout
+     :example-grid-layout
+             :send-foo-message
+     :dev-main
+             :run-faulty-async
+     :demo-event-loop)))
 
 (in-package :elmtui.dev)
 
@@ -26,7 +33,7 @@
          (container (make-styled-node :type :container
                                       :props '(:display :flex :flex-direction :row)
                                       :children (list child1 child2 child3)))
-         (screen-rect (make-rectangle :x 0 :y 0 :w 800 :h 600)))
+         (screen-rect (make-instance 'rectangle :x 0 :y 0 :w 800 :h 600))) ; Use make-instance
     (layout-tree container screen-rect)
     (format t "Flexbox Layout Example:~%")
     (dolist (child (ui-node-children container))
@@ -50,7 +57,7 @@
                                                :grid-template-columns '(:fr 1 :fr 2 :fr 1)
                                                :grid-template-rows '(:auto :auto :auto))
                                       :children (list child1 child2 child3 child4)))
-         (screen-rect (make-rectangle :x 0 :y 0 :w 800 :h 600)))
+         (screen-rect (make-instance 'rectangle :x 0 :y 0 :w 800 :h 600))) ; Use make-instance
     (layout-tree container screen-rect)
     (format t "Grid Layout Example:~%")
     (dolist (child (ui-node-children container))
@@ -105,6 +112,7 @@
   "Start event loop, add subscriber, publish events, and handle errors."
   (elmtui.core.loop:start-loop)
   (let ((token (elmtui.core.loop:subscribe :demo #'my-event-handler)))
+    (declare (ignore token)) ; Ignore unused variable
     ;; Publish valid event
     (elmtui.core.loop:publish (elmtui.core.events:make-message :demo :ok))
     ;; Publish event that triggers handler error (handled by conditions)
@@ -122,3 +130,6 @@
 ;; - DRY restart macros allow interactive or programmatic recovery from errors.
 ;; - Async tasks and event loop handlers are robust to errors, supporting rollback, replacement, and custom results.
 ;; - All critical operations are instrumented and log failures for debugging.
+
+(defun dev-main ()
+  (format t "Running ElmTUI Dev Examples...~%"))

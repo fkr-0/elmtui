@@ -14,7 +14,7 @@
            #:move! #:overlap #:polygon #:pos #:rect-diff #:rectangle
            #:make-instance
            #:pos-x #:pos-y #:rectangle-size #:rectangle-pos
-
+           #:clamp ; Added clamp
            #:rectangle-pos #:rectangle-union-list
            #:resize-dimension! #:rotate #:scale #:shrink-view!
            #:size #:translate #:triangle #:valid-p #:w #:x #:x2 #:y
@@ -39,7 +39,7 @@
 (defmethod =? ((a list) (b list))
   "Check if two lists are equal by comparing lengths and elements recursively using =?."
   (and (= (length a) (length b))
-       (every #'= ? a b)))
+       (every #'=? a b)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Struct Definitions
@@ -72,6 +72,7 @@
   "Check if two rectangle structs are equal."
   (and (=? (rectangle-pos a) (rectangle-pos b))
        (=? (rectangle-size a) (rectangle-size b))))
+
 
 
 ;;;-----------------------------------------------------------------------------
@@ -206,7 +207,6 @@
 (defmethod w ((s size)) (size-w s))
 (defmethod h ((s size)) (size-h s))
 (defmethod (setf w) (new-value (s size)) (setf (size-w s) new-value))
-(defmethod (setf h) (new-value (s size)) (setf (size-h s) new-value))
 
 ;; Accessors (Rectangle)
 (defmethod pos ((r rectangle)) (rectangle-pos r))
@@ -368,12 +368,13 @@
 
 ;; Contains Point
 (defmethod contains-p ((r rectangle) (p pos))
-  "Check if the rectangle contains the position."
-  (and (<= (x r) (x p) (< (x p) (x2 r))) ; Use < for x2/y2 for exclusive upper bound
-       (<= (y r) (y p) (< (y p) (y2 r)))))
+  "Check if the rectangle contains the position.
+"
+  (and (<= (x r) (x p)) (< (x p) (x2 r)) ; Use < for x2/y2 for exclusive upper bound
+       (<= (y r) (y p)) (< (y p) (y2 r))))
 
 (defmethod contains-p ((r rectangle) (p list))
-  "Check if the rectangle contains the position specified as (x y) list."
+  "Check if the rectangle contains the point specified as (x y) list."
   (and (= (length p) 2)
        (every #'numberp p)
        (contains-p r (make-instance 'pos :x (first p) :y (second p)))))
@@ -494,6 +495,16 @@
         (:right (make-border (- (+ x w) width) y width h))
         (otherwise (error "Invalid border side: ~A" side))))))
 
+;;;-----------------------------------------------------------------------------
+;;; Clamp Function
+;;;-----------------------------------------------------------------------------
+(defun clamp (value min max)
+ "Clamps VALUE to be within the range [MIN, MAX]."
+ (cond
+   ((> min max) (error "Clamp: min (~A) cannot be greater than max (~A)." min max))
+   ((< value min) min)
+   ((> value max) max)
+   (t value)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Printing

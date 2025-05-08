@@ -3,32 +3,43 @@
 ;;; Comprehensive Elm State Management (Transactional, Observable, Thread-safe)
 (uiop:define-package :elmtui.state
   (:use :cl)
-  (:import-from :uncharming-tui.state.state
-    :application-state :make-application-state :state-ref :get-state :set-state
-    :merge-state :with-state :with-comp-state :state-if-unset-else
-    :application-state-observers :application-state-lock
-    :application-state-transaction-log :application-state-transaction-history
-    :log-state-data)
-  (:import-from :uncharming-tui.state.transaction
-    :start-transaction :commit-transaction :rollback-transaction
-    :transaction-open-p :with-transaction)
-  (:import-from :uncharming-tui.state.observe
-    ;; :subscribe-to-state :unsubscribe-from-state
-    )
+  (:import-from :elmtui.statelib.state
+   :application-state :make-application-state :state-ref :get-state :set-state
+                :merge-state :with-state :with-comp-state :state-if-unset-else
+                :application-state-observers :application-state-lock
+                :application-state-transaction-log :application-state-transaction-history
+                :log-state-data)
+  (:import-from :elmtui.statelib.transaction
+   :start-transaction :commit-transaction :rollback-transaction
+                :transaction-open-p :with-transaction)
+  (:import-from :elmtui.statelib.observe
+                ;; :subscribe-to-state :unsubscribe-from-state
+                )
   (:export
-    ;; Core state types and accessors
-    :application-state :make-application-state :state-ref :get-state :set-state
-    :merge-state :with-state :with-comp-state :state-if-unset-else
-    :application-state-observers :application-state-lock
-    :application-state-transaction-log :application-state-transaction-history
-    :log-state-data
-    ;; Transactions
-    :start-transaction :commit-transaction :rollback-transaction
-    :transaction-open-p :with-transaction
-    ;; Observability (future: subscribe-to-state, unsubscribe-from-state)
-    ))
+   ;; Core state types and accessors
+   :application-state :make-application-state :state-ref :get-state :set-state
+   :merge-state :with-state :with-comp-state :state-if-unset-else
+   :application-state-observers :application-state-lock
+   :application-state-transaction-log :application-state-transaction-history
+   :log-state-data
+   ;; Transactions
+   :start-transaction :commit-transaction :rollback-transaction
+   :transaction-open-p :with-transaction
+   ;; Observability (future: subscribe-to-state, unsubscribe-from-state)
+   :*app-state* ; Export the global state variable
+   :rollback-state ; Export the rollback function
+   ))
 
 (in-package :elmtui.state)
+
+;; Define the global application state instance
+(defvar *app-state* (make-application-state)
+  "The global application state instance.")
+
+;; Define the rollback function expected by with-async-restarts
+(defun rollback-state ()
+  "Rolls back the last transaction on the global *app-state*."
+  (undo-last-transaction *app-state*))
 
 ;;; API CONTRACTS:
 ;; - All state is stored in an application-state struct (hash-table-based, thread-safe).

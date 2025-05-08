@@ -1,18 +1,18 @@
-(uiop:define-package ::cl-styles.rule (:nicknames :styles.rule)
+(uiop:define-package ::elmtui.style-lib.rule (:nicknames :styles.rule)
                      (:use :common-lisp)
-                     (:import-from :cl-styles.api :style-rule :rule-selector
+                     (:import-from :elmtui.style-lib.api :style-rule :rule-selector
                       :rule-styles)
-                     (:import-from :cl-styles.util :hash-table-keys)
-                     (:import-from :cl-styles.style-set :style-set :styles-list
+                     (:import-from :elmtui.style-lib.util :hash-table-keys)
+                     (:import-from :elmtui.style-lib.style-set :style-set :styles-list
                       :new :style-set-styles :style-of :merge-styles!)
-                     (:import-from :cl-styles.selector :selector)
-                     (:import-from :cl-styles.api :tuple-prop :style-p
+                     (:import-from :elmtui.style-lib.selector :selector)
+                     (:import-from :elmtui.style-lib.api :tuple-prop :style-p
                       :style-property :value-value :style :style-val
                       :group-styles :make-default-styling :valid-style-value-p
                                    :apply-after :ordered-styles :make-style)
                      (:export :new :defrule))
 
-(in-package :cl-styles.rule)
+(in-package :elmtui.style-lib.rule)
 
 
 

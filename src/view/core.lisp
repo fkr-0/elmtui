@@ -3,8 +3,8 @@
 ;;; View Definition, UI Node & Composition DSL
 (uiop:define-package :elmtui.view.core
   (:use :cl)
-  (:import-from :elmtui.view.layout
-                :layout-vbox :layout-hbox)
+  ;; (:import-from :elmtui.view.layout
+  ;;               :layout-vbox :layout-hbox)
   (:export
    ;; Core Types
    :ui-node :ui-node-p :make-ui-node :copy-ui-node
@@ -28,12 +28,17 @@
 ;;; UI Node Definition & Operations
 ;;;-----------------------------------------------------------------------------
 
-(defstruct (ui-node (:constructor %make-ui-node))
-  "Intermediate tree node: type, props, children.
-   Contract: type (:text|:container|:vbox|:hbox|:widget), props plist, children list."
-  (type nil :type symbol)      ; Node type (:text, :container, etc.)
-  (props nil :type list)       ; Property list (layout, style, etc.)
-  (children nil :type list))   ; List of child ui-nodes
+(defclass ui-node ()
+  ((type :initarg :type :accessor ui-node-type :initform nil :type symbol)
+   (props :initarg :props :accessor ui-node-props :initform nil :type list)
+   (children :initarg :children :accessor ui-node-children :initform nil :type list))
+  (:documentation "Intermediate tree node: type, props, children.
+    Contract: type (:text|:container|:vbox|:hbox|:widget), props plist, children list."))
+
+;; Define the predicate function
+(defun ui-node-p (object)
+  "Returns T if OBJECT is a ui-node, NIL otherwise."
+  (typep object 'ui-node))
 
 (defun make-ui-node (&key type props children)
   "Create a new ui-node with validation."
@@ -41,8 +46,10 @@
   (check-type props list)
   (check-type children list)
   (assert (evenp (length props)) (props) "Props must be a valid property list")
+  ;; Ensure ui-node-p is defined before this assertion runs
   (assert (every #'ui-node-p children) (children) "Children must be ui-nodes")
-  (%make-ui-node :type type :props props :children children))
+  ;; Use make-instance instead of undefined %make-ui-node
+  (make-instance 'ui-node :type type :props props :children children))
 
 (defun copy-ui-node (node &key type props children)
   "Create a copy of NODE with optional overrides."
@@ -79,13 +86,17 @@
   "Merge multiple property lists, later values override earlier ones."
   (loop with result = (copy-list base-props)
         for props in prop-lists do
-        (loop for (key value) on props by #'cddr
-              do (setf (getf result key) value))
+          (loop for (key value) on props by #'cddr
+                do (setf (getf result key) value))
         finally (return result)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Node Creation DSL
 ;;;-----------------------------------------------------------------------------
+
+;; Define the special variable used by with-view-context
+(defvar *default-props* nil
+  "Dynamically bound variable holding default properties for node creation.")
 
 (defmacro with-view-context ((&key props) &body body)
   "Establish a view context with default properties."
@@ -97,16 +108,16 @@
   "Define a function to create a node of TYPE with given props and children."
   `(defun ,name (&rest args &key props &allow-other-keys)
      (let* ((children (loop for arg in args
-                           when (and (not (keywordp arg))
-                                   (not (and (car args) (keywordp (car args)))))
-                           collect arg))
+                            when (and (not (keywordp arg))
+                                      (not (and (car args) (keywordp (car args)))))
+                              collect arg))
             (explicit-props (loop for (key val) on args by #'cddr
-                                when (and (keywordp key) (not (eq key :props)))
-                                nconc (list key val)))
+                                  when (and (keywordp key) (not (eq key :props)))
+                                    nconc (list key val)))
             (final-props (merge-props
-                         (or (and (boundp '*default-props*) *default-props*) nil)
-                         props
-                         explicit-props)))
+                          (or (and (boundp '*default-props*) *default-props*) nil)
+                          props
+                          explicit-props)))
        (make-ui-node :type ,type
                      :props final-props
                      :children children))))
@@ -142,8 +153,8 @@
 (defmacro with-props ((&rest props) node)
   "Add or override properties on NODE."
   `(update-props ,node
-                (lambda (current-props)
-                  (merge-props current-props (list ,@props)))))
+    (lambda (current-props)
+      (merge-props current-props (list ,@props)))))
 
 (defmacro with-children (children node)
   "Set children of NODE."

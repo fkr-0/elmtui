@@ -1,11 +1,11 @@
-(uiop:define-package :cl-styles.styled-strings
+(uiop:define-package :elmtui.style-lib.styled-strings
   (:nicknames :styles.ss) (:use :common-lisp)
   (:import-from :str :upcase :split :join :trim :fit :concat
     :numericp)
   (:export :styled-string :parse-string :parse-style-string
     :make-styled-string))
 
-(in-package :cl-styles.styled-strings)
+(in-package :elmtui.style-lib.styled-strings)
 
 ;; ====================
 ;; = Styled strings   =

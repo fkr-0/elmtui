@@ -1,19 +1,19 @@
 ;;; ───────────────────────── 5. Stylable  ─────────────────────────────────
-(uiop:define-package :cl-styles.stylable
-  (:use :cl :cl-styles.util :cl-styles.types :cl-styles.style-set)
-  (:import-from :cl-styles.style-set
+(uiop:define-package :elmtui.style-lib.stylable
+  (:use :cl :elmtui.style-lib.util :elmtui.style-lib.api :elmtui.style-lib.style-set)
+  (:import-from :elmtui.style-lib.style-set
    :style-set-styles :set-style :value-raw :copy-set)
-  (:import-from :cl-styles.types
-   :stylable :stylable-id :classes :parents-of)
+  (:import-from :elmtui.style-lib.api :dirty-p
+                :stylable :stylable-id :classes :parents-of)
 
   (:export :stylable :styles :stylable-id :classes :parents-of :dirty :dirty-p))
 
-(in-package :cl-styles.stylable)
+(in-package :elmtui.style-lib.stylable)
 
-(defclass stylable (cl-styles.types:stylable)
+(defclass stylable-impl (elmtui.style-lib.api:stylable)
   ((sid     :initarg :id      :accessor stylable-id)
    (classes :initarg :classes :initform nil :accessor classes)
-   (styles  :accessor styles :initform (copy-set cl-styles.style-set::*default-style-set*))
+   (styles  :accessor styles :initform (copy-set elmtui.style-lib.style-set::*default-style-set*))
    (parents :initarg :parents :initform nil :accessor parents-of)
    (dirty   :initform t :accessor dirty)))
 

@@ -1,14 +1,14 @@
-(uiop:define-package :uncharming-tui.state.observe
+(uiop:define-package :elmtui.statelib.observe
   (:nicknames :ut.state.observe)
   (:use :cl :log4cl)
-  (:import-from :ut.state.state
-    :application-state :application-state-observers :application-state-lock)
+  (:import-from :elmtui.statelib.state
+   :application-state :application-state-observers :application-state-lock)
   (:export
-    :observer ; Exporting struct name
-    :observer-key :observer-callback :observer-id ; Exporting accessors
-    :add-observer
-    :remove-observer
-    :notify-observers)) ; Exporting the notification function
+   :observer ; Exporting struct name
+   :observer-key :observer-callback :observer-id ; Exporting accessors
+   :add-observer
+   :remove-observer
+   :notify-observers)) ; Exporting the notification function
 
 (in-package :ut.state.observe)
 

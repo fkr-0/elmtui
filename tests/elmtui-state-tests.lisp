@@ -5,7 +5,7 @@
 (defpackage :elmtui-state-tests
   (:use :cl :fiveam
         :elmtui.state.model
-        :elmtui.state.msg
+   :elmtui.state.msg
         :elmtui.state.update))
 
 (in-package :elmtui-state-tests)
@@ -14,10 +14,14 @@
 (in-suite step3-state)
 
 ;;; 1. defmodel macro: struct creation and slot defaults
-(defmodel test-model
-  (foo :initform 1)
-  (bar :initform "baz"))
+;; (defmodel test-model
+;;     (foo 2 )
+;;     (bar :initform "baz"))
 
+(defmodel counter (:docstring "A simple counter model"
+                   :observe-changes-default-callback my-model-observer)
+          (count :type integer :initform 0 :validate plusp :observe t) ; Observe count
+          (label :type string :initform "Clicks")) ; Don't observe label
 (test defmodel-struct-creation
   (let ((m (make-test-model)))
     (is (= (test-model-foo m) 1))
@@ -25,9 +29,9 @@
 
 ;;; 2. defmsg macro: constant creation and variant registration
 (defmsg test-msg
-  foo
-  bar
-  baz)
+    :foo nil
+    :bar
+    :bazz )
 
 (test defmsg-constant-creation
   (is (boundp 'TEST-MSG))
@@ -43,5 +47,5 @@
       (is (= (first result) 42)))))
 
 ;;; Run all tests
-#-asdf
-(run! 'step3-state)
+;;; #-asdf
+;;; (run! 'step3-state) ; Now handled by elmtui-all-tests:run-all-elmtui-tests
