@@ -84,12 +84,70 @@
 
 ;; (defmsg counter-msg inc dec reset)
 
-;; (defupdate update-counter (app-state msg)
-;;   (case msg
-;;     (inc (incf (elmtui.state:state-ref app-state 'value)))
-;;     (dec (decf (elmtui.state:state-ref app-state 'value)))
-;;     (reset (setf (elmtui.state:state-ref app-state 'value) 0)))
-;;   app-state)
+(defupdate main-update (app-state msg)
+  "Main application update function. Handles messages and updates state.
+   Returns a list of commands."
+  ;; Import set-state! locally for convenience if not already available
+  ;; Note: defupdate already provides a local set-state! macro.
+  ;; Importing it here might be redundant or cause conflicts depending on package setup.
+  ;; Assuming the local macro from defupdate is sufficient.
+  ;; (:import-from :ut.state.state #:set-state!)
+
+  (let ((msg-type (if (listp msg) (first msg) msg))
+        (msg-data (when (listp msg) (rest msg))))
+
+    ;; --- Focus Management ---
+    (case msg-type
+      (:request-focus
+       (let ((widget-id (getf msg-data :widget-id)))
+         ;; TODO: Validate widget-id exists in focusable list?
+         (set-state! :focused-widget-id widget-id)) ; Uses local set-state! from defupdate
+       (return-from main-update nil)) ; Return nil commands
+
+      (:focus-next
+       (let* ((current-focus (state-ref app-state :focused-widget-id))
+              ;; TODO: :focusable-widget-ids needs to be updated dynamically,
+              ;; likely after view rendering. This list might be stale.
+              (focusable-ids (state-ref app-state :focusable-widget-ids))
+              (current-pos (position current-focus focusable-ids :test #'equal)))
+         (when focusable-ids
+           (let* ((next-pos (if (or (null current-pos) (= current-pos (1- (length focusable-ids))))
+                                0 ; Wrap to start
+                                (1+ current-pos)))
+                  (next-id (nth next-pos focusable-ids)))
+             (set-state! :focused-widget-id next-id)))) ; Uses local set-state!
+       (return-from main-update nil)) ; Return nil commands
+
+      (:focus-previous
+       (let* ((current-focus (state-ref app-state :focused-widget-id))
+              (focusable-ids (state-ref app-state :focusable-widget-ids))
+              (current-pos (position current-focus focusable-ids :test #'equal)))
+         (when focusable-ids
+           (let* ((prev-pos (if (or (null current-pos) (zerop current-pos))
+                                (1- (length focusable-ids)) ; Wrap to end
+                                (1- current-pos)))
+                  (prev-id (nth prev-pos focusable-ids)))
+             (set-state! :focused-widget-id prev-id)))) ; Uses local set-state!
+       (return-from main-update nil))) ; Return nil commands
+
+    ;; --- Other Message Handling (Example) ---
+    ;; TODO: Integrate component updates (e.g., calling update-button, update-textinput)
+    ;; This likely involves checking msg-type or a target ID in msg-data.
+    (case msg-type
+      (:increment ; Example adapted from original commented code
+       (set-state! :counter (1+ (or (state-ref app-state :counter) 0))))
+      (:decrement
+       (set-state! :counter (1- (or (state-ref app-state :counter) 0))))
+      ;; --- Internal State Updates ---
+      (:update-focusable-ids
+       (let ((new-ids (getf msg-data :ids)))
+         (set-state! :focusable-widget-ids new-ids)))
+      ;; Add other message handlers here...
+      (otherwise
+       (log:warn "Unhandled message type in main-update: ~S" msg-type)))
+
+    ;; TODO: Return appropriate commands based on updates
+    nil)) ; Default return no commands
 
 ;;; CONTRACTS:
 ;; - All models are hash-table based, with schema-driven validation and defaulting.

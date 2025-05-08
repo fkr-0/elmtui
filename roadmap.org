@@ -65,9 +65,9 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [x] Implement message sending with error handling (=send-message=, =with-recovery=).
     - [x] Basic message logging (=log-message=).
     - [x] Basic S-expression serialization/deserialization with error handling.
-    - [ ] TODO: Richer message contract registration (runtime/macro).
+    - [PARTIAL] TODO: Richer message contract registration (runtime/macro). (Enhanced `validate-message` to use `defmsg` schemas)
     - [ ] TODO: Advanced message priorities/filtering/replay/deduplication.
-    - [ ] TODO: Message lifecycle hooks.
+    - [x] TODO: Message lifecycle hooks.
 
 *** 2. Event Loop & Async Interpreter (=src/core/loop.lisp=, =src/core/async.lisp=)
     - [x] Implement event loop based on =clevelib.event-loop= (=start-loop=, =stop-loop=).
@@ -78,7 +78,7 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [x] Integrate async error handling with condition system (=with-async-restarts=).
     - [x] Define dynamic =*app-sender*= for runtime communication (now in =globals.lisp=).
     - [PARTIAL] Async task progress reporting mechanism (requires runtime binding of =*app-sender*=).
-    - [ ] TODO: Dynamic subscriber removal (=unsubscribe=).
+    - [x] TODO: Dynamic subscriber removal (=unsubscribe=).
     - [ ] TODO: Advanced instrumentation, pausing, queue inspection.
 
 *** 3. State Management & Elm Integration (=src/state/=, =src/statelib/=)
@@ -94,19 +94,34 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [x] Define =defmsg= macro for message variant definition (generates constructors, registers schema).
     - [x] Define =defupdate= macro for transactional updates (provides local =set-state!=).
     - [x] Define global =*app-state*= and =rollback-state= function (used by =with-async-restarts=).
-    - [PARTIAL] Documentation for new state workflow (Docstrings updated, initial =state-management.md=).
-    - [ ] TODO: Refine state management documentation and examples.
-    - [ ] TODO: Add tests for transactions, observers, undo/redo.
+    - [PARTIAL] Documentation for new state workflow (Docstrings updated, initial =state-management.md= updated with focus details).
+    - [PARTIAL] TODO: Refine state management documentation and examples. (Focus management added, needs more examples)
+    - [x] TODO: Add tests for transactions, observers, undo/redo.
     - [ ] TODO: Advanced observer features (filtering, dependencies).
     - [ ] TODO: State introspection/debugging tools.
 
-*** 4. Architecture Refactoring (UI)
-    - [ ] *NEXT*: Refactor =src/ui/primitives.lisp= and =src/ui/composite.lisp= to use the Elm-style Model/Msg/Update/View pattern.
-      - Remove =defclass= definitions for =button-widget=, =label-widget=, =input-widget=, =form-widget=, =list-widget=.
-      - Define corresponding model structs (e.g., =button-model=).
-      - Define =init-=, =update-=, =view-= functions for each widget.
-      - Update call sites (e.g., in tests or example code) to use the new functions.
-    - [ ] *NEXT*: Remove the =elm-widget= class and related generics/accessors from =src/ui/base.lisp= once primitives/composites are refactored.
+*** 4. Architecture Refactoring (UI) [COMPLETED]
+    - [x] Refactor =src/ui/primitives.lisp= and =src/ui/composite.lisp= to use the Elm-style Model/Msg/Update/View pattern.
+      - [x] Remove =defclass= definitions for =button-widget=, =label-widget=, =input-widget=, =form-widget=, =list-widget=.
+        - =button-widget= class removed.
+        - =label-widget= class removed.
+        - =input-widget= class removed.
+        - =form-widget= class removed.
+        - =list-widget= class removed.
+      - [x] Define corresponding model structs (e.g., =button-model=).
+        - =button-model= defined in =src/ui/widgets/button.lisp=.
+        - =label-model= defined in =src/ui/widgets/label.lisp=.
+        - =textinput-model= defined in =src/ui/widgets/textinput.lisp=.
+        - =form-model= defined in =src/ui/widgets/form.lisp=.
+        - =listbox-model= defined in =src/ui/widgets/listbox.lisp=.
+      - [x] Define =init-=, =update-=, =view-= functions for each widget.
+        - =init-button=, =update-button=, =view-button= defined in =src/ui/widgets/button.lisp=.
+        - =init-label=, =update-label=, =view-label= defined in =src/ui/widgets/label.lisp=.
+        - =init-textinput=, =update-textinput=, =view-textinput= defined in =src/ui/widgets/textinput.lisp=.
+        - =init-form=, =update-form=, =view-form= defined in =src/ui/widgets/form.lisp=.
+        - =init-listbox=, =update-listbox=, =view-listbox= defined in =src/ui/widgets/listbox.lisp=.
+      - [PARTIAL] TODO: Update call sites (e.g., in tests or example code) to use the new functions. (Basic tests added in =tests/elmtui-widget-tests.lisp=)
+    - [x] Remove the =elm-widget= class and related generics/accessors from =src/ui/base.lisp= once primitives/composites are refactored.
 
 *** 5. View System & Layout (=src/view/=)
     - [x] Define core =ui-node= class and operations (=make-ui-node=, =copy-ui-node=, =ui-node-p=, accessors).
@@ -126,15 +141,18 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [ ] TODO: Document view composition and DSL usage.
 
 *** 6. Widget Library (=src/ui/widgets/=)
-    - [PARTIAL] Implement widgets using Elm Architecture pattern (Refactoring pending, see Section 4).
-      - Current code uses temporary class-based approach.
-      - Basic models/update/view logic exists but needs alignment with TEA.
+    - [x] Implement widgets using Elm Architecture pattern (Refactoring completed, see Section 4).
+      - =button= widget refactored to Elm pattern in =src/ui/widgets/button.lisp=.
+      - =label= widget refactored to Elm pattern in =src/ui/widgets/label.lisp=.
+      - =input= (textinput) widget refactored to Elm pattern in =src/ui/widgets/textinput.lisp=.
+      - =form= widget refactored to Elm pattern in =src/ui/widgets/form.lisp=.
+      - =list= (listbox) widget refactored to Elm pattern in =src/ui/widgets/listbox.lisp=.
     - [x] Modular structure created (=src/ui/widgets/= directory).
     - [PARTIAL] Basic keyboard/scroll handling logic present (needs focus system).
     - [x] Accessibility roles/states added.
-    - [ ] TODO: Complete refactoring to Elm pattern (see Section 4).
-    - [ ] TODO: Implement robust focus management integration.
-    - [ ] TODO: Implement visual scrolling/cursor rendering.
+    - [x] Complete refactoring to Elm pattern (see Section 4).
+    - [PARTIAL] TODO: Implement robust focus management integration. (Update logic, view updates, focusable ID collection implemented; runtime integration pending)
+    - [PARTIAL] TODO: Implement visual scrolling/cursor rendering. (Listbox view updated for scrolling; TextInput view passes cursor info; Renderer implementation needed)
     - [ ] TODO: Widget registry for extensions.
     - [ ] TODO: Widget test harness.
     - [ ] TODO: Document widget authoring guidelines.
@@ -145,7 +163,7 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [x] Implement stylesheet querying (=query-stylesheet=).
     - [x] Define basic style properties (colors, attributes, padding, margin, flex, grid).
     - [PARTIAL] Specificity calculation and application implemented.
-    - [ ] TODO: Resolve remaining warnings (e.g., =STYLE= type warning).
+    - [x] TODO: Resolve remaining warnings (e.g., =STYLE= type warning). (Cleaned up duplicate/conflicting `style` class definitions in `api.lisp`)
     - [ ] TODO: Implement dynamic theme switching mechanism.
     - [ ] TODO: Implement style inheritance.
     - [ ] TODO: Live style reloading.
@@ -162,10 +180,10 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [ ] TODO: Document backend usage and implementation.
 
 *** 9. Runtime & Application Assembly (=src/runtime.lisp=)
-    - [PARTIAL] Basic =def-elm-app= macro stub exists.
-    - [ ] TODO: Implement full =def-elm-app= wiring (model, update, view, subscriptions).
+    - [PARTIAL] Basic =def-elm-app= macro stub exists. (Now implemented with basic wiring)
+    - [PARTIAL] TODO: Implement full =def-elm-app= wiring (model, update, view, subscriptions). (Basic wiring done; needs refinement for initial state, subscriptions)
     - [ ] TODO: Support hot-reloading.
-    - [ ] TODO: Implement clean shutdown.
+    - [PARTIAL] TODO: Implement clean shutdown. (Basic loop exit implemented)
     - [ ] TODO: REPL-driven workflow support.
     - [ ] TODO: Document application lifecycle.
 

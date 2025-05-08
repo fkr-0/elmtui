@@ -44,13 +44,19 @@
   (list :event-type event-type :handler handler :token (gensym "SUB-")))
 
 (defun unsubscribe (token)
-  "Stub: Remove a subscriber using its token. To be implemented for dynamic removal."
-  ;; Remove handler from *subscribers* for token's event-type
-  ;; (let ((handlers (gethash (getf token :event-type) *subscribers*)))
-  ;;   (setf (gethash (getf token :event-type) *subscribers*)
-  ;;         (remove (getf token :handler) handlers)))
-  (declare (ignore token))
-  (warn "unsubscribe: dynamic subscriber removal not yet implemented."))
+  "Remove a subscriber using its token.
+   TOKEN is a list like (:EVENT-TYPE type :HANDLER handler-fn :TOKEN unique-symbol).
+   Returns T if a handler was removed, NIL otherwise."
+  (when (and (listp token)
+             (getf token :event-type)
+             (getf token :handler))
+    (let* ((event-type (getf token :event-type))
+           (handler-to-remove (getf token :handler))
+           (current-handlers (gethash event-type *subscribers*)))
+      (when (member handler-to-remove current-handlers :test #'eq) ; Ensure handler is present
+        (setf (gethash event-type *subscribers*)
+              (remove handler-to-remove current-handlers :test #'eq :count 1)) ; Remove only one instance
+        t)))) ; Return T indicating successful removal
 
 (defun publish (event)
   "Publish EVENT to all subscribers of its type. Handles subscriber-handler-error."

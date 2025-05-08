@@ -139,15 +139,13 @@
   ((raw  :initarg :value :accessor value-raw)
    (type :initarg :type  :accessor value-type)
    (choices :initarg :choices :initform nil :accessor value-choices)))
-(defclass style ()
-  ((property :initarg :property :accessor style-property :type property)
-   (value    :initarg :value    :accessor style-value    :type value)))
+;; Removed duplicate/simpler style definition that was here.
 
 (defmethod style-property-of ((obj style))
   (intern (property-name (style-property obj)) 'keyword))
 (defmethod style-value-of ((s style))
   "Return the value of the style."
-  (value-raw (style-value s)))
+  (value-raw (style-value s))) ; Use style-value accessor now
 (defclass style-group (style)
   ((sub-styles :initarg :sub-styles :initform nil :accessor sub-styles)))
 
@@ -220,7 +218,7 @@
 
 (defclass style ()
   ((property :initarg :property :accessor style-property)
-   (value :initarg :value :accessor style-val)
+   (value :initarg :value :accessor style-value) ; Ensure accessor is style-value
    (default :initarg :default
             :accessor style-default
             :initform nil

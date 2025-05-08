@@ -5,8 +5,12 @@
 (uiop:define-package :elmtui.state.msg
   (:use :cl :alexandria :log4cl)
   (:export :defmsg :message-variant-p :*message-schemas*
-           ;; Potentially export message type names if needed elsewhere
-           :AppMsg :StateChangeMsg)) ; Example export
+           ;; Structs and their accessors for schema introspection
+           :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
+           :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
+           :arg-def #:arg-def-type #:arg-def-keyword
+           ;; Example message type names
+           :AppMsg :StateChangeMsg))
 (in-package :elmtui.state.msg)
 
 (defvar *message-schemas* (make-hash-table :test 'eq)
@@ -129,7 +133,9 @@
   ;; Input Event Messages (Mapped from platform backends)
   (KeyEvent :key symbol :char t :modifiers list) ; Changed type for :char to t
   (MouseEvent :type keyword :button integer :row integer :col integer :modifiers list)
-  (WindowResize :width integer :height integer))
+  (WindowResize :width integer :height integer)
+  ;; Internal message for updating focus list
+  (UpdateFocusableIds :ids list))
 
 
 ;; Example StateChangeMsg definition (Alternative to :state-changed in AppMsg)

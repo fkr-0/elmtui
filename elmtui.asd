@@ -81,6 +81,7 @@
                                            (:file "button")
                                            (:file "label")
                                            (:file "textinput")
+                                           (:file "form") ; Added form widget
                                            (:file "listbox")
                                            (:file "scrollable-container")))
                              ;; Load the main package file AFTER the individual widget files

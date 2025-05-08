@@ -13,7 +13,8 @@
                              (:file "elmtui-tests")
                              (:file "elmtui-loop-async-tests")
                              (:file "elmtui-state-tests")
-                             (:file "elmtui-view-tests"))))
+                             (:file "elmtui-view-tests")
+                             (:file "elmtui-widget-tests")))) ; Added new widget test file
 
   ;; The following would not return the right exit code on error, but still 0.
   ;; :perform (test-op (op _) (symbol-call :fiveam :run-all-tests))

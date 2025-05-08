@@ -16,7 +16,8 @@ Returns T if all tests pass, NIL otherwise."
         (suites-info '(("STEP1-EVENT-MESSAGE" . "ELMTUI-TESTS")
                        ("STEP2-LOOP-ASYNC" . "ELMTUI-LOOP-ASYNC-TESTS")
                        ("STEP3-STATE" . "ELMTUI-STATE-TESTS")
-                       ("VIEW-TESTS" . "ELMTUI-VIEW-TESTS"))))
+                       ("VIEW-TESTS" . "ELMTUI-VIEW-TESTS")
+                       ("WIDGET-TESTS" . "ELMTUI-WIDGET-TESTS")))) ; Added widget test suite
 
     (format t "~&~%Starting elmtui test execution...")
 

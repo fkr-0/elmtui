@@ -23,6 +23,61 @@
     (is (signals elmtui.core.conditions:message-validation-error
                  (validate-message msg-invalid)))))
 
+;;; 1.5 Schema-based message validation (using defmsg schemas)
+(defmsg schema-validation-msg (:docstring "Message type for schema validation tests")
+ NoArgsVariant
+ (TypedArgVariant :count integer :label string)
+ (OptionalArgVariant &key (id t) (activep boolean :initform t))) ; Assuming defmsg handles &key and initforms for schema
+
+(test schema-based-validation-correct
+ ;; Test with a message that conforms to the defmsg schema
+ (let ((msg-no-args (make-message 'schema-validation-msg '(:no-args-variant)))
+       (msg-typed-args (make-message 'schema-validation-msg '(:typed-arg-variant :count 123 :label "hello")))
+       (msg-optional-args (make-message 'schema-validation-msg '(:optional-arg-variant :id "test-id" :activep nil)))
+       (msg-optional-default (make-message 'schema-validation-msg '(:optional-arg-variant :id "another"))))
+
+   ;; Ensure no explicit contract is set for schema-validation-msg for these tests
+   (remhash 'schema-validation-msg elmtui.core.events::*message-contracts*)
+
+   (is (not (signals elmtui.core.conditions:message-validation-error
+                     (validate-message msg-no-args)))
+       "Correct NoArgsVariant should pass schema validation.")
+   (is (not (signals elmtui.core.conditions:message-validation-error
+                     (validate-message msg-typed-args)))
+       "Correct TypedArgVariant should pass schema validation.")
+   (is (not (signals elmtui.core.conditions:message-validation-error
+                     (validate-message msg-optional-args)))
+       "Correct OptionalArgVariant with all args should pass schema validation.")
+   (is (not (signals elmtui.core.conditions:message-validation-error
+                     (validate-message msg-optional-default)))
+       "Correct OptionalArgVariant with default for activep should pass.")))
+
+(test schema-based-validation-incorrect
+ ;; Ensure no explicit contract is set for schema-validation-msg for these tests
+ (remhash 'schema-validation-msg elmtui.core.events::*message-contracts*)
+
+ (let ((msg-unknown-variant (make-message 'schema-validation-msg '(:unknown-variant-for-schema)))
+       (msg-wrong-type (make-message 'schema-validation-msg '(:typed-arg-variant :count "not-an-int" :label "world")))
+       (msg-missing-arg (make-message 'schema-validation-msg '(:typed-arg-variant :count 456)))
+       (msg-extra-arg (make-message 'schema-validation-msg '(:no-args-variant :extra "data")))
+       (msg-not-a-list (make-message 'schema-validation-msg :no-args-variant))) ; Data is not a list
+
+   (is (signals elmtui.core.conditions:message-validation-error
+                (validate-message msg-unknown-variant))
+       "Unknown variant should fail schema validation.")
+   (is (signals elmtui.core.conditions:message-validation-error
+                (validate-message msg-wrong-type))
+       "Wrong argument type should fail schema validation.")
+   (is (signals elmtui.core.conditions:message-validation-error
+                (validate-message msg-missing-arg))
+       "Missing argument should fail schema validation.")
+   (is (signals elmtui.core.conditions:message-validation-error
+                (validate-message msg-extra-arg))
+       "Extra argument should fail schema validation (based on current validate-message-via-schema logic).")
+   (is (signals elmtui.core.conditions:message-validation-error
+                (validate-message msg-not-a-list))
+       "Message data not being a list should fail schema validation.")))
+
 ;;; 2. Message dispatch to handler
 (defvar *handler-called* nil)
 (defun test-handler (msg) (setf *handler-called* (message-data msg)))
@@ -31,9 +86,12 @@
     (setf *handler-called* nil)
     (let ((token (subscribe :bar #'test-handler)))
       (publish msg)
-      (is (= *handler-called* 42))
+      (is (= *handler-called* 42) "Handler should be called after subscribe and publish.")
       ;; Clean up
-      (unsubscribe token))))
+      (is (elmtui.core.loop:unsubscribe token) "Unsubscribe should return T for a valid token.")
+      (setf *handler-called* nil)
+      (publish msg) ; Publish again
+      (is (null *handler-called*) "Handler should not be called after unsubscribe."))))
 
 ;;; 3. Message dispatch with error and restart
 (defvar *error-handler-called* nil)
@@ -47,7 +105,7 @@
       (is (signals elmtui.core.conditions:subscriber-handler-error
                    (publish msg)))
       (is *error-handler-called*)
-      (unsubscribe token))))
+      (is (elmtui.core.loop:unsubscribe token) "Unsubscribe should return T for a valid token."))))
 
 ;;; 4. Message priorities (stub: correct registration)
 (test message-priority-registration
@@ -92,26 +150,56 @@
   ;; Check list not starting with keyword
   (is (not (message-variant-p 'test-construct-msg '(no-args)))))
 
-;;; 8. Message Lifecycle Hooks (Basic Check)
-;; Note: Testing exact hook call order might require more complex setup or mocks.
-;; This checks if the hook variables exist and can be modified.
-(defvar *test-before-hook-called* nil)
-(defvar *test-after-hook-called* nil)
-(defun test-before-hook (msg) (setf *test-before-hook-called* (message-type msg)))
-(defun test-after-hook (msg) (setf *test-after-hook-called* (message-type msg)))
+;;; 8. Message Lifecycle Hooks for send-message (Basic Check)
+(defvar *test-before-send-hook-args* nil)
+(defvar *test-after-send-hook-args* nil)
 
-(test message-lifecycle-hooks
-  (setf *test-before-hook-called* nil)
-  (setf *test-after-hook-called* nil)
-  (push #'test-before-hook elmtui.core.events::*before-publish-hooks*)
-  (push #'test-after-hook elmtui.core.events::*after-publish-hooks*)
-  (let ((msg (make-message :hook-test :data)))
-    (publish msg)
-    (is (eq *test-before-hook-called* :hook-test))
-    (is (eq *test-after-hook-called* :hook-test)))
-  ;; Clean up hooks
-  (setf elmtui.core.events::*before-publish-hooks* (remove #'test-before-hook elmtui.core.events::*before-publish-hooks*))
-  (setf elmtui.core.events::*after-publish-hooks* (remove #'test-after-hook elmtui.core.events::*after-publish-hooks*)))
+(defun test-before-send-hook (target msg)
+  (setf *test-before-send-hook-args* (list target (message-type msg))))
+
+(defun test-after-send-hook (target msg successp result)
+  (declare (ignore result))
+  (setf *test-after-send-hook-args* (list target (message-type msg) successp)))
+
+(test message-send-lifecycle-hooks
+  (let ((dummy-target (gensym "TARGET-"))
+        (msg (make-message :hook-test :data)))
+    ;; Mock on-message for the dummy target to avoid errors if it's not a real clevelib target
+    (let ((original-on-message (fdefinition 'clevelib.api:on-message)))
+      (setf (fdefinition 'clevelib.api:on-message)
+            (lambda (target message)
+              (declare (ignore target message))
+              ;; Simulate some processing result
+              :processed))
+      (unwind-protect
+           (progn
+             (setf *test-before-send-hook-args* nil)
+             (setf *test-after-send-hook-args* nil)
+             (add-before-send-message-hook #'test-before-send-hook)
+             (add-after-send-message-hook #'test-after-send-hook)
+
+             (send-message dummy-target msg)
+
+             (is (equal *test-before-send-hook-args* (list dummy-target :hook-test))
+                 "Before-send hook should be called with correct target and message type.")
+             (is (equal *test-after-send-hook-args* (list dummy-target :hook-test t))
+                 "After-send hook should be called with correct target, message type, and success status.")
+
+             ;; Test removal
+             (remove-before-send-message-hook #'test-before-send-hook)
+             (remove-after-send-message-hook #'test-after-send-hook)
+             (setf *test-before-send-hook-args* nil)
+             (setf *test-after-send-hook-args* nil)
+
+             (send-message dummy-target (make-message :hook-test-2 :more-data))
+
+             (is (null *test-before-send-hook-args*) "Before-send hook should not be called after removal.")
+             (is (null *test-after-send-hook-args*) "After-send hook should not be called after removal."))
+        ;; Restore original on-message
+        (setf (fdefinition 'clevelib.api:on-message) original-on-message)))
+    ;; Ensure hooks are clear for other tests if any error occurred
+    (setf elmtui.core.events::*before-send-message-hooks* nil)
+    (setf elmtui.core.events::*after-send-message-hooks* nil)))
 
 ;;; Run all tests
 ;;; #-asdf
