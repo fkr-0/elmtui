@@ -618,6 +618,7 @@
 
 (defun determine-line-cross-sizes (lines container available-cross-size main-axis)
   "Determine the cross size of each flex line based on align-content."
+  (declare (ignore main-axis)) ; Main axis is not used here
   (let* ((num-lines (length lines))
          (ac (align-content container))
          (total-lines-cross-size (reduce #'+ lines :key (lambda (ln) (cross-size ln)) :initial-value 0))
@@ -775,6 +776,7 @@
       ;; This might be redundant if the container's size is fixed, but useful if it's content-sized.
       (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
         (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
+          (declare (ignore total-lines-cross-size))
           ;; Decide if we should update the container's rectangle height/width
           ;; For now, assume container size is fixed by parent layout or initial state.
           ;; (set-flex-item-cross-size container total-lines-cross-size main-axis)

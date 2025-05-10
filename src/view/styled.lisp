@@ -5,7 +5,7 @@
 (uiop:define-package :elmtui.view.styled
   (:use :cl)
   (:import-from :elmtui.view.core
-                :ui-node :make-ui-node :copy-ui-node
+   :ui-node :make-ui-node :copy-ui-node
                 :ui-node-type :ui-node-props :ui-node-children)
   ;; Import relevant symbols from elmtui.style-lib API and implementation details
   ;; Assuming elmtui.style-lib.api exports these based on the provided files
@@ -13,7 +13,7 @@
                 #:stylable #:stylable-id #:classes #:parents-of #:styles #:dirty #:dirty-p
                 #:style-set) ; Removed query-stylesheet, copy-set
   ;; Import default style set, value-of, and copy-set from style-set package
-  (:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set) ; Added copy-set
+  (:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set #:set-style) ; Added copy-set
   ;; Import query-stylesheet from sheet package
   (:import-from :elmtui.style-lib.sheet #:query-stylesheet)
   (:export
@@ -87,8 +87,20 @@
     (setf (ui-node-type node) type)
     (setf (ui-node-props node) effective-props)
     (setf (ui-node-children node) children)
-    ;; Initialize styles slot (assuming stylable provides it)
-    (setf (styles node) (copy-set *default-style-set*)) ; Start with defaults
+    ;; Initialize styles slot, applying explicit props over defaults
+    (let ((initial-styles (copy-set *default-style-set*)))
+      ;; Apply explicit layout props from the node's props as base styles.
+      ;; These can be overridden by stylesheet rules later.
+      (let ((prop-width (getf effective-props :width))
+            (prop-height (getf effective-props :height))
+            (prop-display (getf effective-props :display))
+            (prop-flex-dir (getf effective-props :flex-direction)))
+        (when prop-width (set-style initial-styles :width prop-width))
+        (when prop-height (set-style initial-styles :height prop-height))
+        (when prop-display (set-style initial-styles :display prop-display))
+        (when prop-flex-dir (set-style initial-styles :flex-direction prop-flex-dir)))
+      ;; Add other relevant layout props here if needed (e.g., flex, grid props)
+      (setf (styles node) initial-styles))
     (setf (dirty node) t) ; Mark as dirty initially
     node))
 
@@ -181,14 +193,14 @@
             (,props-var (ui-node-props ,node-var))
             ;; Ensure node is styled, converting if necessary
             (,styled-node-var
-             (if (typep ,node-var 'styled-ui-node)
-                 ,node-var
-                 (make-styled-node
-                  :type (ui-node-type ,node-var)
-                  :props ,props-var
-                  :children (ui-node-children ,node-var)
-                  ;; Parent link might be lost here if converted, styling needs re-run
-                  ))))
+              (if (typep ,node-var 'styled-ui-node)
+                  ,node-var
+                  (make-styled-node
+                   :type (ui-node-type ,node-var)
+                   :props ,props-var
+                   :children (ui-node-children ,node-var)
+                   ;; Parent link might be lost here if converted, styling needs re-run
+                   ))))
        ;; Prepend new attributes (overriding existing ones in the props list)
        (setf (ui-node-props ,styled-node-var)
              (list* ,@(loop for (key value) on attributes by #'cddr

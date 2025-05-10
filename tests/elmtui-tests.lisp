@@ -5,7 +5,7 @@
 (defpackage :elmtui-tests
   (:use :cl :fiveam
         :elmtui.core.events
-        :elmtui.state.msg ; For defmsg tests
+   :elmtui.state.msg ; For defmsg tests
         :elmtui.core.conditions))
 
 (in-package :elmtui-tests)
@@ -19,64 +19,65 @@
   (let ((msg-valid (make-message :foo :ok))
         (msg-invalid (make-message :foo :fail)))
     (is (not (signals elmtui.core.conditions:message-validation-error
-                      (validate-message msg-valid))))
+               (validate-message msg-valid))))
     (is (signals elmtui.core.conditions:message-validation-error
-                 (validate-message msg-invalid)))))
+          (validate-message msg-invalid)))))
 
 ;;; 1.5 Schema-based message validation (using defmsg schemas)
 (defmsg schema-validation-msg (:docstring "Message type for schema validation tests")
- NoArgsVariant
- (TypedArgVariant :count integer :label string)
- (OptionalArgVariant &key (id t) (activep boolean :initform t))) ; Assuming defmsg handles &key and initforms for schema
+        NoArgsVariant
+        (TypedArgVariant :count integer :label string)
+        (OptionalArgVariant &key
+                            (:id t) (:activep boolean)( :initform t))) ; Assuming defmsg handles &key and initforms for schema
 
 (test schema-based-validation-correct
- ;; Test with a message that conforms to the defmsg schema
- (let ((msg-no-args (make-message 'schema-validation-msg '(:no-args-variant)))
-       (msg-typed-args (make-message 'schema-validation-msg '(:typed-arg-variant :count 123 :label "hello")))
-       (msg-optional-args (make-message 'schema-validation-msg '(:optional-arg-variant :id "test-id" :activep nil)))
-       (msg-optional-default (make-message 'schema-validation-msg '(:optional-arg-variant :id "another"))))
+  ;; Test with a message that conforms to the defmsg schema
+  (let ((msg-no-args (make-message 'schema-validation-msg '(:no-args-variant)))
+        (msg-typed-args (make-message 'schema-validation-msg '(:typed-arg-variant :count 123 :label "hello")))
+        (msg-optional-args (make-message 'schema-validation-msg '(:optional-arg-variant :id "test-id" :activep nil)))
+        (msg-optional-default (make-message 'schema-validation-msg '(:optional-arg-variant :id "another"))))
 
-   ;; Ensure no explicit contract is set for schema-validation-msg for these tests
-   (remhash 'schema-validation-msg elmtui.core.events::*message-contracts*)
+    ;; Ensure no explicit contract is set for schema-validation-msg for these tests
+    (remhash 'schema-validation-msg elmtui.core.events::*message-contracts*)
 
-   (is (not (signals elmtui.core.conditions:message-validation-error
-                     (validate-message msg-no-args)))
-       "Correct NoArgsVariant should pass schema validation.")
-   (is (not (signals elmtui.core.conditions:message-validation-error
-                     (validate-message msg-typed-args)))
-       "Correct TypedArgVariant should pass schema validation.")
-   (is (not (signals elmtui.core.conditions:message-validation-error
-                     (validate-message msg-optional-args)))
-       "Correct OptionalArgVariant with all args should pass schema validation.")
-   (is (not (signals elmtui.core.conditions:message-validation-error
-                     (validate-message msg-optional-default)))
-       "Correct OptionalArgVariant with default for activep should pass.")))
+    (is (not (signals elmtui.core.conditions:message-validation-error
+               (validate-message msg-no-args)))
+        "Correct NoArgsVariant should pass schema validation.")
+    (is (not (signals elmtui.core.conditions:message-validation-error
+               (validate-message msg-typed-args)))
+        "Correct TypedArgVariant should pass schema validation.")
+    (is (not (signals elmtui.core.conditions:message-validation-error
+               (validate-message msg-optional-args)))
+        "Correct OptionalArgVariant with all args should pass schema validation.")
+    (is (not (signals elmtui.core.conditions:message-validation-error
+               (validate-message msg-optional-default)))
+        "Correct OptionalArgVariant with default for activep should pass.")))
 
 (test schema-based-validation-incorrect
- ;; Ensure no explicit contract is set for schema-validation-msg for these tests
- (remhash 'schema-validation-msg elmtui.core.events::*message-contracts*)
+  ;; Ensure no explicit contract is set for schema-validation-msg for these tests
+  (remhash 'schema-validation-msg elmtui.core.events::*message-contracts*)
 
- (let ((msg-unknown-variant (make-message 'schema-validation-msg '(:unknown-variant-for-schema)))
-       (msg-wrong-type (make-message 'schema-validation-msg '(:typed-arg-variant :count "not-an-int" :label "world")))
-       (msg-missing-arg (make-message 'schema-validation-msg '(:typed-arg-variant :count 456)))
-       (msg-extra-arg (make-message 'schema-validation-msg '(:no-args-variant :extra "data")))
-       (msg-not-a-list (make-message 'schema-validation-msg :no-args-variant))) ; Data is not a list
+  (let ((msg-unknown-variant (make-message 'schema-validation-msg '(:unknown-variant-for-schema)))
+        (msg-wrong-type (make-message 'schema-validation-msg '(:typed-arg-variant :count "not-an-int" :label "world")))
+        (msg-missing-arg (make-message 'schema-validation-msg '(:typed-arg-variant :count 456)))
+        (msg-extra-arg (make-message 'schema-validation-msg '(:no-args-variant :extra "data")))
+        (msg-not-a-list (make-message 'schema-validation-msg :no-args-variant))) ; Data is not a list
 
-   (is (signals elmtui.core.conditions:message-validation-error
-                (validate-message msg-unknown-variant))
-       "Unknown variant should fail schema validation.")
-   (is (signals elmtui.core.conditions:message-validation-error
-                (validate-message msg-wrong-type))
-       "Wrong argument type should fail schema validation.")
-   (is (signals elmtui.core.conditions:message-validation-error
-                (validate-message msg-missing-arg))
-       "Missing argument should fail schema validation.")
-   (is (signals elmtui.core.conditions:message-validation-error
-                (validate-message msg-extra-arg))
-       "Extra argument should fail schema validation (based on current validate-message-via-schema logic).")
-   (is (signals elmtui.core.conditions:message-validation-error
-                (validate-message msg-not-a-list))
-       "Message data not being a list should fail schema validation.")))
+    (is (signals elmtui.core.conditions:message-validation-error
+          (validate-message msg-unknown-variant))
+        "Unknown variant should fail schema validation.")
+    (is (signals elmtui.core.conditions:message-validation-error
+          (validate-message msg-wrong-type))
+        "Wrong argument type should fail schema validation.")
+    (is (signals elmtui.core.conditions:message-validation-error
+          (validate-message msg-missing-arg))
+        "Missing argument should fail schema validation.")
+    (is (signals elmtui.core.conditions:message-validation-error
+          (validate-message msg-extra-arg))
+        "Extra argument should fail schema validation (based on current validate-message-via-schema logic).")
+    (is (signals elmtui.core.conditions:message-validation-error
+          (validate-message msg-not-a-list))
+        "Message data not being a list should fail schema validation.")))
 
 ;;; 2. Message dispatch to handler
 (defvar *handler-called* nil)
@@ -103,8 +104,8 @@
     (setf *error-handler-called* nil)
     (let ((token (subscribe :baz #'error-handler)))
       (is (signals elmtui.core.conditions:subscriber-handler-error
-                   (publish msg)))
-      (is *error-handler-called*)
+            (publish msg)))
+      (is (not (null *error-handler-called*)))
       (is (elmtui.core.loop:unsubscribe token) "Unsubscribe should return T for a valid token."))))
 
 ;;; 4. Message priorities (stub: correct registration)
@@ -121,9 +122,9 @@
 
 ;;; 6. defmsg constructor generation and validation
 (defmsg test-construct-msg (:docstring "Test message for constructors")
-  NoArgs
-  (OneArg :value integer)
-  (MultiArg :name string :count fixnum :active-p boolean))
+        NoArgs
+        (OneArg :value integer)
+        (MultiArg :name string :count fixnum :active-p boolean))
 
 (test defmsg-constructors
   ;; Test no-args variant

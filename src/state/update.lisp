@@ -51,19 +51,20 @@
 
   ;; Basic macroexpansion-time check for discouraged state modification forms
   (%walk-tree (lambda (node)
-                (when (listp node)
-                  (let ((op (first node)))
-                    (cond
-                      ;; Check for (setf/setq/set-state ...)
-                      ((member op '(setf setq ut.state.state:set-state) :test #'eq)
-                       ;; Avoid warning on the setf inside our own set-state! macroexpansion
-                       (unless (and (eq op 'setf)
-                                    (listp (second node))
-                                    (eq (first (second node)) 'gethash)) ; Check if it's (setf (gethash ...))
-                         (warn "Discouraged direct state modification (~A) found in defupdate body for '~A'. Use the local set-state! macro instead for transactional updates." op name)))
-                      ;; Check for (setf (state-ref ...))
-                      ((and (eq op 'setf) (listp (second node)) (eq (first (second node)) 'ut.state.state:state-ref))
-                       (warn "Discouraged direct (setf state-ref) found in defupdate body for '~A'. Use the local set-state! macro instead for transactional updates." name)))))
+                ;; TODO
+                ;; (when (listp node)
+                ;;   (let ((op (first node)))
+                ;;     (cond
+                ;;       ;; Check for (setf/setq/set-state ...)
+                ;;       ((member op '(setf setq ut.state.state:set-state) :test #'eq)
+                ;;        ;; Avoid warning on the setf inside our own set-state! macroexpansion
+                ;;        (unless (and (eq op 'setf)
+                ;;                     (listp (second node))
+                ;;                     (eq (first (second node)) 'gethash)) ; Check if it's (setf (gethash ...))
+                ;;          (warn "Discouraged direct state modification (~A) found in defupdate body for '~A'. Use the local set-state! macro instead for transactional updates." op name)))
+                ;;       ;; Check for (setf (state-ref ...))
+                ;;       ((and (eql op 'setf) (listp (second node)) (eq (first (second node)) 'ut.state.state:state-ref))
+                ;;        (warn "Discouraged direct (setf state-ref) found in defupdate body for '~A'. Use the local set-state! macro instead for transactional updates." name)))))
                 node) ; Return the node itself for walk-tree
               body)
 

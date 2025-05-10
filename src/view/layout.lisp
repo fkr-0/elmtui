@@ -281,6 +281,16 @@
 (defmethod dispatch-layout ((display (eql :block)) node available-rect)
   (layout-block-children node available-rect))
 
+;; --- ListBox layout method (Treat as block for now) ---
+;; Children (list items) are laid out like block elements vertically.
+(defmethod dispatch-layout ((display (eql :list-box)) node available-rect)
+  (layout-block-children node available-rect))
+
+;; --- ListItem layout method (Treat as block for now) ---
+;; Children (usually just text) are laid out like block elements.
+(defmethod dispatch-layout ((display (eql :list-item)) node available-rect)
+  (layout-block-children node available-rect))
+
 ;; --- Inline layout method (stub) ---
 (defmethod dispatch-layout ((display (eql :inline)) node available-rect)
   (declare (ignore node available-rect))

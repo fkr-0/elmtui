@@ -137,15 +137,15 @@
            (setf (textinput-model-cursor-pos new-model) (length new-val)) ; Move cursor to end
            (setf value-changed t))))
 
-      ((eql msg msg-textinput-focus)
+      ((eql msg-textinput-focus) ; Corrected: msg is the var being cased
        (setf (textinput-model-is-focused new-model) t))
 
-      ((eql msg msg-textinput-blur)
+      ((eql msg-textinput-blur) ; Corrected: msg is the var being cased
        (setf (textinput-model-is-focused new-model) nil))
 
       ;; msg-textinput-submit is handled internally by :key-press :enter
       ;; but could be sent by a parent if needed.
-      ((eql msg msg-textinput-submit)
+      ((eql msg-textinput-submit) ; Corrected: msg is the var being cased
        (when (textinput-model-on-submit new-model)
          (push (textinput-model-on-submit new-model) commands))))
 
@@ -163,21 +163,23 @@
 ;;;---------------------------------------------------------------
 ;;; View
 ;;;---------------------------------------------------------------
-(defun view-textinput (model dispatch-fn) ; Removed is-focused arg, using model's slot directly
+(defun view-textinput (model global-current-focus-id dispatch-fn)
   "Creates a UI-NODE representation of the textinput.
    MODEL: The current textinput-model instance.
+   GLOBAL-CURRENT-FOCUS-ID: The ID of the widget that currently has global focus.
    DISPATCH-FN: A function to call to dispatch messages.
    Returns a UI-NODE."
   (check-type model textinput-model)
-  (let ((is-focused (textinput-model-is-focused model)))
+  (let* ((widget-id (textinput-model-id model))
+         (is-globally-focused (equal widget-id global-current-focus-id)))
     (make-ui-node
      :type :text-input ; A specific type for renderers to handle cursor, etc.
-     :props (list :widget-id (textinput-model-id model)
+     :props (list :widget-id widget-id
                   :value (textinput-model-value model)
                   :placeholder (textinput-model-placeholder model)
                   :cursor-pos (textinput-model-cursor-pos model)
-                  :is-focused is-focused ; Pass focus state to renderer
-                  :class (if is-focused
+                  :is-focused is-globally-focused ; Pass global focus state to renderer
+                  :class (if is-globally-focused
                              "textinput textinput-focused"
                              "textinput")
                   :focusable t

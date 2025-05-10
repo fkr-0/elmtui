@@ -180,8 +180,10 @@
                      (incf char-count)
                   until (or (not (graphic-char-p char)) ; Stop on non-graphic or control chars
                             (>= char-count 6)))) ; Max length for typical key sequences
+                                        ; msg is not used in this simple test
          (collected-chars (nreverse collected-chars)) ; Reverse to get original order
          (matched-key nil))
+    (declare (ignore _))
 
     (unless collected-chars (return-from read-escape-bytes (values nil nil)))
 
@@ -264,8 +266,11 @@
 (defmethod initialize-instance :after ((seq ansi-sequence) &rest args)
   "Initialize the sequence with default values."
   (declare (ignore args))
-  (setf (prerender seq) (apply #'concatenate 'string (loop for part in (seq seq)
-                                                           collect (if (stringp part) part "~A"))))
+  (setf (prerender seq) (apply #'concatenate 'string
+                                 (loop for part in (seq seq)
+                                       collect (cond ((string= part "ESC") (string (code-char 27))) ; Use actual ESC char
+                                                     ((stringp part) part)
+                                                     (t "~A"))))) ; For nil placeholders
   (setf (slot-value seq 'default-args) ; Bypassing reader for direct slot write
         (make-list (count-if-not #'stringp (seq seq)) :initial-element 0)))
 
@@ -485,8 +490,9 @@
   (let ((changes '())
         (i 0))
     (labels ((pop-param () (prog1 (nth i sgr-params-list) (incf i)))
-             (peek-param () (nth i sgr-params-list))
+             ;; (peek-param () (nth i sgr-params-list))
              (params-left () (- (length sgr-params-list) i)))
+      ;; (declare (ignorable peek-param))
       (loop while (< i (length sgr-params-list))
             do (let ((p (pop-param)))
                  (cond

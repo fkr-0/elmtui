@@ -35,15 +35,19 @@
 (defmethod initialize-backend ((backend-type (eql :faketerm)) &key filepath (width 80) (height 24) (initial-input nil) &allow-other-keys)
   (unless filepath
     (error "Filepath is required for faketerm backend."))
-  (let ((stream (open filepath :direction :output :if-exists :supersede :if-does-not-exist :create)))
-    (unless stream
-      (error "Could not open file for faketerm backend: ~A" filepath))
-    (let ((instance (make-faketerm-instance :filepath filepath
-                                            :stream stream
-                                            :width width
-                                            :height height
-                                            :input-queue (copy-list initial-input))))
-      (format (faketerm-instance-stream instance) "; Faketerm Initialized: ~A (Width: ~D, Height: ~D)~%"
+  (let ((stream
+          (open filepath :direction :output
+                         :if-exists :supersede
+                         :if-does-not-exist :create)))
+    ;; (unless stream
+    ;;   (error "Could not open file for faketerm backend: ~A" filepath))
+    (let* ((instance (make-faketerm-instance :filepath filepath
+                                             :stream stream
+                                             :width width
+                                             :height height
+                                             :input-queue (copy-list initial-input))))
+      (format (faketerm-instance-stream instance)
+              "; Faketerm Initialized: ~A (Width: ~D, Height: ~D)~%"
               (faketerm-instance-filepath instance)
               (faketerm-instance-width instance)
               (faketerm-instance-height instance))
@@ -96,7 +100,7 @@
   t)
 
 (defmethod get-cursor-position ((instance faketerm-instance))
-   (values (faketerm-instance-cursor-row instance) (faketerm-instance-cursor-col instance)))
+  (values (faketerm-instance-cursor-row instance) (faketerm-instance-cursor-col instance)))
 
 (defmethod hide-cursor ((instance faketerm-instance))
   (set-cursor-visibility instance nil))

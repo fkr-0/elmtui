@@ -141,50 +141,15 @@
    (choices :initarg :choices :initform nil :accessor value-choices)))
 ;; Removed duplicate/simpler style definition that was here.
 
-(defmethod style-property-of ((obj style))
-  (intern (property-name (style-property obj)) 'keyword))
-(defmethod style-value-of ((s style))
-  "Return the value of the style."
-  (value-raw (style-value s))) ; Use style-value accessor now
 (defclass style-group (style)
   ((sub-styles :initarg :sub-styles :initform nil :accessor sub-styles)))
 
-(defclass stylable () ;; defined later – here for forward declaration
-  ())
+(defgeneric style-sub-styles (style-group)
+  (:method ((sg style-group)) (sub-styles sg))
+  (:documentation "Return the sub-styles of a style group."))
 
-(defgeneric valid-value-p (property v))
-(defgeneric group-key (obj))
-(defmethod stylegroup-p ((obj style-group)) t)
-(defmethod stylegroup-p ((obj style)) nil)
-(defmethod group-key ((obj style-group)) (style-property obj))
-(defmethod group-key ((obj style)) (style-property obj))
-(defgeneric group-styles (style-group-key))
-(defgeneric from-style-set (stylegroup style-set)
-  (:method ((stylegroup null) (style-set t)) nil)
-  (:documentation
-   "Return a style set that contains the styles from the given style set that belong to the given group."))
-(defgeneric group-styles (style)
-  (:method ((style t)) nil)
-  (:documentation
-   "Return the styles that belong to the group of the given style, or NIL if it doesn't belong to a group."))
-(defgeneric parents-of (stylable)
-  (:method ((stylable t)) "Return the parent elements of the given stylable."
-    nil)
-  (:documentation "Return the parent elements of the given stylable."))
-(defgeneric selects (selector stylable)
-  (:method ((selector t) (stylable null)) nil)
-  (:documentation "Return T if the given selector selects the given stylable, NIL otherwise."))
-;; Existing definitions remain unchanged...
-
-(defgeneric style-set-valid (style-set)
-  (:documentation "Check if the given style-set is valid."))
-;; (defgeneric make-selector (type &rest args))
-(defgeneric default-styling (prop)
-  (:method ((stylable t)) nil)
-  (:documentation "Return the default styling for the given property."))
-(defmethod make-selector (type &rest args)
-  (declare (ignore type args))
-  (error "make-selector not implemented"))
+;; (defclass stylable () ;; defined later – here for forward declaration
+;;   ())
 
 (defclass style-component () ()
   (:documentation "Base class for style components."))
@@ -257,6 +222,13 @@
   (dirty stylable-object))
 
 (defclass selector () () (:documentation "Base class for all selectors."))
+(defgeneric selects (selector target)
+  (:documentation
+   "Return T if the given selector selects the given target, NIL otherwise."))
+(defgeneric specificity (sel)
+  (:documentation
+   "Return the specificity of the selector as INT. The higher the number, the more specific the selector."))
+
 (defclass style-rule ()
   ((selector :initarg :selector
              :accessor rule-selector
@@ -269,10 +241,52 @@
                     :initform nil
                     :documentation "List of objects that match the selector."))
   (:documentation "A style rule consists of a selector and a set of styles."))
+
 (defclass stylesheet ()
-  ((name :initarg :name :accessor stylesheet-name)
-   (rules :initarg :rules :accessor stylesheet-rules))
-  (:documentation "A stylesheet is a collection of style rules."))
+  ((name :initarg :name :accessor stylesheet-name :initform "" :type string)
+   (rules :initarg :rules :accessor stylesheet-rules :initform nil :type list))
+  (:documentation "A stylesheet is a collection of style rules.
+it carries an optional NAME:string and RULES:list."))
+
+(defmethod style-property-of ((obj style))
+  (intern (property-name (style-property obj)) 'keyword))
+(defmethod style-value-of ((s style))
+  "Return the value of the style."
+  (value-raw (style-value s))) ; Use style-value accessor now
+
+(defgeneric valid-value-p (property v))
+(defgeneric group-key (obj))
+(defmethod stylegroup-p ((obj style-group)) t)
+(defmethod stylegroup-p ((obj style)) nil)
+(defmethod group-key ((obj style-group)) (style-property obj))
+(defmethod group-key ((obj style)) (style-property obj))
+(defgeneric group-styles (style-group-key))
+(defgeneric from-style-set (stylegroup style-set)
+  (:method ((stylegroup null) (style-set t)) nil)
+  (:documentation
+   "Return a style set that contains the styles from the given style set that belong to the given group."))
+(defgeneric group-styles (style)
+  (:method ((style t)) nil)
+  (:documentation
+   "Return the styles that belong to the group of the given style, or NIL if it doesn't belong to a group."))
+(defgeneric parents-of (stylable)
+  (:method ((stylable t)) "Return the parent elements of the given stylable."
+    nil)
+  (:documentation "Return the parent elements of the given stylable."))
+(defgeneric selects (selector stylable)
+  (:method ((selector t) (stylable null)) nil)
+  (:documentation "Return T if the given selector selects the given stylable, NIL otherwise."))
+;; Existing definitions remain unchanged...
+
+(defgeneric style-set-valid (style-set)
+  (:documentation "Check if the given style-set is valid."))
+;; (defgeneric make-selector (type &rest args))
+(defgeneric default-styling (prop)
+  (:method ((stylable t)) nil)
+  (:documentation "Return the default styling for the given property."))
+(defmethod make-selector (type &rest args)
+  (declare (ignore type args))
+  (error "make-selector not implemented"))
 
 (defgeneric make-default-styling ()
   (:method () nil)
@@ -312,9 +326,9 @@
   (:documentation "Returns the list of individual sub-styles within a style group.")
   (:method ((sg style-group)) (style-sub-styles sg)))
 
-(defun stylegroup-p (obj)
-  "Checks if OBJ is a style-group."
-  (typep obj 'style-group))
+;; (defun stylegroup-p (obj)
+;;   "Checks if OBJ is a style-group."
+;;   (typep obj 'style-group))
 
 ;;; --- Printing ---
 

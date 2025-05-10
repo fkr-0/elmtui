@@ -151,8 +151,8 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [PARTIAL] Basic keyboard/scroll handling logic present (needs focus system).
     - [x] Accessibility roles/states added.
     - [x] Complete refactoring to Elm pattern (see Section 4).
-    - [PARTIAL] TODO: Implement robust focus management integration. (Update logic, view updates, focusable ID collection implemented; runtime integration pending)
-    - [PARTIAL] TODO: Implement visual scrolling/cursor rendering. (Listbox view updated for scrolling; TextInput view passes cursor info; Renderer implementation needed)
+    - [PARTIAL] TODO: Implement robust focus management integration. (Core logic in `src/core/focus.lisp`, Tab navigation in `platform/input.lisp`, `dirlister_poc` updated. Listbox view uses global focus. Runtime dispatches focusable IDs. Further widget integration and testing needed.)
+    - [PARTIAL] TODO: Implement visual scrolling/cursor rendering. (Listbox view updated for scrolling; TextInput view passes cursor info; Renderer implementation basic, needs scrollbar logic)
     - [ ] TODO: Widget registry for extensions.
     - [ ] TODO: Widget test harness.
     - [ ] TODO: Document widget authoring guidelines.
@@ -180,8 +180,8 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [ ] TODO: Document backend usage and implementation.
 
 *** 9. Runtime & Application Assembly (=src/runtime.lisp=)
-    - [PARTIAL] Basic =def-elm-app= macro stub exists. (Now implemented with basic wiring)
-    - [PARTIAL] TODO: Implement full =def-elm-app= wiring (model, update, view, subscriptions). (Basic wiring done; needs refinement for initial state, subscriptions)
+    - [x] Basic =def-elm-app= macro stub exists. (Now implemented with basic wiring, styling, layout, rendering pipeline)
+    - [PARTIAL] TODO: Implement full =def-elm-app= wiring (model, update, view, subscriptions). (Basic wiring done; needs refinement for subscriptions, error handling)
     - [ ] TODO: Support hot-reloading.
     - [PARTIAL] TODO: Implement clean shutdown. (Basic loop exit implemented)
     - [ ] TODO: REPL-driven workflow support.
@@ -196,7 +196,8 @@ Leveraging Common Lisp's strengths to achieve an idiomatic and professional Elm-
     - [ ] TODO: Comprehensive documentation.
 
 *** 11. Testing, CI, and Deployment
-    - [ ] TODO: Implement unit, integration, property tests.
+    - [ ] TODO: Implement unit tests for core components (state, widgets, layout).
+    - [ ] TODO: Implement integration testing framework using `:faketerm` backend to verify init->update->view->style->layout->render flow.
     - [ ] TODO: Setup CI (GitHub Actions).
     - [ ] TODO: Automated checks (docs, quality).
     - [ ] TODO: Packaging (Quicklisp/Ultralisp, binary).

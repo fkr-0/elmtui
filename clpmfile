@@ -25,6 +25,7 @@
 (:github "sly-asdf" :path "mmgeorge/sly-asdf" :branch "master")
 (:github "sly-quicklisp" :path "joaotavora/sly-quicklisp" :branch "master")
 
+(:system "log4cl" :source "quicklisp")
 (:system "cl-unicode")
 (:system "flexi-streams")
 (:system "asdf-package-system" :source "quicklisp")

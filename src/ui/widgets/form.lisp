@@ -8,7 +8,10 @@
   ;; We need to know about the child widget types to call their update/view functions
   ;; This creates a dependency. Ideally, child update/view functions could be passed in.
   (:import-from :elmtui.ui.widgets.textinput #:init-textinput #:update-textinput #:view-textinput #:textinput-model)
-  (:import-from :elmtui.ui.widgets.button #:init-button #:update-button #:view-button #:button-model)
+  (:import-from :elmtui.state #:application-state #:state-ref)
+  (:import-from :elmtui.ui.widgets.label #:init-label #:view-label)
+  (:import-from :elmtui.ui.widgets.button #:init-button #:update-button #:view-button #:button-model
+                #:button-model-on-click-msg)
   (:import-from :elmtui.core.events #:cmd)
   (:export #:form-model #:make-form-model
            #:form-model-id #:form-model-children-models #:form-model-on-submit
@@ -58,24 +61,25 @@
           for child-type = (getf spec :type)
           for init-args = (getf spec :init-args)
           do
-       (multiple-value-bind (child-model initial-commands)
-           (case child-type
-             (:textinput (apply #'init-textinput child-id init-args))
-             (:button
-              ;; If button's on-click is meant to submit the form,
-              ;; its :on-click-msg should be something the form's update can recognize,
-              ;; or it could be a direct msg-form-submit.
-              ;; For this example, let's assume :on-click-msg for a submit button
-              ;; would be '(:form-child-update :child-id <btn-id> :child-msg :form-submit-request)
-              ;; or simply '(:form-submit) if the button is tightly coupled.
-              ;; Here, we assume init-args for button includes its specific on-click.
-              (apply #'init-button child-id init-args))
-             ;; TODO: Add other child types like :label, etc.
-             (t (error "Unsupported child type for form: ~S" child-type)))
-         (setf (gethash child-id (form-model-children-models form-model)) child-model)
-         (when initial-commands
-           (setf all-initial-commands (append initial-commands all-initial-commands)))))
+             (multiple-value-bind (child-model initial-commands)
+                 (case child-type
+                   (:textinput (apply #'init-textinput child-id init-args))
+                   (:button
+                    ;; If button's on-click is meant to submit the form,
+                    ;; its :on-click-msg should be something the form's update can recognize,
+                    ;; or it could be a direct msg-form-submit.
+                    ;; For this example, let's assume :on-click-msg for a submit button
+                    ;; would be '(:form-child-update :child-id <btn-id> :child-msg :form-submit-request)
+                    ;; or simply '(:form-submit) if the button is tightly coupled.
+                    ;; Here, we assume init-args for button includes its specific on-click.
+                    (apply #'init-button child-id init-args))
+                   ;; TODO: Add other child types like :label, etc.
+                   (t (error "Unsupported child type for form: ~S" child-type)))
+               (setf (gethash child-id (form-model-children-models form-model)) child-model)
+               (when initial-commands
+                 (setf all-initial-commands (append initial-commands all-initial-commands)))))
     (values form-model (nreverse all-initial-commands))))
+
 
 ;;;---------------------------------------------------------------
 ;;; Update
@@ -117,7 +121,7 @@
                  (push (form-model-on-submit new-model) commands)))))))
 
       ;; Form-level submit action (e.g., triggered by a button or Enter key in a field)
-      ((eql msg msg-form-submit)
+      ((eql msg-form-submit) ; Corrected: msg is the var being cased
        (when (form-model-on-submit new-model)
          (push (form-model-on-submit new-model) commands))))
 
@@ -138,8 +142,8 @@
   ;; However, for simplicity here, we pass app-state to get the focused ID.
   ;; A better approach might involve the main view function calculating focus
   ;; for each child and passing it explicitly.
-  (let ((child-ui-nodes nil)
-        (focused-widget-id (state-ref app-state :focused-widget-id))) ; Get current focus ID
+  (let* ((child-ui-nodes nil)
+         (focused-widget-id (state-ref app-state :focused-widget-id))) ; Get current focus ID
     (maphash (lambda (child-id child-model)
                (let ((is-child-focused (equal child-id focused-widget-id)) ; Check if this child is focused
                      (child-dispatch-fn (lambda (child-msg)
@@ -148,7 +152,7 @@
                                                          :child-id child-id
                                                          :child-msg child-msg)))))
                  (push (etypecase child-model
-                         (textinput-model (view-textinput child-model child-dispatch-fn)) ; textinput view uses internal focus state
+                         (textinput-model (view-textinput child-model is-child-focused child-dispatch-fn)) ; textinput view uses internal focus state
                          (button-model (view-button child-model is-child-focused child-dispatch-fn)) ; Pass focus state to button
                          ;; TODO: Add other child model types (e.g., label doesn't need focus)
                          ;; (label-model (view-label child-model child-dispatch-fn))

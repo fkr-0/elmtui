@@ -155,7 +155,7 @@
                              (var (gensym (symbol-name (slot-definition-name slot)))))
                          `(let ((,var ,slot-name)) ; Bind the keyword arg/default
                             ;; 1. Type Check
-                            ,(check-type ,var ,(slot-definition-type slot))
+                            `(check-type ,var (slot-definition-type slot))
                             ;; 2. Validation Check
                             ,(when (slot-definition-validator slot)
                                `(unless (funcall ,(slot-definition-validator slot) ,var)

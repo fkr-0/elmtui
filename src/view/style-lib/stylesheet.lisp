@@ -5,9 +5,9 @@
    :elmtui.style-lib.style-set :elmtui.style-lib.stylable)
   ;; Correct imports
   (:import-from :elmtui.style-lib.api
-                #:style-set-styles #:value-raw #:selector #:selects #:specificity
-                #:rule-selector #:stylesheet-rules #:rule-styles #:styles #:stylesheet ; Added more API symbols
-                #:style-value) ; Import from types
+                #:style-set-styles #:value-raw #:selector #:selects
+                #:rule-selector #:stylesheet-rules #:rule-styles #:styles
+                #:stylesheet #:style-value :specificity)
   (:import-from :elmtui.style-lib.style-set
                 #:set-style #:copy-set) ; Removed rule-styles (it's in API)
   ;; Removed incorrect imports from selector:

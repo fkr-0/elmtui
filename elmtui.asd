@@ -6,7 +6,7 @@
   :author       "User <user@archlinux>"
   :license      "GNU GPL, version 3"
   :source-control (:git "https://github.com/user/elmtui.git")
-  :depends-on   (#:clevelib #:alexandria #:str #:sb-posix)
+  :depends-on   (#:clevelib #:alexandria #:str #:sb-posix #:log4cl)
   :pathname "./src/"
   :serial t
   :components (
@@ -18,7 +18,7 @@
                 :pathname "state/"
                 :serial t
                 :components (
-                             (:module "statelib"
+                             (:module "state-lib"
                               :serial t
                               :pathname "statelib/"
                               :components (
@@ -41,7 +41,9 @@
                              (:file "conditions")
                              (:file "input_events") ; Added input events definition
                              (:file "async")
+                             (:file "threads")
                              (:file "events")
+                             (:file "focus") ; Added focus management
                              (:file "keymap")
                              (:file "loop")))
 
@@ -53,7 +55,7 @@
                (:module "view/style-lib"
                 :pathname "view/style-lib/"
                 :serial t
-                :components ((:file "api")
+                :components ((:file "api") ; Defines stylable, selector base class, etc.
                              (:file "util")
                              (:file "types")
                              (:file "styles")
@@ -61,13 +63,17 @@
                              (:file "macros")
                              (:file "properties")
                              (:file "selector")
+                             ;; Selector implementations moved after view/styled
                              (:file "rule")
-                             (:file "stylable")
+                             (:file "stylable") ; Implementation details? Might depend on api.
                              (:file "styled-strings")
                              (:file "stylesheet")
-                             (:file "style-lib")))
-               ;; Load the styled node definition
+                             (:file "style-lib"))) ; Main package file?
+
+               ;; Load the styled node definition (depends on style-lib/api)
                (:file "view/styled")
+
+               ;; Load selector implementations (depends on view/styled)
 
                ;; Load UI Components (depend on view/core, view/styled, view/style-lib)
                (:module "ui"

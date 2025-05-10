@@ -5,7 +5,7 @@
 (defpackage :elmtui-state-tests
   (:use :cl :fiveam
         :elmtui.state.model
-        :elmtui.state.msg
+   :elmtui.state.msg
         :elmtui.state.update
         ;; Import state, transaction, and observe symbols for testing
         :ut.state.state
@@ -28,8 +28,8 @@
                               :package :elmtui-state-tests ; Ensure it's in the test package
                               ;; :observe-changes-default-callback my-model-observer ; Assuming my-model-observer is defined
                               )
-  (count :type integer :initform 0 :validate #'plusp :observe t) ; Observe count
-  (label :type string :initform "Clicks")) ; Don't observe label
+          (count :type integer :initform 0 :validate #'plusp :observe t) ; Observe count
+          (label :type string :initform "Clicks")) ; Don't observe label
 
 (test defmodel-struct-creation
   (let ((m (make-test-model))) ; Uses the generated constructor for test-model
@@ -41,9 +41,9 @@
 
 ;;; 2. defmsg macro: constant creation and variant registration
 (defmsg test-msg
-    :foo
-    :bar
-    :baz) ; Corrected :bazz to :baz for consistency if intended
+    (:docstring "aloaha")
+
+    (a be  i barz )) ; Corrected :bazz to :baz for consistency if intended
 
 (test defmsg-constant-creation
   (is (boundp (intern (string :test-msg) :elmtui-state-tests))) ; defmsg creates a constant

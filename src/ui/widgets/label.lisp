@@ -37,8 +37,8 @@
    MSG: The message to process.
    MODEL: The current label-model instance.
    Returns (values new-label-model command)."
-  (check-type model label-model)
   (declare (ignore msg)) ; Labels generally don't react to messages
+  (check-type model label-model)
   (values model nil))    ; Return model unchanged, no command
 
 ;;;---------------------------------------------------------------
@@ -49,8 +49,8 @@
    MODEL: The current label-model instance.
    DISPATCH-FN: A function to call to dispatch messages (not typically used by label).
    Returns a UI-NODE."
-  (check-type model label-model)
   (declare (ignore dispatch-fn)) ; Labels typically don't dispatch messages
+  (check-type model label-model)
   (make-ui-node
    :type :text
    :props (list :widget-id (label-model-id model)

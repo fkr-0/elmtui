@@ -3,7 +3,7 @@
 ;;; Elm-style ListBox Widget
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.listbox
-  (:use :cl :alexandria)
+  (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.view.core #:make-ui-node #:ui-node)
   (:import-from :elmtui.core.events #:cmd)
   ;; TODO: Import specific key symbols if needed
@@ -11,6 +11,7 @@
            ;; Accessors
            #:listbox-model-id
            #:listbox-model-items
+           #:listbox-model-height
            #:listbox-model-selected-index
            #:listbox-model-scroll-offset
            #:listbox-model-is-focused
@@ -36,6 +37,7 @@
   (items nil :type list) ; List of items (e.g., strings, plists)
   (selected-index nil :type (or null unsigned-byte)) ; Index of the selected item
   (scroll-offset 0 :type unsigned-byte) ; Index of the first visible item
+  (height 10 :type unsigned-byte) ; Visible height in lines
   (is-focused nil :type boolean)
   (on-select nil :type T)) ; Message to dispatch when an item is selected
 
@@ -59,15 +61,39 @@
 (defparameter msg-listbox-blur :listbox-blur)
 
 ;;;---------------------------------------------------------------
+;;; Helper Functions
+;;;---------------------------------------------------------------
+(defun clamp-index (idx item-count)
+  "Clamps the index within valid bounds for the list.
+   IDX: The index to clamp
+   ITEM-COUNT: Total number of items
+   Returns a valid index or NIL if input was NIL."
+  (when idx 
+    (alexandria:clamp idx 0 (max 0 (1- item-count)))))
+
+(defun clamp-scroll (offset height item-count)
+  "Clamps the scroll offset within valid bounds.
+   OFFSET: Current scroll position
+   HEIGHT: Visible height of the viewport
+   ITEM-COUNT: Total number of items
+   Returns a valid scroll offset."
+  (alexandria:clamp offset 0 (max 0 (- item-count height))))
+
+;;;---------------------------------------------------------------
 ;;; Init
 ;;;---------------------------------------------------------------
-(defun init-listbox (id &key (items nil) (selected-index nil) (on-select nil))
+(defun init-listbox (id &key
+                          (items nil)
+                          (selected-index nil)
+                          (height 10)
+                          (on-select nil))
   "Initializes a new listbox model.
    Returns (values listbox-model initial-command)."
   (values (%make-listbox-model :id id
                                :items items
                                :selected-index selected-index
                                :scroll-offset 0
+                               :height height ; Store height
                                :is-focused nil
                                :on-select on-select)
           nil))
@@ -76,123 +102,136 @@
 ;;; Update
 ;;;---------------------------------------------------------------
 (defun update-listbox (msg model)
-  "Updates the listbox model based on a message.
+  "Updates the listbox model based on a message. PURE function.
    Returns (values new-listbox-model command-list)."
   (check-type model listbox-model)
+  ;; Create a fresh copy to modify and return
   (let ((new-model (copy-structure model))
         (commands nil)
         (selection-changed nil)
-        (item-count (length (listbox-model-items model))))
+        (item-count (length (listbox-model-items model)))
+        (msg-data (when (listp msg) (rest msg))))
 
-    (flet ((clamp-index (idx)
-             (when idx (alexandria:clamp idx 0 (max 0 (1- item-count)))))
-           (clamp-scroll (offset height) ; Height is needed for page up/down, assume 10 for now
-             (alexandria:clamp offset 0 (max 0 (- item-count height)))))
+    ;; Modify the *copy* (new-model) based on the message
+    (case (first msg)
+      ;; --- Keyboard Navigation (when focused) ---
+      (:listbox-key-press
+       (when (listbox-model-is-focused model) ; Check focus on original model
+         (let* ((key-data (getf msg-data :key))
+                (key-sym (getf key-data :key-sym))
+                (current-index (listbox-model-selected-index model))) ; Use original index
+           (case key-sym
+             (:up
+              (when (> item-count 0)
+                (let ((new-idx (clamp-index (if current-index (1- current-index) (1- item-count)) item-count)))
+                  (when new-idx
+                    (setf (listbox-model-selected-index new-model) new-idx ; Modify copy
+                          selection-changed t)))))
+             (:down
+              (when (> item-count 0)
+                (let ((new-idx (clamp-index (if current-index (1+ current-index) 0) item-count)))
+                  (when new-idx
+                    (setf (listbox-model-selected-index new-model) new-idx ; Modify copy
+                          selection-changed t)))))
+             ;; TODO: Add PageUp, PageDown, Home, End handling (requires knowing view height)
+             (:enter
+              (when (and current-index (listbox-model-on-select model)) ; Check original model
+                (setf selection-changed t)))))))
 
-      (etypecase msg
-        ;; --- Keyboard Navigation (when focused) ---
-        ((cons (eql msg-listbox-key-press))
-         (when (listbox-model-is-focused new-model)
-           (let* ((key-data (getf (rest msg) :key))
-                  (key-sym (getf key-data :key-sym))
-                  (current-index (listbox-model-selected-index new-model)))
-             (case key-sym
-               (:up
-                (when (> item-count 0)
-                  (let ((new-idx (if current-index (max 0 (1- current-index)) (1- item-count))))
-                    (setf (listbox-model-selected-index new-model) new-idx)
-                    (setf selection-changed t)
-                    ;; TODO: Adjust scroll-offset if selection goes out of view
-                    )))
-               (:down
-                (when (> item-count 0)
-                  (let ((new-idx (if current-index (min (1- item-count) (1+ current-index)) 0)))
-                    (setf (listbox-model-selected-index new-model) new-idx)
-                    (setf selection-changed t)
-                    ;; TODO: Adjust scroll-offset if selection goes out of view
-                    )))
-               ;; TODO: Add PageUp, PageDown, Home, End handling (requires knowing view height)
-               (:enter
-                (when (and current-index (listbox-model-on-select new-model))
-                  (setf selection-changed t)))) ; Trigger on-select command below
-               ))))
+      ;; --- Direct Manipulation ---
+      (:listbox-select-index
+       (let ((new-idx (clamp-index (getf msg-data :index) item-count)))
+         (when (and new-idx (not (equal new-idx (listbox-model-selected-index model)))) ; Compare with original
+           (setf (listbox-model-selected-index new-model) new-idx ; Modify copy
+                 selection-changed t))))
 
-        ;; --- Direct Manipulation ---
-        ((cons (eql msg-listbox-select-index))
-         (let ((new-idx (clamp-index (getf (rest msg) :index))))
-           (unless (equal new-idx (listbox-model-selected-index new-model))
-             (setf (listbox-model-selected-index new-model) new-idx)
-             (setf selection-changed t))))
+      (:listbox-set-items
+       (let* ((new-items (getf msg-data :items))
+              (new-item-count (length new-items))
+              (current-index (listbox-model-selected-index model)) ; Use original
+              (current-offset (listbox-model-scroll-offset model)) ; Use original
+              (current-height (listbox-model-height model)) ; Use original
+              (clamped-index (clamp-index current-index new-item-count))
+              (clamped-offset (clamp-scroll current-offset current-height new-item-count)))
+         (setf (listbox-model-items new-model) new-items ; Modify copy
+               (listbox-model-selected-index new-model) clamped-index
+               (listbox-model-scroll-offset new-model) clamped-offset)))
 
-        ((cons (eql msg-listbox-set-items))
-         (let ((new-items (getf (rest msg) :items)))
-           (setf (listbox-model-items new-model) new-items)
-           ;; Reset selection and scroll on item change? Or try to preserve? Resetting is simpler.
-           (setf (listbox-model-selected-index new-model) (clamp-index (listbox-model-selected-index new-model)))
-           (setf (listbox-model-scroll-offset new-model) (clamp-scroll (listbox-model-scroll-offset new-model) 10)) ; Assume height 10
-           ))
+      ;; --- Scrolling ---
+      (:listbox-scroll-up
+       (let* ((amount (or (getf msg-data :amount) 1))
+              (current-offset (listbox-model-scroll-offset model)) ; Use original
+              (current-height (listbox-model-height model)) ; Use original
+              (new-offset (max 0 (- current-offset amount))))
+         (setf (listbox-model-scroll-offset new-model) ; Modify copy
+               (clamp-scroll new-offset current-height item-count))))
 
-        ;; --- Scrolling ---
-        ((cons (eql msg-listbox-scroll-up))
-         (let ((amount (or (getf (rest msg) :amount) 1)))
-           (setf (listbox-model-scroll-offset new-model)
-                 (clamp-scroll (max 0 (- (listbox-model-scroll-offset new-model) amount)) 10)))) ; Assume height 10
+      (:listbox-scroll-down
+       (let* ((amount (or (getf msg-data :amount) 1))
+              (current-offset (listbox-model-scroll-offset model)) ; Use original
+              (current-height (listbox-model-height model)) ; Use original
+              (new-offset (+ current-offset amount)))
+         (setf (listbox-model-scroll-offset new-model) ; Modify copy
+               (clamp-scroll new-offset current-height item-count))))
 
-        ((cons (eql msg-listbox-scroll-down))
-         (let ((amount (or (getf (rest msg) :amount) 1)))
-           (setf (listbox-model-scroll-offset new-model)
-                 (clamp-scroll (+ (listbox-model-scroll-offset new-model) amount) 10)))) ; Assume height 10
+      ;; --- Focus ---
+      (:listbox-focus
+       (unless (listbox-model-is-focused model) ; Check original
+         (setf (listbox-model-is-focused new-model) t))) ; Modify copy
 
-        ;; --- Focus ---
-        ((eql msg msg-listbox-focus)
-         (setf (listbox-model-is-focused new-model) t))
-
-        ((eql msg msg-listbox-blur)
-         (setf (listbox-model-is-focused new-model) nil))
-        ))
+      (:listbox-blur
+       (when (listbox-model-is-focused model) ; Check original
+         (setf (listbox-model-is-focused new-model) nil)))) ; Modify copy
 
     ;; --- Post-update Actions ---
+    ;; Generate commands based on the *new* model state
     (when (and selection-changed (listbox-model-on-select new-model))
       (let* ((selected-idx (listbox-model-selected-index new-model))
              (selected-item (when selected-idx (nth selected-idx (listbox-model-items new-model))))
              (on-select-msg (listbox-model-on-select new-model)))
-        ;; Assume on-select message might need index and/or item
-        (if (listp on-select-msg)
-            (push (append on-select-msg (list :index selected-idx :item selected-item)) commands)
-            (push on-select-msg commands)))) ; Simple signal
+        (push (if (listp on-select-msg)
+                  (append on-select-msg (list :index selected-idx :item selected-item))
+                  on-select-msg)
+              commands)))
 
+    ;; Return the *new* model and commands
     (values new-model (nreverse commands))))
-
 
 ;;;---------------------------------------------------------------
 ;;; View
 ;;;---------------------------------------------------------------
-(defun view-listbox (model dispatch-fn) ; Removed is-focused arg, using model's slot directly
+(defun view-listbox (model global-current-focus-id &optional dispatch-fn)
   "Creates a UI-NODE representation of the listbox.
    MODEL: The current listbox-model instance.
-   DISPATCH-FN: A function to call to dispatch messages.
+   GLOBAL-CURRENT-FOCUS-ID: The ID of the widget that currently has global focus.
+   DISPATCH-FN: (Optional) A function to call to dispatch messages for events like clicks.
    Returns a UI-NODE."
   (check-type model listbox-model)
   (let* ((items (listbox-model-items model))
          (selected-idx (listbox-model-selected-index model))
          (scroll-offset (listbox-model-scroll-offset model))
-         (is-focused (listbox-model-is-focused model)) ; Get focus state from model
-         ;; TODO: Determine visible height from layout properties passed down or context. Assume 10 for now.
-         (visible-height 10)
+         (widget-id (listbox-model-id model))
+         (is-globally-focused (equal widget-id global-current-focus-id))
+         (visible-height (listbox-model-height model)) ; Use height from model
          (visible-items (subseq items scroll-offset (min (length items) (+ scroll-offset visible-height)))))
 
+    ;; (format t "DEBUG: Listbox ~A, Global Focus: ~A, Is Globally Focused: ~A~%" widget-id global-current-focus-id is-globally-focused)
+    ;; (format t "DEBUG: Visible items for ~A: ~A~%" widget-id visible-items)
     (make-ui-node
      :type :list-box ; Specific type for renderer
-     :props (list :widget-id (listbox-model-id model)
-                  :class (if is-focused "listbox listbox-focused" "listbox") ; Use is-focused here
+     :props (list :widget-id widget-id
+                  ;; :height visible-height ; Height is now handled by style system
+                  :class (if is-globally-focused "listbox listbox-focused" "listbox")
                   :scroll-offset scroll-offset
                   :item-count (length items)
-                  :focusable t
+                  :focusable t ; This widget can be focused
                   ;; Click on item to select
-                  :events (list (list :click ; Platform needs to provide item index on click
-                                      (lambda (&key item-index)
-                                        (when item-index
-                                          (funcall dispatch-fn (list msg-listbox-select-index :index item-index)))))))
+                  :events (when dispatch-fn
+                            (list (list :click ; Platform needs to provide item index on click
+                                        (lambda (&key item-index) ; item-index relative to visible items
+                                          (when item-index
+                                            (let ((actual-index (+ scroll-offset item-index)))
+                                              (funcall dispatch-fn (list msg-listbox-select-index :index actual-index)))))))))
      :children (loop for item in visible-items
                      for item-index from scroll-offset
                      collect (make-ui-node

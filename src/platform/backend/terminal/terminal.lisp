@@ -22,6 +22,7 @@
                 #:make-key-event)      ; For creating key event objects
   ;; Note: Raw events are not mapped to messages, they are returned directly if parsing fails
   (:import-from #:elmtui.core.input-events #:make-raw-input-event)
+  (:import-from #:elmtui.platform.api #:term-w #:term-h #:term-style #:term-stream)
   (:export #:terminal-instance
            #:initialize-backend ; Re-exporting for discoverability
            #:shutdown-backend
@@ -43,6 +44,25 @@
   (current-style '(:fg :white :bg :black :attrs nil)) ; Store current style as a plist
   (input-buffer (make-array 0 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0))
   (lock (bt:make-recursive-lock "terminal-io-lock")))
+(defmethod term-w((instance terminal-instance))
+  "Return the width of the terminal instance."
+  (terminal-instance-width instance))
+
+(defmethod term-h((instance terminal-instance))
+  "Return the height of the terminal instance."
+  (terminal-instance-height instance))
+(defmethod (setf term-h) ((instance terminal-instance) new-height)
+  "Set the height of the terminal instance."
+  (setf (terminal-instance-height instance) new-height))
+(defmethod (setf term-w) ((instance terminal-instance) new-width)
+  "Set the width of the terminal instance."
+  (setf (terminal-instance-width instance) new-width))
+"Return the current style of the terminal instance."
+(defmethod term-style ((instance terminal-instance))
+  (terminal-instance-current-style instance))
+(defmethod term-stream ((instance terminal-instance))
+  "Return the stream of the terminal instance."
+  (terminal-instance-stream instance))
 
 (defmacro with-terminal-lock ((instance) &body body)
   `(bt:with-recursive-lock-held ((terminal-instance-lock ,instance))
@@ -51,59 +71,6 @@
 ;;;---------------------------------------------------------------
 ;;; Terminal Raw Mode Control
 ;;;---------------------------------------------------------------
-;; == src/platform/backend/terminal/terminal.lisp ==
-;; (defun enable-raw-mode (fd)
-;;   (declare (type termios original-termios-val))
-;;   (let* ((original-termios-val (sb-posix:tcgetattr fd))
-;;          (_ (unless original-termios-val
-;;               (error "sb-posix:tcgetattr failed to return a termios structure for fd ~A." fd))))
-;;     (declare (type termios original-termios-val))
-;;     ;; 1) Guard: error out if NIL
-
-;;     ;; 2) Declaration MUST come immediately after the guard, as the first “real” form
-
-
-;;     ;; 3) Now safe to copy and tweak it:
-;;     (let ((new-termios (copy-structure original-termios-val)))
-;;       (declare (type termios new-termios))
-;;       (setf (termios-lflag new-termios)
-;;             (logand (termios-lflag new-termios)
-;;                     (lognot (logior icanon echo))))
-;;       (setf (aref (termios-cc new-termios) vmin) 0)
-;;       (setf (aref (termios-cc new-termios) vtime) 1)
-;;       (sb-posix:tcsetattr fd sb-posix:tcsaflush new-termios)
-;;       original-termios-val)))
-;; == end/src/platform/backend/terminal/terminal.lisp ==
-(defmethod enable-raw-mode (fd)
-  (let ((tio (sb-posix:tcgetattr fd)))
-    ;; disable echo & canonical
-    (setf (sb-posix:termios-lflag tio)
-          (logand (lognot sb-posix:icanon)
-                  (lognot sb-posix:echo)
-                  (sb-posix:termios-lflag tio)))
-    (sb-posix:tcsetattr fd sb-posix:tcsaflush tio)
-    tio))
-
-
-
-;; (defun enable-raw-mode (fd)
-;;   (let ((original-termios-val (tcgetattr fd)))
-;;     (unless original-termios-val
-;;       ;; If tcgetattr returns NIL, it's an issue. Signal an error.
-;;       (error "sb-posix:tcgetattr failed to return a termios structure for fd ~A." fd))
-;;     ;; At this point, original-termios-val is guaranteed to be a termios structure
-;;     ;; (and thus a structure-object) due to the 'unless' check above, which errors if it's NIL.
-;;     (let ((new-termios (copy-structure original-termios-val)))
-;;       (declare (type termios new-termios)) ; This declaration is important for tcsetattr
-;;       (setf (termios-lflag new-termios)
-;;             (logand (termios-lflag new-termios)
-;;                     (lognot (logior icanon echo))))
-;;       (setf (aref (termios-cc new-termios) vmin) 0)
-;;       (setf (aref (termios-cc new-termios) vtime) 1)
-;;       (tcsetattr fd tcsaflush new-termios)
-;;       original-termios-val)))
-                                        ; Return the original termios structure
-
 (defun disable-raw-mode (fd original-termios)
   (when original-termios
     (tcsetattr fd tcsaflush original-termios)))
@@ -112,55 +79,48 @@
 ;;; Backend Lifecycle
 ;;;---------------------------------------------------------------
 
+;;; ——— 1) enable-raw-mode: guard + VMIN/VTIME like the original spec ———
+;; (defmethod enable-raw-mode ((fd integer))
+;;   (let ((orig (sb-posix:tcgetattr fd)))
+;;     (unless orig
+;;       (error "sb-posix:tcgetattr failed on fd ~A" fd))
+;;     (let ((new (copy-structure orig)))
+;;       ;; disable canonical & echo
+;;       (setf (sb-posix:termios-lflag new)
+;;             (logand (sb-posix:termios-lflag new)
+;;                     (lognot sb-posix:icanon)
+;;                     (lognot sb-posix:echo)))
+;;       ;; nonblocking read: VMIN=0, VTIME=1 (0.1s)
+;;       (setf (aref (sb-posix:termios-cc new) sb-posix:vmin)  0
+;;             (aref (sb-posix:termios-cc new) sb-posix:vtime) 1)
+;;       (sb-posix:tcsetattr fd sb-posix:tcsanow new)
+;;       orig)))
+                                        ; return original
+
+;;; ——— 2) initialize-backend: actually send escape sequences ———
 (defmethod initialize-backend ((backend-type (eql :terminal)) &key (tty-path "/dev/tty") &allow-other-keys)
-  (let ((fd (unix-open tty-path o_rdwr 0))) ; Use imported unix-open and o_rdwr
+  (let ((fd (sb-unix:unix-open tty-path sb-posix:o-rdwr 0)))
     (unless (and fd (>= fd 0))
       (error "Could not open terminal TTY: ~A" tty-path))
-    ;; enable-raw-mode will signal an error if tcgetattr fails.
-    ;; Thus, original-termios-obj will be a valid termios structure if we proceed.
-    (let* ((original-termios-obj (enable-raw-mode fd)) 
-           (stream (make-fd-stream fd :input t :output t :element-type 'character :buffering :none)) ; Use imported make-fd-stream
-           ;; Fetch current termios settings *after* raw mode is successfully enabled
-           (current-termios-obj (tcgetattr fd)) ; Use imported tcgetattr
-           (instance (make-terminal-instance :fd fd
-                                             :stream stream
-                                             :original-termios original-termios-obj
-                                             :current-termios current-termios-obj)))
-      (declare (type terminal-instance instance)
-               (type integer fd)
-               (type stream stream)
-               (type termios original-termios-obj)
-               (type termios current-termios-obj))
-      ;; Query initial dimensions
+    (let* ((orig-termios  (enable-raw-mode fd))
+           (stream        (sb-sys:make-fd-stream fd :input t :output t :element-type 'character :buffering :none))
+           (curr-termios  (sb-posix:tcgetattr fd))
+
+           (instance      (make-terminal-instance
+                           :fd             fd
+                           :stream         stream
+                           :original-termios orig-termios
+                           :current-termios curr-termios)))
+      ;; store dimensions
       (multiple-value-bind (w h) (get-screen-dimensions instance)
-        (setf (terminal-instance-width instance) w
+        (setf (terminal-instance-width  instance) w
               (terminal-instance-height instance) h))
-      (elmtui.backend.common.utils:render-seq (get-sequence :cursor-hide)) ; Hide cursor initially
-      (elmtui.backend.common.utils:render-seq (get-sequence :alt-screen-buffer))
+      ;; now actually hide cursor & switch to alt buffer
+      (send-sequence instance :cursor-hide)
+      ;(send-sequence instance :alt-screen-buffer)
       (clear-screen instance)
       (flush-output instance)
       instance)))
-
-(defmethod shutdown-backend ((instance terminal-instance))
-  (with-terminal-lock (instance)
-    (elmtui.backend.common.utils:render-seq (get-sequence :normal-screen-buffer))
-    (elmtui.backend.common.utils:render-seq (get-sequence :cursor-show))
-    (elmtui.backend.common.utils:render-seq (get-sequence :reset)) ; Reset styles
-    (flush-output instance)
-    (disable-raw-mode (terminal-instance-fd instance) (terminal-instance-original-termios instance))
-    (when (terminal-instance-stream instance)
-      (close (terminal-instance-stream instance))
-      (setf (terminal-instance-stream instance) nil))
-    (when (>= (terminal-instance-fd instance) 0)
-      (unix-close (terminal-instance-fd instance))
-      (setf (terminal-instance-fd instance) -1)))
-  t)
-
-(defmethod backend-name ((instance terminal-instance))
-  "StandardTerminal")
-
-(defmethod backend-version ((instance terminal-instance))
-  "0.1.0")
 
 ;;;---------------------------------------------------------------
 ;;; Display & Screen Management
@@ -233,31 +193,40 @@
 ;;;---------------------------------------------------------------
 ;;; Drawing Primitives
 ;;;---------------------------------------------------------------
+;;; ——— 3) apply-style-diff: write the raw ANSI bytes from ansi-*-seq ———
 (defun apply-style-diff (instance new-style-plist)
-  "Applies only the SGR sequences needed to transition from current to new style."
+  "Only emit the minimal SGR codes to transition from current to NEW-STYLE-PLIST."
   (let ((current (terminal-instance-current-style instance))
-        (stream (terminal-instance-stream instance))
-        (changes nil))
-
+        (stream  (terminal-instance-stream instance))
+        (changes '()))
+    ;; figure out what changed
     (unless (equal (getf current :fg) (getf new-style-plist :fg))
       (push (list :fg-color (getf new-style-plist :fg)) changes))
     (unless (equal (getf current :bg) (getf new-style-plist :bg))
       (push (list :bg-color (getf new-style-plist :bg)) changes))
-
-    (let ((current-attrs (getf current :attrs))
+    (let ((cur-attrs (getf current :attrs))
           (new-attrs (getf new-style-plist :attrs)))
       (dolist (attr '(:bold :italic :underline :faint :blink :inverse :strike :invisible))
-        (let ((cur-val (member attr current-attrs))
-              (new-val (member attr new-attrs)))
-          (unless (eq (not (not cur-val)) (not (not new-val))) ; Compare boolean presence
-            (push (list attr (not (not new-val))) changes)))))
-
+        (let ((had (member attr cur-attrs))
+              (want (member attr new-attrs)))
+          (unless (eq (not (null had)) (not (null want)))
+            (push (list attr (not (null want))) changes)))))
+    ;; emit in logical order
     (when changes
-      (dolist (change (nreverse changes)) ; Apply in a logical order (e.g. reset first if needed)
-        (case (first change)
-          (:fg-color (send-sequence instance (elmtui.backend.common.utils:ansi-fg-color-seq (second change))))
-          (:bg-color (send-sequence instance (elmtui.backend.common.utils:ansi-bg-color-seq (second change))))
-          (otherwise (send-sequence instance (elmtui.backend.common.utils:ansi-attr-seq (first change) (second change))))))
+      (dolist (chg (nreverse changes))
+        (case (first chg)
+          (:fg-color
+           (write-string
+            (elmtui.backend.common.utils:ansi-fg-color-seq (second chg))
+            stream))
+          (:bg-color
+           (write-string
+            (elmtui.backend.common.utils:ansi-bg-color-seq (second chg))
+            stream))
+          (otherwise
+           (write-string
+            (elmtui.backend.common.utils:ansi-attr-seq (first chg) (second chg))
+            stream))))
       (setf (terminal-instance-current-style instance) new-style-plist)
       (finish-output stream))))
 
@@ -446,14 +415,14 @@
                                  (let ((mouse-event (parse-sgr-mouse-event params raw final-byte-code)))
                                    (return-from parser
                                      (make-mouse-event :type (mouse-event-type mouse-event)
-                                                               :button (mouse-event-button mouse-event)
-                                                               :row (mouse-event-row mouse-event)
-                                                               :col (mouse-event-col mouse-event)
-                                                               :modifiers (mouse-event-modifiers mouse-event)))))
+                                                       :button (mouse-event-button mouse-event)
+                                                       :row (mouse-event-row mouse-event)
+                                                       :col (mouse-event-col mouse-event)
+                                                       :modifiers (mouse-event-modifiers mouse-event)))))
 
                                 ;; Other CSI sequences (likely keys)
                                 (t (multiple-value-bind (key-symbol remaining)
-                                       (read-escape-bytes (make-string-input-stream (coerce csi-content-list 'string)) :CSI)
+                                       (read-escape-bytes (make-string-input-stream (map 'string #'code-char csi-content-list)) :CSI)
                                      (declare (ignore remaining))
                                      (if key-symbol
                                          (make-key-event :key key-symbol :modifiers '(:alt) :char nil) ; Assume Alt for now
@@ -464,7 +433,7 @@
                      ((= introducer-char-code #o117) ; 'O'
                       (if (> (length bytes-vector) 2)
                           (multiple-value-bind (key-symbol remaining)
-                              (read-escape-bytes (make-string-input-stream (coerce (subseq bytes-vector 2) 'string)) :SS3)
+                              (read-escape-bytes (make-string-input-stream (map 'string #'code-char (subseq bytes-vector 2))) :SS3)
                             (declare (ignore remaining))
                             (if key-symbol
                                 (make-key-event :key key-symbol :modifiers '(:alt) :char nil) ; Assume Alt
@@ -474,8 +443,8 @@
                      ;; Alt + Character (ESC followed by a non-introducer)
                      (t (let ((char (code-char introducer-char-code)))
                           (make-key-event :key (intern (string-upcase (string char)) :keyword)
-                                                  :char char
-                                                  :modifiers '(:alt))))))
+                                          :char char
+                                          :modifiers '(:alt))))))
                  ;; Just ESC key
                  (make-key-event :key :escape :modifiers nil :char nil)))
 
@@ -490,17 +459,17 @@
              (let* ((base-char-code (+ first-byte 64))
                     (base-char (code-char base-char-code)))
                (make-key-event :key (intern (format nil "C-~A" base-char) :keyword)
-                                       :char (code-char first-byte) ; Keep original control char
-                                       :modifiers '(:control))))
+                               :char (code-char first-byte) ; Keep original control char
+                               :modifiers '(:control))))
 
             ;; --- Printable Characters ---
             (t (let ((char (code-char first-byte)))
                  (make-key-event :key (intern (string char) :keyword) ; Use char itself as key symbol
-                                         :char char
-                                         :modifiers nil))))
+                                 :char char
+                                 :modifiers nil))))
         (error (e)
           (warn "Error parsing input bytes ~A: ~A. Returning raw event." bytes-vector e)
-          (make-raw-input-event :bytes raw)))))) ; Fallback to raw event on error
+          (make-raw-input-event :bytes (coerce raw '(vector (unsigned-byte 8))))))))) ; Fallback to raw event on error
 
 
 (defmethod poll-input-event ((instance terminal-instance) &key timeout)
@@ -565,30 +534,55 @@
     (finish-output (terminal-instance-stream instance)))
   t)
 
-(defmethod set-input-mode ((instance terminal-instance) mode)
-  (declare (ignore mode))
-  ;; Raw mode is handled by initialize/shutdown. Other modes (cbreak, cooked)
-  ;; are not explicitly managed here beyond that.
+;; (defmethod set-input-mode ((instance terminal-instance) mode)
+;;   (declare (ignore mode))
+;; Raw mode is handled by initialize/shutdown. Other modes (cbreak, cooked)
+;; are not explicitly managed here beyond that.
+;;; ——— 4) shutdown-backend: restore screen, cursor & reset ———
+;; (defmethod shutdown-backend ((instance terminal-instance))
+;;   (with-terminal-lock (instance)
+;;     ;; back to normal buffer, show cursor, reset all
+;;     (send-sequence instance :normal-screen-buffer)
+;;     (send-sequence instance :cursor-show)
+;;     (send-sequence instance :reset)
+;;     (flush-output instance)
+;;     (disable-raw-mode (terminal-instance-fd instance)
+;;                       (terminal-instance-original-termios instance))
+;;     ;; close streams/fds
+;;     (when (terminal-instance-stream instance)
+;;       (close (terminal-instance-stream instance))
+;;       (setf (terminal-instance-stream instance) nil))
+;;     (when (>= (terminal-instance-fd instance) 0)
+;;       (unix-close (terminal-instance-fd instance))
+;;       (setf (terminal-instance-fd instance) -1)))
+;;   t)
+(defmethod enable-raw-mode ((fd integer))
+  (let ((orig (the sb-posix:termios (sb-posix:tcgetattr fd))))
+
+    ;; now safe to treat ORIG as a termios structure
+    (let ((new (the sb-posix:termios (sb-int:sys-copy-struct orig))))
+      ;; disable canonical & echo
+      (setf (sb-posix:termios-lflag new)
+            (logand (sb-posix:termios-lflag new)
+                    (lognot sb-posix:icanon)
+                    (lognot sb-posix:echo)))
+      ;; nonblocking reads: VMIN=0, VTIME=1
+      (setf (aref (sb-posix:termios-cc new) sb-posix:vmin)  0
+            (aref (sb-posix:termios-cc new) sb-posix:vtime) 1)
+      (sb-posix:tcsetattr fd sb-posix:tcsaflush new)
+      orig)))
+(defmethod shutdown-backend ((instance elmtui.backend.terminal:terminal-instance))
+  (with-terminal-lock (instance)
+    (send-sequence instance :normal-screen-buffer)
+    (send-sequence instance :cursor-show)
+    (send-sequence instance :reset)
+    (flush-output instance)
+    (disable-raw-mode (terminal-instance-fd instance)
+                      (terminal-instance-original-termios instance))
+    (when (terminal-instance-stream instance)
+      (close (terminal-instance-stream instance))
+      (setf (terminal-instance-stream instance) nil))
+    (when (>= (terminal-instance-fd instance) 0)
+      (unix-close (terminal-instance-fd instance))
+      (setf (terminal-instance-fd instance) -1)))
   t)
-
-;;;---------------------------------------------------------------
-;;; Capability Querying
-;;;---------------------------------------------------------------
-(defmethod query-feature ((instance terminal-instance) feature-keyword)
-  (case feature-keyword
-    (:unicode (string= (uiop:getenv "LC_ALL") "en_US.UTF-8")) ; Basic check
-    (:truecolor (equal (uiop:getenv "COLORTERM") "truecolor"))
-    (:mouse t) ; Assume modern terminals support it if requested
-    (otherwise nil)))
-
-(defmethod supports-unicode-p ((instance terminal-instance))
-  (query-feature instance :unicode))
-
-(defmethod supports-mouse-p ((instance terminal-instance))
-  (query-feature instance :mouse))
-
-;;;---------------------------------------------------------------
-;;; Raw Access (Escape Hatch)
-;;;---------------------------------------------------------------
-(defmethod get-native-handle ((instance terminal-instance))
-  (terminal-instance-fd instance))

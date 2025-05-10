@@ -1,29 +1,29 @@
 ;;; ───────────────────────── 2. Selector Engine ──────────────────────────
 (uiop:define-package :elmtui.style-lib.selector
   (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types :elmtui.style-lib.api)
+  (:import-from :elmtui.style-lib.api
+   :selector :selects :specificity)
+  (:import-from :elmtui.view.core :ui-node :ui-node-type)
   (:export
    ;; selector classes
-   :selector :class-selector :id-selector :lisp-class-selector
+   ;; selector classes
+   :selector :type-selector :class-selector :id-selector
    :combined-selector :or-selector :child-selector :desc-selector
    ;; reader macros
-   :cls> :id> :cl-cls> :and> :or> :child> :descendant>
+   :type> :cls> :id> :and> :or> :child> :descendant> ; Added type>, removed cl-cls>
    ;; API
    :selects :specificity))
 
 (in-package :elmtui.style-lib.selector)
 
-(defclass selector () ())
 
-;;; base + generics
-(defgeneric selects (selector target)
-  (:documentation
-   "Return T if the given selector selects the given target, NIL otherwise."))
+;;; base + generics ------------------------------------------------
+;;; imported from style-lib/api
 
 (defmethod print-object ((selector selector) stream)
   "Print a representation of the selector."
   (format stream "<~a:>" (type-of selector)))
 
-(defgeneric specificity (sel))
 
 ;;; simple selectors -------------------------------------------------------
 (defclass class-selector (selector)
@@ -42,7 +42,14 @@
   ((klass :initarg :klass :reader sel-klass)))
 (defmethod selects ((s lisp-class-selector) o)
   (typep o (sel-klass s)))
-(defmethod specificity ((s lisp-class-selector)) 1)
+(defmethod specificity ((s id-selector)) 100)
+
+;; New Type Selector
+(defclass type-selector (selector)
+  ((node-type :initarg :node-type :reader sel-type :type keyword)))
+(defmethod selects ((s type-selector) (o ui-node))
+  (eq (sel-type s) (ui-node-type o)))
+(defmethod specificity ((s type-selector)) 1) ; Specificity like an element type
 
 ;;; combinators ------------------------------------------------------------
 (defclass combined-selector (selector)
@@ -80,12 +87,24 @@
 ;;; reader convenience -----------------------------------------------------
 (defmacro cls> (name) `(make-instance 'class-selector :class ,name))
 (defmacro id>  (name) `(make-instance 'id-selector    :id    ,name))
-(defmacro cl-cls> (sym) `(make-instance 'lisp-class-selector :klass ,sym))
+(defmacro type> (kw) `(make-instance 'type-selector :node-type ,kw)) ; New macro for type selector
 (defmacro and> (&rest subs) `(make-instance 'combined-selector :subs (list ,@subs)))
 (defmacro or>  (&rest subs) `(make-instance 'or-selector       :subs (list ,@subs)))
 (defmacro child> (p c) `(make-instance 'child-selector :parent ,p :child ,c))
 (defmacro descendant> (a d) `(make-instance 'desc-selector :anc ,a :desc ,d))
 
-;;; fallback
-(defmethod selects ((_ selector) (_x t)) nil)
-(defmethod specificity ((_ selector)) 0)
+;;; Type Selector (using keywords)
+;;; Universal Selector (using a specific class might be cleaner, but eql specializer works)
+(defmethod selects ((selector (eql :*)) o)
+  "The universal selector '*' matches everything."
+  (declare (ignore o))
+  t)
+(defmethod specificity ((selector (eql :*))) 0)
+
+;;; fallback for selector classes against non-stylable objects
+(defmethod selects ((s selector) (o t))
+  (declare (ignore s o))
+  nil)
+
+;;; fallback specificity
+(defmethod specificity ((s t)) 0) ; Specificity for anything not explicitly defined

@@ -68,31 +68,31 @@
   (if (scrollable-container-model-disabled-p model)
       (return-from update-scrollable-container-model (values model nil)))
 
-   (unless (typep msg 'scrollable-container-msg)
-     (return-from update-scrollable-container-model (values model nil)))
+  (unless (typep msg 'scrollable-container-msg)
+    (return-from update-scrollable-container-model (values model nil)))
 
-   (let ((event-type (second msg))
-         (payload (cddr msg)))
-     (let ((current-st (scrollable-container-model-scroll-top model))
+  (let ((event-type (second msg))
+        (payload (cddr msg)))
+    (let* ((current-st (scrollable-container-model-scroll-top model))
            (current-sl (scrollable-container-model-scroll-left model))
            (vp-w (scrollable-container-model-viewport-width model))
            (vp-h (scrollable-container-model-viewport-height model))
            (c-w (scrollable-container-model-content-width model))
            (c-h (scrollable-container-model-content-height model))
            (new-st current-st) (new-sl current-sl)
-           (new-vp-w vp-w) (new-vp-h vp-h)
+           (new-vp-w vp-w) (new-vp-h vp-h) ;; new viewport dimensions
            (new-c-w c-w) (new-c-h c-h)
            (new-focused-p (scrollable-container-model-focused-p model))
            (commands nil)
            (scrolled-p nil))
-       ;; Add type declarations
-       (declare (type integer current-st current-sl new-st new-sl)
-                (type unsigned-byte vp-w vp-h c-w c-h new-vp-w new-vp-h new-c-w new-c-h)
-                (type boolean new-focused-p scrolled-p)
-                (type list commands payload))
+      ;; Add type declarations
+      (declare (type integer current-st current-sl new-st new-sl)
+               (type unsigned-byte vp-w vp-h c-w c-h new-vp-w new-vp-h new-c-w new-c-h)
+               (type boolean new-focused-p scrolled-p)
+               (type list commands payload))
 
-       (case event-type
-         (:scroll
+      (case event-type
+        (:scroll
          (let ((dx (getf payload :delta-x 0))
                (dy (getf payload :delta-y 0)))
            (setf new-sl (+ current-sl dx))

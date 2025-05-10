@@ -3,15 +3,17 @@
 ;;; Comprehensive Elm State Management (Transactional, Observable, Thread-safe)
 (uiop:define-package :elmtui.state
   (:use :cl)
+  (:import-from :elmtui.core.globals
+   :*app-state*)
   (:import-from :elmtui.statelib.state
    :application-state :make-application-state :state-ref :get-state :set-state
                 :merge-state :with-state :with-comp-state :state-if-unset-else
                 :application-state-observers :application-state-lock
                 :application-state-transaction-log :application-state-transaction-history
-                :log-state-data)
+                :log-state-data )
   (:import-from :elmtui.statelib.transaction
    :start-transaction :commit-transaction :rollback-transaction
-                :transaction-open-p :with-transaction)
+                :undo-last-transaction :transaction-open-p :with-transaction)
   (:import-from :elmtui.statelib.observe
                 ;; :subscribe-to-state :unsubscribe-from-state
                 )
@@ -19,7 +21,7 @@
    ;; Core state types and accessors
    :application-state :make-application-state :state-ref :get-state :set-state
    :merge-state :with-state :with-comp-state :state-if-unset-else
-   :application-state-observers :application-state-lock
+   :application-state-observers :application-state-lock ;; :set-state!
    :application-state-transaction-log :application-state-transaction-history
    :log-state-data
    ;; Transactions
@@ -33,13 +35,13 @@
 (in-package :elmtui.state)
 
 ;; Define the global application state instance
-(defvar *app-state* (make-application-state)
-  "The global application state instance.")
+;; (defvar *app-state* (make-application-state)
+;;   "The global application state instance.")
 
 ;; Define the rollback function expected by with-async-restarts
 (defun rollback-state ()
   "Rolls back the last transaction on the global *app-state*."
-  (undo-last-transaction *app-state*))
+  (undo-last-transaction elmtui.core.globals:*app-state*))
 
 ;;; API CONTRACTS:
 ;; - All state is stored in an application-state struct (hash-table-based, thread-safe).
@@ -66,3 +68,4 @@
 ;; - Transactions batch updates for atomicity.
 ;; - Thread safety via mutexes.
 ;; - Observers allow efficient, reactive UI updates.
+

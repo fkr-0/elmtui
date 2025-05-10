@@ -44,6 +44,12 @@
    :supports-truecolor-p
    :max-colors
 
+   ;; Terminal Instance
+   :term-w
+   :term-h
+   :term-stream
+   :term-style
+
    ;; Input Handling
    :poll-input-event
    :peek-input-event
@@ -56,11 +62,18 @@
    :supports-unicode-p
    :supports-mouse-p
 
+   ;; terminal stats
+
+
    ;; Raw Access (Escape Hatch)
    :get-native-handle))
 
 (in-package :elmtui.platform.api)
 
+(defgeneric term-w (term))
+(defgeneric term-h (term))
+(defgeneric term-stream (term))
+(defgeneric term-style (term))
 ;;;---------------------------------------------------------------
 ;;; Backend Lifecycle
 ;;;---------------------------------------------------------------
@@ -310,3 +323,15 @@ This provides an escape hatch for backend-specific operations not covered by the
 Use with caution, as it breaks platform independence.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 Returns a native handle, or NIL if not applicable or not exposed."))
+
+;; (defgeneric terminal-instance-width (backend-instance)
+;;   (:documentation "Returns the width of the terminal instance in character cells."))
+
+;; (defgeneric terminal-instance-height (backend-instance)
+;;   (:documentation "Returns the height of the terminal instance in character cells."))
+
+;; (defgeneric terminal-instance-stream (backend-instance)
+;;   (:documentation "Returns the stream associated with the terminal instance."))
+
+;; (defgeneric terminal-instance-current-style (backend-instance)
+;;   (:documentation "Returns the current style applied to the terminal instance."))

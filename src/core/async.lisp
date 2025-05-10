@@ -15,7 +15,7 @@
            :*async-errors*
    :await-cmd
            :cancel-cmd))
-           ; Removed export of *app-sender*
+                                        ; Removed export of *app-sender*
 (in-package :elmtui.core.async)
 
 ;;;-----------------------------------------------------------------------------
@@ -116,6 +116,8 @@
         (:batch (mapcar #'cancel-cmd (cadr cmd)))
         (:dispatch nil) ; Cannot cancel a dispatch command
         (otherwise (log:warn "Cannot cancel unknown command type: ~A" cmd-type) nil)))))
+
+
 
 ;;; USAGE EXAMPLES:
 ;; (let ((cmd (cmd-async #'sleep 1)))

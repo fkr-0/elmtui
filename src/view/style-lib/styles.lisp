@@ -2,12 +2,12 @@
 (uiop:define-package :elmtui.style-lib.styles
   (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types)
   (:import-from :elmtui.style-lib.api
-   :style :property :value :style-group :style-set
-                :style-value :valid-style-value-p :stylegroup-p)
+   :style :property :value :style-group
+   :style-set :make-style :style-value :valid-style-value-p :stylegroup-p)
   ;; (:import-from :elmtui.style-lib.stylable
   ;;  :stylable-id)
   (:export
-   :defstyle :defstylegroup :make-style :style-p
+   :defstyle :defstylegroup  :style-p
    :default-styles))
 
 (in-package :elmtui.style-lib.styles)

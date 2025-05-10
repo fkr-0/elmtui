@@ -24,8 +24,8 @@
                 #:mouse-event-type #:mouse-event-button #:mouse-event-row #:mouse-event-col #:mouse-event-modifiers
                 #:make-mouse-event     ; For creating mouse event objects
                 #:make-key-event)      ; For creating key event objects
- ;; Note: Raw events are not mapped to messages, they are returned directly if parsing fails
- (:import-from #:elmtui.core.input-events #:make-raw-input-event)
+  ;; Note: Raw events are not mapped to messages, they are returned directly if parsing fails
+  (:import-from #:elmtui.core.input-events #:make-raw-input-event)
   (:shadowing-import-from #:elmtui.backend.common.utils #:render-seq) ; Ensure we use our common one
   (:export #:urxvt-instance
            #:initialize-backend
@@ -101,9 +101,10 @@
                                               :stream stream
                                               :original-termios original-termios)))
           ;; Set non-blocking on master PTY for reads
-          (fcntl master-fd sb-posix::f-setfd (fcntl master-fd sb-posix::f_getfd 0)) ; Clear O_NONBLOCK if set by run-program
-          (fcntl master-fd sb-posix::f-setfd (logior (fcntl master-fd sb-posix::f_getfd 0) sb-posix::o_nonblock))
-
+          (fcntl master-fd sb-posix::f-setfd (fcntl master-fd sb-posix::f-getfd 0)) ; Clear O_NONBLOCK if set by run-program
+          (fcntl master-fd sb-posix::f-setfd (logior
+                                              (fcntl master-fd sb-posix::f-getfd 0)
+                                              sb-posix::o-nonblock))
           (sleep 0.5) ; Give URxvt a moment to start up
 
           (multiple-value-bind (w h) (get-screen-dimensions instance)
@@ -313,7 +314,7 @@
                             ((>= button-code 64)                         ; scroll events
                              (if (evenp (logand button-code 1)) :scroll-up :scroll-down))
                             (t                                            :unknown-mouse)))
-         (final-button    (ecase type
+         (final-button    (case type
                             (:scroll-up   4)
                             (:scroll-down 5)
                             (otherwise    (1+ button)))))                 ; shift 0→1,1→2,2→3
@@ -390,8 +391,8 @@
           (t
            (let ((c (code-char first-byte)))
              (make-key-event :key (intern (string c) :keyword)
-                                   :char c
-                                   :modifiers nil))))
+                             :char c
+                             :modifiers nil))))
       (error (e)
         (warn "Parsing error ~A; returning raw" e)
         (make-raw-input-event :bytes raw)))))

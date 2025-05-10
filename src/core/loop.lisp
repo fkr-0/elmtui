@@ -3,32 +3,36 @@
 ;;; Event Loop & Dispatcher (using clevelib)
 (uiop:define-package :elmtui.core.loop
   (:use :cl)
+  (:import-from :elmtui.core.globals
+   :*event-loop* :*subscribers*)
+  (:import-from :elmtui.core.conditions
+   :subscriber-handler-error :event-loop-dispatch-error)
+  (:import-from :clevelib.message
+   :message-type)
+  (:import-from :elmtui.core.input-events
+                #:key-event #:key-event-key)
   (:import-from :clevelib.event-loop
-    :event-loop :make-event-loop :run-loop :stop-loop :event-loop-active-p
-    :enqueue-event :i-queue :o-queue)
+   :event-loop :make-event-loop :run-loop :stop-loop :event-loop-active-p
+                :enqueue-event :i-queue :o-queue)
   (:import-from :clevelib.channel
-    :make-channel :channel-send :channel-receive :channel-close)
+   :make-channel :channel-send :channel-receive :channel-close)
   (:export :start-loop
-           :stop-loop
-           :subscribe
-           :publish
-           :*event-loop*
-           :*subscribers*
-           :instrument-event-loop
-           :event-loop-active-p))
+   :enqueue-event
+           :stop-loop :unsubscribe
+           :subscribe :publish
+           :*event-loop* :*subscribers*
+           :instrument-event-loop :event-loop-active-p))
 (in-package :elmtui.core.loop)
 
-(defvar *event-loop* nil "The main event loop instance.")
-(defvar *subscribers* (make-hash-table :test 'equal) "Registered event subscribers.")
 
 (defun start-loop (&key (fps 60) (wait t))
   "Initialize and start the main event loop. Supports instrumentation."
   (unless *event-loop*
     (setf *event-loop*
-      (make-event-loop
-        :wait wait
-        :fps fps
-        :loop-fun #'dispatch-event)))
+          (make-instance 'clevelib.event-loop:event-loop
+                         :wait wait
+                         :fps fps
+                         :loop-fun #'dispatch-event)))
   (run-loop *event-loop*))
 
 (defun stop-loop ()
@@ -60,17 +64,28 @@
 
 (defun publish (event)
   "Publish EVENT to all subscribers of its type. Handles subscriber-handler-error."
-  ;; Use the imported message-type function
-  (let ((handlers (gethash (clevelib.message:message-type event) *subscribers*)))
-    (dolist (handler handlers)
-      (elmtui.core.conditions:with-recovery (elmtui.core.conditions:subscriber-handler-error)
-        (handler-case
-            (funcall handler event)
-          (error (e)
-            (signal 'elmtui.core.conditions:subscriber-handler-error
-                    :event event
-                    :handler handler
-                    :reason e)))))))
+  ;; Determine event type based on event structure
+  (let* ((event-key (cond
+                      ((typep event 'clevelib.message:message)
+                       (clevelib.message:message-type event))
+                      ((typep event 'key-event)
+                       (key-event-key event))
+                      ((listp event)
+                       (first event))
+                      (t
+                       (warn "Publishing an event of unknown structure: ~S" event)
+                       nil))) ; Fallback for unknown structures
+         (handlers (when event-key (gethash event-key *subscribers*))))
+    (when event-key ; Proceed only if a valid event key was determined
+      (dolist (handler handlers)
+        (elmtui.core.conditions:with-recovery (elmtui.core.conditions:subscriber-handler-error)
+          (handler-case
+              (funcall handler event) ; Pass the original event to the handler
+            (error (e)
+              (signal 'elmtui.core.conditions:subscriber-handler-error
+                      :event event
+                      :handler handler
+                      :reason e))))))))
 
 (defun dispatch-event (event)
   "Dispatch EVENT to subscribers and perform instrumentation. Handles event-loop-dispatch-error."
@@ -89,7 +104,7 @@
 
 (defun instrument-event-loop (event)
   "Instrumentation hook for debugging/profiling. Extend with hooks for timing/metrics."
-  (format t "[event-loop] Dispatched event: ~A~%" event)
+  ;; (format t "[event-loop] Dispatched event: ~A~%" event)
   (dolist (hook *event-loop-instrumentation-hooks*)
     (funcall hook event)))
 

@@ -4,12 +4,13 @@
 
 (uiop:define-package :elmtui.state.elm
   (:use :cl :elmtui.state)
+  (:import-from :ut.state.state #:set-state!)
   (:export :defmodel
-           :defmsg
+   :defmsg
            :defupdate
-           :*model-schemas*
+   :*model-schemas*
            :*msg-variants*
-           :*update-contracts*))
+   :*update-contracts*))
 (in-package :elmtui.state.elm)
 
 (defvar *model-schemas* (make-hash-table :test 'equal)
@@ -45,7 +46,7 @@
            ;; Optionally: validate slots
            ,@(loop for slot in schema
                    when (getf slot :validate)
-                   collect
+                     collect
                    `(unless (funcall ,(getf slot :validate) (gethash ',(getf slot :name) model))
                       (error "Model slot ~A failed validation." ',(getf slot :name))))
            model))
