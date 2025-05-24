@@ -11,7 +11,7 @@
   (uiop:define-package :elmtui.dev
     (:use :cl :elmtui.core.events :elmtui.core.conditions :elmtui.view.core
           :elmtui.view.layout :elmtui.view.styled :elmtui.view.layout.grid
-          :elmtui.view.geo) ; Added :elmtui.view.geo
+     :elmtui.view.geo) ; Added :elmtui.view.geo
     (:export :example-flexbox-layout
      :example-grid-layout
              :send-foo-message
@@ -119,7 +119,7 @@
     (elmtui.core.loop:publish (elmtui.core.events:make-message :demo :fail))
     ;; Remove subscriber (dynamic removal, not yet implemented)
     ;; (elmtui.core.loop:unsubscribe token)
-    (elmtui.core.loop:stop-loop)))
+    (elmtui.core.loop:elm-stop-loop)))
 
 ;;; Example usage:
 ;; (demo-event-loop)

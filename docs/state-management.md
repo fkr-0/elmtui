@@ -171,11 +171,11 @@ Implement the state transition logic. Use the local `set-state!` macro for all m
 (defupdate main-update (app-state msg)
   "Main application update function. Handles global messages and delegates to children."
   ;; First, try to handle focus messages using the dedicated utility.
-  ;; elmtui.core.focus:handle-focus-message expects the app-state, the message,
+  ;; elmtui.core.base-focus:handle-base-focus-message expects the app-state, the message,
   ;; and the transactional set-state! function (provided by defupdate's macrolet).
-  (if (elmtui.core.focus:handle-focus-message
+  (if (elmtui.core.base-focus:handle-base-focus-message
        app-state msg (lambda (key value) (set-state! key value)))
-      ;; If handle-focus-message returns T (message was handled),
+      ;; If handle-base-focus-message returns T (message was handled),
       ;; usually no further commands are needed from this level.
       nil
       ;; Else, the message was not a focus message or not handled by the utility,
@@ -201,7 +201,7 @@ Implement the state transition logic. Use the local `set-state!` macro for all m
              ;; Potentially return commands based on state changes
              (return-from main-update nil)))
 
-          ;; Note: :update-focusable-ids is handled by elmtui.core.focus:handle-focus-message
+          ;; Note: :update-base-focusable-ids is handled by elmtui.core.base-focus:handle-base-focus-message
 
           ;; --- Message Delegation Example ---
       (:main-view-msg

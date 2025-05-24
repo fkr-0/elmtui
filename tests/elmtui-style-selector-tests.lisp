@@ -33,10 +33,10 @@
                     :children children
                     :parent parent))
 
+
 ;;; Test Cases
 
 (test type-selector-test
-  "Test the type selector (type>)"
   (let ((node-div (make-test-node :type :div))
         (node-span (make-test-node :type :span)))
     (is-true (selects (type> :div) node-div))
@@ -46,7 +46,6 @@
     (is (= 1 (specificity (type> :div))))))
 
 (test class-selector-test
-  "Test the class selector (cls>)"
   (let ((node1 (make-test-node :classes "foo"))
         (node2 (make-test-node :classes '("foo" "bar")))
         (node3 (make-test-node :classes "baz")))
@@ -58,7 +57,6 @@
     (is (= 10 (specificity (cls> "foo"))))))
 
 (test id-selector-test
-  "Test the ID selector (id>)"
   (let ((node1 (make-test-node :id "my-id"))
         (node2 (make-test-node :id "other-id")))
     (is-true (selects (id> "my-id") node1))
@@ -67,16 +65,14 @@
     (is (= 100 (specificity (id> "my-id"))))))
 
 (test universal-selector-test
-  "Test the universal selector (:*)"
   (let ((node1 (make-test-node :type :div))
         (node2 (make-test-node :id "foo")))
     (is-true (selects :* node1))
     (is-true (selects :* node2))
-    (is-true (selects :* nil)) ; Should match anything
+    (is-true (selects :* nil))
     (is (= 0 (specificity :*)))))
 
 (test combined-selector-test
-  "Test the combined selector (and>)"
   (let ((node1 (make-test-node :type :button :id "btn1" :classes "primary"))
         (node2 (make-test-node :type :button :classes "primary"))
         (node3 (make-test-node :type :label :classes "primary")))
@@ -90,7 +86,6 @@
            (specificity (and> (type> :button) (id> "btn1")))))))
 
 (test or-selector-test
-  "Test the OR selector (or>)"
   (let ((node-btn (make-test-node :type :button))
         (node-lbl (make-test-node :type :label))
         (node-div (make-test-node :type :div)))
@@ -100,5 +95,16 @@
     (is (= (max (specificity (type> :button)) (specificity (type> :label)))
            (specificity (or> (type> :button) (type> :label)))))))
 
-;; TODO: Add tests for child> and descendant> selectors - requires setting up parent links.
-;; These might be better suited for the integration test where a tree exists.
+;;; Additional coverage: child> and descendant> selectors
+(test child-descendant-selector-test
+  (let* ((parent (make-test-node :type :div :id "parent"))
+         (child (make-test-node :type :span :parent parent))
+         (grandchild (make-test-node :type :label :parent child)))
+    (is-true (selects (child> (type> :div) (type> :span)) child))
+    (is-false (selects (child> (type> :div) (type> :span)) grandchild))
+    (is-true (selects (descendant> (type> :div) (type> :label)) grandchild))
+    (is-false (selects (descendant> (type> :span) (type> :div)) parent))))
+
+;;; Run all tests
+(defun run-elmtui-style-selector-tests ()
+  (fiveam:run! 'elmtui-style-selector-suite))

@@ -3,18 +3,19 @@
 ;;; Async Command Interpreter (using clevelib)
 (uiop:define-package :elmtui.core.async
   (:use :cl)
-  (:import-from :clevelib.async
+  (:import-from :cleve-elm.async
    :async-task :new-task :async-exec :cancel-async-task
    :async-task-finished-p :async-task-result :async-task-status
                 :promise :resolve-promise :reject-promise :await)
   (:import-from :elmtui.core.globals #:*app-sender*) ; Import *app-sender* from globals
   (:export :cmd-async
-   :cmd-batch
-           :interpret-cmd
-   :*async-tasks*
-           :*async-errors*
-   :await-cmd
-           :cancel-cmd))
+   :spawn-worker
+           :cmd-batch
+   :interpret-cmd
+           :*async-tasks*
+   :*async-errors*
+           :await-cmd
+   :cancel-cmd))
                                         ; Removed export of *app-sender*
 (in-package :elmtui.core.async)
 
@@ -24,7 +25,7 @@
 
 ;; *app-sender* is now defined and imported from elmtui.core.events
 
-;; (defvar *async-tasks* (make-hash-table :test 'equal) "Active async tasks.") ;; Still not used for cancellation
+(defvar *async-tasks* (make-hash-table :test 'equal) "Active async tasks.") ;; Still not used for cancellation
 (defvar *async-errors* (make-hash-table :test 'equal) "Async task errors.")
 
 
@@ -118,6 +119,20 @@
         (otherwise (log:warn "Cannot cancel unknown command type: ~A" cmd-type) nil)))))
 
 
+(defun spawn-worker (task &key name )
+  "Spawn a worker thread to execute TASK asynchronously."
+  (elmtui.core.conditions:with-async-restarts (c)
+    (handler-case
+        (let ((task-id (gensym (format nil "WORKER-~A" name)))
+              (worker-task (new-task task)))
+          ;; Store the worker task in the async tasks hash table
+          (setf (gethash task-id *async-tasks*) worker-task)
+          ;; Execute the worker task
+          (async-exec worker-task)
+          ;; Return the task ID
+          task-id)
+      ;; Handle errors with restarts
+      (error (e) (error 'elmtui.core.conditions:async-task-error :task task :reason e)))))
 
 ;;; USAGE EXAMPLES:
 ;; (let ((cmd (cmd-async #'sleep 1)))
@@ -125,6 +140,6 @@
 ;;   (await-cmd cmd))
 
 ;;; CONTRACTS:
-;; - All async commands are executed as clevelib.async tasks.
+;; - All async commands are executed as cleve-elm.async tasks.
 ;; - Errors are handled with CL conditions and restarts.
 ;; - Supports batching and cancellation of commands.

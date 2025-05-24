@@ -4,65 +4,51 @@
 
 (uiop:define-package :elmtui.state.elm
   (:use :cl :elmtui.state)
-  (:import-from :ut.state.state #:set-state!)
-  (:export :defmodel
-   :defmsg
+  ;; Import model system from dedicated module
+  (:import-from :elmtui.state.model 
+                #:defmodel 
+                #:make-model 
+                #:initialize-model-state
+                #:get-slot
+                #:*model-schemas*)
+  ;; Import message system from dedicated module
+  (:import-from :elmtui.state.msg 
+                #:*message-schemas* 
+                #:defmsg)
+
+  (:export ;; Re-export model system
+           :defmodel
+           :make-model
+           :initialize-model-state
+           :get-slot
+           :*model-schemas*
+           ;; Re-export message system
+           :defmsg
+           :*message-schemas*
+           ;; Update system
            :defupdate
-   :*model-schemas*
-           :*msg-variants*
-   :*update-contracts*))
+           :*update-contracts*))
 (in-package :elmtui.state.elm)
-
-(defvar *model-schemas* (make-hash-table :test 'equal)
-  "Registry of model schemas for contract validation and documentation.")
-
-(defvar *msg-variants* (make-hash-table :test 'equal)
-  "Registry of allowed message variants for runtime validation.")
 
 (defvar *update-contracts* (make-hash-table :test 'equal)
   "Registry of update function contracts for documentation and validation.")
 
-;;; defmodel: Define a model schema with contract validation, defaulting, and observer hooks.
-(defmacro defmodel (name &rest slots)
-  "Define a MODEL schema for application-state.
-   - Registers schema in *model-schemas* for contract validation.
-   - Supports slot :type, :initform, :validate, :observer.
-   - Generates constructor with defaulting and validation.
-   - Optionally generates observer hooks for slots.
-   - Documents schema and usage."
-  (let ((schema (mapcar (lambda (slot)
-                          (destructuring-bind (slot-name &key type initform validate observer) slot
-                            (list :name slot-name :type type :initform initform :validate validate :observer observer)))
-                        slots)))
-    `(progn
-       (setf (gethash ',name *model-schemas*) ',schema)
-       (defun ,(intern (format nil "MAKE-~A" name)) ()
-         ;; Construct model with defaults and validation
-         (let ((model (make-hash-table :test 'equal)))
-           ,@(loop for slot in schema
-                   collect
-                   `(setf (gethash ',(getf slot :name) model)
-                          ,(or (getf slot :initform) nil)))
-           ;; Optionally: validate slots
-           ,@(loop for slot in schema
-                   when (getf slot :validate)
-                     collect
-                   `(unless (funcall ,(getf slot :validate) (gethash ',(getf slot :name) model))
-                      (error "Model slot ~A failed validation." ',(getf slot :name))))
-           model))
-       ;; Optionally: define observer hooks (stub)
-       ;; (defun ,(intern (format nil "~A-OBSERVERS" name)) () ...)
-       )))
-
-;;; defmsg: Register allowed message variants and runtime validation.
-(defmacro defmsg (name &rest variants)
-  "Define a Msg union: variants are symbols.
-   - Registers allowed variants in *msg-variants* for runtime validation.
-   - Generates a constant symbol listing allowed variants.
-   - Documents usage and anti-patterns."
-  `(progn
-     (setf (gethash ',name *msg-variants*) ',variants)
-     (defconstant ,(intern (string-upcase (symbol-name name))) ',variants)))
+;; Message definition is now handled by elmtui.state.msg:defmsg
+;; See src/state/msg.lisp for implementation details
+;; 
+;; The defmsg macro provides a standardized way to define message types and variants.
+;; It generates type-checked constructor functions and registers message schemas.
+;; Message creators should use these generated constructors (e.g., make-increment-counter-appmsg)
+;; for proper validation and consistent message format.
+;; 
+;; Example usage:
+;;   (defmsg AppMsg (:docstring "Main application messages")
+;;            IncrementCounter
+;;            (SetCounterLabel :new-label string))
+;;
+;; Generated functions:
+;;   (make-increment-counter-appmsg) => '(:increment-counter)
+;;   (make-set-counter-label-appmsg :new-label "Hello") => '(:set-counter-label :new-label "Hello")
 
 ;;; defupdate: Wrap a pure update function with transactional state, contract validation, and undo/redo.
 (defmacro defupdate (name args &body body)
@@ -77,6 +63,33 @@
      (defun ,name ,args
        (elmtui.state:with-transaction (,(first args))
          ,@body))))
+
+;;; Update Function Pattern Best Practices:
+;;;
+;;; 1. Use pattern matching (case/cond or a pattern matching library) for message dispatch
+;;; 2. Return command lists consistently, even when empty (nil)
+;;; 3. Always use typed constructors for message creation (e.g., make-increment-counter-appmsg)
+;;; 4. Keep update functions pure except for state changes via set-state!
+;;; 5. Group related logic into separate component update functions
+;;;
+;;; Example:
+;;;
+;;; (defupdate update-counter (app-state msg)
+;;;   "Update counter model state based on counter messages"
+;;;   (case (if (listp msg) (first msg) msg)
+;;;     (:increment
+;;;       (let ((amount (or (getf (rest msg) :amount) 1)))
+;;;         (setf (state-ref app-state :counter :value) 
+;;;               (+ (state-ref app-state :counter :value) amount))
+;;;         ;; Return nil commands - no side effects
+;;;         nil))
+;;;     (:decrement
+;;;       (let ((amount (or (getf (rest msg) :amount) 1)))
+;;;         (setf (state-ref app-state :counter :value)
+;;;               (- (state-ref app-state :counter :value) amount))
+;;;         ;; Return a command - e.g., play sound effect
+;;;         (list '(:play-sound :click))))
+;;;     (otherwise nil)))
 
 ;;; USAGE EXAMPLES:
 
@@ -102,8 +115,8 @@
       (:request-focus
        (let ((widget-id (getf msg-data :widget-id)))
          ;; TODO: Validate widget-id exists in focusable list?
-         (set-state! :focused-widget-id widget-id)) ; Uses local set-state! from defupdate
-       (return-from main-update nil)) ; Return nil commands
+         (setf (state-ref app-state :focused-widget-id) widget-id) ; Uses local set-state! from defupdate
+         (return-from main-update nil))) ; Return nil commands
 
       (:focus-next
        (let* ((current-focus (state-ref app-state :focused-widget-id))
@@ -116,8 +129,8 @@
                                 0 ; Wrap to start
                                 (1+ current-pos)))
                   (next-id (nth next-pos focusable-ids)))
-             (set-state! :focused-widget-id next-id)))) ; Uses local set-state!
-       (return-from main-update nil)) ; Return nil commands
+             (setf (state-ref app-state :focused-widget-id) next-id))) ; Uses local set-state!
+         (return-from main-update nil))) ; Return nil commands
 
       (:focus-previous
        (let* ((current-focus (state-ref app-state :focused-widget-id))
@@ -128,21 +141,21 @@
                                 (1- (length focusable-ids)) ; Wrap to end
                                 (1- current-pos)))
                   (prev-id (nth prev-pos focusable-ids)))
-             (set-state! :focused-widget-id prev-id)))) ; Uses local set-state!
-       (return-from main-update nil))) ; Return nil commands
+             (setf (state-ref app-state :focused-widget-id) prev-id))) ; Uses local set-state!
+         (return-from main-update nil))) ; Return nil commands
 
-    ;; --- Other Message Handling (Example) ---
-    ;; TODO: Integrate component updates (e.g., calling update-button, update-textinput)
-    ;; This likely involves checking msg-type or a target ID in msg-data.
-    (case msg-type
+      ;; --- Other Message Handling (Example) ---
+      ;; TODO: Integrate component updates (e.g., calling update-button, update-textinput)
+      ;; This likely involves checking msg-type or a target ID in msg-data.
+      ;; (case msg-type
       (:increment ; Example adapted from original commented code
-       (set-state! :counter (1+ (or (state-ref app-state :counter) 0))))
+       (setf (state-ref app-state :counter) (1+ (or (state-ref app-state :counter) 0))))
       (:decrement
-       (set-state! :counter (1- (or (state-ref app-state :counter) 0))))
+       (setf (state-ref app-state :counter) (1- (or (state-ref app-state :counter) 0))))
       ;; --- Internal State Updates ---
       (:update-focusable-ids
        (let ((new-ids (getf msg-data :ids)))
-         (set-state! :focusable-widget-ids new-ids)))
+         (setf (state-ref app-state :focused-widget-ids) new-ids)))
       ;; Add other message handlers here...
       (otherwise
        (log:warn "Unhandled message type in main-update: ~S" msg-type)))

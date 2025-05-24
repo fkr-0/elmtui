@@ -168,14 +168,45 @@
 
   Returns:
     The set value.")
-  (:method (value (app-state application-state) key &optional comp-id)
-    ;; WARNING: This bypasses the lock and transaction logging.
-    ;; Prefer using set-state! within defupdate.
-    (set-state app-state
-               (if comp-id
-                   (list comp-id key)
-                   key)
-               value)))
+  ;; (:method (value (app-state application-state) key &optional comp-id)
+  ;;   ;; WARNING: This bypasses the lock and transaction logging.
+  ;;   ;; Prefer using set-state! within defupdate.
+  ;;   (set-state app-state
+  ;;              (if comp-id
+  ;;                  (list comp-id key)
+  ;;                  key)
+  ;;              value))
+  )
+
+;;; ──────────────────────────────────────────────────────────────────────────
+;;;  Minimal logging for state mutations
+;;; ──────────────────────────────────────────────────────────────────────────
+
+(defstruct change
+  "A single key modification to APP-STATE."
+  key old new)
+
+(defun %log-change (app-state key old new)
+  (push (make-change :key key :old old :new new)
+        (application-state-transaction-log app-state)))
+
+;;; existing reader:
+;; (defun state-ref (value app-state key &optional comp-id)
+;;   (gethash key (application-state-data app-state) ))
+
+;;; NEW writer that records the diff
+(defmethod (setf state-ref) (new-value (app-state application-state) key &optional comp-id)
+  "Set the value of `KEY' in application state `APP-STATE' to `NEW-VALUE'.
+    Optionally provide COMP-ID to scope the key.
+    NOTE: This method bypasses transaction logging. Use within transaction logic"
+  (let* ((data (state-data-data (application-state-data app-state)))
+         (old  (gethash key data :%not-present%))
+         (key (if comp-id
+                  (list comp-id key)
+                  key)))
+    (setf (gethash key data) new-value)
+    (%log-change app-state key old new-value)
+    new-value))
 
 (defmethod log-state-data ((state application-state))
   "Log the state data."

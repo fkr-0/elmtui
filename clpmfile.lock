@@ -9,9 +9,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :sources
-(:implicit-file :type :file-system :system-files ("elmtui.asd"))
-(:implicit-file :type :file-system :system-files ("../clevelib/clevelib.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui-tests.asd"))
+(:implicit-file :type :file-system :system-files ("elmtui.asd"))
 (:implicit-file :type :file-system :system-files
  ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"))
 (:implicit-vcs :type :vcs :projects
@@ -32,12 +31,11 @@
 :requirements
 (:system :name "cl-reexport" :source "quicklisp")
 (:system :name "str" :source "quicklisp")
+(:system :name "alexandria" :source "quicklisp")
 (:system :name "slynk")
 (:system :name "bordeaux-threads")
-(:system :name "clevelib")
 (:system :name "asdf-package-system" :source "quicklisp")
 (:system :name "flexi-streams")
-(:system :name "cl-unicode")
 (:system :name "log4cl" :source "quicklisp")
 (:project :name "sly-quicklisp" :branch "master" :source :implicit-vcs)
 (:project :name "sly-asdf" :branch "master" :source :implicit-vcs)
@@ -46,9 +44,8 @@
 (:project :name "fiveam" :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379"
  :source :implicit-vcs)
 (:project :name "sly" :branch "master" :source :implicit-vcs)
-(:asd-file :name "elmtui.asd")
-(:asd-file :name "../clevelib/clevelib.asd")
 (:asd-file :name "elmtui-tests.asd")
+(:asd-file :name "elmtui.asd")
 (:asd-file :name "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 
 
@@ -57,8 +54,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :releases
-("../clevelib/clevelib.asd" :version :newest :source :implicit-file :systems
- ("clevelib"))
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd" :version :newest
  :source :implicit-file :systems ("quicklisp"))
 ("alexandria" :version "2024-10-12" :source "quicklisp" :systems ("alexandria"))
@@ -90,7 +85,7 @@
  ("global-vars"))
 ("log4cl" :version "2023-06-18" :source "quicklisp" :systems ("log4cl"))
 ("rove" :version "2024-10-12" :source "quicklisp" :systems ("rove"))
-("sly" :version (:commit "ce17a568efd3673e9d6f41438acc4023379c198e") :source
+("sly" :version (:commit "63131ef965d8ff3a6b79cc7aff8e8f5fc1a82aec") :source
  :implicit-vcs :systems
  ("slynk" "slynk/arglists" "slynk/fancy-inspector" "slynk/indentation"
   "slynk/mrepl" "slynk/package-fu" "slynk/profiler" "slynk/retro"
@@ -117,11 +112,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :reverse-dependencies
-("../clevelib/clevelib.asd"
- ((:system :name "elmtui") (:system :name "clevelib"))
- (t (:system :name "clevelib"))
- (t (:asd-file :name "../clevelib/clevelib.asd")))
-
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"
  ((:system :name "slynk-quicklisp") (:system :name "quicklisp"))
  (t
@@ -131,7 +121,8 @@
 ("alexandria" ((:system :name "fiveam") (:system :name "alexandria"))
  ((:system :name "elmtui") (:system :name "alexandria"))
  ((:system :name "cl-reexport") (:system :name "alexandria"))
- ((:system :name "bordeaux-threads") (:system :name "alexandria")))
+ ((:system :name "bordeaux-threads") (:system :name "alexandria"))
+ (t (:system :name "alexandria" :source "quicklisp")))
 
 ("asdf-flv"
  ((:system :name "fiveam") (:system :name "net.didierverna.asdf-flv")))
@@ -141,7 +132,7 @@
 
 ("bordeaux-threads" ((:system :name "rove") (:system :name "bordeaux-threads"))
  ((:system :name "log4cl") (:system :name "bordeaux-threads"))
- ((:system :name "clevelib") (:system :name "bordeaux-threads"))
+ ((:system :name "elmtui") (:system :name "bordeaux-threads"))
  (t (:system :name "bordeaux-threads")))
 
 ("cl-change-case" ((:system :name "str") (:system :name "cl-change-case")))
@@ -159,14 +150,13 @@
  ((:system :name "cl-change-case") (:system :name "cl-ppcre"))
  ((:system :name "cl-change-case") (:system :name "cl-ppcre-unicode")))
 
-("cl-reexport" ((:system :name "clevelib") (:system :name "cl-reexport"))
+("cl-reexport" ((:system :name "elmtui") (:system :name "cl-reexport"))
  (t (:system :name "cl-reexport" :source "quicklisp")))
 
 ("cl-str" ((:system :name "elmtui") (:system :name "str"))
  (t (:system :name "str" :source "quicklisp")))
 
-("cl-unicode" ((:system :name "cl-ppcre-unicode") (:system :name "cl-unicode"))
- (t (:system :name "cl-unicode")))
+("cl-unicode" ((:system :name "cl-ppcre-unicode") (:system :name "cl-unicode")))
 
 ("dissect" ((:system :name "rove") (:system :name "dissect")))
 
@@ -188,7 +178,6 @@
  ((:system :name "bordeaux-threads") (:system :name "global-vars")))
 
 ("log4cl" ((:system :name "elmtui") (:system :name "log4cl"))
- ((:system :name "clevelib") (:system :name "log4cl"))
  (t (:system :name "log4cl" :source "quicklisp")))
 
 ("rove" ((:system :name "asdf-test/tests") (:system :name "rove")))
@@ -204,7 +193,7 @@
  ((:system :name "slynk/arglists") (:system :name "slynk"))
  ((:system :name "slynk-quicklisp") (:system :name "slynk"))
  ((:system :name "slynk-asdf") (:system :name "slynk"))
- (t (:system :name "slynk"))
+ ((:system :name "elmtui") (:system :name "slynk")) (t (:system :name "slynk"))
  (t (:project :name "sly" :branch "master" :source :implicit-vcs)))
 
 ("sly-asdf"

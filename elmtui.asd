@@ -6,11 +6,31 @@
   :author       "User <user@archlinux>"
   :license      "GNU GPL, version 3"
   :source-control (:git "https://github.com/user/elmtui.git")
-  :depends-on   (#:clevelib #:alexandria #:str #:sb-posix #:log4cl)
+  :depends-on   (#:alexandria #:str #:sb-posix
+                              #:log4cl #:slynk
+                              #:cl-reexport
+                              #:bordeaux-threads)
   :pathname "./src/"
   :serial t
-  :components (
-               ;; Global Definitions (Load First)
+  :components ((:module "cleve-elm"
+                :pathname "clevelib/"
+                :serial t
+                :components ((:file "api")
+                             (:file "config")
+                             (:file "queue")
+                             (:file "thread")
+                             (:file "async")
+                             (:file "thread-pool")
+                             (:file "event-loop")
+                             (:file "channel")
+                             (:file "event")
+                             (:file "message")
+                             (:file "emitter")
+                             (:file "target")
+                             (:file "translator")
+                             ;; (:file "relay")
+                             (:file "ems")
+                             (:file "clevelib")))
                (:file "core/globals")
 
                ;; State Management (Load before Core/Conditions)
@@ -28,30 +48,13 @@
                                            (:file "package")))
 
                              (:file "state")
-                             (:file "elm")
-                             (:file "model")
                              (:file "msg")
+                             (:file "model")
+                             (:file "elm")
                              (:file "update")))
 
-               ;; Core Modules (Load after State)
-               (:module "core"
-                :pathname "./core/"
-                :serial t
-                :components (
-                             (:file "conditions")
-                             (:file "input_events") ; Added input events definition
-                             (:file "async")
-                             (:file "threads")
-                             (:file "events")
-                             (:file "focus") ; Added focus management
-                             (:file "keymap")
-                             (:file "loop")))
-
-               ;; --- View / UI Dependency Resolution ---
-               ;; Load core view definitions first
                (:file "view/geo")
                (:file "view/core")
-               ;; Load the style library needed by styled nodes and UI
                (:module "view/style-lib"
                 :pathname "view/style-lib/"
                 :serial t
@@ -68,10 +71,52 @@
                              (:file "stylable") ; Implementation details? Might depend on api.
                              (:file "styled-strings")
                              (:file "stylesheet")
-                             (:file "style-lib"))) ; Main package file?
+                             (:file "style-lib")))
+               (:file "view/styled")
+               (:file "view/position")
+               ;; Core Modules (Load after State)
+               (:module "core"
+                :pathname "./core/"
+                :serial t
+                :components (
+                             (:file "conditions")
+                             (:file "async")
+                             (:file "threads")
+                             (:file "event-channels")
+                             (:file "message-bus")
+                             (:file "topics")
+                             (:file "topic-registry")
+                             (:file "event-types") ; Event type definitions
+                             (:file "events")
+                             (:file "event-compat") ; Event compatibility layer
+                             (:file "event-propagation") ; Event propagation system
+                             (:file "event-async") ; Async event handling
+                             (:file "base-keymap")
+                             ;; (:file "focus-manager")
+                             ;; Enhanced Focus Management
+                             ;; Advanced Keyboard Event Handling
+
+                             (:module "keymap"
+                              :pathname "keymap/"
+                              :serial t
+                              :components ((:file "sequence")
+                                           (:file "registry")
+                                           (:file "defaults")
+                                           (:file "event-integration")))
+                             (:module "focus"
+                              :pathname "focus/"
+                              :serial t
+                              :components ((:file "manager")))
+                             (:file "keymap-system") ; Main entry point for keyboard/focus system
+                             (:file "loop")))
+
+               ;; --- View / UI Dependency Resolution ---
+               ;; Load core view definitions first
+               ;; Load the style library needed by styled nodes and UI
+                                        ; Main package file?
 
                ;; Load the styled node definition (depends on style-lib/api)
-               (:file "view/styled")
+
 
                ;; Load selector implementations (depends on view/styled)
 
@@ -79,27 +124,33 @@
                (:module "ui"
                 :serial t
                 :pathname "ui/"
-                :components ((:file "base")
-                             (:module "widgets"
+                :components ((:module "widgets"
                               :pathname "widgets/"
                               :serial t
-                              :components ((:file "utils")
+                              :components (
+                                           (:file "utils")
                                            (:file "button")
                                            (:file "label")
                                            (:file "textinput")
-                                           (:file "form") ; Added form widget
+                                           (:file "grid-container")
+                                           (:file "form") ; Using v2 form widget
                                            (:file "listbox")
+                                           (:file "counter")
                                            (:file "scrollable-container")))
                              ;; Load the main package file AFTER the individual widget files
-                             (:file "elm-widgets") ; Correct filename to load widgets.lisp
-                             (:file "primitives")
-                             (:file "composite")))
+                             (:file "widgets-pkg") ; Correct filename to load widgets.lisp
+                             (:file "widget-registry")))
 
                ;; Load remaining View components (depend on UI widgets, layout etc)
+               (:file "view/memo")
+               ;; (:file "view/dsl")
                (:file "view/dsl")
                (:file "view/flex")
                (:file "view/layout") ; Load layout before grid
                (:file "view/grid")   ; Grid depends on layout now
+               (:file "view/grid-layout") ; Load layout before grid
+               (:file "view/reactive") ; Reactive view system
+               (:file "view/animation") ; Animation framework
 
                ;; Styling System (Moved here as it depends on view/style-lib)
                (:module "style"
@@ -116,6 +167,8 @@
                 :components (
                              ;; Platform API Definition
                              (:file "api")
+                             (:file "backend/common/virtual-buffer")
+                             (:file "canvas")
                              ;; Backend Implementations
                              (:module "backend"
                               :pathname "backend/"
@@ -123,8 +176,11 @@
                               :components (
                                            ;; Common utilities for backends
                                            (:module "common"
+                                            :serial t
                                             :pathname "common/"
-                                            :components ((:file "utils")))
+                                            :components ((:file "utils")
+                                                         (:file "ansi-styling")
+                                                         ))
                                            ;; Fake Terminal Backend
                                            (:module "faketerm"
                                             :pathname "faketerm/"
@@ -132,26 +188,43 @@
                                            ;; Standard Terminal Backend
                                            (:module "terminal"
                                             :pathname "terminal/"
-                                            :components ((:file "terminal")))
+                                            :serial t
+                                            :components ((:file "terminal")
+                                                         (:file "diff-renderer")))
                                            ;; URxvt Backend
                                            (:module "urxvt"
                                             :pathname "urxvt/"
                                             :components ((:file "urxvt")))
                                            ))
+
                              ;; Original driver/input/output
                              (:file "input")
                              (:file "output")
+
                              (:file "driver")))
 
                ;; Files loaded after modules
                (:file "runtime")
-               (:file "elmtui")
+
                ;; Development Utilities
-               (:module "dev"
+               ;; (:module "dev"
+               ;;   :serial t
+               ;;   :pathname "dev/"
+               ;;   :components (
+               ;;                 (:file "dev")))
+               (:module "examples"
                 :serial t
-                :pathname "dev/"
-                :components (
-                             (:file "dev"))))
+                :pathname "../examples/"
+                :components ((:file "keymap-app")
+                             (:file "rainbow-app")
+                             (:file "boxes-app")
+                             (:file "colortext-app")))
+               (:module "dirlister"
+                :serial t
+                :pathname "../examples/dirlister_poc/"
+                :components ((:file "dirlister_poc")))
+               (:file "../dev-setup")
+               (:file "elmtui"))
   ;; Build a binary:
   :build-operation "program-op"
   :build-pathname "elmtui"

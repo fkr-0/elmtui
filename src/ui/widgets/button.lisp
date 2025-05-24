@@ -1,12 +1,17 @@
 ;;;===============================================================
 ;;; File: src/ui/widgets/button.lisp
-;;; Elm-style Button Widget
+;;; Elm-style Button Widget with Standardized Interface
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.button
   (:use :cl)
   (:import-from :elmtui.view.core #:make-ui-node #:ui-node)
+  (:import-from :elmtui.view.styled #:make-styled-node #:styled-ui-node)
   (:import-from :elmtui.core.async #:cmd-async)
-  (:import-from :elmtui.core.events #:send-message) ; Assuming send-message is the target for cmd-async
+  (:import-from :elmtui.core.events #:send-message)
+  (:import-from :elmtui.ui.widgets.utils
+   :defwidget-view
+                :with-widget-model
+   :widget-focused-p)
   (:export #:button-model #:make-button-model ; Struct and its constructor
            #:button-model-id #:button-model-label #:button-model-on-click-msg #:button-model-disabled ; Accessors
            #:init-button #:update-button #:view-button)) ; Core TEA functions
@@ -56,38 +61,79 @@
      (values model nil)))) ; Ignore other messages
 
 ;;;---------------------------------------------------------------
-;;; View
+;;; View (NEW STANDARDIZED FORMAT)
 ;;;---------------------------------------------------------------
-(defun view-button (model is-focused dispatch-fn)
-  "Creates a UI-NODE representation of the button.
-   MODEL: The current button-model instance.
-   IS-FOCUSED: Boolean indicating if this widget currently has focus.
-   DISPATCH-FN: A function to call to dispatch messages, e.g., (lambda (msg) (funcall dispatch-fn msg)).
-                The generated message should be handled by the parent component's update function,
-                which then calls this button's `update-button` with a simplified message like :CLICK.
-   Returns a UI-NODE."
-  (check-type model button-model)
-  (let ((base-class "button")
-        (disabled-class (when (button-model-disabled model) "button-disabled"))
-        (focused-class (when is-focused "button-focused")))
-    (make-ui-node
-     :type :container ; Buttons are often containers for text and styling
-     :props (list :widget-id (button-model-id model)
-                  :class (format nil "~A~@[ ~A~]~@[ ~A~]" ; Combine classes cleanly
-                                 base-class disabled-class focused-class)
-                  :focusable (not (button-model-disabled model)) ; Only focusable if not disabled
-                  ;; The :events property is a list of (event-type handler-lambda).
-                  ;; The handler-lambda calls dispatch-fn with a message.
-                  ;; This message should be specific enough for the parent to route it.
-                  :events (list (list :click ; Raw input event type (e.g., from platform)
-                                      (lambda ()
-                                        (unless (button-model-disabled model) ; Don't dispatch if disabled
-                                          (funcall dispatch-fn
-                                                   ;; Message payload for the parent to interpret:
-                                                   (list :button-interaction ; Generic type for widget interactions
-                                                         :id (button-model-id model)
-                                                         :interaction-type :click)))))))
-     :children (list (make-ui-node
-                      :type :text
-                      :props (list :value (button-model-label model))
-                      :children nil)))))
+(defwidget-view view-button (app-state
+                                :widget-id-var widget-id :model-var model
+                                :add-args (label on-click disabled
+                                                 tooltip aria-label class)
+                                :documentation
+                                "Creates a UI-NODE representation of a button.
+   APP-STATE: The application state.
+   WIDGET-ID: The unique ID for this button (required).
+   LABEL: Text to display on the button. Defaults to model's label if not provided.
+   ON-CLICK: Message to send when clicked. Defaults to model's on-click-msg if not provided.
+   DISABLED: Whether the button is disabled. Defaults to model's disabled property if not provided.
+   TOOLTIP: Optional tooltip text to display on hover.
+   ARIA-LABEL: Accessibility label for screen readers.
+   CLASS: Additional CSS classes to apply.")
+
+  ;; Determine effective values from model and/or provided props
+  (let* ((effective-label (or label
+                              (when model (button-model-label model))
+                              "Button"))
+         (effective-on-click (or on-click
+                                 (when model (button-model-on-click-msg model))
+                                 nil))
+         (effective-disabled (or disabled
+                                 (when model (button-model-disabled model))
+                                 nil))
+         (is-focused (widget-focused-p app-state widget-id))
+         ;; Build CSS classes
+         (base-class "button")
+         (disabled-class (when effective-disabled "button-disabled"))
+         (focused-class (when is-focused "button-focused"))
+         (custom-class class)
+         (all-classes (remove nil (list base-class disabled-class focused-class custom-class))))
+
+    ;; Create the styled node representing the button
+    (make-styled-node
+     :type :button
+     :props (list* :id widget-id
+                   :focusable t
+                   :value effective-label    ; Value can be used by renderers
+                   :label effective-label    ; Label is the visible text
+                   :disabled effective-disabled
+                   :on-click (unless effective-disabled effective-on-click)
+                   :class (format nil "~{~A~^ ~}" all-classes) ; Join classes with spaces
+                   :aria-role "button"
+                   :aria-disabled (if effective-disabled "true" "false")
+                   ;; Include optional properties only if provided
+                   (append
+                    (when tooltip (list :title tooltip))
+                    (when aria-label (list :aria-label aria-label))))
+     :children nil)))
+
+;;;---------------------------------------------------------------
+;;; Backward Compatibility Wrapper
+;;;---------------------------------------------------------------
+;; This is a temporary function to maintain backward compatibility
+;; during transition to the new widget pattern
+;; (defun view-button (model &key is-focused dispatch-fn)
+;;   "DEPRECATED: Use view-button instead."
+;;   (warn "view-button is deprecated. Use view-button with app-state and :widget-id instead.")
+;;   (make-styled-node
+;;    :type :button
+;;    :props (list :id (button-model-id model)
+;;                 :label (button-model-label model)
+;;                 :disabled (button-model-disabled model)
+;;                 :on-click (when (and dispatch-fn (button-model-on-click-msg model))
+;;                             (lambda (_)
+;;                               (funcall dispatch-fn (button-model-on-click-msg model))))
+;;                 :focusable t
+;;                 :class (format nil "button~@[ button-disabled~*~]~@[ button-focused~*~]"
+;;                                (button-model-disabled model)
+;;                                is-focused)
+;;                 :aria-role "button"
+;;                 :aria-disabled (if (button-model-disabled model) "true" "false"))
+;;    :children nil))

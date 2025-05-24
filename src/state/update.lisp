@@ -50,48 +50,24 @@
        nil)"
 
   ;; Basic macroexpansion-time check for discouraged state modification forms
-  (%walk-tree (lambda (node)
-                ;; TODO
-                ;; (when (listp node)
-                ;;   (let ((op (first node)))
-                ;;     (cond
-                ;;       ;; Check for (setf/setq/set-state ...)
-                ;;       ((member op '(setf setq ut.state.state:set-state) :test #'eq)
-                ;;        ;; Avoid warning on the setf inside our own set-state! macroexpansion
-                ;;        (unless (and (eq op 'setf)
-                ;;                     (listp (second node))
-                ;;                     (eq (first (second node)) 'gethash)) ; Check if it's (setf (gethash ...))
-                ;;          (warn "Discouraged direct state modification (~A) found in defupdate body for '~A'. Use the local set-state! macro instead for transactional updates." op name)))
-                ;;       ;; Check for (setf (state-ref ...))
-                ;;       ((and (eql op 'setf) (listp (second node)) (eq (first (second node)) 'ut.state.state:state-ref))
-                ;;        (warn "Discouraged direct (setf state-ref) found in defupdate body for '~A'. Use the local set-state! macro instead for transactional updates." name)))))
-                node) ; Return the node itself for walk-tree
-              body)
-
+  ;; Removed %walk-tree as set-state! is no longer a local macro to check for.
+  ;; The user's code inside defupdate will now return a state-patch plist and commands.
   `(defun ,name (,app-state-arg ,msg-arg)
-     (with-transaction (,app-state-arg :label ',name) ; Pass function name as transaction label
-       (macrolet ((set-state! (key value)
-                    "Sets KEY to VALUE in the current APP-STATE transactionally.
-                     Must be used within a DEFUPDATE body. Records the change
-                     and performs the state update."
-                    ;; Use gensyms to avoid capturing key/value if they are complex forms
-                    ;; and ensure proper evaluation order.
-                    (let ((key-gs (gensym "KEY"))
-                          (value-gs (gensym "VALUE"))
-                          (old-value-gs (gensym "OLD_VALUE"))
-                          (state-data-gs (gensym "STATE_DATA")))
-                      `(let* ((,key-gs ,key)
-                              (,value-gs ,value)
-                              (,state-data-gs (application-state-data ,',app-state-arg))
-                              ;; Capture old value *before* setting the new one.
-                              ;; Use a sentinel value if the key is not present for accurate recording.
-                              (,old-value-gs (gethash ,key-gs (state-data-data ,state-data-gs) :%not-present%)))
-                         ;; Record the change for the transaction log
-                         (record-change ,',app-state-arg ,key-gs ,old-value-gs ,value-gs)
-                         ;; Perform the actual state update using gethash for direct access
-                         (setf (gethash ,key-gs (state-data-data ,state-data-gs)) ,value-gs)
-                         ;; Return the new value, mimicking setf behavior
-                         ,value-gs))))
-         ;; The user's body code executes here, using set-state!
-         ;; The result of the last form in body is returned by with-transaction
-         ,@body))))
+     (declare (ignorable ,msg-arg)) ; Ignore the message argument for now
+     ;; The user's body is expected to perform its logic and return two values:
+     ;; 1. A state-patch-plist: a plist of key-value pairs to update in the state.
+     ;; 2. A commands-list: a list of commands to be executed.
+     (multiple-value-bind (state-patch-plist returned-commands)
+         (progn ,@body)
+       ;; If a state patch is returned, apply it transactionally.
+       (when state-patch-plist
+         (with-transaction (,app-state-arg :label ',name)
+           (loop for (key value) on state-patch-plist by #'cddr
+                 do (let* ((state-data (application-state-data ,app-state-arg))
+                           (old-value (gethash key (state-data-data state-data) :%not-present%)))
+                      ;; Ensure key is not nil before using it in gethash or record-change
+                      (unless key (error "State patch contains a nil key: ~S" state-patch-plist))
+                      (record-change ,app-state-arg key old-value value)
+                      (setf (gethash key (state-data-data state-data)) value)))))
+       ;; Return the commands.
+       returned-commands)))

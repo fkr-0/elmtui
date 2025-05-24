@@ -1,6 +1,6 @@
 ;;;===============================================================
 ;;; File: src/runtime.lisp
-;;; Runtime Assembly & Entrypoint
+;;; Runtime Assembly & Entrypoint with Canvas Support
 ;;;===============================================================
 (uiop:define-package :elmtui.runtime
   (:use :cl :alexandria :log4cl)
@@ -9,8 +9,8 @@
   (:import-from :ut.state.state #:set-state #:merge-state) ; Internal state management functions
   ;; Core Systems
   (:import-from :elmtui.core.globals #:*app-sender*)
-  (:import-from :elmtui.core.loop #:start-loop #:stop-loop #:event-loop-active-p #:enqueue-event #:*event-loop*)
-  (:import-from :clevelib.event-loop #:dequeue-event) ; Import dequeue-event directly
+  (:import-from :elmtui.core.loop #:start-loop #:elm-stop-loop #:elm-event-loop-active-p #:enqueue-event #:*event-loop*)
+  (:import-from :cleve-elm.event-loop #:dequeue-event) ; Import dequeue-event directly
   (:import-from :elmtui.core.async #:interpret-cmd)
   (:import-from :elmtui.core.events #:cmd #:make-message)
   (:import-from :elmtui.state.msg #:make-update-focusable-ids-app-msg) ; Constructor for the message
@@ -21,7 +21,6 @@
   (:import-from :elmtui.view.layout #:layout-tree)
   (:import-from :elmtui.view.geo #:make-rectangle #:make-pos #:make-size) ; For screen rect
   ;; UI Utilities
-  (:import-from :elmtui.ui.widgets.utils #:collect-focusable-ids)
   (:export :def-elm-app
    :run-app))
 (in-package :elmtui.runtime)
@@ -31,46 +30,43 @@
 
 (defmacro def-elm-app (name &key init update view subscriptions)
   "Defines an ElmTUI application.
-
-   Args:
-     NAME: Symbol naming the application.
-     INIT: A function designator (#'my-init) that takes no arguments and returns
-           (values initial-model initial-commands-list).
-     UPDATE: A function designator (#'my-update) that takes (app-state message)
-             and returns commands-list. It uses set-state! internally.
-     VIEW: A function designator (#'my-view) that takes (app-state) and returns
-           a UI-NODE tree.
-     SUBSCRIPTIONS: (Optional) A function designator (#'my-subscriptions) that takes (app-state)
-                    and returns a list of subscriptions (e.g., for timers, external events). (Not fully implemented yet)
-
-   Generates:
-     - A `run-<NAME>` function to start and manage the application lifecycle.
-     - Sets `*current-app-name*` and `*current-app-runner*` for the default `run-app`.
-Example:
-(def-elm-app my-app )
-
-
-   "
+   [Original documentation]
+   
+   Added support for terminal canvas positioning."
   (let ((run-func-name (symbolicate "RUN-" name)))
-    ;; Removed unused gensyms: init-func, update-func, view-func, subs-func-var
+    ;; Removed unused gensyms
     `(progn
-       (defun ,run-func-name (&key (platform :terminal) platform-options)
-         ;; Bind function designators locally within the generated run function
-         ;; This avoids defparameter and potential issues with global state during compilation/loading of multiple apps.
+       (defun ,run-func-name (&key 
+                            (platform :terminal) 
+                            platform-options
+                            ;; Add canvas options
+                            (use-canvas nil)
+                            (canvas-anchor :cursor)
+                            (canvas-growth :down)
+                            (canvas-initial-size nil)
+                            (canvas-max-size nil))
+         ;; Bind function designators locally
          (let ((effective-init-fn ,init)
                (effective-update-fn ,update)
                (effective-view-fn ,view)
                (effective-subscriptions-fn ,subscriptions))
-           (log:info "Running ElmTUI application: ~A via elmtui.platform.driver:run-application (Platform: ~A)" ',name platform)
-           (let ((app-spec (list :name ',name ; Pass name for logging/identification
+           (log:info "Running ElmTUI application: ~A via elmtui.platform.driver:run-application (Platform: ~A, Canvas: ~A)"
+                    ',name platform use-canvas)
+           (let ((app-spec (list :name ',name
                                  :init-fn effective-init-fn
                                  :update-fn effective-update-fn
                                  :view-fn effective-view-fn
                                  :subscriptions-fn effective-subscriptions-fn)))
-             ;; Delegate to the platform driver's run-application
-             (elmtui.platform.driver:run-application app-spec
-                                                     :backend-type platform
-                                                     :tty-path (getf platform-options :tty-path "/dev/tty")))))
+             ;; Delegate to the platform driver with canvas options
+             (elmtui.platform.driver:run-application 
+              app-spec
+              :backend-type platform
+              :tty-path (getf platform-options :tty-path "/dev/tty")
+              :use-canvas use-canvas
+              :canvas-anchor canvas-anchor
+              :canvas-growth canvas-growth
+              :canvas-initial-size canvas-initial-size
+              :canvas-max-size canvas-max-size))))
 
        ;; Set this app as the default runnable one
        (setf *current-app-name* ',name)

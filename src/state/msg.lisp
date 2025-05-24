@@ -31,11 +31,56 @@
     (arg-spec nil :type T) ; Original spec for reference
     (constructor-name nil :type symbol)) ; Name of the generated constructor function
 
+;;; ------------------------------------------------------------------
+;;; Variant parsing helpers
+;;; ------------------------------------------------------------------
+
+  ;; (defstruct arg-def
+  ;;   keyword   ;; e.g. :new-label
+  ;;   type)     ;; e.g. STRING
+
   (defstruct arg-def
     "Represents a single argument in a variant definition."
     ;; var-name is removed as we will use gensyms in the macro expansion
     (type t :type T)            ; The type specifier
     (keyword nil :type symbol)) ; The keyword used in the message list
+
+  (defun %parse-variant (spec msg-type)
+    "Return a VARIANT-DEFINITION for SPEC.
+   SPEC forms:
+     SYMBOL                     ; ⇒ simple keyword :symbol
+     (Symbol kw1 typ1 kw2 typ2) ; ⇒ keyword args
+   The list of tail elements must be an *even* number of keyword/type pairs."
+    (etypecase spec
+      ;; 1. lone symbol ⇒ no args
+      (symbol
+       (make-variant-definition
+        :name        (intern (string spec) :keyword)
+        :args        nil
+        :constructor-name
+        (symbolicate "MAKE-" spec "-" msg-type)))
+      ;; 2. list ⇒ variant plus (kw type) pairs
+      (cons
+       (destructuring-bind (head &rest rest) spec
+         (unless (evenp (length rest))
+           (error "Variant specification ~S has an odd number of tail elements." spec))
+         (let ((args '()))
+           (loop for (kw typ) on rest by #'cddr
+                 do (unless (keywordp kw)
+                      (error "Expected keyword in ~S, got ~S." spec kw))
+                 do (push (make-arg-def :keyword kw :type typ) args))
+           (make-variant-definition
+            :name        (intern (string head) :keyword)
+            :args        (nreverse args)
+            :constructor-name
+            (symbolicate "MAKE-" head "-" msg-type)))))))
+
+;;; ------------------------------------------------------------------
+;;; Constructor generation (excerpt)
+;;; ------------------------------------------------------------------
+
+
+
 
   (defun %parse-variant-args (arg-specs)
     "Parses variant argument specifications into a list of arg-def structs."
@@ -51,120 +96,178 @@
                            (type (second spec)))
                        (make-arg-def :type type :keyword kw)))))) ; Store only keyword and type
 
-  (defun %parse-variant (variant-spec message-type-name)
-    "Parses a defmsg variant specification into a variant-definition struct.
-     Handles both simple and complex variant specifications.
-     - Simple: (IncrementCounter) => :increment-counter
-     - Complex: (SetCounterLabel :new-label string) => :set-counter-label"
-    (let* ((name-sym (if (listp variant-spec) (first variant-spec) variant-spec))
-           (arg-specs (when (listp variant-spec) (rest variant-spec)))
-           (variant-keyword (make-keyword name-sym))
-           (constructor-name (symbolicate "MAKE-" name-sym "-" message-type-name))) ; Make constructor name unique
-      (unless (symbolp name-sym)
-        (error "Message variant name must be a symbol: ~S" name-sym))
-      (make-variant-definition :name variant-keyword
-                               :args (%parse-variant-args arg-specs)
-                               :arg-spec variant-spec
-                               :constructor-name constructor-name))))
+  ;; (defun %parse-variant (variant-spec message-type-name)
+  ;;   "Parses a defmsg variant specification into a variant-definition struct.
+  ;;    Handles both simple and complex variant specifications.
+  ;;    - Simple: (IncrementCounter) => :increment-counter
+  ;;    - Complex: (SetCounterLabel :new-label string) => :set-counter-label"
+  ;;   (let* ((name-sym (if (listp variant-spec) (first variant-spec) variant-spec))
+  ;;          (arg-specs (when (listp variant-spec) (rest variant-spec)))
+  ;;          (variant-keyword (make-keyword name-sym))
+  ;;          (constructor-name (symbolicate "MAKE-" name-sym "-" message-type-name))) ; Make constructor name unique
+  ;;     (unless (symbolp name-sym)
+  ;;       (error "Message variant name must be a symbol: ~S" name-sym))
+  ;;     (make-variant-definition :name variant-keyword
+  ;;                              :args (%parse-variant-args arg-specs)
+  ;;                              :arg-spec variant-spec
+  ;;                              :constructor-name constructor-name)))
+  )
 
 (defmacro defmsg (name (&key docstring) &rest variant-specs)
-  "Defines a message type, registers its allowed variants, and generates constructor functions.
-   See docstring in source for more details.
-   Args:
-     NAME: The symbol naming the message type (e.g., 'AppMsg).
-     DOCSTRING: Optional documentation string for the message type.
-     VARIANT-SPECS: A list of variant specifications, each can be:
-       - A simple symbol (e.g., 'IncrementCounter)
-       - A keyword with argument types (e.g., '(:set-counter-label :new-label string))
-       - A list of keyword and argument types (e.g., '(SetCounterLabel :new-label string)
-
-   Returns:
-     The symbol naming the message type (e.g., 'AppMsg).)
-  This macro generates constructor functions for each variant, which can be used to create
-  message instances. The constructors perform type checks on the arguments based on the
-    specifications provided in the variant definitions. The generated constructors are named
-  in the format `make-<variant-name>-<message-type-name>`, e.g., `make-increment-counter-app-msg`.
-  The message type is registered in the global *message-schemas* hash table, allowing for
-  runtime validation of message instances against the defined variants. The schema is also
-    stored in the hash table with the message type name as the key. The schema includes the
-    name, variants, and an optional docstring. The variants are stored as a list of
-    variant-definition structs, each containing the variant name, argument definitions,
-    original argument specification, and the constructor name. The constructor functions
-    are generated at compile time, and the schema is registered at load time to avoid
-    dumping the struct object. The macro also provides a helper function `message-variant-p`
-    to check if a given message instance is a valid variant of the specified message type.
-    The macro also generates a helper function `message-variant-p` to check if a given
-    message instance is a valid variant of the specified message type. This function checks
-    if the message instance is a list starting with a valid registered variant keyword for
-    the message type. It does not validate the arguments of the message instance, as this
-    is handled by the generated constructor functions. The function returns T if the
-    instance uses a registered variant keyword for the type, and NIL otherwise. The
-    `message-variant-p` function can be used to validate incoming messages before processing
-    them in the application state update functions. It is important to note that this
-    function only checks the initial keyword of the message instance, not the arguments.
-    Use the generated `make-<variant>-<type>` constructors for argument validation.
-
-    Example:
-      (defmsg AppMsg (:docstring \"Main application messages\")
-                 IncrementCounter
-                 DecrementCounter
-                 (SetCounterLabel :new-label string)
-                 (ActivateUser :user-id integer)
-                 (DeactivateUser :user-id integer)
-                    (RequestFocus :widget-id t))
-        (defmsg StateChangeMsg (:docstring \"Wraps state changes detected by observers\")
-                 (Changed :model symbol :slot keyword :value t))"
+  "Define a message type NAME with variants and auto-generated
+   constructor functions.  See source for full doc."
+  ;; sanity
   (unless (and (symbolp name) (not (keywordp name)))
-    (error "Message type name must be a symbol: ~S" name))
+    (error "Message type name must be a (non-keyword) symbol, not ~S" name))
+
   (let* ((schema-name name)
-         ;; Parse variants at compile time to generate constructors
-         (variants (mapcar (lambda (spec) (%parse-variant spec schema-name)) variant-specs)))
+         (variants     (mapcar (lambda (spec)
+                                 (%parse-variant spec schema-name))
+                               variant-specs)))
 
     `(progn
-       ;; Generate Constructor Functions at compile time
-       ,@(loop for variant in variants
+       ;; ───────────────── constructors ─────────────────
+       ,@(loop for v in variants
                collect
-               (let* ((constructor (variant-definition-constructor-name variant))
-                      (variant-key (variant-definition-name variant))
-                      (args (variant-definition-args variant))
-                      ;; Generate gensyms for local variables
-                      (gensym-vars (loop for arg in args collect (gensym (symbol-name (arg-def-keyword arg)))))
-                      ;; Generate lambda list using keywords and gensyms
-                      (lambda-list (if args
-                                       `(&key ,@(loop for arg in args
-                                                      for g in gensym-vars
-                                                      collect (list g nil))) ; Use gensyms here: (G123 nil)
-                                       nil)))
-                 `(defun ,constructor ,lambda-list
-                    ,(format nil "Constructor for the ~S variant of the ~S message type."
-                             (subseq (symbol-name variant-key) 1) ; Remove leading ':'
-                             schema-name)
-                    ;; Perform type checks using gensyms and type from arg-def
-                    ,@(loop for arg in args
-                            for g in gensym-vars
-                            collect `(check-type ,g ,(arg-def-type arg))) ; Use gensym here
-                    ;; Construct the message list using keyword from arg-def and gensym
-                    (list ',variant-key
-                          ,@(loop for arg in args
-                                  for g in gensym-vars
-                                  collect (arg-def-keyword arg) ; Use the original keyword
-                                  collect g))))) ; Use the gensym holding the value
+               (let* ((ctor   (variant-definition-constructor-name v))
+                      (vkey   (variant-definition-name v))
+                      (args   (variant-definition-args v))
+                      ;; build one (keyword var) spec per argument
+                      (params (loop for a in args
+                                    for kw  = (intern (symbol-name (arg-def-keyword a)) *package*)
+                                    for kww  =  (arg-def-keyword a)
+                                    for var = (gensym (string-downcase (symbol-name kw)))  ; <- gensym!
+                                    collect (list kw kww var))))
+                 `(defun ,ctor ,(when params `(&key ,@(mapcar #'car  params)))
+                    ,(format nil "Constructor for ~A variant of ~A." vkey `,schema-name)
+                    ;; type checks
+                    ,@(loop for a in args
+                            for p in params
+                            collect
+                            `(check-type ,(first p) ,(arg-def-type a)))
+                    ;; message list
+                    (list ,vkey
+                          ,@(mapcan (lambda (p) (list (second p) (first p))) params)))))
 
-       ;; Register the schema at load time to avoid dumping struct object
+       ;; ───────────────── schema registration ──────────
        (eval-when (:load-toplevel :execute)
-         (let* (;; Re-parse variants at load time to create the schema object
-                (load-time-variants (mapcar (lambda (spec) (%parse-variant spec ',schema-name)) ',variant-specs))
+         (let* ((load-variants (mapcar (lambda (spec)
+                                         (%parse-variant spec ',schema-name))
+                                       ',variant-specs))
                 (schema (make-message-schema :name ',schema-name
-                                             :variants load-time-variants
+                                             :variants load-variants
                                              :docstring ,(or docstring ""))))
            (setf (gethash ',schema-name *message-schemas*) schema)))
-       
-       ;; Export the generated constructor functions
-       ,@(loop for variant in variants
-               collect `(export ',(variant-definition-constructor-name variant) ,(package-name *package*)))
 
-       ',schema-name))) ; Return the message type name
+       ;; ───────────────── export constructors ──────────
+       ,@(loop for v in variants
+               collect `(export ',(variant-definition-constructor-name v)
+                         ,*package*))
 
+       ',schema-name)))
+;; (defun dud (&key a)
+;;   (format nil "a: ~A" a)) (dud :a 2)
+
+
+;; (defmacro defmsg (name (&key docstring) &rest variant-specs)
+;;   "Defines a message type, registers its allowed variants, and generates constructor functions.
+;;    See docstring in source for more details.
+;;    Args:
+;;      NAME: The symbol naming the message type (e.g., 'AppMsg).
+;;      DOCSTRING: Optional documentation string for the message type.
+;;      VARIANT-SPECS: A list of variant specifications, each can be:
+;;        - A simple symbol (e.g., 'IncrementCounter)
+;;        - A keyword with argument types (e.g., '(:set-counter-label :new-label string))
+;;        - A list of keyword and argument types (e.g., '(SetCounterLabel :new-label string)
+
+;;    Returns:
+;;      The symbol naming the message type (e.g., 'AppMsg).)
+;;   This macro generates constructor functions for each variant, which can be used to create
+;;   message instances. The constructors perform type checks on the arguments based on the
+;;     specifications provided in the variant definitions. The generated constructors are named
+;;   in the format `make-<variant-name>-<message-type-name>`, e.g., `make-increment-counter-app-msg`.
+;;   The message type is registered in the global *message-schemas* hash table, allowing for
+;;   runtime validation of message instances against the defined variants. The schema is also
+;;     stored in the hash table with the message type name as the key. The schema includes the
+;;     name, variants, and an optional docstring. The variants are stored as a list of
+;;     variant-definition structs, each containing the variant name, argument definitions,
+;;     original argument specification, and the constructor name. The constructor functions
+;;     are generated at compile time, and the schema is registered at load time to avoid
+;;     dumping the struct object. The macro also provides a helper function `message-variant-p`
+;;     to check if a given message instance is a valid variant of the specified message type.
+;;     The macro also generates a helper function `message-variant-p` to check if a given
+;;     message instance is a valid variant of the specified message type. This function checks
+;;     if the message instance is a list starting with a valid registered variant keyword for
+;;     the message type. It does not validate the arguments of the message instance, as this
+;;     is handled by the generated constructor functions. The function returns T if the
+;;     instance uses a registered variant keyword for the type, and NIL otherwise. The
+;;     `message-variant-p` function can be used to validate incoming messages before processing
+;;     them in the application state update functions. It is important to note that this
+;;     function only checks the initial keyword of the message instance, not the arguments.
+;;     Use the generated `make-<variant>-<type>` constructors for argument validation.
+
+;;     Example:
+;;       (defmsg AppMsg (:docstring \"Main application messages\")
+;;                  IncrementCounter
+;;                  DecrementCounter
+;;                  (SetCounterLabel :new-label string)
+;;                  (ActivateUser :user-id integer)
+;;                  (DeactivateUser :user-id integer)
+;;                     (RequestFocus :widget-id t))
+;;         (defmsg StateChangeMsg (:docstring \"Wraps state changes detected by observers\")
+;;                  (Changed :model symbol :slot keyword :value t))"
+;;   (unless (and (symbolp name) (not (keywordp name)))
+;;     (error "Message type name must be a symbol: ~S" name))
+;;   (let* ((schema-name name)
+;;          ;; Parse variants at compile time to generate constructors
+;;          (variants (mapcar (lambda (spec) (%parse-variant spec schema-name)) variant-specs)))
+
+;;     `(progn
+;;        ;; Generate Constructor Functions at compile time
+;;        ,@(loop for variant in variants
+;;                collect
+;;                (let* ((constructor (variant-definition-constructor-name variant))
+;;                       (variant-key (variant-definition-name variant))
+;;                       (args (variant-definition-args variant))
+;;                       ;; Generate gensyms for local variables
+;;                       (gensym-vars (loop for arg in args collect (gensym (symbol-name (arg-def-keyword arg)))))
+;;                       ;; Generate lambda list using keywords and gensyms
+;;                       (lambda-list (if args
+;;                                        `(&key ,@(loop for arg in args
+;;                                                       for g in gensym-vars
+;;                                                       collect (list g nil))) ; Use gensyms here: (G123 nil)
+;;                                        nil)))
+;;                  `(defun ,constructor ,lambda-list
+;;                     ,(format nil "Constructor for the ~S variant of the ~S message type."
+;;                              (subseq (symbol-name variant-key) 1) ; Remove leading ':'
+;;                              schema-name)
+;;                     ;; Perform type checks using gensyms and type from arg-def
+;;                     ,@(loop for arg in args
+;;                             for g in gensym-vars
+;;                             collect `(check-type ,g ,(arg-def-type arg))) ; Use gensym here
+;;                     ;; Construct the message list using keyword from arg-def and gensym
+;;                     (list ',variant-key
+;;                           ,@(loop for arg in args
+;;                                   for g in gensym-vars
+;;                                   collect (arg-def-keyword arg) ; Use the original keyword
+;;                                   collect g))))) ; Use the gensym holding the value
+
+;;        ;; Register the schema at load time to avoid dumping struct object
+;;        (eval-when (:load-toplevel :execute)
+;;          (let* (;; Re-parse variants at load time to create the schema object
+;;                 (load-time-variants (mapcar (lambda (spec) (%parse-variant spec ',schema-name)) ',variant-specs))
+;;                 (schema (make-message-schema :name ',schema-name
+;;                                              :variants load-time-variants
+;;                                              :docstring ,(or docstring ""))))
+;;            (setf (gethash ',schema-name *message-schemas*) schema)))
+;;        ;; Export the generated constructor functions
+;;        ,@(loop for variant in variants
+;;                collect `(export ',(variant-definition-constructor-name variant) ,(package-name *package*)))
+
+;;        ',schema-name)))
+                                        ; Return the message type name
+(defmsg SnAppMsg (:docstring "Main application messages")
+        (ActivateUser :user-id integer))
 ;; Example AppMsg definition including Focus messages
 (defmsg AppMsg (:docstring "Main application messages")
         ;; Counter Example Messages

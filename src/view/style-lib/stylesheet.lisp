@@ -5,11 +5,14 @@
    :elmtui.style-lib.style-set :elmtui.style-lib.stylable)
   ;; Correct imports
   (:import-from :elmtui.style-lib.api
-                #:style-set-styles #:value-raw #:selector #:selects
+                #:style-set-styles #:selector #:selects #:value-value #:parents-of
                 #:rule-selector #:stylesheet-rules #:rule-styles #:styles
-                #:stylesheet #:style-value :specificity)
+                #:selects
+                #:style-rule
+                #:stylesheet #:style-value :specificity #:make-style-set) ; Added make-style-set
   (:import-from :elmtui.style-lib.style-set
-                #:set-style #:copy-set) ; Removed rule-styles (it's in API)
+                #:set-style #:copy-set #:style-of #:value-of) ; Added style-of, value-of
+  (:import-from :elmtui.style-lib.properties #:*inheritable-style-properties*) ; Import inheritable props list
   ;; Removed incorrect imports from selector:
   (:export
    :defstylesheet
@@ -24,30 +27,86 @@
 
 ;; (defclass stylesheet () ((rules :initform nil :accessor rules))) ; Defined in API
 
-(defun merge-rule! (sheet rule)
+(defmethod merge-rule! ((sheet stylesheet) (rule style-rule))
   (let ((old (find (rule-selector rule) (stylesheet-rules sheet) ; Use API accessors
                    :key #'rule-selector :test #'equalp))) ; Use equalp for selectors?
-    (if old (merge-sets! (rule-styles old) (rule-styles rule)) ; merge-sets! from style-set, rule-styles from API
+    (if old 
+        ;; Call merge-sets! from style-set package
+        (elmtui.style-lib.style-set:merge-sets! (rule-styles old) (rule-styles rule))
         ;; Use the correct accessor from API
         (push rule (stylesheet-rules sheet))))
   sheet)
 
+(defmethod merge-rule! ((sheet stylesheet) (rule list))
+  (mapcar (lambda (r) (merge-rule! sheet r)) rule))
+
 (defun query-stylesheet (sheet stylable)
-  (let ((out (copy-set (styles stylable))) ; styles is from API
-        (spec (make-hash-table :test 'eq)))
-    ;; base spec 0
-    (maphash (lambda (k v) (declare (ignore v)) (setf (gethash k spec) 0)) ; Ignore v
-             (style-set-styles out)) ; Imported from API
-    (dolist (r (stylesheet-rules sheet)) ; Use API accessor
-      (when (selects (rule-selector r) stylable) ; selects, rule-selector from API
-        (let ((sp (specificity (rule-selector r)))) ; specificity from API
-          (maphash (lambda (k v) ; k=prop keyword, v=style object
-                     (when (> sp (gethash k spec -1))
-                       (setf (gethash k spec) sp)
-                       ;; Use value-raw (from API) and style-value (from Types)
-                       (set-style out k (value-raw (style-value v)))))
-                   (style-set-styles (rule-styles r)))))) ; style-set-styles from API
-    out))
+  (log:debug "QUERY-STYLESHEET: Entered for stylable ID ~S. Initial (styles stylable) is: ~S"
+             (if (slot-boundp stylable 'elmtui.style-lib.api:sid) (stylable-id stylable) "UNBOUND-ID")
+             (if (slot-boundp stylable 'elmtui.style-lib.api:styles) (styles stylable) "UNBOUND-STYLES"))
+  (let ((initial-node-styles (if (slot-boundp stylable 'elmtui.style-lib.api:styles) (styles stylable) nil)))
+    (unless (typep initial-node-styles 'style-set)
+      (log:error "QUERY-STYLESHEET: (styles stylable) for ID ~S is NOT a style-set! Value: ~S"
+                 (if (slot-boundp stylable 'elmtui.style-lib.api:sid) (stylable-id stylable) "UNBOUND-ID") initial-node-styles)))
+  (let ((out (copy-set (if (slot-boundp stylable 'elmtui.style-lib.api:styles) (styles stylable) (make-style-set))))) ; Ensure copy-set gets a style-set
+    (unless (typep out 'style-set)
+      (log:error "QUERY-STYLESHEET: copy-set result for ID ~S is NOT a style-set! Value: ~S. (styles stylable) was: ~S"
+                 (if (slot-boundp stylable 'elmtui.style-lib.api:sid) (stylable-id stylable) "UNBOUND-ID") out
+                 (if (slot-boundp stylable 'elmtui.style-lib.api:styles) (styles stylable) "UNBOUND-STYLES")))
+    (log:debug "QUERY-STYLESHEET: Initial 'out' for ID ~S is: ~S"
+               (if (slot-boundp stylable 'elmtui.style-lib.api:sid) (stylable-id stylable) "UNBOUND-ID") out)
+    (let ((spec (make-hash-table :test 'eq)))
+      ;; base spec 0
+      (if (typep out 'style-set)
+          (maphash (lambda (k v) (declare (ignore v)) (setf (gethash k spec) 0))
+                   (style-set-styles out))
+          (log:error "QUERY-STYLESHEET: 'out' is NIL or not a style-set for ID ~S before maphash. Value: ~S"
+                     (if (slot-boundp stylable 'elmtui.style-lib.api:sid) (stylable-id stylable) "UNBOUND-ID") out))
+      (dolist (r (stylesheet-rules sheet))
+        (let ((selector (rule-selector r)))
+          (when (cond
+                  ((keywordp selector) ; Type selector (e.g., :button)
+                   (and (typep stylable 'elmtui.view.core:ui-node) ; Ensure stylable is a node
+                        (eq selector (elmtui.view.core:ui-node-type stylable))))
+                  ((stringp selector) ; Raw string selector - workaround
+                   (log:warn "QUERY-STYLESHEET: Encountered raw string selector \"~A\" in rule. Treating as class selector. Rule: ~S" selector r)
+                   (selects (elmtui.style-lib.selector:cls> selector) stylable))
+                  ((typep selector 'elmtui.style-lib.api:selector) ; Proper selector object
+                   (selects selector stylable))
+                  (t ; Unknown selector type
+                   (log:warn "QUERY-STYLESHEET: Unknown selector type ~S for rule ~S" (type-of selector) r)
+                   nil))
+            (let ((sp (cond
+                        ((keywordp selector) 1) ; Specificity for type selector
+                        ((stringp selector) 10) ; Specificity for (implicit) class selector
+                        ((typep selector 'elmtui.style-lib.api:selector) (specificity selector))
+                        (t 0))))
+              (if (typep out 'style-set)
+                  (maphash (lambda (k v)
+                             (when (> sp (gethash k spec -1))
+                               (setf (gethash k spec) sp)
+                               ;; Pass the unwrapped, raw style value to set-style
+                               (set-style out k (value-value (style-value v)))))
+                           (style-set-styles (rule-styles r)))
+                  (log:error "QUERY-STYLESHEET: 'out' is NIL or not a style-set for ID ~S during rule application. Value: ~S"
+                             (if (slot-boundp stylable 'elmtui.style-lib.api:sid) (stylable-id stylable) "UNBOUND-ID") out))))))
+
+      ;; --- Style Inheritance ---
+      (let ((parent (first (parents-of stylable))))
+        (when (and parent (typep parent 'stylable) (styles parent)) ; Check if parent has styles
+          (dolist (prop *inheritable-style-properties*)
+            ;; If the current node's 'out' style-set does NOT have this property directly set
+            (unless (style-of out prop)
+              (let ((parent-style-obj (style-of (styles parent) prop)))
+                (when parent-style-obj
+                  (log:debug "QUERY-STYLESHEET: Inheriting property ~S from parent ~S for node ~S"
+                             prop (stylable-id parent) (stylable-id stylable))
+                  ;; Directly set the style object from parent into child's 'out' set
+                  (setf (gethash prop (style-set-styles out)) parent-style-obj)))))))
+
+      (log:debug "QUERY-STYLESHEET: Returning 'out' (after inheritance) for ID ~S: ~S"
+                 (if (slot-boundp stylable 'elmtui.style-lib.api:sid) (stylable-id stylable) "UNBOUND-ID") out)
+      out)))
 
 ;;; sugar macros -----------------------------------------------------------
 ;; (defmacro defrule (sel &body kvs)

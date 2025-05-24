@@ -11,6 +11,11 @@
 (uiop:define-package :elmtui.platform.api
   (:use :cl)
   (:export
+   :lockable
+   :lock-of
+   :with-lock
+   :acquire-lock
+   :release-lock
    ;; Backend Lifecycle
    :initialize-backend
    :shutdown-backend
@@ -32,6 +37,7 @@
    :draw-char-at
    :fill-rectangle
    :draw-box-outline
+   :draw-styled-box ; New generic for detailed border drawing
    :set-cell-style
    :clear-area
 
@@ -49,6 +55,8 @@
    :term-h
    :term-stream
    :term-style
+   ;; (setf term-w) and (setf term-h) are made available by exporting :term-w and :term-h
+   ;; and defining the (setf ...) generic functions. No need for explicit (setf ...) in :export.
 
    ;; Input Handling
    :poll-input-event
@@ -70,8 +78,50 @@
 
 (in-package :elmtui.platform.api)
 
+(defclass lockable ()
+  ((lock :initarg :lock
+         :initform (bt:make-recursive-lock)
+         :accessor lock-of)
+   (lock-owner :initarg :lock-owner
+               :initform nil
+               :accessor lock-owner)
+   (lock-owner-count :initarg :lock-owner-count
+                     :initform 0
+                     :accessor lock-owner-count)))
+
+(defmethod acquire-lock ((l lockable))
+  "Acquire the terminal lock. If the lock is already held by the current thread,
+increment the lock count. Otherwise, acquire the lock and set the lock owner to
+the current thread."
+  (with-slots (lock lock-owner lock-owner-count)
+      l
+    (bt:with-recursive-lock-held (lock)
+      (if (eq lock-owner t)
+          (incf lock-owner-count)
+          (setf lock-owner t
+                lock-owner-count 1)))))
+
+(defmethod release-lock ((l lockable))
+  "Release the terminal lock. If the lock count is greater than 1, decrement the
+lock count. Otherwise, release the lock and set the lock owner to nil."
+  (with-slots (lock lock-owner lock-owner-count)
+      l
+    (bt:with-recursive-lock-held (lock)
+      (when (eq lock-owner t)
+        (if (> lock-owner-count 1)
+            (decf lock-owner-count)
+            (setf lock-owner nil
+                  lock-owner-count 0))))))
+
+(defmacro with-lock ((lockable) &body body)
+  "Execute BODY with LOCKABLE locked."
+  `(progn
+     (acquire-lock ,lockable)
+     (unwind-protect (progn ,@body) (release-lock ,lockable))))
 (defgeneric term-w (term))
 (defgeneric term-h (term))
+(defgeneric (setf term-w) (new-value term))
+(defgeneric (setf term-h) (new-value term))
 (defgeneric term-stream (term))
 (defgeneric term-style (term))
 ;;;---------------------------------------------------------------
@@ -190,6 +240,20 @@ CORNERS: A list of four characters for top-left, top-right, bottom-left, bottom-
          Defaults to backend-specific line drawing characters.
 SIDES: A list of two characters for horizontal and vertical lines.
        Defaults to backend-specific line drawing characters."))
+
+(defgeneric draw-styled-box (backend-instance row col height width &key border-style border-color box-char-set style)
+  (:documentation "Draws a box with potentially different styles for each side/corner.
+BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
+ROW: The top row of the box.
+COL: The left column of the box.
+HEIGHT: The height of the box.
+WIDTH: The width of the box.
+BORDER-STYLE: A keyword or list describing the line style (e.g., :single, :double, or a list for individual sides).
+BORDER-COLOR: A color spec or list of color specs for the border lines.
+BOX-CHAR-SET: (Optional) A specific set of characters to use for corners and lines,
+              allowing for styles like :ascii or custom characters. If nil, backend chooses based on BORDER-STYLE.
+STYLE: An optional backend-specific style object (primarily for foreground color of the border).
+       If BORDER-COLOR is provided, it should take precedence for the border lines themselves."))
 
 (defgeneric set-cell-style (backend-instance row col &key style)
   (:documentation "Applies a style to the character cell at the given coordinates without changing the character itself.
@@ -335,3 +399,5 @@ Returns a native handle, or NIL if not applicable or not exposed."))
 
 ;; (defgeneric terminal-instance-current-style (backend-instance)
 ;;   (:documentation "Returns the current style applied to the terminal instance."))
+
+;;;--------------------------------------------------------------- ;;; Recovery and Reset ;;;---------------------------------------------------------------

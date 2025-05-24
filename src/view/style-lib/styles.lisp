@@ -7,15 +7,36 @@
   ;; (:import-from :elmtui.style-lib.stylable
   ;;  :stylable-id)
   (:export
+   :rgb
    :defstyle :defstylegroup  :style-p
    :default-styles))
 
 (in-package :elmtui.style-lib.styles)
 
 (defun style-p (x) (typep x 'style))
+(defun rgb (x) (if (and (listp x) (= (length x) 3) (every #'numberp x))
+                   x
+                   nil))
 
 ;;; defstyle macro ---------------------------------------------------------
 (defmacro defstyle (keyword spec &key default docstring)
+  "Define a new style with the given KEYWORD and SPEC.
+The KEYWORD is used to create a class and a function for creating instances of the style.
+The SPEC defines the valid values for the style, which can be a list of symbols, a type specifier, or a function.
+The DEFAULT value is used to set a default style if provided.
+The DOCSTRING is used to document the style class.
+
+The macro generates a class for the style, a value class, and a method to validate the value.
+It also generates a function to create an instance of the style with the given value.
+The generated function checks if the value is valid according to the SPEC and raises an error if not.
+The generated function is named MAKE-STYLE/KEYWORD, where KEYWORD is the keyword provided.
+The macro also generates a method to create a style instance based on the keyword and value.
+
+Example usage:
+  (defstyle my-style '(red green blue)
+    :default 'red
+    :docstring \"A style that can be red, green, or blue.\"
+    :default 'red"
   (let* ((pk (intern (string-upcase (string keyword)) :elmtui.style-lib.styles))
          (vk (intern (format nil "~a-VALUE" pk) :elmtui.style-lib.styles))
          (kwsym (intern (string keyword) :keyword)))
