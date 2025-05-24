@@ -4,78 +4,148 @@
 (uiop:define-package :elmtui.core.events
   (:use :cl :alexandria) ; Added alexandria for once-only
   (:import-from :elmtui.core.conditions :log-condition :with-recovery)
-  (:import-from :clevelib.message
-    :message :make-message :message-type :message-data :message-state
-                 :broadcast-p :capture-p :bubble-p :propagation-stopped-p
-                 :stop-propagation)
-  (:import-from :clevelib.api
-    :on-message :relay-message)
+  (:import-from :cleve-elm.message
+   :message :make-message :message-type :message-data :message-state
+                :broadcast-p :capture-p :bubble-p :propagation-stopped-p
+                :stop-propagation)
+  (:import-from :cleve-elm.api
+   :on-message :relay-message)
+  (:import-from :elmtui.core.conditions
+   :message-validation-error
+                :command-execution-error)
+  (:import-from :elmtui.core.globals
+   :*app-sender*)
   (:import-from :elmtui.state.msg
-                :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
-                :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
+   :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
+   :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
                 :arg-def #:arg-def-type #:arg-def-keyword
-                :*message-schemas*)
+   :*message-schemas*)
+
+  (:import-from :elmtui.core.event-types
+   ;; Standard event structures
+   :key-event
+                :make-key-event
+   :key-event-type
+                :key-event-key
+   :key-event-code
+                :key-event-modifiers
+   :key-event-timestamp
+                :key-event-consumed-p
+   :key-event-p
+                :mouse-event
+   :make-mouse-event
+                :mouse-event-type
+   :mouse-event-x
+                :mouse-event-y
+   :mouse-event-button
+                :mouse-event-modifiers
+   :mouse-event-timestamp
+                :mouse-event-consumed-p
+   :mouse-event-p
+                :focus-event
+   :make-focus-event
+                :focus-event-type
+   :focus-event-target
+                :focus-event-source
+   :focus-event-timestamp
+                :focus-event-consumed-p
+   :focus-event-p
+
+                :window-event
+   :make-window-event
+                :window-event-type
+   :window-event-width
+                :window-event-height
+   :window-event-timestamp
+                :window-event-consumed-p
+   :window-event-p
+
+                :system-event
+   :make-system-event
+                :system-event-type
+   :system-event-data
+                :system-event-timestamp
+   :system-event-p
+
+                :timer-event
+   :make-timer-event
+                :timer-event-id
+   :timer-event-timestamp
+                :timer-event-user-data
+   :timer-event-p
+
+                :command-event
+   :make-command-event
+                :command-event-name
+   :command-event-args
+                :command-event-source
+   :command-event-timestamp
+                :command-event-p
+   :consume-event)
   (:export :message
    :make-message
            :message-p
-   :message-type
-           :message-data
-   :message-state
-           :broadcast-p
-   :capture-p
-           :bubble-p
-   :propagation-stopped-p
-           :stop-propagation
-   :cmd
-           :make-cmd
-   :send-message
-           :validate-message
-   :log-message
-           :*message-contracts*
+   :*message-priorities*
+           :message-type
+   :message-data
+           :message-state
+   :broadcast-p
+           :capture-p
+   :bubble-p
+           :propagation-stopped-p
+   :stop-propagation
+           :cmd
+   :make-cmd
+           :send-message
+   :validate-message
+           :log-message
+   :*message-contracts*
+           :register-message-contract
            ;; Serialization
-           :serialize-message
-            :deserialize-message
-            ;; Lifecycle Hooks
-            :*before-send-message-hooks*
-            :*after-send-message-hooks*
-            :add-before-send-message-hook
-            :remove-before-send-message-hook
-            :add-after-send-message-hook
-            :remove-after-send-message-hook))
-            ; Removed export of *app-sender*
+   :serialize-message
+           :deserialize-message
+           ;; Lifecycle Hooks
+   :*before-send-message-hooks*
+           :*after-send-message-hooks*
+   :add-before-send-message-hook
+           :remove-before-send-message-hook
+   :add-after-send-message-hook
+           :remove-after-send-message-hook
+           ))
+
 (in-package :elmtui.core.events)
 
 ;; *app-sender* is now defined in elmtui.core.globals
 
 (defvar *message-contracts* (make-hash-table :test 'equal)
- "Registry of message contracts for validation and documentation.")
+  "Registry of message contracts for validation and documentation.")
 
 (defvar *message-priorities* (make-hash-table :test 'equal)
- "Stub: Registry for message priorities. Extend for advanced priority handling.")
+  "Stub: Registry for message priorities. Extend for advanced priority handling.")
 
 (defvar *before-send-message-hooks* nil
- "A list of functions to be called before a message is sent via SEND-MESSAGE.
+  "A list of functions to be called before a message is sent via SEND-MESSAGE.
 Each hook function should accept the target and the message as arguments.")
 
 (defvar *after-send-message-hooks* nil
- "A list of functions to be called after a message has been processed by SEND-MESSAGE.
+  "A list of functions to be called after a message has been processed by SEND-MESSAGE.
 Each hook function should accept the target and the message as arguments.")
 
-(defun add-before-send-message-hook (hook-fn)
- "Adds HOOK-FN to the list of hooks executed before sending a message."
- (pushnew hook-fn *before-send-message-hooks* :test #'eq))
+(defun add-before-send-message-hook (hook-fN)
+  "Adds HOOK-FN to the list of hooks executed before sending a message."
+  (pushnew hook-fN *before-send-message-hooks* :test #'eq))
 
-(defun remove-before-send-message-hook (hook-fn)
- "Removes HOOK-FN from the list of hooks executed before sending a message."
- (setf *before-send-message-hooks* (remove hook-fn *before-send-message-hooks* :test #'eq)))
+(defun remove-before-send-message-hook (hook-fN)
+  "Removes HOOK-FN from the list of hooks executed before sending a message."
+  (setf *before-send-message-hooks* (remove hook-fN *before-send-message-hooks* :test #'eq)))
 
-(defun add-after-send-message-hook (hook-fn)
- "Adds HOOK-FN to the list of hooks executed after sending a message."
- (pushnew hook-fn *after-send-message-hooks* :test #'eq))
+(defun add-after-send-message-hook (hook-fN)
+  "Adds HOOK-FN to the list of hooks executed after sending a message."
+  (pushnew hook-fN *after-send-message-hooks* :test #'eq))
 
-(defun remove-after-send-message-hook (hook-fn)
- "Removes HOOK-FN from the list of hooks executed after sending a message."
- (setf *after-send-message-hooks* (remove hook-fn *after-send-message-hooks* :test #'eq)))
+(defun remove-after-send-message-hook (hook-fN)
+  "Removes HOOK-FN from the list of hooks executed after sending a message."
+  (setf *after-send-message-hooks* (remove hook-fN *after-send-message-hooks* :test #'eq)))
 
 (defmacro register-message-contract (type contract-fn &optional (priority 0))
   "Register a message contract and optional priority for TYPE.
@@ -121,18 +191,18 @@ Stub for richer contract registration and enforcement."
             for expected-type = (arg-def-type arg-def)
             for value = (getf provided-args-plist expected-keyword :not-found)
             do
-         (when (eq value :not-found)
-           (signal 'elmtui.core.conditions:message-validation-error
-                   :message msg
-                   :reason (format nil "Missing keyword argument ~S for variant ~S of ~S."
-                                   expected-keyword variant-key message-type-name))
-           (return-from validate-message-via-schema nil))
-         (unless (typep value expected-type)
-           (signal 'elmtui.core.conditions:message-validation-error
-                   :message msg
-                   :reason (format nil "Type error for argument ~S in variant ~S of ~S. Expected ~S, got ~S (value: ~S)."
-                                   expected-keyword variant-key message-type-name expected-type (type-of value) value))
-           (return-from validate-message-via-schema nil))))
+               (when (eq value :not-found)
+                 (signal 'elmtui.core.conditions:message-validation-error
+                         :message msg
+                         :reason (format nil "Missing keyword argument ~S for variant ~S of ~S."
+                                         expected-keyword variant-key message-type-name))
+                 (return-from validate-message-via-schema nil))
+               (unless (typep value expected-type)
+                 (signal 'elmtui.core.conditions:message-validation-error
+                         :message msg
+                         :reason (format nil "Type error for argument ~S in variant ~S of ~S. Expected ~S, got ~S (value: ~S)."
+                                         expected-keyword variant-key message-type-name expected-type (type-of value) value))
+                 (return-from validate-message-via-schema nil))))
     t)) ; Validation passed
 
 (defun validate-message (msg)
@@ -140,12 +210,16 @@ Stub for richer contract registration and enforcement."
    Signals message-validation-error if invalid."
   (let* ((m-type-name (message-type msg)) ; This is the message type symbol, e.g., 'AppMsg
          (explicit-contract (gethash m-type-name *message-contracts*)))
+    (format t (format nil "Validating message type ~S with explicit contract: ~S" m-type-name explicit-contract))
+    (when explicit-contract
+      (format t "Explicit contract: ~S" (funcall explicit-contract msg)))
     (cond
       (explicit-contract
        (unless (funcall explicit-contract msg)
          (signal 'elmtui.core.conditions:message-validation-error
                  :message msg
-                 :reason (format nil "Explicit contract validation failed for message type ~S." m-type-name))))
+                 :reason (format nil "Explicit contract validation failed for message type ~S." m-type-name)))
+       t)
       ((gethash m-type-name elmtui.state.msg:*message-schemas*)
        (validate-message-via-schema msg m-type-name (gethash m-type-name elmtui.state.msg:*message-schemas*)))
       (t
@@ -181,7 +255,7 @@ Stub for richer contract registration and enforcement."
     (with-recovery (elmtui.core.conditions:command-execution-error)
       (handler-case
           (progn
-            (setf result (on-message target msg)) ; This is clevelib.api:on-message
+            (setf result (on-message target msg)) ; This is cleve-elm.api:on-message
             (setf successp t))
         (error (e)
           (signal 'elmtui.core.conditions:command-execution-error
@@ -192,12 +266,12 @@ Stub for richer contract registration and enforcement."
     result)) ; Return the result of on-message
 
 ;;; USAGE EXAMPLES:
-;; (defparameter *relay* (make-instance 'clevelib.ems:ems))
+;; (defparameter *relay* (make-instance 'cleve-elm.ems:ems))
 ;; (defparameter *msg* (make-message :custom-type '(:foo 42)))
 ;; (send-message *relay* *msg*)
 
 ;;; CONTRACTS:
-;; - All messages must be instances of clevelib.message:message or subclasses.
+;; - All messages must be instances of cleve-elm.message:message or subclasses.
 ;; - Message types must be registered in *message-contracts* for validation.
 ;; - Message flows are logged and traced.
 ;; - Commands are constructed with make-cmd and dispatched via the event loop.
@@ -216,14 +290,14 @@ Stub for richer contract registration and enforcement."
       (write-to-string data :pretty nil :readably t :escape t)
     (error (original-error)
       (restart-case
-                  (error 'elmtui.core.conditions:message-serialization-error
-                         :data data
-                          :original-error original-error)
-         (use-default-value (&optional (default-value "\":error\"")) ; Default to readable :error symbol string
-           ;; Quote the symbol in the report format string
-           :report (lambda (s) (format s "Return a default string value instead (defaults to ~S)." 'default-value))
-           default-value)
-         (use-value (value)
+          (error 'elmtui.core.conditions:message-serialization-error
+                 :data data
+                 :original-error original-error)
+        (use-default-value (&optional (default-value "\":error\"")) ; Default to readable :error symbol string
+          ;; Quote the symbol in the report format string
+          :report (lambda (s) (format s "Return a default string value instead (defaults to ~S)." 'default-value))
+          default-value)
+        (use-value (value)
           :report "Interactively specify a string value to use instead."
           :interactive (lambda () (format *query-io* "Enter string value to use: ") (read *query-io*))
           value)
@@ -240,12 +314,12 @@ Stub for richer contract registration and enforcement."
         (restart-case
             (error 'elmtui.core.conditions:message-deserialization-error
                    :serialized-data serialized-data-string
-                    :original-error original-error)
-           (use-default-value (&optional (default-value nil))
-             ;; Quote the symbol in the report format string
-             :report (lambda (s) (format s "Return a default Lisp value instead (defaults to ~S)." 'default-value))
-             default-value)
-           (use-value (value)
+                   :original-error original-error)
+          (use-default-value (&optional (default-value nil))
+            ;; Quote the symbol in the report format string
+            :report (lambda (s) (format s "Return a default Lisp value instead (defaults to ~S)." 'default-value))
+            default-value)
+          (use-value (value)
             :report "Interactively specify a Lisp value to use instead."
             :interactive (lambda () (format *query-io* "Enter Lisp form to evaluate for value: ") (eval (read *query-io*)))
             value)
@@ -278,3 +352,4 @@ Stub for richer contract registration and enforcement."
         ;; we still create the message but with nil data.
         ;; A different restart could provide alternative data.
         (make-message :type msg-type :data msg-data)))))
+

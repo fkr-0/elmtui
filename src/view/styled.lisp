@@ -4,14 +4,17 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.view.styled
   (:use :cl)
+  (:import-from :log4cl #:log-debug)
   (:import-from :elmtui.view.core
    :ui-node :make-ui-node :copy-ui-node
-                :ui-node-type :ui-node-props :ui-node-children)
+                :ui-node-type :ui-node-props :ui-node-children :node-type)
+  (:export #:ui-node-type #:node-type) ; Export these generics
   ;; Import relevant symbols from elmtui.style-lib API and implementation details
   ;; Assuming elmtui.style-lib.api exports these based on the provided files
   (:import-from :elmtui.style-lib.api
                 #:stylable #:stylable-id #:classes #:parents-of #:styles #:dirty #:dirty-p
-                #:style-set) ; Removed query-stylesheet, copy-set
+
+                #:style-set #:stylesheet-name) ; Removed query-stylesheet, copy-set. Added stylesheet-name
   ;; Import default style set, value-of, and copy-set from style-set package
   (:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set #:set-style) ; Added copy-set
   ;; Import query-stylesheet from sheet package
@@ -22,6 +25,8 @@
    :copy-styled-node       ; Copier
    :apply-stylesheet-to-tree ; Main styling function
    :style-value             ; Helper to get computed style value
+   :styles
+   :mark-tree-dirty-for-styling ; New function to mark tree as dirty
    :with-attributes))       ; Renamed from with-styles
 (in-package :elmtui.view.styled)
 
@@ -41,8 +46,22 @@
 
 ;; Methods implementing the stylable interface for styled-ui-node
 (defmethod stylable-id ((node styled-ui-node))
-  "Returns the :id from the node's props."
-  (getf (ui-node-props node) :id))
+  "Returns the :id from the node's props, synchronizing with the 'sid slot."
+  ;; Check if the 'sid slot (from stylable) is bound and has a value.
+  ;; The actual slot name is 'sid' in the elmtui.style-lib.api package.
+  (let ((slot-id-value (when (slot-boundp node 'elmtui.style-lib.api::sid)
+                         (slot-value node 'elmtui.style-lib.api::sid))))
+    (if slot-id-value
+        ;; If slot has a value, ensure props :id matches and return it.
+        (progn
+          (unless (equal (getf (ui-node-props node) :id) slot-id-value)
+            (setf (getf (ui-node-props node) :id) slot-id-value))
+          slot-id-value)
+        ;; If slot is not bound or nil, try to initialize it from props :id.
+        (let ((props-id (getf (ui-node-props node) :id)))
+          (when props-id
+            (setf (slot-value node 'elmtui.style-lib.api::sid) props-id))
+          props-id))))
 
 (defmethod classes ((node styled-ui-node))
   "Returns the :classes from the node's props, ensuring it's a list or nil."
@@ -59,6 +78,8 @@
 
 ;; dirty/dirty-p are assumed to be accessor/method provided by elmtui.style-lib:stylable.
 
+
+
 ;;;-----------------------------------------------------------------------------
 ;;; Node Creation / Copying
 ;;;-----------------------------------------------------------------------------
@@ -67,30 +88,32 @@
   "Create a new styled UI node.
    Props should include :id and :classes for styling selectors.
    PARENT is the direct parent styled-ui-node (used for :parents initarg)."
-  (let* ((id (or (getf props :id) (gensym "NODE-"))) ; Ensure ID for stylability
+  (log:debug "STYLED: make-styled-node - Type: ~S, Props: ~S, Children count: ~A, Parent provided: ~S"
+             type props (length children) (if parent t nil))
+  (let* ((provided-id (getf props :id))
+         (final-id (or provided-id (gensym "NODE-"))) ; Use provided ID if it exists
          (classes (getf props :classes))
-         ;; Ensure props has the potentially generated ID
-         (effective-props (list* :id id (copy-list props)))
+         ;; Create effective-props, ensuring :id is final-id and removing any other :id from original props
+         (props-without-original-id (loop for (key val) on (copy-list props) by #'cddr
+                                          unless (eq key :id)
+                                            collect key and collect val))
+         (effective-props (list* :id final-id props-without-original-id))
          (node (make-instance 'styled-ui-node
-                              ;; Initargs for stylable superclass (assuming standard names)
-                              :id id
+                              :id final-id ; Use the final, correct ID
                               :classes (cond ((null classes) nil)
                                              ((listp classes) classes)
                                              (t (list classes)))
-                              ;; Pass parent list for elmtui.style-lib:stylable init
-                              ;; This assumes elmtui.style-lib uses the :parents initarg
-                              ;; and handles building the full ancestor list if needed,
-                              ;; or that selectors only need the direct parent.
-                              :parents (when parent (list parent))
-                              )))
+                              :parents (when parent (list parent)))))
     ;; Set basic ui-node slots
     (setf (ui-node-type node) type)
     (setf (ui-node-props node) effective-props)
     (setf (ui-node-children node) children)
     ;; Initialize styles slot, applying explicit props over defaults
     (let ((initial-styles (copy-set *default-style-set*)))
+      (unless (typep initial-styles 'style-set)
+        (log:error "STYLED: make-styled-node - initial-styles is NOT a style-set! Value: ~S. *default-style-set* is: ~S"
+                   initial-styles *default-style-set*))
       ;; Apply explicit layout props from the node's props as base styles.
-      ;; These can be overridden by stylesheet rules later.
       (let ((prop-width (getf effective-props :width))
             (prop-height (getf effective-props :height))
             (prop-display (getf effective-props :display))
@@ -99,7 +122,6 @@
         (when prop-height (set-style initial-styles :height prop-height))
         (when prop-display (set-style initial-styles :display prop-display))
         (when prop-flex-dir (set-style initial-styles :flex-direction prop-flex-dir)))
-      ;; Add other relevant layout props here if needed (e.g., flex, grid props)
       (setf (styles node) initial-styles))
     (setf (dirty node) t) ; Mark as dirty initially
     node))
@@ -130,26 +152,41 @@
 
 (defmethod apply-stylesheet-to-tree ((node styled-ui-node) stylesheet &optional parent)
   "Apply styles to an already styled-ui-node tree."
+  (log:debug "STYLED: apply-stylesheet-to-tree for styled-ui-node - Type: ~S, ID: ~S, Stylesheet: ~A"
+             (ui-node-type node) (stylable-id node) (if stylesheet (stylesheet-name stylesheet) "NIL_STYLESHEET"))
   ;; Create a copy, setting the correct parent link for this instance
   (let ((new-node (copy-styled-node node :parent parent)))
     ;; Recompute styles if dirty
     (when (dirty-p new-node)
+      (log:debug "STYLED: Node ~S is dirty, recomputing styles." (stylable-id new-node))
       ;; Ensure the parents slot is correctly set before querying
-      ;; (This might be redundant if copy-styled-node handles it via :parents initarg)
       (setf (parents-of new-node) (when parent (list parent)))
       ;; Query the stylesheet
-      (setf (styles new-node) (query-stylesheet stylesheet new-node))
-      (setf (dirty new-node) nil)) ; Mark as clean after styling
+      (let ((computed-styles (query-stylesheet stylesheet new-node)))
+        (unless (typep computed-styles 'style-set)
+          (log:error "STYLED: apply-stylesheet-to-tree - query-stylesheet for node ~S (ID: ~S) returned non-style-set: ~S"
+                     new-node (stylable-id new-node) computed-styles))
+        ;; Enhanced Logging: Log node ID, (TODO: matching rules), and final computed style-set
+        (log:debug "STYLED: Node ID: ~S, Stylesheet: ~A, Final Computed Style-Set: ~S"
+                   (stylable-id new-node)
+                   (if stylesheet (stylesheet-name stylesheet) "NIL_STYLESHEET")
+                   computed-styles)
+        (setf (styles new-node) computed-styles)
+        (unless (typep (styles new-node) 'style-set)
+          (log:error "STYLED: apply-stylesheet-to-tree - (styles new-node) for node ~S (ID: ~S) is NOT a style-set after assignment! Value: ~S"
+                     new-node (stylable-id new-node) (styles new-node)))
+        (setf (dirty new-node) nil))) ; Mark as clean after styling
 
     ;; Recursively apply to children, passing self (new-node) as parent
     (setf (ui-node-children new-node)
-          (loop for child in (ui-node-children new-node) ; Iterate over children of the *new* node copy
+          (loop for child in (ui-node-children node) ; Iterate over children of the ORIGINAL node
                 collect (apply-stylesheet-to-tree child stylesheet new-node)))
 
     new-node))
 
 (defmethod apply-stylesheet-to-tree ((node ui-node) stylesheet &optional parent)
   "Handle plain ui-nodes by converting them first."
+  (log:debug "STYLED: apply-stylesheet-to-tree for plain ui-node - Type: ~S, converting to styled." (ui-node-type node))
   ;; Convert to styled-node, setting the parent link
   (let ((styled-node (make-styled-node
                       :type (ui-node-type node)
@@ -173,7 +210,11 @@
   "Get the computed style value of PROPERTY for NODE.
    Returns DEFAULT if NODE is not a styled-ui-node or property not found."
   (if (typep node 'styled-ui-node)
-      (value-of (styles node) property default)
+      (let ((node-styles (styles node)))
+        (unless (typep node-styles 'style-set)
+          (log:error "STYLED: style-value - (styles node) for node ~S (type ~S, id ~S) is NOT a style-set! Value: ~S"
+                     node (ui-node-type node) (stylable-id node) node-styles))
+        (value-of node-styles property default))
       default))
 
 ;;;-----------------------------------------------------------------------------
@@ -210,9 +251,16 @@
        ;; Update stylable info directly if :id or :classes changed
        ;; This assumes elmtui.style-lib.stylable uses these slot names directly
        (when (find :id attributes)
-         (setf (slot-value ,styled-node-var 'elmtui.style-lib.api::id) (getf (ui-node-props ,styled-node-var) :id)))
+         (setf (slot-value ,styled-node-var 'elmtui.style-lib.api::sid) (getf (ui-node-props ,styled-node-var) :id)))
        (when (find :classes attributes)
          (setf (slot-value ,styled-node-var 'elmtui.style-lib.api::classes) (getf (ui-node-props ,styled-node-var) :classes)))
        ;; Mark dirty as attributes potentially affecting style selection changed
        (setf (dirty ,styled-node-var) t)
        ,styled-node-var)))
+
+(defun mark-tree-dirty-for-styling (styled-node)
+  "Recursively marks STYLED-NODE and all its styled-ui-node children as dirty for styling."
+  (when (typep styled-node 'styled-ui-node)
+    (setf (dirty styled-node) t)
+    (dolist (child (ui-node-children styled-node))
+      (mark-tree-dirty-for-styling child))))

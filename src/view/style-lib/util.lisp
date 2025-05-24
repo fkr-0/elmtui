@@ -37,20 +37,27 @@
 (defparameter *pad-fill-char* #\Space)
 (defparameter *margin-fill-char* #\Space)
 
-(defun keyword-split (kw &key (sep "-") (pos nil))
-  "Splits a keyword into a list of keywords. SEQ is the separating character and \"-\"
-is the default. If POS is nil, returns a list of keywords. If POS is :last, returns the last keyword. If POS is :first,
-returns the first keyword. Otherwise, returns the keyword at POS."
-  (let ((kz
-          (mapcar (lambda (x) (intern (upcase x) :keyword))
-                  (split sep (symbol-name kw)))))
-    (cond ((null pos) kz)
-          ((eq pos 'last) (car (last kz)))
-          ((eq pos 'first) (first kz))
-          (t (nth pos kz)))))
-(defun keyword-concat (kw-list &key (sep "-"))
-  "Concatenates a list of keywords into a single keyword."
-  (intern (join sep (mapcar #'symbol-name kw-list)) :keyword))
+;; Add the missing apply-after function
+(defgeneric apply-after (property stylelist)
+  (:documentation 
+   "Determines if a property should be applied after another style in the rendering process.
+    Returns the style that this property should be applied after, or :non-decorating if
+    the property is not decorating, or NIL if no specific ordering is needed.")
+  (:method ((property t) (stylelist t)) 
+    nil))
+
+;; Convenience functions for keyword manipulation
+(defun keyword-split (keyword)
+  "Split a keyword at hyphens, returning a list of sub-keywords"
+  (mapcar (lambda (x) (intern x :keyword)) (split #\- (string keyword)) ))
+
+(defun keyword-concat (keywords)
+  "Join keywords with hyphens to create a single keyword"
+  (intern (join #\- (mapcar #'string keywords)) :keyword))
+
+;; Aliases for better naming
+(defun kw-split (kw) (keyword-split kw))
+(defun kw-join (kws) (keyword-concat kws))
 
 (defgeneric =? (a b)
   (:method ((a t) (b t))

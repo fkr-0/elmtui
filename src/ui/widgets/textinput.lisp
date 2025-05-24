@@ -1,28 +1,30 @@
 ;;;===============================================================
 ;;; File: src/ui/widgets/textinput.lisp
-;;; Elm-style TextInput Widget
+;;; Standardized Elm-style Text Input Widget
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.textinput
   (:use :cl :alexandria)
-  (:import-from :elmtui.view.core #:make-ui-node #:ui-node)
-  (:import-from :elmtui.core.events #:cmd) ; For potential commands like :on-change or :on-submit
-  ;; TODO: Import specific key symbols if needed from elmtui.core.input-events
+  (:import-from :elmtui.view.styled #:make-styled-node)
+  (:import-from :elmtui.core.async #:cmd-async)
+  (:import-from :elmtui.core.events #:send-message)
+  (:import-from :elmtui.ui.widgets.utils 
+                #:defwidget-view
+                #:with-widget-model
+                #:widget-focused-p)
   (:export #:textinput-model #:make-textinput-model ; Struct and its constructor
            ;; Accessors
            #:textinput-model-id
            #:textinput-model-value
            #:textinput-model-placeholder
            #:textinput-model-cursor-pos
-           #:textinput-model-is-focused
-           #:textinput-model-on-change ;; Message to send when value changes
-           #:textinput-model-on-submit ;; Message to send on enter
+           #:textinput-model-on-change
+           #:textinput-model-on-submit
+           #:textinput-model-disabled
            ;; Core TEA functions
            #:init-textinput #:update-textinput #:view-textinput
-           ;; Message types (keywords for now, could be defmsg'd later if complex)
+           ;; Message types 
            #:msg-textinput-key-press
            #:msg-textinput-set-value
-           #:msg-textinput-focus
-           #:msg-textinput-blur
            #:msg-textinput-submit))
 (in-package :elmtui.ui.widgets.textinput)
 
@@ -30,44 +32,47 @@
 ;;; Model
 ;;;---------------------------------------------------------------
 (defstruct (textinput-model (:constructor %make-textinput-model))
-  "Model for a text input widget."
+  "Model for a text input widget.
+   ID: Unique identifier.
+   VALUE: Current text content.
+   PLACEHOLDER: Text to show when empty.
+   CURSOR-POS: Current cursor position.
+   ON-CHANGE: Message to dispatch when value changes.
+   ON-SUBMIT: Message to dispatch on submit (e.g., Enter key).
+   DISABLED: Whether the input is disabled."
   (id (error "ID must be provided.") :type T :read-only t)
   (value "" :type string)
   (placeholder "" :type string)
   (cursor-pos 0 :type unsigned-byte)
-  (is-focused nil :type boolean)
-  (on-change nil :type T) ; Message to dispatch on value change
-  (on-submit nil :type T)) ; Message to dispatch on submit (e.g., Enter key)
+  (on-change nil :type T) 
+  (on-submit nil :type T)
+  (disabled nil :type boolean))
 
 ;;;---------------------------------------------------------------
-;;; Messages (Keywords - can be expanded with defmsg if needed)
+;;; Messages (Keywords)
 ;;;---------------------------------------------------------------
-;; (:key-press :key <key-event-data>) - from platform, handled by parent, then passed here
-;; (:set-value :value <new-string>) - direct manipulation
-;; (:focus) - from parent
-;; (:blur) - from parent
-;; (:submit) - internal, or from parent if enter key is handled globally
-
 (defparameter msg-textinput-key-press :textinput-key-press)
 (defparameter msg-textinput-set-value :textinput-set-value)
-(defparameter msg-textinput-focus :textinput-focus)
-(defparameter msg-textinput-blur :textinput-blur)
 (defparameter msg-textinput-submit :textinput-submit)
-
 
 ;;;---------------------------------------------------------------
 ;;; Init
 ;;;---------------------------------------------------------------
-(defun init-textinput (id &key (value "") (placeholder "") (on-change nil) (on-submit nil))
-  "Initializes a new textinput model.
+(defun init-textinput (id &key 
+                               (value "")
+                               (placeholder "")
+                               (on-change nil)
+                               (on-submit nil)
+                               (disabled nil))
+  "Initializes a new text input model.
    Returns (values textinput-model initial-command)."
   (values (%make-textinput-model :id id
                                  :value value
                                  :placeholder placeholder
                                  :cursor-pos (length value) ; Cursor at end by default
-                                 :is-focused nil
                                  :on-change on-change
-                                 :on-submit on-submit)
+                                 :on-submit on-submit
+                                 :disabled disabled)
           nil)) ; No initial commands
 
 ;;;---------------------------------------------------------------
@@ -75,6 +80,8 @@
 ;;;---------------------------------------------------------------
 (defun update-textinput (msg model)
   "Updates the textinput model based on a message.
+   MSG: The message to process.
+   MODEL: The current textinput-model instance.
    Returns (values new-textinput-model command-list)."
   (check-type model textinput-model)
   (let ((new-model (copy-structure model))
@@ -82,10 +89,10 @@
         (value-changed nil))
 
     (etypecase msg
-      ;; (:textinput-key-press (key-event)) - msg is like '(:key-press :key <key-data>)
-      ((cons (eql msg-textinput-key-press)) ; e.g. '(:textinput-key-press :key <key-obj>)
-       (when (textinput-model-is-focused new-model)
-         (let* ((key-data (getf (rest msg) :key)) ; Assuming key-data has :char, :key-sym
+      ;; (:textinput-key-press :key <key-data>) 
+      ((cons (eql msg-textinput-key-press))
+       (unless (textinput-model-disabled new-model)
+         (let* ((key-data (getf (rest msg) :key))
                 (char (getf key-data :char))
                 (key-sym (getf key-data :key-sym))
                 (current-value (textinput-model-value new-model))
@@ -114,7 +121,6 @@
                       (concatenate 'string
                                    (subseq current-value 0 cursor)
                                    (subseq current-value (1+ cursor))))
-                ;; Cursor position does not change for delete
                 (setf value-changed t)))
              ((eq key-sym :left)
               (when (> cursor 0)
@@ -128,64 +134,133 @@
               (setf (textinput-model-cursor-pos new-model) (length current-value)))
              ((eq key-sym :enter)
               (when (textinput-model-on-submit new-model)
-                (push (textinput-model-on-submit new-model) commands)))))))
+                (push (cmd-async #'send-message (textinput-model-on-submit new-model)) commands)))))))
 
-      ((cons (eql msg-textinput-set-value)) ; e.g. '(:textinput-set-value :value "new text")
-       (let ((new-val (getf (rest msg) :value)))
-         (unless (string= (textinput-model-value new-model) new-val)
-           (setf (textinput-model-value new-model) new-val)
-           (setf (textinput-model-cursor-pos new-model) (length new-val)) ; Move cursor to end
-           (setf value-changed t))))
+      ;; (:textinput-set-value :value "new text")
+      ((cons (eql msg-textinput-set-value))
+       (unless (textinput-model-disabled new-model)
+         (let ((new-val (getf (rest msg) :value)))
+           (unless (string= (textinput-model-value new-model) new-val)
+             (setf (textinput-model-value new-model) new-val)
+             (setf (textinput-model-cursor-pos new-model) (length new-val)) ; Move cursor to end
+             (setf value-changed t)))))
 
-      ((eql msg-textinput-focus) ; Corrected: msg is the var being cased
-       (setf (textinput-model-is-focused new-model) t))
+      ((eql msg-textinput-submit) 
+       (unless (textinput-model-disabled new-model)
+         (when (textinput-model-on-submit new-model)
+           (push (cmd-async #'send-message (textinput-model-on-submit new-model)) commands)))))
 
-      ((eql msg-textinput-blur) ; Corrected: msg is the var being cased
-       (setf (textinput-model-is-focused new-model) nil))
-
-      ;; msg-textinput-submit is handled internally by :key-press :enter
-      ;; but could be sent by a parent if needed.
-      ((eql msg-textinput-submit) ; Corrected: msg is the var being cased
-       (when (textinput-model-on-submit new-model)
-         (push (textinput-model-on-submit new-model) commands))))
-
+    ;; Handle on-change command if value changed
     (when value-changed
       (when (textinput-model-on-change new-model)
-        ;; The on-change message might need the new value
-        ;; Assuming on-change is a message template that can be completed or is a simple signal
         (let ((on-change-msg (textinput-model-on-change new-model)))
-          (if (listp on-change-msg) ; If it's a list, assume it's a message template like '(:my-change-event :value nil)
-              (push (append on-change-msg (list :value (textinput-model-value new-model))) commands)
-              (push on-change-msg commands))))) ; If not a list, assume it's a simple message type
+          (if (listp on-change-msg) ; If it's a message template
+              (push (cmd-async #'send-message
+                               (append on-change-msg (list :value (textinput-model-value new-model))))
+                    commands)
+              (push (cmd-async #'send-message on-change-msg) commands)))))
 
     (values new-model commands)))
 
 ;;;---------------------------------------------------------------
-;;; View
+;;; View (STANDARDIZED FORMAT)
 ;;;---------------------------------------------------------------
-(defun view-textinput (model global-current-focus-id dispatch-fn)
-  "Creates a UI-NODE representation of the textinput.
-   MODEL: The current textinput-model instance.
-   GLOBAL-CURRENT-FOCUS-ID: The ID of the widget that currently has global focus.
-   DISPATCH-FN: A function to call to dispatch messages.
-   Returns a UI-NODE."
-  (check-type model textinput-model)
-  (let* ((widget-id (textinput-model-id model))
-         (is-globally-focused (equal widget-id global-current-focus-id)))
-    (make-ui-node
-     :type :text-input ; A specific type for renderers to handle cursor, etc.
-     :props (list :widget-id widget-id
-                  :value (textinput-model-value model)
-                  :placeholder (textinput-model-placeholder model)
-                  :cursor-pos (textinput-model-cursor-pos model)
-                  :is-focused is-globally-focused ; Pass global focus state to renderer
-                  :class (if is-globally-focused
-                             "textinput textinput-focused"
-                             "textinput")
-                  :focusable t
-                  ;; Events for focus/blur, key presses are typically handled by parent/platform
-                  ;; and translated into messages for this component's update function.
-                  ;; However, :click could trigger a focus request.
-                  :events (list (list :click
-                                      (lambda () (funcall dispatch-fn (list :request-focus :widget-id (textinput-model-id model))))))) ; Use :widget-id
-     :children nil))) ; Text inputs are usually leaf nodes in terms of Elm component children
+(defwidget-view view-textinput (app-state
+                                   :model-var model
+                                   :widget-id-var widget-id
+                                   :add-args (
+                                              value placeholder
+                                              on-change on-submit
+                                              disabled
+                                              tooltip aria-label
+                                              class width height)
+                                   :documentation
+                                   "Creates a UI representation of a text input field.
+   APP-STATE: The application state.
+   WIDGET-ID: The unique ID for this text input (required).
+   VALUE: Text content. Defaults to model's value if not provided.
+   PLACEHOLDER: Text to show when input is empty.
+   ON-CHANGE: Message to dispatch when value changes.
+   ON-SUBMIT: Message to dispatch on submit (e.g., Enter key).
+   DISABLED: Whether the input is disabled.
+   TOOLTIP: Optional tooltip text to display on hover.
+   ARIA-LABEL: Accessibility label for screen readers.
+   CLASS: Additional CSS classes to apply.
+   WIDTH: Width in columns.
+   HEIGHT: Height in rows.")
+
+  ;; Determine effective values from model and/or provided props
+  (let* ((effective-value (or value 
+                              (when model (textinput-model-value model))
+                              ""))
+         (effective-placeholder (or placeholder
+                                    (when model (textinput-model-placeholder model))
+                                    ""))
+         (effective-on-change (or on-change
+                                  (when model (textinput-model-on-change model))
+                                  nil))
+         (effective-on-submit (or on-submit
+                                  (when model (textinput-model-on-submit model))
+                                  nil))
+         (effective-disabled (or disabled
+                                 (when model (textinput-model-disabled model))
+                                 nil))
+         (effective-cursor-pos (when model (textinput-model-cursor-pos model)))
+         (is-focused (widget-focused-p widget-id app-state))
+         
+         ;; Build CSS classes
+         (base-class "textinput")
+         (focused-class (when is-focused "textinput-focused"))
+         (disabled-class (when effective-disabled "textinput-disabled"))
+         (custom-class class)
+         (all-classes (remove nil (list base-class focused-class disabled-class custom-class))))
+    
+    ;; Create the styled node representing the text input
+    (make-styled-node
+     :type :text-input
+     :props (list* :id widget-id
+                   :value effective-value
+                   :placeholder effective-placeholder
+                   :cursor-pos effective-cursor-pos
+                   :on-change effective-on-change
+                   :on-submit effective-on-submit
+                   :disabled effective-disabled
+                   :focusable (not effective-disabled)
+                   :class (format nil "~{~A~^ ~}" all-classes) ; Join classes with spaces
+                   :aria-role "textbox"
+                   :aria-disabled (if effective-disabled "true" "false")
+                   ;; Include optional properties only if provided
+                   (append
+                    (when width (list :width width))
+                    (when height (list :height height))
+                    (when tooltip (list :title tooltip))
+                    (when aria-label (list :aria-label aria-label))))
+     :children nil)))
+
+;;;---------------------------------------------------------------
+;;; Backward Compatibility Wrapper
+;;;---------------------------------------------------------------
+;; This is a temporary function to maintain backward compatibility
+;; during transition to the new widget pattern
+;; (defun view-textinput (model &key current-focus-id dispatch-fn)
+;;   "DEPRECATED: Use view-textinput instead."
+;;   (warn "view-textinput is deprecated. Use view-textinput with app-state and :widget-id instead.")
+;;   (let ((widget-id (textinput-model-id model))
+;;         (is-focused (eq widget-id current-focus-id)))
+;;     (make-styled-node
+;;      :type :text-input
+;;      :props (list :id widget-id
+;;                   :value (textinput-model-value model)
+;;                   :placeholder (textinput-model-placeholder model)
+;;                   :cursor-pos (textinput-model-cursor-pos model)
+;;                   :is-focused is-focused
+;;                   :disabled nil ; Old model doesn't have this property
+;;                   :focusable t
+;;                   :class (if is-focused
+;;                              "textinput textinput-focused"
+;;                              "textinput")
+;;                   :aria-role "textbox"
+;;                   :aria-disabled "false"
+;;                   ;; Events handling
+;;                   )
+;;      :children nil)))

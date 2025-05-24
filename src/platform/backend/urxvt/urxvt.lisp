@@ -8,7 +8,7 @@
 
 (uiop:define-package :elmtui.backend.urxvt
   (:use :cl :elmtui.platform.api :elmtui.backend.common.utils)
-  (:import-from #:elmtui.backend.terminal ; For reusing raw mode, etc.
+  (:import-from #:elmtui.platform.backend.terminal ; For reusing raw mode, etc.
                 #:enable-raw-mode #:disable-raw-mode #:send-sequence #:apply-style-diff
                 #:read-char-nonblock) ; Removed parse-input-bytes import
   (:import-from #:sb-posix
@@ -19,13 +19,13 @@
                 #:unix-open #:unix-close #:unix-read #:unix-write #:o_rdwr #:o_noctty)
   (:import-from #:sb-ext #:run-program  #:process-pid #:process-pty #:process-kill)
   (:import-from #:sb-sys #:make-fd-stream #:fd-stream-fd)
-  (:import-from #:elmtui.core.input-events ; Event structs for intermediate parsing
+  (:import-from #:elmtui.core.event-types ; Event structs for intermediate parsing
                 #:key-event-key #:key-event-char #:key-event-modifiers
-                #:mouse-event-type #:mouse-event-button #:mouse-event-row #:mouse-event-col #:mouse-event-modifiers
+                #:mouse-event-type #:mouse-event-button #:mouse-event-y #:mouse-event-x #:mouse-event-modifiers
                 #:make-mouse-event     ; For creating mouse event objects
                 #:make-key-event)      ; For creating key event objects
   ;; Note: Raw events are not mapped to messages, they are returned directly if parsing fails
-  (:import-from #:elmtui.core.input-events #:make-raw-input-event)
+  (:import-from #:elmtui.core.event-types #:make-raw-input-event)
   (:shadowing-import-from #:elmtui.backend.common.utils #:render-seq) ; Ensure we use our common one
   (:export #:urxvt-instance
            #:initialize-backend
@@ -315,14 +315,15 @@
                              (if (evenp (logand button-code 1)) :scroll-up :scroll-down))
                             (t                                            :unknown-mouse)))
          (final-button    (case type
-                            (:scroll-up   4)
-                            (:scroll-down 5)
-                            (otherwise    (1+ button)))))                 ; shift 0→1,1→2,2→3
+                            (:scroll-up   :scroll-up)
+                            (:scroll-down :scroll-down)
+                            (otherwise    (if (= (1+ button) 1)
+                                              :left :dunno-2)))))                 ; shift 0→1,1→2,2→3
     (make-mouse-event
      :type      type
      :button    final-button
-     :row       (1- row)    ; to 0-based
-     :col       (1- col)
+     :y       (1- row)    ; to 0-based
+     :x       (1- col)
      :modifiers modifiers
      :raw       raw-bytes)))
 
@@ -349,8 +350,8 @@
                             (make-mouse-event
                              :type      (mouse-event-type me)
                              :button    (mouse-event-button me)
-                             :row       (mouse-event-row me)
-                             :col       (mouse-event-col me)
+                             :y       (mouse-event-y me)
+                             :x       (mouse-event-x me)
                              :modifiers (mouse-event-modifiers me)))
                           ;; fallback to key CSI
                           (multiple-value-bind (keysym _)

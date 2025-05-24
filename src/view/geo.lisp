@@ -8,17 +8,17 @@
   ;; Removed :ut.config import, defining =? locally
   (:import-from :cl :make-instance)
   (:export #:=? #:area #:area< #:contains-p #:normalize!
-           #:rectangle-union #:border #:bounding-box #:circle
-           #:corner #:dim #:dim-length #:dim-pos #:flip #:grow-view!
-           #:h #:line #:make-pos #:make-rectangle #:make-size
-           #:move! #:overlap #:polygon #:pos #:rect-diff #:rectangle
-           #:make-instance
-           #:pos-x #:pos-y #:rectangle-size #:rectangle-pos
-           #:clamp ; Added clamp
-           #:rectangle-pos #:rectangle-union-list
-           #:resize-dimension! #:rotate #:scale #:shrink-view!
-           #:size #:translate #:triangle #:valid-p #:w #:x #:x2 #:y
-           #:y2))
+    #:rectangle-union #:border #:bounding-box #:circle
+    #:corner #:dim #:dim-length #:dim-pos #:flip #:grow-view!
+    #:h #:line #:make-pos #:make-rectangle #:make-size
+    #:move! #:overlap #:polygon #:pos #:rect-diff #:rectangle
+    #:make-instance
+    #:pos-x #:pos-y #:rectangle-size #:rectangle-pos
+    #:clamp ; Added clamp
+    #:rectangle-pos #:rectangle-union-list
+    #:resize-dimension! #:rotate #:scale #:shrink-view!
+    #:size #:translate #:triangle #:valid-p #:w #:x #:x2 #:y
+    #:y2))
 (in-package :elmtui.view.geo)
 
 ;;;-----------------------------------------------------------------------------
@@ -39,7 +39,7 @@
 (defmethod =? ((a list) (b list))
   "Check if two lists are equal by comparing lengths and elements recursively using =?."
   (and (= (length a) (length b))
-       (every #'=? a b)))
+    (every #'=? a b)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Struct Definitions
@@ -61,17 +61,17 @@
 (defmethod =? ((a pos) (b pos))
   "Check if two pos structs are equal."
   (and (= (pos-x a) (pos-x b))
-       (= (pos-y a) (pos-y b))))
+    (= (pos-y a) (pos-y b))))
 
 (defmethod =? ((a size) (b size))
   "Check if two size structs are equal."
   (and (= (size-w a) (size-w b))
-       (= (size-h a) (size-h b))))
+    (= (size-h a) (size-h b))))
 
 (defmethod =? ((a rectangle) (b rectangle))
   "Check if two rectangle structs are equal."
   (and (=? (rectangle-pos a) (rectangle-pos b))
-       (=? (rectangle-size a) (rectangle-size b))))
+    (=? (rectangle-size a) (rectangle-size b))))
 
 
 
@@ -143,36 +143,36 @@
 (defmethod make-instance ((class (eql 'pos)) &rest initargs)
   (let ((p (make-pos)))
     (loop for (key value) on initargs by #'cddr
-          do (case key
-               (:x (setf (pos-x p) value))
-               (:y (setf (pos-y p) value))
-               (otherwise (error "Invalid initarg for pos: ~A" key))))
+      do (case key
+           (:x (setf (pos-x p) value))
+           (:y (setf (pos-y p) value))
+           (otherwise (error "Invalid initarg for pos: ~A" key))))
     p))
 
 (defmethod make-instance ((class (eql 'size)) &rest initargs)
   (let ((s (make-size)))
     (loop for (key value) on initargs by #'cddr
-          do (case key
-               (:w (setf (size-w s) value))
-               (:h (setf (size-h s) value))
-               (:width (setf (size-w s) value)) ; Alias
-               (:height (setf (size-h s) value)) ; Alias
-               (otherwise (error "Invalid initarg for size: ~A" key))))
+      do (case key
+           (:w (setf (size-w s) value))
+           (:h (setf (size-h s) value))
+           (:width (setf (size-w s) value)) ; Alias
+           (:height (setf (size-h s) value)) ; Alias
+           (otherwise (error "Invalid initarg for size: ~A" key))))
     s))
 
 (defmethod make-instance ((class (eql 'rectangle)) &rest initargs)
   (let ((r (make-rectangle)))
     (loop for (key value) on initargs by #'cddr
-          do (case key
-               (:pos (setf (rectangle-pos r) value))
-               (:size (setf (rectangle-size r) value))
-               (:x (setf (pos-x (rectangle-pos r)) value))
-               (:y (setf (pos-y (rectangle-pos r)) value))
-               (:w (setf (size-w (rectangle-size r)) value))
-               (:h (setf (size-h (rectangle-size r)) value))
-               (:width (setf (size-w (rectangle-size r)) value)) ; Alias
-               (:height (setf (size-h (rectangle-size r)) value)) ; Alias
-               (otherwise (error "Invalid initarg for rectangle: ~A" key))))
+      do (case key
+           (:pos (setf (rectangle-pos r) value))
+           (:size (setf (rectangle-size r) value))
+           (:x (setf (pos-x (rectangle-pos r)) value))
+           (:y (setf (pos-y (rectangle-pos r)) value))
+           (:w (setf (size-w (rectangle-size r)) value))
+           (:h (setf (size-h (rectangle-size r)) value))
+           (:width (setf (size-w (rectangle-size r)) value)) ; Alias
+           (:height (setf (size-h (rectangle-size r)) value)) ; Alias
+           (otherwise (error "Invalid initarg for rectangle: ~A" key))))
     ;; Normalize after setting potentially negative dimensions via x/y/w/h
     (normalize! r)
     r))
@@ -298,9 +298,9 @@
   (:documentation "Calculate the bounding rectangle between two positions."))
 (defmethod rectangle-between ((p1 pos) (p2 pos))
   (let ((x (min (x p1) (x p2)))
-        (y (min (y p1) (y p2)))
-        (x2 (max (x p1) (x p2)))
-        (y2 (max (y p1) (y p2))))
+         (y (min (y p1) (y p2)))
+         (x2 (max (x p1) (x p2)))
+         (y2 (max (y p1) (y p2))))
     (make-instance 'rectangle :x x :y y :w (- x2 x) :h (- y2 y))))
 
 ;; Delta Operations (Non-mutating)
@@ -344,9 +344,9 @@
 (defmethod rectangle-union ((r1 rectangle) (r2 rectangle))
   "Calculate the bounding box containing both rectangles."
   (let ((x (min (x r1) (x r2)))
-        (y (min (y r1) (y r2)))
-        (x2 (max (x2 r1) (x2 r2)))
-        (y2 (max (y2 r1) (y2 r2))))
+         (y (min (y r1) (y r2)))
+         (x2 (max (x2 r1) (x2 r2)))
+         (y2 (max (y2 r1) (y2 r2))))
     (make-instance 'rectangle :x x :y y :w (- x2 x) :h (- y2 y))))
 
 (defgeneric rectangle-union-list (rectangles)
@@ -360,9 +360,9 @@
 (defmethod overlap ((r1 rectangle) (r2 rectangle))
   "Calculate the intersection rectangle of two rectangles, or NIL if no overlap."
   (let* ((x (max (x r1) (x r2)))
-         (y (max (y r1) (y r2)))
-         (x2 (min (x2 r1) (x2 r2)))
-         (y2 (min (y2 r1) (y2 r2))))
+          (y (max (y r1) (y r2)))
+          (x2 (min (x2 r1) (x2 r2)))
+          (y2 (min (y2 r1) (y2 r2))))
     (when (and (< x x2) (< y y2)) ; Check for positive width and height
       (make-instance 'rectangle :x x :y y :w (- x2 x) :h (- y2 y)))))
 
@@ -371,21 +371,21 @@
   "Check if the rectangle contains the position.
 "
   (and (<= (x r) (x p)) (< (x p) (x2 r)) ; Use < for x2/y2 for exclusive upper bound
-       (<= (y r) (y p)) (< (y p) (y2 r))))
+    (<= (y r) (y p)) (< (y p) (y2 r))))
 
 (defmethod contains-p ((r rectangle) (p list))
   "Check if the rectangle contains the point specified as (x y) list."
   (and (= (length p) 2)
-       (every #'numberp p)
-       (contains-p r (make-instance 'pos :x (first p) :y (second p)))))
+    (every #'numberp p)
+    (contains-p r (make-instance 'pos :x (first p) :y (second p)))))
 
 ;; Contains Rectangle
 (defmethod contains-p ((r1 rectangle) (r2 rectangle))
   "Check if rectangle r1 completely contains rectangle r2."
   (and (<= (x r1) (x r2))
-       (<= (y r1) (y r2))
-       (>= (x2 r1) (x2 r2))
-       (>= (y2 r1) (y2 r2))))
+    (<= (y r1) (y r2))
+    (>= (x2 r1) (x2 r2))
+    (>= (y2 r1) (y2 r2))))
 
 ;; Normalize (Ensure non-negative width/height)
 (defmethod normalize! ((r rectangle))
@@ -441,13 +441,13 @@
 (defmethod line ((p1 pos) (p2 pos))
   "Create a 1-unit thick rectangle representing an axis-aligned line between two points."
   (let ((dx (- (x p2) (x p1)))
-        (dy (- (y p2) (y p1))))
+         (dy (- (y p2) (y p1))))
     (unless (or (zerop dx) (zerop dy))
       (error "Cannot create diagonal line with this method."))
     (let ((x (min (x p1) (x p2)))
-          (y (min (y p1) (y p2)))
-          (w (if (zerop dx) 1 (1+ (abs dx)))) ; Width is 1 if vertical, else dx+1
-          (h (if (zerop dy) 1 (1+ (abs dy))))) ; Height is 1 if horizontal, else dy+1
+           (y (min (y p1) (y p2)))
+           (w (if (zerop dx) 1 (1+ (abs dx)))) ; Width is 1 if vertical, else dx+1
+           (h (if (zerop dy) 1 (1+ (abs dy))))) ; Height is 1 if horizontal, else dy+1
       (make-instance 'rectangle :x x :y y :w w :h h))))
 
 ;; Rectangle Difference (Subtract r2 from r1)
@@ -458,10 +458,10 @@
       (return-from rect-diff (list r1))) ; No overlap, return r1
 
     (let ((rects '())
-          (ox (x overlap-rect)) (oy (y overlap-rect))
-          (ox2 (x2 overlap-rect)) (oy2 (y2 overlap-rect))
-          (x (x r1)) (y (y r1))
-          (x2 (x2 r1)) (y2 (y2 r1)))
+           (ox (x overlap-rect)) (oy (y overlap-rect))
+           (ox2 (x2 overlap-rect)) (oy2 (y2 overlap-rect))
+           (x (x r1)) (y (y r1))
+           (x2 (x2 r1)) (y2 (y2 r1)))
 
       ;; Top part
       (when (> oy y)
@@ -486,9 +486,9 @@
              (overlap r (make-instance 'rectangle :x bx :y by :w bw :h bh)))) ; Ensure border is within original rect bounds
       (case side
         (:all (remove nil (list (make-border x y w width)          ; Top
-                                (make-border x (- (+ y h) width) w width) ; Bottom
-                                (make-border x y width h)          ; Left
-                                (make-border (- (+ x w) width) y width h)))) ; Right
+                            (make-border x (- (+ y h) width) w width) ; Bottom
+                            (make-border x y width h)          ; Left
+                            (make-border (- (+ x w) width) y width h)))) ; Right
         (:top (make-border x y w width))
         (:bottom (make-border x (- (+ y h) width) w width))
         (:left (make-border x y width h))
@@ -499,12 +499,12 @@
 ;;; Clamp Function
 ;;;-----------------------------------------------------------------------------
 (defun clamp (value min max)
- "Clamps VALUE to be within the range [MIN, MAX]."
- (cond
-   ((> min max) (error "Clamp: min (~A) cannot be greater than max (~A)." min max))
-   ((< value min) min)
-   ((> value max) max)
-   (t value)))
+  "Clamps VALUE to be within the range [MIN, MAX]."
+  (cond
+    ((> min max) (error "Clamp: min (~A) cannot be greater than max (~A)." min max))
+    ((< value min) min)
+    ((> value max) max)
+    (t value)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Printing

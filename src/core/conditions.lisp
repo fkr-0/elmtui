@@ -17,7 +17,19 @@
    :message-serialization-error   ; New
    :message-deserialization-error ; New
    :log-condition
-   :with-recovery))
+   :with-recovery
+   ;; New validation error types
+   :elmtui-validation-error
+   :type-validation-error
+   :property-validation-error
+   :constraint-validation-error
+   :validation-error-path
+   :validation-error-value
+   :type-validation-error-expected-type
+   :property-validation-error-property
+   :constraint-validation-error-constraint
+   ;; Event validation
+   :event-validation-error))
 (in-package :elmtui.core.conditions)
 
 (defun log-condition (condition &optional (level :error))
@@ -189,6 +201,55 @@
              (format s "Failed to deserialize message data: ~S~%Original Error: ~A"
                      (serialized-data c) (original-error c)))))
 
+
+(define-condition elmtui-validation-error (error)
+  ((path :initarg :path :initform nil :reader validation-error-path)
+   (value :initarg :value :initform nil :reader validation-error-value)
+   (message :initarg :message :reader error-message))
+  (:report (lambda (condition stream)
+             (format stream "Validation error~@[ at ~a~]: ~a" 
+                     (validation-error-path condition)
+                     (error-message condition)))))
+
+(define-condition type-validation-error (elmtui-validation-error)
+  ((expected-type :initarg :expected-type :reader type-validation-error-expected-type))
+  (:report (lambda (condition stream)
+             (format stream "Type validation error~@[ at ~a~]: Expected ~a, got ~s" 
+                     (validation-error-path condition)
+                     (type-validation-error-expected-type condition)
+                     (validation-error-value condition)))))
+
+(define-condition property-validation-error (elmtui-validation-error)
+  ((property :initarg :property :reader property-validation-error-property))
+  (:report (lambda (condition stream)
+             (format stream "Property validation error for ~a~@[ at ~a~]: ~a" 
+                     (property-validation-error-property condition)
+                     (validation-error-path condition)
+                     (error-message condition)))))
+
+(define-condition constraint-validation-error (elmtui-validation-error)
+  ((constraint :initarg :constraint :reader constraint-validation-error-constraint))
+  (:report (lambda (condition stream)
+             (format stream "Constraint validation error~@[ at ~a~]: ~a violated" 
+                     (validation-error-path condition)
+                     (constraint-validation-error-constraint condition)))))
+
+;; Base error for validation errors
+(define-condition elmtui-validation-error (error)
+  ((path :initarg :path :reader validation-error-path :initform nil)
+   (value :initarg :value :reader validation-error-value))
+  (:report (lambda (condition stream)
+             (format stream "Validation error at ~A: ~S"
+                     (or (validation-error-path condition) "root")
+                     (validation-error-value condition)))))
+
+;; Event validation error
+(define-condition event-validation-error (elmtui-validation-error)
+  ((event-type :initarg :event-type :reader event-validation-error-type))
+  (:report (lambda (condition stream)
+             (format stream "Event validation error: Invalid event of type ~A: ~S"
+                     (event-validation-error-type condition)
+                     (validation-error-value condition)))))
 
 ;;; USAGE EXAMPLES:
 ;; (with-recovery (message-validation-error)

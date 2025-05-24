@@ -1,18 +1,19 @@
 ;;; ───────────────────────── 2. Selector Engine ──────────────────────────
 (uiop:define-package :elmtui.style-lib.selector
-  (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types :elmtui.style-lib.api)
+  (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types :elmtui.style-lib.api :elmtui.view.core)
   (:import-from :elmtui.style-lib.api
-   :selector :selects :specificity)
-  (:import-from :elmtui.view.core :ui-node :ui-node-type)
+   :selector :selects :specificity :stylable)
   (:export
-   ;; selector classes
    ;; selector classes
    :selector :type-selector :class-selector :id-selector
    :combined-selector :or-selector :child-selector :desc-selector
    ;; reader macros
    :type> :cls> :id> :and> :or> :child> :descendant> ; Added type>, removed cl-cls>
+   ;; Accessors
+   :sel-type :sel-class :sel-id :subs :parent :child :anc :desc
    ;; API
-   :selects :specificity))
+   :specificity
+   :node-type))  ; Export the new generic function
 
 (in-package :elmtui.style-lib.selector)
 
@@ -47,7 +48,22 @@
 ;; New Type Selector
 (defclass type-selector (selector)
   ((node-type :initarg :node-type :reader sel-type :type keyword)))
-(defmethod selects ((s type-selector) (o ui-node))
+
+(defmethod selects ((s type-selector) o)
+  "Match by node type for any UI node (including styled ones)"
+  (eq (sel-type s) (ui-node-type o)))
+
+;; (defgeneric node-type (object)
+;;   (:method ((node ui-node))
+;;     (ui-node-type node))
+;;   (:method ((node stylable))
+;;     (when (slot-boundp node 'ui-node-type)
+;;       (slot-value node 'ui-node-type)))
+;;   (:method (object)
+;;     nil))
+
+(defmethod selects ((s type-selector) (o t))
+  "Fallback for type selectors on any object"
   (eq (sel-type s) (ui-node-type o)))
 (defmethod specificity ((s type-selector)) 1) ; Specificity like an element type
 

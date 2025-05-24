@@ -35,11 +35,20 @@
   "Macro to define a style rule.
 
 Arguments:
-  selector: The selector for the rule (instance of a selector subclass).
+  selector: The selector for the rule. If a keyword (e.g., :P, :LIST-ITEM),
+            it's treated as a type selector. Otherwise, it should be an
+            instance of a selector subclass (e.g., from (cls> ...), (id> ...)).
   styles: The styles to apply (as property-value pairs).
 
 Example:
-  (defrule (cls> \"button\") (:bg-color :red))"
-  `(make-instance 'style-rule
-    :selector ,selector
-    :styles (new 'style-set :styles ',styles)))
+  (defrule :button (:bg-color :red))
+  (defrule (cls> \"important\") (:font-weight :bold))"
+  (let ((processed-selector
+          (cond ((keywordp selector)
+                 `(elmtui.style-lib.selector:type> ,selector))
+                ((stringp selector) ; If it's a string, treat as a class selector
+                 `(elmtui.style-lib.selector:cls> ,selector))
+                (t selector)))) ; Otherwise, assume it's already a selector object
+    `(make-instance 'style-rule
+       :selector ,processed-selector
+       :styles (new 'style-set :styles (list ,@styles)))))

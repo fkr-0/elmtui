@@ -48,24 +48,36 @@
                 :initarg :name
                 :accessor property-name))
          (:documentation ,docstring))
-       (defmethod valid-style-value-p ((style ,property-class-name) value)
-         (typecase ,value-specifier
-           (list (member value ,value-specifier))
-           (symbol (typep value ,value-specifier))
-           (function (funcall ,value-specifier value))
-           (t (error "Invalid value specifier: ~A" ,value-specifier))))
-       (defmethod initialize-instance :after
-           ((property ,property-class-name) &key value)
-         (unless (valid-style-value-p property value)
-           (error "Invalid value: ~A for property: ~A" value ',name)))
+       (defmethod valid-style-value-p ((p ,property-class-name) value)
+         (let ((spec ,value-specifier))
+           (cond
+             ;; Case 1: Spec is a list of explicit keywords, e.g., (list :foo :bar)
+             ((and (listp spec) (every #'keywordp spec))
+              (member value spec))
+             ;; Case 2: Spec is a symbol (e.g., 'integer) or a complex type specifier list (e.g., '(or integer string))
+             ((or (symbolp spec) (consp spec)) ; consp covers lists like (or ...) and (integer 0 *)
+              (typep value spec))
+             ;; Case 3: Spec is a function (predicate)
+             ((functionp spec)
+              (funcall spec value))
+             (t (error "Invalid value specifier for style property ~A: ~S" (property-name p) spec)))))
+       ;; (defmethod initialize-instance :after
+       ;;     ((property ,property-class-name) &key value)
+       ;;   ;; Initialize-instance for property doesn't usually take :value.
+       ;;   ;; Validation should happen when a style object is made with this property.
+       ;;   ;; Let's remove this :after method for property, or ensure it's harmless.
+       ;;   ;; For now, commenting out to avoid potential issues if :value isn't passed to make-instance 'property-class-name
+       ;;   #|
+       ;;   (unless (valid-style-value-p property value)
+       ;;     (error "Invalid value: ~A for property: ~A" value ',name))
+       ;;   |#
+       ;;   )
        (defclass ,value-class-name (value)
          ((value :initarg :value :accessor value-value)
-          (type :initform ,(if (listp value-specifier)
-                               ''keyword
-                               (eval value-specifier))
+          (type :initform ',value-specifier ; Store the original specifier
                 :initarg :type
                 :accessor value-type)
-          (possible-values :initform ,(if (listp value-specifier)
+          (possible-values :initform ,(if (and (listp value-specifier) (every #'keywordp value-specifier))
                                           value-specifier
                                           'nil)
                            :initarg :possible-values
@@ -89,10 +101,13 @@
               (style ,property-class-name) value)
            (when (next-method-p)
              (call-next-method))))
-       (defmethod make-style ((property (eql ,property-key-name)) value)
-         (make-instance 'style
-                        :property (make-instance ',property-class-name :value value)
-                        :value (make-instance ',value-class-name :value value)))
+       (defmethod make-style ((property-key (eql ,property-key-name)) value)
+         (let ((prop-instance (make-instance ',property-class-name)))
+           (unless (valid-style-value-p prop-instance value)
+             (error "Invalid value ~S for style property ~S." value property-key))
+           (make-instance 'style
+                          :property prop-instance
+                          :value (make-instance ',value-class-name :value value :type ',value-specifier))))
        (unless (eql ,default :unset)
          (defmethod default-styling ((kw (eql ,property-key-name)))
            (make-style kw ,default))))))
@@ -181,9 +196,14 @@ results in a validation error. Example: (defstylegroup :groups
            s))
 
        (defmethod make-style ((property (eql ,group-name-key)) value)
-         (let ((result (progn ,@body)))
+         (let ((result (progn ,@body))) ; result is the list of sub-style objects
            (if result
-               (let ((inst (make-instance ',group-name :value value)))
+               (let ((inst (make-instance ',group-name
+                                          ;; The :property slot is initialized by the group-name class's defclass initform.
+                                          ;; The :value initarg is inherited from the 'style' class.
+                                          ;; We need to wrap the raw 'value' (the shorthand) into a 'value' object.
+                                          :value (make-instance 'value :value value :type t))))
+                 ;; The 'result' (list of parsed sub-style objects) is set to the sub-styles slot.
                  (setf (style-sub-styles inst) result)
                  inst)
                (signal 'illegal-group-value

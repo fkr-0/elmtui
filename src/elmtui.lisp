@@ -1,7 +1,5 @@
 (uiop:define-package :elmtui
   (:use :cl
-   :elmtui.ui.primitives
-        :elmtui.ui.composite
    :elmtui.style.core
         :elmtui.style.presets )
   ;; Removed all old widget exports (:button-widget, :label-widget, :input-widget, :form-widget, :list-widget)
@@ -13,11 +11,17 @@
              :elmtui.platform.input
    :elmtui.platform.output
              :elmtui.platform.driver
+   :elmtui.platform.backend.terminal
+             :elmtui.platform.backend.common.virtual-buffer
    :elmtui.ui.widgets.button      ; Re-export new button symbols
              :elmtui.ui.widgets.label       ; Re-export new label symbols
    :elmtui.ui.widgets.textinput   ; Re-export new textinput symbols
              :elmtui.ui.widgets.form        ; Re-export new form symbols
-   :elmtui.ui.widgets.listbox)    ; Re-export new listbox symbols
+   :elmtui.ui.widgets.listbox
+             :elmtui.examples.boxes-app :elmtui.examples.keymap-app
+             :elmtui.examples.colortext-app
+   :elmtui.examples.rainbow-app
+   )    ; Re-export new listbox symbols
 
   (:export :message
    :cmd :send-message :dev-main))

@@ -2,23 +2,23 @@
 (:api-version "0.4")
 
 (:source "quicklisp"
-  :url "https://beta.quicklisp.org/dist/quicklisp.txt"
-  :type :quicklisp)
+ :url "https://beta.quicklisp.org/dist/quicklisp.txt"
+ :type :quicklisp)
 
 (:asd "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
-(:asd "elmtui-tests.asd")
-(:asd "../clevelib/clevelib.asd")
+
 
 (:asd "elmtui.asd")
+(:asd "elmtui-tests.asd")
 
 (:github "sly" :path "joaotavora/sly" :branch "master")
 (:github "fiveam"
-  :path "lispci/fiveam"
-  :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379")
+ :path "lispci/fiveam"
+ :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379")
 
 (:github "cl-fzy"
-  :path "fkr-0/cl-fzy"
-  :commit "fbb8c8a0c3c5c2f62a21895592f6ac6032d1135c")
+ :path "fkr-0/cl-fzy"
+ :commit "fbb8c8a0c3c5c2f62a21895592f6ac6032d1135c")
 
 
 
@@ -26,12 +26,12 @@
 (:github "sly-quicklisp" :path "joaotavora/sly-quicklisp" :branch "master")
 
 (:system "log4cl" :source "quicklisp")
-(:system "cl-unicode")
+                                        ;(:system "cl-unicode")
 (:system "flexi-streams")
 (:system "asdf-package-system" :source "quicklisp")
-(:system "clevelib")
 
 (:system "bordeaux-threads")
 (:system "slynk")
+(:system "alexandria" :source "quicklisp")
 (:system "str" :source "quicklisp")
 (:system "cl-reexport" :source "quicklisp")

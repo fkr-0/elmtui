@@ -6,6 +6,7 @@
   (:use :cl)
   (:export :*app-sender* :*app-state*
            :*event-loop* :*subscribers*
+           :*debug-layout-outlines* ; Export the new debug flag
            ))
 (in-package :elmtui.core.globals)
 
@@ -17,3 +18,6 @@
 
 (defvar *event-loop* nil "The main event loop instance.")
 (defvar *subscribers* (make-hash-table :test 'equal) "Registered event subscribers.")
+
+(defvar *debug-layout-outlines* nil
+  "When T, enables rendering of layout box outlines (margin, border, padding, content) for debugging.")

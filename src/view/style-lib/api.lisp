@@ -130,17 +130,15 @@
    :stylegroup-p :group-key :group-styles ; Style group specifics
    :valid-value-p ; Validation generic
    :dirty :dirty-p ; Export dirty accessor and predicate
+   :sid
+   ;; Value related functions
+   :style-property-definition-default-value
+   :parse-property-value
+   :style-property-value-raw-value
    ;; Macros and functions
    :make-selector))
+
 (in-package :elmtui.style-lib.api)
-
-(defclass property () ((name :initarg :name :accessor property-name)))
-(defclass value ()
-  ((raw  :initarg :value :accessor value-raw)
-   (type :initarg :type  :accessor value-type)
-   (choices :initarg :choices :initform nil :accessor value-choices)))
-;; Removed duplicate/simpler style definition that was here.
-
 (defclass style-group (style)
   ((sub-styles :initarg :sub-styles :initform nil :accessor sub-styles)))
 
@@ -204,11 +202,17 @@
         :initform nil
         :accessor stylable-id
         :documentation "The ID of the stylable object.")
-   (classes :initform 'nil
+   (classes :initarg :classes ; Added :initarg
+            :initform 'nil
             :accessor classes
             :documentation "The classes of the stylable object.")
+   (parents :initarg :parents ; Added slot for parents
+            :initform nil
+            :accessor parents-of ; Accessor for parents
+            :documentation "A list of parent stylable objects.")
    (styles :accessor styles
            :type style-set
+           :initform (make-style-set) ; Initialize with an empty style-set
            :documentation "The styles associated with the stylable object.")
    (dirty :initform t
           :accessor dirty
@@ -216,15 +220,46 @@
   (:documentation
    "A stylable is an entity that can have styles applied to it."))
 
+(defgeneric style-property-definition-default-value (definition)
+  (:documentation "Get the default value from a style property definition"))
+
+(defgeneric parse-property-value (definition value)
+  (:documentation "Parse and validate a value according to a property definition"))
+
+(defgeneric style-property-value (raw-value)
+  (:documentation "Get the raw value from a style property value")
+  (:method ((raw-value t)) raw-value)
+  (:method ((raw-value value))
+    (value-value raw-value)))
+
+(defgeneric style-property-value-raw-value (value)
+  (:documentation "Get the raw value from a style property value"))
+
+(defmethod style-property-value-raw-value ((value value))
+  (value-value value))
+
+(defmethod style-property-value-raw-value ((value t))
+  value)
+
+;; Add missing ordered-styles implementation
+(defgeneric ordered-styles (style-key-list)
+  (:documentation "Orders style keys for proper rendering sequence")
+  (:method ((style-key-list list))
+    "Default behavior: return the list as is"
+    style-key-list))
+
+;; Removed duplicate/simpler style definition that was here.
+
+
 ;; Define the dirty-p predicate
 (defmethod dirty-p (stylable-object)
   "Returns T if the stylable object is marked as dirty, NIL otherwise."
   (dirty stylable-object))
 
 (defclass selector () () (:documentation "Base class for all selectors."))
-(defgeneric selects (selector target)
-  (:documentation
-   "Return T if the given selector selects the given target, NIL otherwise."))
+;; (defgeneric selects (selector target)
+;;   (:documentation
+;;    "Return T if the given selector selects the given target, NIL otherwise."))
 (defgeneric specificity (sel)
   (:documentation
    "Return the specificity of the selector as INT. The higher the number, the more specific the selector."))
@@ -252,7 +287,7 @@ it carries an optional NAME:string and RULES:list."))
   (intern (property-name (style-property obj)) 'keyword))
 (defmethod style-value-of ((s style))
   "Return the value of the style."
-  (value-raw (style-value s))) ; Use style-value accessor now
+  (value-value (style-value s))) ; Use style-value accessor now, and value-value for the value object
 
 (defgeneric valid-value-p (property v))
 (defgeneric group-key (obj))
@@ -294,16 +329,11 @@ it carries an optional NAME:string and RULES:list."))
 (defgeneric style-rule-valid (rule)
   (:method ((set t)) nil)
   (:documentation "Check if the style set is valid."))
-(defmethod new ((class (eql 'style-rule)) &key selector styles)
-  "Create a new style rule."
-  (let ((rule (make-instance 'style-rule :selector selector :styles styles)))
-    (when (style-rule-valid rule) rule)))
 
-(defmethod new ((class (eql 'style-set)) &key styles)
-  "Create a new style set."
-  (let ((set (make-instance 'elmtui.style-lib.api:style-set)))
-    (setf (style-set-styles set) (or styles (make-hash-table :test #'equal)))
-    (when (style-set-valid set) set)))
+
+
+(defgeneric new (class &key)
+  (:documentation "Create a new instance of the given class."))
 
 (defgeneric implement-style (stylable style value)
   (:method ((stylable t) (style t) (value t))
@@ -347,4 +377,48 @@ it carries an optional NAME:string and RULES:list."))
 (defmethod print-object ((obj style-group) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
     (format stream "~A (~D sub-styles)" (group-key obj) (length (style-sub-styles obj)))))
-;; End of api.lisp
+
+(defmethod stylesheet-rules ((stylesheet null))
+  "Handles the case where stylesheet-rules is called with NIL. Returns NIL (no rules)."
+  nil)
+
+;;;----------------------------------------------------------------------------------;;;
+;;; Stylesheet Rules API                                                            ;;;
+;;;----------------------------------------------------------------------------------;;;
+
+(defgeneric stylesheet-rules (stylesheet)
+  (:documentation "Returns the list of rules in a stylesheet."))
+
+(defmethod stylesheet-rules ((stylesheet function))
+  "Handle function-based stylesheets by calling them with NIL for introspection."
+  (handler-case
+      (funcall stylesheet nil)
+    (error (e)
+      (warn "Error getting stylesheet rules from function: ~A" e)
+      nil)))
+
+;;;----------------------------------------------------------------------------------;;;
+;;; Style Values API                                                               ;;;
+;;;----------------------------------------------------------------------------------;;;
+
+(defclass style-value ()
+  ((value :initarg :value :accessor value-of))
+  (:documentation "Represents a styled value with additional metadata."))
+
+(defun make-value (&key value metadata)
+  "Create a new style value with the given raw value and optional metadata."
+  (let ((val (make-instance 'style-value :value value)))
+    (when metadata
+      (setf (getf (slot-value val 'metadata) :meta) metadata))
+    val))
+
+(defgeneric style-property-value-raw-value (value)
+  (:documentation "Extract the raw value from a style property value."))
+
+(defmethod style-property-value-raw-value ((value style-value))
+  "Extract the raw value from a style-value object."
+  (value-of value))
+
+(defmethod style-property-value-raw-value (value)
+  "For non-style-value objects, return the value directly."
+  value)

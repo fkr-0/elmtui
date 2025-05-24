@@ -29,7 +29,7 @@
 ;;;-----------------------------------------------------------------------------
 
 (defclass ui-node ()
-  ((type :initarg :type :accessor ui-node-type :initform nil :type symbol)
+  ((type :initarg :type :accessor ui-node-type :initform 'base :type symbol)
    (props :initarg :props :accessor ui-node-props :initform nil :type list)
    (children :initarg :children :accessor ui-node-children :initform nil :type list))
   (:documentation "Intermediate tree node: type, props, children.
@@ -57,6 +57,11 @@
    :type (or type (ui-node-type node))
    :props (or props (copy-list (ui-node-props node)))
    :children (or children (copy-list (ui-node-children node)))))
+
+(defmethod ui-node-type ((object list))
+  (error "ui-node-type was called with a list as an argument: ~S.
+This function expects a single ui-node instance.
+Please check the call site." object))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Property Operations
