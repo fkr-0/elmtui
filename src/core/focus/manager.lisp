@@ -361,126 +361,208 @@
 ;; For this integration, we'll assume functions like `get-element-position`
 ;; and `get-all-element-positions` are available and work on the UI tree or a registry.
 
+(defun calculate-nav-distance (x1 y1 x2 y2 direction)
+  "Calculate a weighted distance score for navigation.
+   Prefer elements that are directly in the specified direction.
+   Returns a weighted score considering both primary direction and orthogonal deviation."
+  (let* ((dx (- x2 x1))
+         (dy (- y2 y1))
+         (dx-abs (abs dx))
+         (dy-abs (abs dy))
+         (primary-axis-distance
+           (case direction
+             ((:up :down) dy-abs)
+             ((:left :right) dx-abs)))
+         (secondary-axis-distance
+           (case direction
+             ((:up :down) dx-abs)
+             ((:left :right) dy-abs)))
+         ;; Increase penalty for deviation from the primary axis of navigation
+         (penalty-factor 3.0) ; Higher penalty to prefer more aligned elements
+         ;; Check if the element is actually in the right direction
+         (wrong-direction-p
+           (case direction
+             (:up (>= dy 0))    ; Should be negative (target above source)
+             (:down (<= dy 0))  ; Should be positive (target below source)
+             (:left (>= dx 0))  ; Should be negative (target left of source)
+             (:right (<= dx 0)))) ; Should be positive (target right of source))))
+         (direction-penalty (if wrong-direction-p 10000.0 0.0))) ; Huge penalty for wrong direction
+
+    ;; Total score: primary distance + penalized deviation + wrong direction penalty
+    (+ primary-axis-distance
+       (* secondary-axis-distance penalty-factor)
+       direction-penalty)))
+
+(defun find-grid-adjacent (source-grid-coords direction ui-tree)
+  "Placeholder for finding an adjacent element in a grid layout.
+  SOURCE-GRID-COORDS: An element-grid-coordinates struct.
+  DIRECTION: One of :UP, :DOWN, :LEFT, :RIGHT.
+  UI-TREE: The current UI tree.
+  Returns an element node or NIL."
+  (declare (ignorable source-grid-coords direction ui-tree))
+  ;; TODO: Implement actual grid navigation logic.
+  (log-warn "find-grid-adjacent is not yet implemented.")
+  nil)
+
 (defun find-closest-in-direction (focus-manager source-id direction ui-tree)
   "Finds the closest element to source-id in the specified direction.
    UI-TREE is needed to get element positions and properties."
-  (let* ((source-element (find source-id (collect-focusable-elements ui-tree) :key #'stylable-id :test #'equal)) ; Find the source element object
-         (source-pos (when source-element (element-position source-element))) ; Get its position data
-         (source-grid-coords (when source-element (element-grid-coordinates source-element)))) ; Get its grid data
-    (unless source-pos (return-from find-closest-in-direction nil)) ; Cannot navigate without position
+  ;; Early return if we have no source
+  (unless source-id (return-from find-closest-in-direction nil))
 
-    (let ((candidates '())
-          (source-center-x (+ (getf source-pos :x 0) (/ (getf source-pos :width 1) 2)))
-          (source-center-y (+ (getf source-pos :y 0) (/ (getf source-pos :height 1) 2))))
+  (let* ((source-element (find source-id (collect-focusable-elements ui-tree) :key #'stylable-id :test #'equal))
+         (source-pos (when source-element (element-position source-element)))
+         (source-grid-coords (when source-element (element-grid-coordinates source-element))))
 
-      ;; Attempt Grid Navigation First if applicable
+    ;; Early return if we can't determine the source position
+    (unless source-pos
+      (log-debug "Source element ~A has no position data, cannot navigate" source-id)
+      (return-from find-closest-in-direction nil))
+
+    ;; Extract source position details for easier access
+    (let* ((source-x (getf source-pos :x 0))
+           (source-y (getf source-pos :y 0))
+           (source-width (getf source-pos :width 1))
+           (source-height (getf source-pos :height 1))
+           (source-center-x (+ source-x (/ source-width 2)))
+           (source-center-y (+ source-y (/ source-height 2)))
+           (candidates '()))
+
+      ;; Try grid navigation first if we have grid coordinates
       (when source-grid-coords
+        (log-debug "Attempting grid navigation for ~A with coords ~A" source-id source-grid-coords)
         (let ((adj (find-grid-adjacent source-grid-coords direction ui-tree)))
-          (when adj (return-from find-closest-in-direction (stylable-id adj)))))
+          (when adj
+            (log-debug "Found grid adjacent element: ~A" (stylable-id adj))
+            (return-from find-closest-in-direction (stylable-id adj)))))
 
-      ;; Collect candidates based on direction (spatial)
+      ;; If grid navigation failed or wasn't applicable, try spatial navigation
+      (log-debug "Performing spatial navigation from ~A in direction ~A" source-id direction)
+
+      ;; Collect all potential candidates in the specified direction
       (dolist (el (focus-manager-focusable-elements focus-manager))
-        (unless (equal el source-id)
+        (unless (equal el source-id) ; Don't consider the source itself
           (let* ((target-element (find el (collect-focusable-elements ui-tree) :key #'stylable-id :test #'equal))
                  (pos (when target-element (element-position target-element))))
-            (when pos
+            (when pos ; Only consider elements with position data
               (let* ((target-x (getf pos :x 0))
                      (target-y (getf pos :y 0))
                      (target-width (getf pos :width 1))
                      (target-height (getf pos :height 1))
                      (target-center-x (+ target-x (/ target-width 2)))
-                     (target-center-y (+ target-y (/ target-height 2)))
-                     (is-candidate nil))
+                     (target-center-y (+ target-y (/ target-height 2))))
 
+                ;; Check if the target is in the correct direction
                 (case direction
-                  (:up (when (< target-center-y source-center-y) ; Element is above
-                         ;; Check for significant overlap or alignment
-                         (when (or (and (<= target-x source-center-x) (>= (+ target-x target-width) source-center-x)) ; Source center X is within target X range
-                                   (and (<= (getf source-pos :x) target-center-x) (>= (+ (getf source-pos :x) (getf source-pos :width)) target-center-x))) ; Target center X is within source X range
-                           (setf is-candidate t))))
-                  (:down (when (> target-center-y source-center-y) ; Element is below
-                           (when (or (and (<= target-x source-center-x) (>= (+ target-x target-width) source-center-x))
-                                     (and (<= (getf source-pos :x) target-center-x) (>= (+ (getf source-pos :x) (getf source-pos :width)) target-center-x)))
-                             (setf is-candidate t))))
-                  (:left (when (< target-center-x source-center-x) ; Element is to the left
-                           (when (or (and (<= target-y source-center-y) (>= (+ target-y target-height) source-center-y))
-                                     (and (<= (getf source-pos :y) target-center-y) (>= (+ (getf source-pos :y) (getf source-pos :height)) target-center-y)))
-                             (setf is-candidate t))))
-                  (:right (when (> target-center-x source-center-x) ; Element is to the right
-                            (when (or (and (<= target-y source-center-y) (>= (+ target-y target-height) source-center-y))
-                                      (and (<= (getf source-pos :y) target-center-y) (>= (+ (getf source-pos :y) (getf source-pos :height)) target-center-y)))
-                              (setf is-candidate t)))))
+                  (:up
+                   (when (< target-center-y source-center-y) ; Target is above source
+                     ;; Check for horizontal alignment/overlap
+                     (when (or
+                            ;; Source center is within target width
+                            (and (<= target-x source-center-x)
+                                 (>= (+ target-x target-width) source-center-x))
+                            ;; Target center is within source width
+                            (and (<= source-x target-center-x)
+                                 (>= (+ source-x source-width) target-center-x))
+                            ;; Partial overlap between source and target
+                            (and (< target-x (+ source-x source-width))
+                                 (> (+ target-x target-width) source-x)))
+                       (push (list el (calculate-nav-distance
+                                       source-center-x source-center-y
+                                       target-center-x target-center-y
+                                       direction))
+                             candidates))))
 
-                (when is-candidate
-                  (push (list el (calculate-nav-distance source-center-x source-center-y
-                                                         target-center-x target-center-y
-                                                         direction))
-                        candidates)))))))
+                  (:down
+                   (when (> target-center-y source-center-y) ; Target is below source
+                     (when (or
+                            (and (<= target-x source-center-x)
+                                 (>= (+ target-x target-width) source-center-x))
+                            (and (<= source-x target-center-x)
+                                 (>= (+ source-x source-width) target-center-x))
+                            (and (< target-x (+ source-x source-width))
+                                 (> (+ target-x target-width) source-x)))
+                       (push (list el (calculate-nav-distance
+                                       source-center-x source-center-y
+                                       target-center-x target-center-y
+                                       direction))
+                             candidates))))
 
-      ;; Find the closest candidate
+                  (:left
+                   (when (< target-center-x source-center-x) ; Target is left of source
+                     (when (or
+                            ;; Source center is within target height
+                            (and (<= target-y source-center-y)
+                                 (>= (+ target-y target-height) source-center-y))
+                            ;; Target center is within source height
+                            (and (<= source-y target-center-y)
+                                 (>= (+ source-y source-height) target-center-y))
+                            ;; Partial overlap between source and target
+                            (and (< target-y (+ source-y source-height))
+                                 (> (+ target-y target-height) source-y)))
+                       (push (list el (calculate-nav-distance
+                                       source-center-x source-center-y
+                                       target-center-x target-center-y
+                                       direction))
+                             candidates))))
+
+                  (:right
+                   (when (> target-center-x source-center-x) ; Target is right of source
+                     (when (or
+                            (and (<= target-y source-center-y)
+                                 (>= (+ target-y target-height) source-center-y))
+                            (and (<= source-y target-center-y)
+                                 (>= (+ source-y source-height) target-center-y))
+                            (and (< target-y (+ source-y source-height))
+                                 (> (+ target-y target-height) source-y)))
+                       (push (list el (calculate-nav-distance
+                                       source-center-x source-center-y
+                                       target-center-x target-center-y
+                                       direction))
+                             candidates))))))))))
+
+      ;; Sort candidates by distance score (lower is better)
       (when candidates
-        (first (first (sort candidates #'< :key #'second)))))))
-
-(defun calculate-nav-distance (x1 y1 x2 y2 direction)
-  "Calculate a weighted distance score for navigation.
-   Prefer elements that are directly in the specified direction."
-  (let* ((dx (- x2 x1))
-         (dy (- y2 y1))
-         (primary-axis-distance
-           (case direction
-             ((:up :down) (abs dy))
-             ((:left :right) (abs dx))))
-         (secondary-axis-distance
-           (case direction
-             ((:up :down) (abs dx))
-             ((:left :right) (abs dy))))
-         ;; Penalize deviation from the primary axis of navigation
-         (penalty-factor 2.0) ; How much to penalize secondary axis distance
-         )
-    (+ primary-axis-distance (* secondary-axis-distance penalty-factor))))
-
-(defun find-grid-adjacent (source-grid-coords direction ui-tree)
-  "Find the element adjacent to source in a grid based on :grid-x, :grid-y properties.
-   UI-TREE is needed to search for elements with matching grid coordinates."
-  (let* ((source-gx (getf source-grid-coords :grid-x))
-         (source-gy (getf source-grid-coords :grid-y))
-         (target-gx source-gx)
-         (target-gy source-gy))
-    (unless (and source-gx source-gy) (return-from find-grid-adjacent nil))
-
-    (case direction
-      (:up (decf target-gy))
-      (:down (incf target-gy))
-      (:left (decf target-gx))
-      (:right (incf target-gx)))
-
-    (dolist (el (collect-focusable-elements ui-tree)) ; Search through all focusable elements
-      (let ((el-grid-coords (element-grid-coordinates el)))
-        (when (and el-grid-coords
-                   (eql (getf el-grid-coords :grid-x) target-gx)
-                   (eql (getf el-grid-coords :grid-y) target-gy))
-          (return-from find-grid-adjacent el))))
-    nil))
+        (let ((sorted-candidates (sort candidates #'< :key #'second)))
+          (log-debug "Found ~D candidate(s) for navigation in direction ~A from ~A"
+                     (length sorted-candidates) direction source-id)
+          (log-debug "Best candidate: ~A with score ~A"
+                     (first (first sorted-candidates))
+                     (second (first sorted-candidates)))
+          (first (first sorted-candidates)))))))
 
 (defun navigate-direction (focus-manager direction &key app-state ui-tree)
   "Navigate focus in a spatial direction (one of :up, :down, :left, :right).
    UI-TREE is required for spatial/grid navigation."
   (let ((current-focus (focus-manager-current-focus focus-manager)))
-    (unless current-focus (return-from navigate-direction nil))
+    (unless current-focus
+      (log-debug "No current focus, cannot navigate in direction: ~A" direction)
+      (return-from navigate-direction nil))
 
     (let ((next-focus nil))
-      (if ui-tree ; If UI tree is provided, attempt spatial/grid navigation
-          (setf next-focus (find-closest-in-direction focus-manager current-focus direction ui-tree))
-          (progn ; Fallback to simple next/previous if no ui-tree
-            (log-warn "UI Tree not provided for directional navigation, falling back to simple tab order.")
+      ;; Attempt spatial navigation if we have a UI tree
+      (if ui-tree
+          (progn
+            (log-debug "Attempting directional navigation from ~A in direction ~A" current-focus direction)
+            (setf next-focus (find-closest-in-direction focus-manager current-focus direction ui-tree))
+            (if next-focus
+                (log-debug "Found next focus target: ~A" next-focus)
+                (log-debug "No suitable target found in direction: ~A" direction)))
+
+          ;; Fall back to simple tab order if no UI tree is provided
+          (progn
+            (log-warn "UI Tree not provided for directional navigation, falling back to tab order.")
             (setf next-focus
                   (case direction
                     ((:up :left) (get-previous-focusable focus-manager current-focus))
                     ((:down :right) (get-next-focusable focus-manager current-focus))
                     (otherwise current-focus)))))
 
+      ;; Set focus to the new target if found
       (when (and next-focus (not (eq next-focus current-focus)))
-        (set-focus focus-manager next-focus :app-state app-state)))))
+        (log-debug "Setting focus from ~A to ~A" current-focus next-focus)
+        (set-focus focus-manager next-focus :app-state app-state)
+        t))))
 
 (defun navigate-up (focus-manager &key app-state ui-tree)
   "Navigate focus upward."
@@ -670,12 +752,59 @@
 
 ;; Copied from legacy/focus-integration.lisp and adapted
 (defun handle-default-navigation-keys (focus-manager key-event &key app-state ui-tree)
-  "Handle standard navigation keys like Tab, arrows, etc.
-   This combines tab navigation and directional navigation."
-  (if (handle-tab-navigation focus-manager key-event :app-state app-state)
-      t ; Tab navigation handled
-      (handle-navigation-keys focus-manager key-event :app-state app-state :ui-tree ui-tree))) ; Try directional/other nav keys
+  "Handle standard navigation keys including arrows, tab, escape, etc.
+   Provides a comprehensive set of default navigation behaviors.
+   Returns T if the event was handled, NIL otherwise."
+  (when (key-event-p key-event)
+    (let* ((key (key-event-key key-event))
+           (modifiers (key-event-modifiers key-event)))
 
+      (cond
+        ;; Arrow Keys - Directional Navigation
+        ((eq key :up)
+         (navigate-up focus-manager :app-state app-state :ui-tree ui-tree)
+         t)
+        ((eq key :down)
+         (navigate-down focus-manager :app-state app-state :ui-tree ui-tree)
+         t)
+        ((eq key :left)
+         (navigate-left focus-manager :app-state app-state :ui-tree ui-tree)
+         t)
+        ((eq key :right)
+         (navigate-right focus-manager :app-state app-state :ui-tree ui-tree)
+         t)
+
+        ;; Tab Navigation
+        ((and (eq key :tab) (not (member :shift modifiers)))
+         (tab-navigate focus-manager :forward :app-state app-state)
+         t)
+        ((and (eq key :tab) (member :shift modifiers))
+         (tab-navigate focus-manager :backward :app-state app-state)
+         t)
+
+        ;; Escape - Could clear focus or go back depending on app needs
+        ((eq key :escape)
+         ;; This implementation clears focus, but could be customized per app
+         (clear-focus focus-manager :app-state app-state)
+         t)
+
+        ;; Home/End - Could navigate to first/last focusable
+        ((eq key :home)
+         (when (focus-manager-focusable-elements focus-manager)
+           (set-focus focus-manager (first (focus-manager-focusable-elements focus-manager)) :app-state app-state)
+           t))
+        ((eq key :end)
+         (when (focus-manager-focusable-elements focus-manager)
+           (set-focus focus-manager (first (last (focus-manager-focusable-elements focus-manager))) :app-state app-state)
+           t))
+
+        ;; Enter/Space - Could be handled by application-specific code
+        ;; Typically trigger an action on the focused element
+
+        ;; No match - not handled
+        (t nil)))
+    ;; Not a key event
+    nil))
 
 ;; Top-level key event handler, adapted from legacy focus-integration.lisp
 (defmethod handle-key-event (focus-manager key-event &key app-state ui-tree)
@@ -736,6 +865,56 @@
     result))
 
 ;;;-----------------------------------------------------------------------------
+;;; Focusable Elements Collection
+;;;-----------------------------------------------------------------------------
+
+(defun collect-focusable-elements (ui-tree)
+  "Traverses the UI tree and collects all elements that are focusable.
+   Returns a list of element objects that can receive focus."
+  ;; This implementation will depend on the structure of your UI tree
+  ;; Here's a simplified version that assumes a nested structure with :focusable property
+  (labels ((collect-recursive (node result)
+             (if (null node)
+                 result
+                 (let ((new-result
+                         (if (and (getf node :focusable) (getf node :id))
+                             (cons node result)
+                             result)))
+                   (if (listp (getf node :children))
+                       (reduce #'collect-recursive (getf node :children) :initial-value new-result)
+                       new-result)))))
+    (collect-recursive ui-tree nil)))
+
+(defun collect-focusable-ids (ui-tree)
+  "Traverses the UI tree and collects IDs of all elements that are focusable.
+   Returns a list of element IDs that can receive focus."
+  (mapcar #'stylable-id (collect-focusable-elements ui-tree)))
+
+(defun recalculate-focusable-elements (focus-manager ui-tree &key app-state preserve-focus)
+  "Recalculates the list of focusable elements based on the current UI tree.
+   Returns the updated list. If preserve-focus is T, tries to maintain current focus.
+   If the current focus is no longer valid, either clears focus or sets to the first element."
+  (let* ((old-current-focus (focus-manager-current-focus focus-manager))
+         (new-focusable-elements (collect-focusable-ids ui-tree)))
+
+    ;; Update the focus-manager with the new elements
+    (setf (focus-manager-focusable-elements focus-manager) new-focusable-elements)
+    (setf (focus-manager-focus-ring-dirty-p focus-manager) nil)
+
+    ;; Check if we need to update the current focus
+    (unless (or (null old-current-focus)
+                (and preserve-focus (member old-current-focus new-focusable-elements :test #'equal)))
+      ;; Current focus is no longer valid
+      (if new-focusable-elements
+          ;; Set to first available element
+          (set-focus focus-manager (first new-focusable-elements) :app-state app-state)
+          ;; No focusable elements, clear focus
+          (clear-focus focus-manager :app-state app-state)))
+
+    ;; Return the new list
+    new-focusable-elements))
+
+;;;-----------------------------------------------------------------------------
 ;;; Recalculate and Collect Focusable Elements (Refined)
 ;;;-----------------------------------------------------------------------------
 
@@ -780,55 +959,31 @@
       (traverse ui-tree-node)
       (nreverse focusable-nodes)))) ; Reverse to get depth-first order
 
-;; Refined version of recalculate-focusable-elements from legacy focus-manager
-;; and current manager.
-(defun recalculate-focusable-elements (focus-manager ui-tree)
-  "Updates the list of focusable elements based on the current UI tree.
-   Sorts them by tab order (assumed to be document order or explicit tab-index).
-   Returns T if the list was updated, NIL otherwise."
-  (let* ((all-elements (find-focusable-elements-in-tree ui-tree)) ; Actual traversal
-         ;; Sort elements by tab-index first, then by document order (represented by their ID)
-         (sorted-elements (sort (copy-list all-elements) 
-                                #'(lambda (a b)
-                                    (let ((a-props (when (listp a) (second a)))
-                                          (b-props (when (listp b) (second b))))
-                                      (let ((a-tab-index (getf a-props :tab-index 0))
-                                            (b-tab-index (getf b-props :tab-index 0)))
-                                        (if (= a-tab-index b-tab-index)
-                                            ;; If tab indexes are equal, use ID as secondary sort
-                                            (string< (princ-to-string (stylable-id a))
-                                                     (princ-to-string (stylable-id b)))
-                                            (< a-tab-index b-tab-index)))))))
-         (focusable-ids (mapcar #'stylable-id sorted-elements)))
-
-    nil ; Return NIL if no changes
-    ;; If the focusable elements have changed
-    (unless (equal focusable-ids (focus-manager-focusable-elements focus-manager))
-      (setf (focus-manager-focusable-elements focus-manager) focusable-ids)
-      (setf (focus-manager-focus-ring-dirty-p focus-manager) nil)
-      t) ; Return T if list was updated
-
-    ;; If current focus is no longer in focusable list, try to focus first element
-    (let ((current-focus (focus-manager-current-focus focus-manager)))
-      (when (and current-focus (not (member current-focus focusable-ids :test #'equal)))
-        (set-focus focus-manager (first focusable-ids) :app-state nil ; app-state might
-                                        ; be needed if set-focus calls hooks
-                   )
-        t))))
-
 ;; collect-focusable-elements and collect-focusable-ids are now effectively
 ;; handled by recalculate-focusable-elements and the direct use of
 ;; (focus-manager-focusable-elements focus-manager). If a separate collection function
 ;; is needed without modifying the focus-manager state, it can be:
-(defun collect-focusable-elements (ui-tree)
-  "Traverses the UI tree and collects all focusable elements, sorted."
-  (let ((focusable-elements (find-focusable-elements-in-tree ui-tree)))
-    ;; TODO: Sort by tab-index or document order
-    (sort focusable-elements #'(lambda (a b) (string< (princ-to-string (stylable-id a)) (princ-to-string (stylable-id b))))))) ;
+;; (defun collect-focusable-elements (ui-tree)
+;;   "Traverses the UI tree and collects all elements that are focusable.
+;;    Returns a list of element objects that can receive focus."
+;;   ;; This implementation will depend on the structure of your UI tree
+;;   ;; Here's a simplified version that assumes a nested structure with :focusable property
+;;   (labels ((collect-recursive (node result)
+;;              (if (null node)
+;;                  result
+;;                  (let ((new-result
+;;                          (if (and (getf node :focusable) (getf node :id))
+;;                              (cons node result)
+;;                              result)))
+;;                    (if (listp (getf node :children))
+;;                        (reduce #'collect-recursive (getf node :children) :initial-value new-result)
+;;                        new-result)))))
+;;     (collect-recursive ui-tree nil)))
 
-(defun collect-focusable-ids (ui-tree)
-  "Collects sorted focusable IDs from the UI tree."
-  (mapcar #'stylable-id (collect-focusable-elements ui-tree)))
+;; (defun collect-focusable-ids (ui-tree)
+;;   "Traverses the UI tree and collects IDs of all elements that are focusable.
+;;    Returns a list of element IDs that can receive focus."
+;;   (mapcar #'stylable-id (collect-focusable-elements ui-tree)))
 
 ;; Ensure existing functions like get-next/previous-focusable use the
 ;; (focus-manager-focusable-elements focus-manager) which is updated by

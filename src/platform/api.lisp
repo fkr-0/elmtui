@@ -25,6 +25,7 @@
    ;; Display & Screen Management
    :get-screen-dimensions
    :clear-screen
+   :with-terminal-output
    :flush-output
    :set-cursor-visibility
    :set-cursor-position
@@ -387,6 +388,20 @@ This provides an escape hatch for backend-specific operations not covered by the
 Use with caution, as it breaks platform independence.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 Returns a native handle, or NIL if not applicable or not exposed."))
+
+;;;-----------------------------------------------------------------------------
+;;; Terminal Output Access
+;;;-----------------------------------------------------------------------------
+
+(defmacro with-terminal-output ((backend stream-var) &body body)
+  "Execute BODY with STREAM-VAR bound to the terminal output stream from BACKEND.
+   Provides safe access to the terminal output stream for direct writing.
+   
+   Example:
+     (with-terminal-output (backend out)
+       (format out \"~c[0m\" #\\Escape))"
+  `(let ((,stream-var (term-stream ,backend)))
+     ,@body))
 
 ;; (defgeneric terminal-instance-width (backend-instance)
 ;;   (:documentation "Returns the width of the terminal instance in character cells."))

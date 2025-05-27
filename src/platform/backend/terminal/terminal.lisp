@@ -695,6 +695,13 @@ This should be called when the physical terminal size changes."
                      ((= introducer-char-code #o133) ; '['
                       (if (> (length bytes-vector) 2)
                           (let ((csi-content-list (coerce (subseq bytes-vector 2) 'list))) ; Use list for collect-csi-params
+                            ;; Special handling for cursor position response - these have the form ESC [ row ; col R
+                            ;; Check if the last byte is 'R' (ASCII 82) which indicates a cursor position response
+                            (when (and (> (length csi-content-list) 0)
+                                       (= (car (last csi-content-list)) 82)) ; 'R' character
+                              (log:debug "Detected cursor position response, ignoring: ~S" bytes-vector)
+                              (return-from parser nil)) ; Return nil to ignore this message
+                              
                             (multiple-value-bind (params intermediates final-byte-code)
                                 (collect-csi-params csi-content-list)
                               ;; (declare (ignore intermediates)) ; Removed ignore, as intermediates is used below
