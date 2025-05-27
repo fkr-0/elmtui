@@ -19,13 +19,14 @@
    :make-channel :channel-send :channel-receive :channel-close)
   (:export :start-loop
    :enqueue-event
-           :dispatch-event
-   :subscribe-with-priority
-           :elm-stop-loop :unsubscribe
-           :subscribe :publish
-           :*lifecycle-hooks*
-   :*event-loop* :*subscribers*
-   :instrument-event-loop :elm-event-loop-active-p))
+           :stop-loop
+   :dispatch-event
+           :subscribe-with-priority
+   :elm-stop-loop :unsubscribe
+   :subscribe :publish
+   :*lifecycle-hooks*
+           :*event-loop* :*subscribers*
+           :instrument-event-loop :elm-event-loop-active-p))
 (in-package :elmtui.core.loop)
 
 
@@ -85,7 +86,8 @@
         t)))) ; Return T indicating successful removal
 
 (defun publish (event)
-  "Publish EVENT to all subscribers of its type. Handles subscriber-handler-error."
+  "Publish EVENT to all subscribers of its type. Also dispatches to channels if available.
+   Handles subscriber-handler-error."
   ;; Determine event type based on event structure
   (let* ((event-key (cond
                       ((typep event 'cleve-elm.message:message)
@@ -101,21 +103,30 @@
          (generic-key-event-handlers (when (typep event 'key-event)
                                        (gethash :key-event *subscribers*)))
          (all-handlers (remove-duplicates (append handlers generic-key-event-handlers) :test #'eq)))
+    
+    ;; Also dispatch through channels system if available
+    (when (find-package :elmtui.core.event-async)
+      (let ((dispatch-fn (find-symbol "DISPATCH-EVENT-ASYNC" :elmtui.core.event-async))
+            (main-channel (find-symbol "*MAIN-EVENT-CHANNEL*" :elmtui.core.event-async)))
+        (when (and dispatch-fn (fboundp dispatch-fn) main-channel (boundp main-channel))
+          (ignore-errors
+            (log:debug "Also dispatching event to channel system: ~S" event)
+            (funcall dispatch-fn event)))))
+    
+    ;; Classic subscriber model
     (when event-key ; Proceed only if a valid event key was determined
       (if all-handlers
           (dolist (handler all-handlers)
             (log:debug "LOOP: Publishing to handler ~S event ~S (Event Key(s): ~A~@[, :KEY-EVENT~])"
                        handler event event-key (typep event 'key-event))
-            ;; (elmtui.core.conditions:with-recovery (elmtui.core.conditions:subscriber-handler-error)
-            ;;   (handler-case
-            (funcall handler event)) ; Pass the original event to the handler
-          ;; (error (e)
-          ;;   (log:error "LOOP: Error in handler ~S for event ~S. Reason: ~A" handler event e)
-          ;;   (signal 'elmtui.core.conditions:subscriber-handler-error
-          ;;           :event event
-          ;;           :handler handler
-          ;;           :reason e)))))
-          (log:debug "LOOP: No handlers found for event key ~S (and not a generic key-event or no generic handlers) (Event: ~S)" event-key event)))))
+            ;; Try to handle any errors that might occur
+            (handler-case
+                (funcall handler event) ; Pass the original event to the handler
+              (error (e)
+                (log:error "LOOP: Error in handler ~S for event ~S. Reason: ~A" 
+                           handler event e))))
+          (log:debug "LOOP: No handlers found for event key ~S (and not a generic key-event or no generic handlers) (Event: ~S)" 
+                    event-key event)))))
 
 (defun dispatch-event (event)
   "Dispatch EVENT to subscribers and perform instrumentation. Handles event-loop-dispatch-error."

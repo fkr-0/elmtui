@@ -6,7 +6,7 @@
 (uiop:define-package :elmtui.platform.driver
   (:use :cl :elmtui.core.loop
         :elmtui.platform.input :elmtui.platform.output)
-  (:import-from :log4cl #:log-debug #:log-info #:log-error)
+  (:import-from :log4cl #:log-debug #:log-info #:log-error #:log-warn)
   (:import-from :elmtui.view.core #:ui-node-type)
   (:import-from :elmtui.view.styled #:apply-stylesheet-to-tree)
   (:import-from :elmtui.view.layout #:layout-tree)
@@ -142,8 +142,24 @@
 
   (let ((shutdown-p nil))
     (lambda (message)
-      ;; simplified: call update, view, render, diff, swap, canvas integration
+      ;; Enhance logging for message diagnosis
+      (log:debug "Handler received message: ~S, type: ~A" message (type-of message))
+
+      ;; Process message only if we're not already shutting down
       (when (not shutdown-p)
+        ;; Check for quitting conditions
+        (log:debug "Checking message: ~S, should-quit flag: ~S" message (elmtui.state:state-ref app-state :should-quit))
+        (when (check-and-handle-quit app-state message)
+          (log:info "Application termination requested. Initiating shutdown...")
+          (setf shutdown-p t)
+          ;; Dispatch-event-async to the command-event-channel
+          (when (and (find-package :elmtui.core.event-async)
+                     (fboundp (find-symbol "DISPATCH-EVENT-ASYNC" :elmtui.core.event-async)))
+            (log:debug "Dispatching :shutdown command via channel")
+            (funcall (find-symbol "DISPATCH-EVENT-ASYNC" :elmtui.core.event-async)
+                     '(:command :shutdown)))
+          (return-from make-update-handler nil))
+
         (let ((cmds (funcall update-fn app-state message)))
           (dolist (c cmds) (elmtui.core.loop:publish c)))
         ;; view + layout + render with canvas-buffer rendering
@@ -154,8 +170,8 @@
                          (canvas-content-rectangle canvas)
                          ;; Otherwise use full terminal dimensions
                          (make-rectangle :pos (make-pos :x 0 :y 0)
-                                        :size (make-size :w (term-w *backend*)
-                                                       :h (term-h *backend*)))))
+                                         :size (make-size :w (term-w *backend*)
+                                                          :h (term-h *backend*)))))
                (laid (layout-tree styled rect)))
           (let ((orig-back (terminal-instance-back-buffer *backend*)))
             (when use-canvas
@@ -182,25 +198,132 @@
                 (with-terminal-lock (*backend*)
                   (apply-terminal-diff *backend* (compute-buffer-diff f b)))
                 (rotatef (terminal-instance-front-buffer *backend*)
-                         (terminal-instance-back-buffer *backend*))))))
-        ;; quit logic omitted for brevity
-        ))))
+                         (terminal-instance-back-buffer *backend*))))))))))
+;;;;; Helper: check-and-handle-quit
+(defun check-and-handle-quit (app-state message)
+  "Check if the application should quit based on message or state.
+   Returns T if quitting, NIL otherwise."
+  ;; Check explicit quit message
+  (when (and (listp message) (eq (first message) :app-quit-requested))
+    (log:info "Application quit requested via message: ~A" message)
+    (elmtui.core.loop:elm-stop-loop)
+    (return-from check-and-handle-quit t))
 
-;;;;; Helper: subscribe events
-(defun subscribe-default-events (handler subs-fn)
-  (when subs-fn
-    (dolist (ev (funcall subs-fn elmtui.state:*app-state*))
-      (elmtui.core.loop:subscribe ev handler)))
-  (dolist (ev '(:app-quit-requested :terminal-resize-request :key-event :force-render))
-    (elmtui.core.loop:subscribe ev handler)))
+  ;; Check application state
+  (when (elmtui.state:state-ref app-state :should-quit)
+    (log:info "Application quit requested via state flag")
+    (elmtui.core.loop:elm-stop-loop)
+    (return-from check-and-handle-quit t))
+    
+  ;; Check for key events in the rainbow-app example that should trigger quit
+  (when (or 
+         ;; Check for key-event list format
+         (and (listp message) (eq (first message) :key-event))
+         ;; Check for key-event structure format
+         (typep message 'elmtui.core.event-types:key-event))
+    (when (eql (elmtui.state:state-ref app-state :app-name) :rainbow-example-app)
+      (log:info "Rainbow app - key press detected, quitting: ~A" message)
+      (elmtui.state:update-state app-state (list :should-quit t))
+      (elmtui.core.loop:elm-stop-loop)
+      (return-from check-and-handle-quit t)))
+
+  ;; Not quitting
+  nil)
+
+(defun subscribe-default-events (handler subscriptions-fn)
+  "Subscribes the handler to events specified by subscriptions-fn.
+   HANDLER: The function to call when a subscribed event occurs.
+   SUBSCRIPTIONS-FN: A function that returns a list of event types/topics to subscribe to."
+  (when subscriptions-fn
+    (let ((subscriptions (funcall subscriptions-fn elmtui.state:*app-state*))) ; Assuming subs-fn might need app-state
+      (if (listp subscriptions)
+          (dolist (event-type subscriptions)
+            (log-debug "Subscribing to event type: ~A" event-type)
+            (elmtui.core.loop:subscribe event-type handler))
+          (log-warn "Subscriptions function did not return a list: ~S" subscriptions)))))
 
 ;;;;; Helper: cleanup
 (defun cleanup-application (backend canvas use-canvas)
-  (when (and backend use-canvas)
-    (restore-terminal-state canvas))
+  "Perform comprehensive cleanup of the terminal environment and application resources.
+   Ensures terminal state is properly restored and all resources are released."
+  (log:info "Starting application cleanup...")
+  
+  ;; Track cleanup success
+  (let ((terminal-restored nil))
+
+    ;; Stop input thread if it exists
+    (when *stop-input-fn*
+      (log:debug "Stopping input thread...")
+      (ignore-errors
+       (funcall *stop-input-fn*))
+      (setf *input-thread* nil
+            *stop-input-fn* nil))
+
+    ;; Reset terminal state using canvas if available
+    ;; This is a critical step for restoring proper terminal state
+    (when (and backend use-canvas canvas)
+      (log:debug "Restoring terminal state from canvas...")
+      (handler-case
+          (progn
+            (restore-terminal-state canvas)
+            (setf terminal-restored t)
+            (log:info "Terminal state restored successfully via canvas"))
+        (error (e)
+          (log:error "Failed to restore terminal state via canvas: ~A" e))))
+
+  ;; Force terminal cursor to be visible and reset terminal attributes
+  (unless terminal-restored
+    (when backend
+      (log:debug "Terminal not restored by canvas, performing manual terminal cleanup...")
+      (handler-case
+          (progn
+            ;; Try using the with-terminal-output macro
+            (elmtui.platform.api:with-terminal-output (backend stream)
+              (let ((*standard-output* stream))
+                ;; ANSI escape sequences to ensure terminal reset
+                (format t "~c[?25h" #\Escape)  ; Show cursor
+                (format t "~c[0m" #\Escape)    ; Reset all attributes
+                (format t "~c[J" #\Escape)     ; Clear screen (optional)
+                (format t "~c[H" #\Escape)     ; Return cursor home
+                (format t "~%") ; Add a newline at the end
+                (finish-output t)))
+            (setf terminal-restored t))
+        (error (e)
+          ;; Fallback method if with-terminal-output fails
+          (log:warn "Could not use with-terminal-output: ~A, using direct methods" e)
+          (handler-case
+              (let ((stream (elmtui.platform.api:term-stream backend)))
+                (when stream
+                  (format stream "~c[?25h~c[0m~c[J~c[H~%" #\Escape #\Escape #\Escape #\Escape)
+                  (finish-output stream)
+                  (setf terminal-restored t)))
+            (error (e2)
+              (log:error "Failed to restore terminal via direct stream: ~A" e2)))))))
+
+  ;; Shutdown the backend properly
   (when backend
-    (elmtui.platform.api:shutdown-backend backend))
-  (log:info "Driver: cleanup complete."))
+    (handler-case
+        (elmtui.platform.api:shutdown-backend backend)
+      (error (e)
+        (log:error "Error during backend shutdown: ~A" e))))
+
+  ;; Clear the special variables
+  (setf *backend* nil)
+
+  ;; Reset terminal using stty commands as a last resort
+  (unless terminal-restored
+    (log:warn "Attempting terminal restoration via stty sane as last resort...")
+    (handler-case
+        (progn
+          (sb-ext:run-program "/bin/stty" '("sane") :input nil :output nil :error nil :search t)
+          (log:info "Terminal reset with stty sane"))
+      (error (e)
+        (log:error "Failed to reset terminal with stty: ~A" e))))
+
+  ;; Final report
+  (if terminal-restored
+      (log:info "Driver: cleanup complete with terminal state restored")
+      (log:error "Driver: cleanup complete but terminal state restoration may have failed")))
 
 ;;;;; Refactored run-application
 (defun run-application (app-spec &key
@@ -235,13 +358,57 @@
                    (initialize-app-state app-spec)
                  ;; process initial commands from init
                  (process-initial-commands cmds)
+
+                 ;; Store application name in state for identification
+                 (elmtui.state:update-state state (list :app-name (if (symbolp app-spec) app-spec :unknown-app)))
+                 
+                 ;; Set up channel-based event processing if available
+                 (when (and (find-package :elmtui.core.event-async)
+                            (fboundp (find-symbol "INITIALIZE-EVENT-CHANNELS" :elmtui.core.event-async))
+                            (fboundp (find-symbol "START-EVENT-PROCESSING" :elmtui.core.event-async)))
+                   (log:info "Using channel-based event processing")
+                   (handler-case
+                       (progn
+                         (funcall (find-symbol "INITIALIZE-EVENT-CHANNELS" :elmtui.core.event-async))
+                         (funcall (find-symbol "START-EVENT-PROCESSING" :elmtui.core.event-async)
+                                  ;; Lambda to provide UI tree
+                                  (lambda () (funcall view-fn state #'elmtui.core.loop:publish))))
+                     (error (e)
+                       (log:error "Failed to initialize channel-based event processing: ~A" e))))
+
                  ;; Create update handler and set up subscriptions
                  (let ((handler (make-update-handler upd-fn view-fn state canvas use-canvas)))
                    (subscribe-default-events handler subs-fn)
                    ;; trigger first render
                    (elmtui.core.loop:publish '(:force-render))))
-               ;; Start the main event loop
-               (elmtui.core.loop:start-loop))
+               ;; Start the main event loop and ensure it terminates properly
+               (elmtui.core.loop:start-loop)
+               (log:info "Event loop terminated. Starting cleanup..."))
           ;; Always clean up on exit
-          (cleanup-application backend canvas use-canvas)))
+          (progn
+            ;; Stop channel-based event processing if active
+            (when (and (find-package :elmtui.core.event-async)
+                       (fboundp (find-symbol "STOP-EVENT-PROCESSING" :elmtui.core.event-async)))
+              (funcall (find-symbol "STOP-EVENT-PROCESSING" :elmtui.core.event-async)))
+            ;; Clean up application resources
+            (cleanup-application backend canvas use-canvas)))
+      ;; Handle any errors during execution
+      (error (condition)
+        (log:error "Error in application: ~A" condition)
+        ;; Stop channel-based event processing if active
+        (when (and (find-package :elmtui.core.event-async)
+                   (fboundp (find-symbol "STOP-EVENT-PROCESSING" :elmtui.core.event-async)))
+          (funcall (find-symbol "STOP-EVENT-PROCESSING" :elmtui.core.event-async)))
+        ;; Clean up application resources
+        (cleanup-application backend canvas use-canvas)))
     (values)))
+
+;;; Driver code for testing the application
+(defun driver-test ()
+  (run-application
+   '(:name test-app
+     :init-fn (lambda () (values nil nil))
+     :update-fn (lambda (state msg) (list msg))
+     :view-fn (lambda (state publish) (publish '(:render-request)))
+     :subscriptions-fn (lambda (state) (list :app-quit-requested))))
+  (format t "Driver test completed.~%"))

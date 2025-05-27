@@ -33,6 +33,25 @@
    [Original documentation]
    
    Added support for terminal canvas positioning."
+ 
+    Args:
+      NAME: Symbol naming the application.
+      INIT: A function designator (#'my-init) that takes no arguments and returns
+            (values initial-model initial-commands-list).
+      UPDATE: A function designator (#'my-update) that takes (app-state message)
+              and returns commands-list. It uses set-state! internally.
+      VIEW: A function designator (#'my-view) that takes (app-state) and returns
+            a UI-NODE tree.
+      SUBSCRIPTIONS: (Optional) A function designator (#'my-subscriptions) that takes (app-state)
+                     and returns a list of subscriptions (e.g., for timers, external events). (Not fully implemented yet)
+ 
+    Generates:
+      - A `run-<NAME>` function to start and manage the application lifecycle.
+     - Sets `*current-app-name*` and `*current-app-runner*` for the default `run-app`.
+Example:
+(def-elm-app my-app )
+
+   "
   (let ((run-func-name (symbolicate "RUN-" name)))
     ;; Removed unused gensyms
     `(progn
@@ -82,7 +101,5 @@
     (if runner
         (apply runner (remove-from-plist args :app-name))
         (error "No ElmTUI application defined or specified to run."))))
-
-
 
 ;; (def-elm-app my-app)
