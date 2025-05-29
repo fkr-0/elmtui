@@ -123,6 +123,21 @@
       
       ;; Add the key itself
       (princ key-str out))))
+;; "Human-readable form, e.g. \"Shift-Ctrl-Alt-Z\"."
+;; (string-trim (list #\-)
+;;              (with-output-to-string (out)
+;;                (let ((mods (normalize-modifiers (normalized-key-modifiers nk)))
+;;                      (ky (format nil "-~A"
+;;                                  (etypecase (normalized-key-key nk)
+;;                                    (character (string (normalized-key-key nk)))
+;;                                    (symbol    (string-capitalize (symbol-name (normalized-key-key nk))))))))
+;;                  (loop for m in mods
+;;                        for i from 0
+;;                        do (progn
+;;                             (when (> i 0) (write-char #\- out))
+;;                             (princ (string-capitalize (symbol-name m)) out)))
+;;                  (princ ky out) ; Append the key at the end)
+;;                  ))))
 
 ;;;; ------------------------------------------------------------------------
 ;;;; Existing public constructor remains unchanged; key-event helper just
@@ -169,32 +184,39 @@
       ;; Handle single key
       (parse-single-key-string key-string)))
 
+;; TODO for M-m and A-a
 (defun parse-single-key-string (key-string)
   "Parse a single key string (no spaces) into a normalized key."
-  (let* ((modifiers nil)
-         (key nil)
-         (parts (str:split "-" key-string))
-         (last-part (car (last parts)))
-         (last-part-sym (make-keyword (string-upcase last-part)))
-         (butlast-parts (butlast parts)))
+  ;; (let* ((modifiers nil)
+  ;;        (key nil)
+  ;;        (parts (str:split "-" key-string))
+  ;;        (last-part (car (last parts)))
+  ;;        (last-part-sym (make-keyword (string-upcase last-part)))
+  ;;        (butlast-parts (butlast parts)))
 
-    (cond
-      ((eql last-part-sym :ESCAPE) (setf key :esc))
-      ((eql last-part-sym :ENTER) (setf key :enter))
-      ((eql last-part-sym :DELETE) (setf key :delete))
-      ((eql last-part-sym :BACKSPACE) (setf key :backspace))
-      ((eql last-part-sym :TAB) (setf key :tab))
-      ((eql last-part-sym :SPACE) (setf key :space))
+  ;;   (cond
+  ;;     ((eql last-part-sym :ESCAPE) (setf key :esc))
+  ;;     ((eql last-part-sym :ENTER) (setf key :enter))
+  ;;     ((eql last-part-sym :DELETE) (setf key :delete))
+  ;;     ((eql last-part-sym :BACKSPACE) (setf key :backspace))
+  ;;     ((eql last-part-sym :TAB) (setf key :tab))
+  ;;     ((eql last-part-sym :SPACE) (setf key :space))
 
-      ;; For single character keys, store the character
-      ((and (= (length (symbol-name last-part-sym)) 1)
-            (alpha-char-p (char (symbol-name last-part-sym) 0)))
-       (setf key (char (symbol-name last-part-sym) 0)))
+  ;;     ;; For single character keys, store the character
+  ;;     ((and (= (length (symbol-name last-part-sym)) 1)
+  ;;           (alpha-char-p (char (symbol-name last-part-sym) 0)))
+  ;;      (setf key (char (symbol-name last-part-sym) 0)))
 
-      ;; Any other key is a keyword
-      (t (setf key last-part-sym)))
+  ;;     ;; Any other key is a keyword
+  ;;     (t (setf key last-part-sym)))
+  (let ((modifiers nil)
+        (key nil)
+        (butlast-parts (butlast (str:split "-" key-string))))
+
     ;; Handle modifiers and key
     (loop for part in butlast-parts
+          ;; (loop for part in (str:split "-" key-string) ;:regex t)
+          ;; (loop for part in (str:split "[-|+]" key-string) ;:regex t)
           do (let ((part-sym (make-keyword (string-upcase part))))
                (cond
                  ;; Single letter modifiers
@@ -212,9 +234,20 @@
                  (t (push part-sym modifiers)))))
     ;; Special key mappings
 
-    ;; Normalize the key for the tests
-    (when (characterp key)
-      (setf key (char-downcase key)))
+    ;; ;; Normalize the key for the tests
+    ;; (when (characterp key)
+    ;;   (setf key (char-downcase key)))
+    ;;              ;; Modifier
+    ;;              ((member part-sym '(:ctrl :control :c :cmd :command :alt :meta :m :shift :s))
+    ;;               ;; unless last part and :C or :A
+    ;;               (if (and (eql part-sym :C)
+    ;;                        (member part-sym (normalize-modifiers modifiers)  :test #'eq))
+    ;;                   (setf key part-sym)
+    ;;                   ;; Add to modifiers
+    ;;                   (push (canonicalise-modifier part-sym) modifiers)))
+
+    ;;              ;; Key
+    ;;              (t (setf key part-sym)))))
 
     ;; Create normalized key
     (make-normalized-key :key key :modifiers (normalize-modifiers modifiers))))
