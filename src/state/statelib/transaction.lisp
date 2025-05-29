@@ -7,9 +7,11 @@
            :make-transaction :record-change :apply-transaction
    :revert-transaction :with-transaction :undo-last-transaction
            :redo-last-transaction :clear-transaction-history
+           :selective-undo ; Added
            ;; Transaction history utilities
            :print-transaction-history :format-transaction-summary
            :export-transaction-history
+           :visualize-transaction-history ; Added
            ;; :notify-observers ; No longer exporting from here
            ))
 
@@ -189,6 +191,38 @@ Example:
           ;; Notify observers about the redone changes
           (notify-observers app-state (transaction-changes transaction))
           transaction))))
+
+(defun get-transaction-history (app-state)
+  "Returns the list of committed transactions."
+  (application-state-transaction-history app-state))
+
+(defun move-transaction-to-redo (app-state transaction)
+  "Moves a specific transaction from the main history to the undone history.
+   The transaction is removed from its current position in the main history
+   and pushed onto the head of the undone-history stack."
+  (setf (application-state-transaction-history app-state)
+        (delete transaction (application-state-transaction-history app-state) :count 1))
+  (push transaction (application-state-undone-history app-state)))
+
+(defun selective-undo (app-state transaction-id)
+  "Undo a specific transaction by ID.
+   The transaction is reverted, moved from the main history to the undone history,
+   and observers are notified.
+   Returns the reverted transaction, or NIL if not found."
+  (check-type app-state application-state)
+  (let* ((history (get-transaction-history app-state))
+         (tx (find transaction-id history :key #'transaction-id)))
+    (if tx
+        (progn
+          (log-info "Selectively undoing transaction ID: ~A" (transaction-id tx))
+          (revert-transaction app-state tx)
+          (move-transaction-to-redo app-state tx)
+          (notify-observers app-state (transaction-changes tx))
+          tx)
+        (progn
+          (log-warn "Selective undo: Transaction ID ~A not found in history." transaction-id)
+          nil))))
+
 ;; (defmacro with-transaction ((app-state &key (label "Unnamed Transaction"))
 ;;                              &body body)
 ;;   "Executes BODY within a transaction context.
@@ -249,7 +283,7 @@ Example:
   (multiple-value-bind (second minute hour day month year zone)
       (decode-universal-time time)
     (declare (ignorable zone))
-    (format nil "~A-~A-~A ~A:~A:~A" year month day hour minute second)))
+    (format nil "~A-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D" year month day hour minute second)))
 
 (defun print-transaction-history (app-state &key (stream *standard-output*) (max-changes 5))
   "Print the transaction history of an application state in a formatted way.
@@ -267,11 +301,12 @@ Example:
     (loop for tx in history
           for i from 1
           do (let ((changes-count (length (transaction-changes tx))))
-               (format stream "~&~D. Transaction #~D~@[ '~A'~]~@[ - ~A~] (~D change~:P)~%   Time: ~A~%"
+               (format stream "~&~D. Transaction #~D~@[ '~A'~]~@[ - ~A~]~@[ Cats: ~{~S~^,~}~] (~D change~:P)~%   Time: ~A~%"
                        i
                        (transaction-id tx)
                        (transaction-name tx)
                        (transaction-description tx)
+                       (transaction-categories tx)
                        changes-count
                        (format-universal-time (transaction-timestamp tx)))
                (when (> changes-count 0)
@@ -283,43 +318,91 @@ Example:
                    (format stream "     ...~D more change~:P...~%" (- changes-count max-changes))))))
     (length history)))
 
+(defun visualize-transaction-history (app-state &optional output-file)
+  "Generate a visualization of the transaction history."
+  (check-type app-state application-state)
+  (let ((history (get-transaction-history app-state))
+        (stream (if output-file
+                    (open output-file :direction :output :if-exists :supersede)
+                    *standard-output*)))
+    (format stream "~&Transaction History Visualization (~D transaction~:P):~%" (length history))
+    (format stream "~&----------------------------------------------------------~%")
+    (loop for tx in history
+          for i from 1
+          do (format stream "~&~3D: [~A] ~A~@[ Cats: ~{~S~^,~}~]~%"
+                    i
+                    (format-universal-time (transaction-timestamp tx))
+                    (or (transaction-name tx) "Unnamed transaction")
+                    (transaction-categories tx))
+             (format stream "     Changes: ~A~%" (length (transaction-changes tx)))
+             (format stream "     ID: ~A~%~%" (transaction-id tx)))
+    (when output-file (close stream))
+    (length history)))
+
 (defun format-transaction-summary (transaction)
-  "Returns a one-line summary string for a transaction.
-   Useful for displaying in UI transaction lists."
+  "Returns a one-line summary string for a transaction."
   (with-output-to-string (s)
     (format s "Transaction #~D" (transaction-id transaction))
     (when (transaction-name transaction)
       (format s " '~A'" (transaction-name transaction)))
+    (when (transaction-categories transaction)
+      (format s " [~{~S~^,~}]" (transaction-categories transaction)))
     (format s " - ~D change~:P" (length (transaction-changes transaction)))
     (when (transaction-description transaction)
       (format s " (~A)" (transaction-description transaction)))))
 
-(defun export-transaction-history (app-state &key (stream *standard-output*) format)
-  "Export the transaction history in various formats.
-   
-   Args:
-     app-state: The application state instance
-     stream: Output stream to write to (default: *standard-output*)
-     format: Output format, one of :text (default), :json, :s-exp
-     
-   Returns:
-     The number of transactions exported"
+(defun escape-html (text)
+  "Basic HTML escaping for text content."
+  (if (stringp text)
+      (cl-ppcre:regex-replace-all "&"
+       (cl-ppcre:regex-replace-all "<"
+        (cl-ppcre:regex-replace-all ">" text ">")
+        "<")
+       "&")
+      (princ-to-string text)))
+
+(defun export-transaction-history (app-state &key (stream *standard-output*) (format :text) (include-changes nil))
+  "Export the transaction history in various formats."
   (check-type app-state application-state)
-  (check-type format (member nil :text :json :s-exp))
-  (let ((history (application-state-transaction-history app-state))
-        (format (or format :text)))
+  (check-type format (member :text :json :s-exp :html)) ; Added :html
+  (let ((history (application-state-transaction-history app-state)))
     (case format
       (:text (print-transaction-history app-state :stream stream))
+      (:html
+       (format stream "<!DOCTYPE html>~%<html><head><title>Transaction History</title>")
+       (format stream "<style>body {font-family: sans-serif;} table {border-collapse: collapse; width: 90%; margin: 20px auto;} th, td {border: 1px solid #ccc; padding: 8px; text-align: left;} tr:nth-child(even){background-color: #f2f2f2;} th {background-color: #4CAF50; color: white;} pre {white-space: pre-wrap; word-wrap: break-word;}</style>")
+       (format stream "</head><body>~%<h2>Transaction History (~D)</h2>~%" (length history))
+       (format stream "<table><thead><tr><th>ID</th><th>Timestamp</th><th>Name</th><th>Description</th><th>Categories</th><th>Changes Count</th>~@[<th>Details</th>~]</tr></thead><tbody>~%"
+               (if include-changes "<th>Details</th>" ""))
+       (loop for tx in history
+             do (format stream "<tr><td>~D</td><td>~A</td><td>~A</td><td>~A</td><td>~{~S~^, ~}</td><td>~D</td>~@[<td><pre>~{~A~%~}</pre></td>~]</tr>~%"
+                        (transaction-id tx)
+                        (format-universal-time (transaction-timestamp tx))
+                        (escape-html (or (transaction-name tx) ""))
+                        (escape-html (or (transaction-description tx) ""))
+                        (transaction-categories tx)
+                        (length (transaction-changes tx))
+                        (when include-changes
+                          (mapcar (lambda (ch) (escape-html (format nil "~S: ~S => ~S" (first ch) (second ch) (third ch))))
+                                  (transaction-changes tx)))))
+       (format stream "</tbody></table></body></html>~%"))
       (:json
        (format stream "{\"transactions\": [~{~A~^, ~}]}~%"
                (loop for tx in history
                      collect (with-output-to-string (s)
-                               (format s "{\"id\": ~D, \"name\": ~S, \"description\": ~S, \"timestamp\": ~D, \"changes\": ~D}"
+                               (format s "{\"id\": ~D, \"name\": ~S, \"description\": ~S, \"timestamp\": ~D, \"categories\": ~S, \"changes_count\": ~D~@[, \"changes\": ~A~]}"
                                        (transaction-id tx)
                                        (transaction-name tx)
                                        (transaction-description tx)
                                        (transaction-timestamp tx)
-                                       (length (transaction-changes tx)))))))
+                                       (transaction-categories tx)
+                                       (length (transaction-changes tx))
+                                       (when include-changes
+                                         (format nil "[~{~A~^, ~}]"
+                                                 (mapcar (lambda (ch)
+                                                           (format nil "{\"key\": ~S, \"old_value\": ~S, \"new_value\": ~S}"
+                                                                   (first ch) (second ch) (third ch)))
+                                                         (transaction-changes tx)))))))))
       (:s-exp
        (format stream "(:transactions~{ ~S~})~%"
                (loop for tx in history
@@ -327,12 +410,30 @@ Example:
                                :name ,(transaction-name tx)
                                :description ,(transaction-description tx)
                                :timestamp ,(transaction-timestamp tx)
-                               :changes ,(length (transaction-changes tx)))))))
+                               :categories ,(transaction-categories tx)
+                               :changes-count ,(length (transaction-changes tx))
+                               ,@(when include-changes `(:changes ,(transaction-changes tx))))))))
     (length history)))
 
 (defun clear-transaction-history (app-state)
-  "Clears the transaction history of the application state."
+  "Clears the transaction history."
   (log-info "Clearing transaction history.")
   (setf (application-state-transaction-history app-state) nil)
   (setf (application-state-undone-history app-state) nil)
-  (setf (application-state-transaction-log app-state) nil))
+  (setf (application-state-transaction-log app-state) nil)))
+
+;; Placeholder for advanced filtering
+(defun filter-transaction-history (app-state &key category time-start time-end name-regex affected-key)
+  "Filters the transaction history based on provided criteria.
+   Returns a new list of transactions. (Placeholder - not fully implemented)"
+  (declare (ignore category time-start time-end name-regex affected-key))
+  (warn "filter-transaction-history is a placeholder and not fully implemented.")
+  (copy-list (get-transaction-history app-state)))
+
+;; Placeholder for diff visualization
+(defun generate-transaction-diff (transaction1 transaction2)
+  "Generates a diff between two transaction states or a transaction and current state.
+   Returns a structured diff representation. (Placeholder - very complex)"
+  (declare (ignore transaction1 transaction2))
+  (warn "generate-transaction-diff is a placeholder and not fully implemented.")
+  nil)
