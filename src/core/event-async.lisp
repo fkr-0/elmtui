@@ -4,9 +4,6 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.core.event-async
   (:use :cl :alexandria)
-  (:import-from :elmtui.core.event-channels
-                #:register-event-handler
-                #:unregister-event-handler)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn #:log-error)
   (:import-from :elmtui.core.event-types
                 #:ui-event
@@ -141,9 +138,10 @@
 ;;; Event Processing System
 ;;;-----------------------------------------------------------------------------
 
-(defun start-event-processing (ui-tree-fn)
+(defun start-event-processing (ui-tree-fn app-state-fn)
   "Start the event processing system.
-   UI-TREE-FN: Function to get the current UI tree."
+   UI-TREE-FN: Function to get the current UI tree.
+   APP-STATE-FN: Function to get the current application state."
   (unless *main-event-channel*
     (initialize-event-channels))
 
@@ -158,7 +156,7 @@
   (setf *event-worker*
         (create-thread
          (lambda ()
-           (event-processing-loop ui-tree-fn))
+           (event-processing-loop ui-tree-fn app-state-fn))
          :name "ELMTUI Event Worker"))
 
   (log-info "Event processing system started")
@@ -189,9 +187,10 @@
   (log-info "Event processing system stopped")
   t)
 
-(defun event-processing-loop (ui-tree-fn)
+(defun event-processing-loop (ui-tree-fn app-state-fn)
   "Main event processing loop. Continuously monitors all channels for events.
-   UI-TREE-FN: Function to get the current UI tree."
+   UI-TREE-FN: Function to get the current UI tree.
+   APP-STATE-FN: Function to get the current application state."
   (log-debug "Starting event processing loop")
 
   (loop while *event-processing-active* do
@@ -204,20 +203,22 @@
                           *command-event-channel*)))
 
       ;; Use select to wait for an event from any channel
-      (let ((result (select :timeout 100 channels )))
+      (let ((result (select channels :timeout 100)))
         (when result
           (destructuring-bind (channel value) (first result)
-            (process-event channel value ui-tree-fn)))))))
+            (process-event channel value ui-tree-fn app-state-fn)))))))
 
-(defun process-event (channel event ui-tree-fn)
+(defun process-event (channel event ui-tree-fn app-state-fn)
   "Process an event received from a channel.
    CHANNEL: The channel from which the event was received.
    EVENT: The event to process.
-   UI-TREE-FN: Function to get the current UI tree."
+   UI-TREE-FN: Function to get the current UI tree.
+   APP-STATE-FN: Function to get the current application state."
   (log-debug "Processing event from channel ~A: ~A" channel event)
 
-  ;; Get the current UI tree
-  (let ((ui-tree (funcall ui-tree-fn)))
+  ;; Get the current UI tree and app state
+  (let ((ui-tree (funcall ui-tree-fn))
+        (app-state (funcall app-state-fn)))
 
     ;; Process based on event type
     (typecase event
@@ -241,7 +242,7 @@
        (let ((real-event (second event))
              (timestamp (third event)))
          (log-debug "Processing delayed event from ~A: ~A" timestamp real-event)
-         (process-event channel real-event ui-tree-fn)))
+         (process-event channel real-event ui-tree-fn app-state-fn)))
 
       ;; Handle focus events
       ((cons (eql :focus))
@@ -406,45 +407,34 @@
    TIMEOUT: Optional timeout in milliseconds.
    Returns a promise that resolves with the event when received, or rejects on timeout."
   (let ((result-promise (make-promise))
-        (timer-id nil)
-        (handler-fn nil)) ; Declare handler-fn here to be in scope for timeout lambda
-
-    ;; Define the handler function
-    (setf handler-fn
-          (lambda (event)
-            (when (and (ui-event-type event) ; Ensure event is not nil
-                       (eq (ui-event-type event) event-type)
-                       (or (null target) (eq (ui-event-target event) target)))
-              ;; Cancel the timeout timer if it exists
-              (when timer-id
-                (cancel-timer timer-id)
-                (setf timer-id nil)) ; Mark timer as handled
-
-              ;; Unregister this handler
-              (unregister-event-handler *main-event-channel* handler-fn)
-
-              ;; Resolve the promise with the event
-              (resolve-promise result-promise event))))
+        (timer-id nil))
 
     ;; Set up timeout if specified
     (when timeout
       (setf timer-id
-            (schedule-timer ;; Use schedule-timer for a callback
+            (schedule-event
              (lambda ()
-               ;; This lambda is called when the timer expires.
-               ;; If timer-id is still set, it means the event wasn't caught in time.
-               (when timer-id
-                 (unregister-event-handler *main-event-channel* handler-fn)
-                 (reject-promise result-promise :timeout)))
+               (reject-promise result-promise :timeout))
              timeout)))
 
-    ;; Register the handler
-    ;; Assuming *main-event-channel* is compatible or there's a mechanism
-    ;; in register-event-handler to deal with it.
-    (register-event-handler *main-event-channel* handler-fn)
+    ;; Create a handler for the event
+    (let ((handler-fn
+            (lambda (event)
+              (when (and (eq (ui-event-type event) event-type)
+                         (or (null target) (eq (ui-event-target event) target)))
+                ;; Cancel the timeout timer if it exists
+                (when timer-id
+                  (cancel-timer timer-id))
 
-    ;; Return the promise
-    result-promise))
+                ;; Resolve the promise with the event
+                (resolve-promise result-promise event)))))
+
+      ;; Register the handler
+      ;; (register-event-handler handler-fn)
+
+
+      ;; Return the promise
+      result-promise)))
 
 (defun wait-for-event-async (event-type &key target timeout)
   "Asynchronously wait for an event of the specified type.
@@ -535,46 +525,43 @@
    Returns a new function that will execute at most once per interval."
   (let ((last-execution 0)
         (queued nil)
-        (result-promise nil)
-        (mutex (bordeaux-threads:make-lock "throttle-lock")))
+        (result-promise nil))
     (lambda (&rest args)
-      (bordeaux-threads:with-lock-held (mutex)
-        (let ((now (get-internal-real-time))
-              (ms-per-internal-time-unit (/ 1000 internal-time-units-per-second)))
+      (let ((now (get-internal-real-time))
+            (ms-per-internal-time-unit (/ 1000 internal-time-units-per-second)))
 
-          ;; Calculate time since last execution in milliseconds
-          (let ((time-since-last (* (- now last-execution) ms-per-internal-time-unit)))
+        ;; Calculate time since last execution in milliseconds
+        (let ((time-since-last (* (- now last-execution) ms-per-internal-time-unit)))
 
-            ;; If we're beyond the interval, execute immediately
-            (if (>= time-since-last interval)
-                (progn
-                  (setf last-execution now)
-                  (let ((result (apply function args)))
-                    (when result-promise
-                      (resolve-promise result-promise result))
-                    (setf result-promise (make-promise))
-                    (resolve-promise result-promise result)
-                    result-promise))
+          ;; If we're beyond the interval, execute immediately
+          (if (>= time-since-last interval)
+              (progn
+                (setf last-execution now)
+                (let ((result (apply function args)))
+                  (when result-promise
+                    (resolve-promise result-promise result))
+                  (setf result-promise (make-promise))
+                  (resolve-promise result-promise result)
+                  result-promise))
 
-                ;; Otherwise, queue for later execution
-                (progn
-                  (setf queued args)
-                  (unless result-promise
-                    (setf result-promise (make-promise))
+              ;; Otherwise, queue for later execution
+              (progn
+                (setf queued args)
+                (unless result-promise
+                  (setf result-promise (make-promise))
 
-                    ;; Schedule execution at the next interval
-                    (let ((wait-time (- interval time-since-last)))
-                      (schedule-event
-                       (lambda ()
-                         (bordeaux-threads:with-lock-held (mutex)
-                           (when queued
-                             (setf last-execution (get-internal-real-time))
-                             (let ((result (apply function queued)))
-                               (resolve-promise result-promise result)
-                               (setf queued nil)
-                               (setf result-promise nil)))))
-                       wait-time)))
-                  result-promise))))))))
+                  ;; Schedule execution at the next interval
+                  (let ((wait-time (- interval time-since-last)))
+                    (schedule-event
+                     (lambda ()
+                       (when queued
+                         (setf last-execution (get-internal-real-time))
+                         (let ((result (apply function queued)))
+                           (resolve-promise result-promise result)
+                           (setf queued nil)
+                           (setf result-promise nil))))
+                     wait-time)))
+                result-promise)))))))
 
 (defun delay-event (event delay-ms)
   "Create a delayed version of an event.

@@ -5,9 +5,12 @@
 (uiop:define-package :elmtui.core.keymap.registry
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.core.keymap
-   :keymap :make-keymap
-   :normalized-key :normalized-key=
-   :lookup-keymap :create-keymap-from-definitions)
+   :keymap
+                :make-keymap
+   :normalized-key
+                :normalized-key=
+   :lookup-keymap
+                :create-keymap-from-definitions)
   (:export
    ;; Registry management
    #:find-context

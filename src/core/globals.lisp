@@ -7,6 +7,7 @@
   (:export :*app-sender* :*app-state*
            :*event-loop* :*subscribers*
            :*debug-layout-outlines* ; Export the new debug flag
+           :*main-event-channel*    ; Export the main event channel
            ))
 (in-package :elmtui.core.globals)
 
@@ -21,3 +22,10 @@
 
 (defvar *debug-layout-outlines* nil
   "When T, enables rendering of layout box outlines (margin, border, padding, content) for debugging.")
+
+(defvar *main-event-channel* nil
+  "Central event channel for all TEA-cycle-triggering events and messages.
+   This is an lparallel:channel that serves as a single, serialized entry point
+   for all events that should trigger the update function of the application.
+   All events must be submitted to this channel to ensure proper TEA compliance
+   with sequential updates to application state.")

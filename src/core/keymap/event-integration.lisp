@@ -10,7 +10,9 @@
    :lookup-key-binding
                 :current-context
    :collect-all-defined-sequences)
-
+  (:import-from :elmtui.core.focus ; Changed from elmtui.core.keymap.focus-integration
+   #:handle-key-event
+   #:handle-key-binding)
   (:import-from :elmtui.core.keymap.sequence
    :make-sequence-state
                 :update-sequence-state
@@ -21,7 +23,7 @@
   (:import-from :elmtui.core.event-async
    :*key-event-channel*
                 :dispatch-event-async)
-  (:import-from :elmtui.core.topic-registry #:subscribe) ; Added for setup-keyboard-event-handler
+  (:import-from :elmtui.core.loop #:subscribe) ; Added for setup-keyboard-event-handler
   ;; :normalize-event was removed as it's no longer used here.
   ;; Canonical event structs are expected.
   ;; (:import-from :elmtui.core.events :make-key-event) ; This import seems unused or incorrect, make-key-event-from-normalized uses elmtui.core.event-types

@@ -14,6 +14,7 @@
            :model-slot-names :model-slot-definition :model-slot-type
            :model-slot-initform :model-slot-validator :model-slot-observe?
            :model-schema-info
+           :with-model-access ; Added export
            ;; Schema structs and accessors
            :model-schema :model-schema-name :model-schema-slots :model-schema-docstring
            :slot-definition :slot-definition-name :slot-definition-type
@@ -177,6 +178,24 @@
 
        ;; expose the model symbol
        ',name)))
+
+(defmacro with-model-access ((model-var-symbol) &body body)
+  "Macro to enforce proper model access patterns.
+   Warns when direct state-ref is used on the specified model variable.
+   Usage: (with-model-access (my-model-instance) ... (state-ref my-model-instance :foo) ...)"
+  `(locally
+     (declare (notinline state-ref)) ; Prevent inlining of the imported state-ref we are wrapping
+     (macrolet ((state-ref (object &rest args) ; This redefines the local meaning of 'state-ref'
+                  ;; 'object' is the first form passed to state-ref in the body.
+                  ;; 'model-var-symbol' is the symbol passed to with-model-access.
+                  (if (eq object ',model-var-symbol) ; Check if the form 'object' is literally the symbol 'model-var-symbol'
+                      (progn
+                        (warn "Direct state-ref usage on model object '~A' detected. Consider using model-specific accessors or get-slot/set-slot instead." ',model-var-symbol)
+                        ;; Call the original state-ref from its package
+                        `(elmtui.statelib.state:state-ref ,object ,@args))
+                      ;; If 'object' is not the model symbol we are watching, call original state-ref
+                      `(elmtui.statelib.state:state-ref ,object ,@args))))
+       ,@body)))
 
 ;; (defmacro defmodel (name (&key docstring (observe-changes-default-callback 'default-model-observer-callback))
 ;;                     &rest slot-specs)
