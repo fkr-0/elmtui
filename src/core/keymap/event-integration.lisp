@@ -10,9 +10,8 @@
    :lookup-key-binding
                 :current-context
    :collect-all-defined-sequences)
-  (:import-from :elmtui.core.focus ; Changed from elmtui.core.keymap.focus-integration
-   #:handle-key-event
-   #:handle-key-binding)
+  ;; (:import-from :elmtui.core.focus ; Changed from elmtui.core.keymap.focus-integration
+  ;;               )
   (:import-from :elmtui.core.keymap.sequence
    :make-sequence-state
                 :update-sequence-state
@@ -23,7 +22,8 @@
   (:import-from :elmtui.core.event-async
    :*key-event-channel*
                 :dispatch-event-async)
-  (:import-from :elmtui.core.loop #:subscribe) ; Added for setup-keyboard-event-handler
+  ;; (:import-from :elmtui.core.loop #:subscribe)
+                                        ; Added for setup-keyboard-event-handler
   ;; :normalize-event was removed as it's no longer used here.
   ;; Canonical event structs are expected.
   ;; (:import-from :elmtui.core.events :make-key-event) ; This import seems unused or incorrect, make-key-event-from-normalized uses elmtui.core.event-types
@@ -31,7 +31,7 @@
    ;; Event processing
    #:process-keyboard-event
    #:setup-keyboard-event-handler
-   
+
    ;; Key sequence tracking
    #:handle-key-event
    #:handle-key-binding
@@ -39,6 +39,9 @@
    #:handle-key-sequence))
 
 (in-package :elmtui.core.keymap.event-integration)
+
+(defgeneric subscribe (event-type handler) ;&key app-state)
+  (:documentation "Subscribe to an event type with a handler."))
 (defgeneric handle-key-binding (binding &key app-state)
   (:documentation "Execute the action associated with a key binding."))
 
@@ -63,14 +66,14 @@
    HANDLE-SEQUENCE: Whether to handle key sequences (default: T).
    Returns T if the event was handled, NIL otherwise."
   (log-debug "Processing keyboard event: ~A" key-event)
-  
+
   ;; Assuming key-event is already a canonical event struct from elmtui.core.event-types
   (let* ((normalized-key (key-event->normalized-key key-event)))
     (when normalized-key
       (if (and handle-sequence (not (null handle-sequence)))
           ;; Try to handle as part of a key sequence
           (handle-key-sequence normalized-key focus-manager :app-state app-state)
-          
+
           ;; Handle as a single key
           ;; handle-key-event (from focus/manager) expects a canonical key-event struct
           (handle-key-event key-event focus-manager :app-state app-state)))))
@@ -79,16 +82,16 @@
   "Handle a key as part of a potential key sequence.
    Returns T if handled, NIL otherwise."
   ;; Update the sequence state with the new key
-  (let* ((new-sequence (update-sequence-state 
-                        *key-sequence-state* 
+  (let* ((new-sequence (update-sequence-state
+                        *key-sequence-state*
                         normalized-key
                         :timeout-fn (lambda (seq)
-                                      (log-debug "Key sequence timeout: ~A" 
+                                      (log-debug "Key sequence timeout: ~A"
                                                  (sequence->string seq))
                                       (reset-sequence-state *key-sequence-state*))))
          ;; Get all available sequences from all active keymaps
          (available-sequences (collect-all-defined-sequences (current-context))))
-    
+
     ;; Check if it's a complete sequence in any active keymap
     (let ((binding (lookup-key-binding new-sequence)))
       (cond
@@ -98,18 +101,18 @@
          (handle-key-binding binding :app-state app-state)
          (reset-sequence-state *key-sequence-state*)
          t)
-        
+
         ;; Not a complete sequence, check if it might be partial
         ((key-sequence-partial-p new-sequence available-sequences)
          ;; Partial sequence, wait for more keys
          (log-debug "Partial key sequence detected: ~A" (sequence->string new-sequence))
          ;; We're handling this as part of a sequence
          t)
-        
+
         ;; Not a valid sequence, reset and try handling as a single key
         (t
          (reset-sequence-state *key-sequence-state*)
-         (handle-key-event 
+         (handle-key-event
           ;; Convert back to event structure for handle-key-event
           (make-key-event-from-normalized normalized-key)
           focus-manager
@@ -136,15 +139,15 @@
   "Set up a handler for keyboard events by subscribing to :key-event
    from elmtui.core.loop. The handler will call process-keyboard-event."
   (log-info "Setting up keyboard event handler for focus-manager: ~A and app-state: ~A" focus-manager app-state)
-  
+
   (let ((handler-token
           (subscribe :key-event
                      (lambda (event)
                        (log-debug "Keymap event integration received event: ~S" event)
                        ;; Ensure it's a key-event struct before processing
                        (if (typep event 'elmtui.core.event-types:key-event)
-                           (process-keyboard-event event focus-manager 
-                                                   :app-state app-state 
+                           (process-keyboard-event event focus-manager
+                                                   :app-state app-state
                                                    :handle-sequence t) ; Default to handling sequences
                            (log-warn "Keymap event integration received non-key-event: ~S" event))))))
     (log-info "Keyboard event handler subscribed with token: ~A" handler-token)

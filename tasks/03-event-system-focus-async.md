@@ -30,13 +30,17 @@ This file lists pending tasks for the ELMTUI event system, focus management, and
 
 ## Application Lifecycle Message Bus
 
--   **[x] Implement hierarchical topics for the application lifecycle message bus.**
+    -   **[x] Implement hierarchical topics for the application lifecycle message bus.**
     -   **Solution:**
-        -   `elmtui.core.topic-registry` and `elmtui.core.message-bus` (if distinct, or if `topic-registry` serves this role) were confirmed/enhanced to support hierarchical topics like `app/lifecycle/start`, `app/lifecycle/shutdown/begin`, `app/lifecycle/shutdown/complete`. Wildcard subscriptions (e.g., `app/lifecycle/*`) are supported.
-        -   `elmtui.runtime:run-application` now publishes `(elmtui.core.loop:publish 'app/lifecycle/start app-state)` at the beginning and `(elmtui.core.loop:publish 'app/lifecycle/shutdown/begin app-state)` before cleanup, and `(elmtui.core.loop:publish 'app/lifecycle/shutdown/complete app-state)` at the very end.
-        -   Modules can subscribe to these topics to perform initialization or cleanup tasks.
+        -   `elmtui.core.topic-registry` was confirmed/enhanced to support hierarchical topics like `app/lifecycle/start`, `app/lifecycle/shutdown/begin`, `app/lifecycle/shutdown/complete`. Wildcard subscriptions (e.g., `app/lifecycle/*`) are supported.
+        -   `elmtui.runtime:run-application` now sends lifecycle events to the main event loop using `elmtui.core.loop:publish`. For example:
+            -   At startup: `(elmtui.core.loop:publish (list 'app/lifecycle/start initial-app-state))`
+            -   Before cleanup: `(elmtui.core.loop:publish (list 'app/lifecycle/shutdown/begin current-app-state))`
+            -   At the end: `(elmtui.core.loop:publish (list 'app/lifecycle/shutdown/complete final-app-state))`
+        -   These events are processed by the main event loop consumer (`app-update-handler` in `src/platform/driver.lisp`). The `app-update-handler` can then use `elmtui.core.topic-registry:dispatch-topic` to route these to interested modules. For example, upon receiving `(list 'app/lifecycle/start initial-app-state)`, it might call `(elmtui.core.topic-registry:dispatch-topic 'app/lifecycle/start initial-app-state initial-app-state)`.
+        -   Modules can subscribe to these topics (e.g., `'app/lifecycle/start`) via `elmtui.core.topic-registry:subscribe` to perform initialization or cleanup tasks. Handler functions for these subscriptions would typically have a signature like `(lambda (payload app-state-context) ...)`.
     -   **Affected Files:**
-        -   `src/core/message-bus.lisp`
+        -   `src/core/topic-registry.lisp`
         -   `src/core/topic-registry.lisp`
         -   `src/core/topics.lisp`
         -   `src/runtime.lisp`
@@ -88,18 +92,24 @@ This file lists pending tasks for the ELMTUI event system, focus management, and
 
 ## Event System Consolidation
 
--   **[x] Complete streamlining of Event Dispatching: Transition to a Central Channel-Based Event Core (addresses "Strategic Review Needed" and "Not Met" parts from `docs/implementation.md` section 9).**
-    -   **Goal**: Ensure all events and messages destined for the main application `update-fn` are processed sequentially by a single consumer reading from a central, dedicated channel. This will enforce stricter TEA compliance by preventing concurrent `update-fn` invocations and simplifying the main event processing flow.
+    -   **[x] Complete streamlining of Event Dispatching: Transition to a Central Channel-Based Event Core (addresses "Strategic Review Needed" and "Not Met" parts from `docs/implementation.md` section 9).**
+    -   **Goal**: Ensure all events and messages destined for the main application `update-fn` are processed sequentially by a single consumer reading from a central, dedicated channel (`*main-event-channel*`). This will enforce stricter TEA compliance by preventing concurrent `update-fn` invocations and simplifying the main event processing flow.
     -   **Core Changes & Design:**
         1.  **Central Event Channel**:
-            -   Introduced `elmtui.core.globals:*main-event-channel*` (an `lparallel:channel`) in `src/core/globals.lisp`.
+            -   `elmtui.core.globals:*main-event-channel*` (a `cleve-elm.channel:channel`) is used.
         2.  **Event Production (Sending to the Channel)**:
-            -   `elmtui.core.loop:enqueue-event` now calls `lparallel:submit-task *main-event-channel* event-data`.
-            -   `elmtui.core.loop:publish` (and `elmtui.core.globals:*app-sender*`) now also submits to `*main-event-channel*` for TEA messages. A separate `publish-sync-internal` was added for rare cases needing synchronous non-TEA side effects.
-            -   Async task completions and OS signal handlers updated to send messages to `*main-event-channel*`.
-            -   `src/platform/input.lisp` sends normalized input events to `*main-event-channel*`.
+            -   `elmtui.core.loop:enqueue-event (event)` sends the (potentially timestamped) `event` to `*main-event-channel*`.
+            -   `elmtui.core.loop:publish (event)` (which is `elmtui.core.globals:*app-sender*`) wraps the `event` if necessary (e.g., as `(:app-message event-payload)` or passes it directly if it's a command like `(:async ...)`), then calls `enqueue-event`. This ensures all TEA messages go through the channel.
+            -   A separate `publish-sync-internal (event)` exists for rare cases needing synchronous non-TEA side effects (e.g., for legacy subscribers not part of the main TEA update cycle).
+            -   Async task completions and OS signal handlers are updated to send messages to `*main-event-channel*` (typically via `elmtui.core.loop:publish`).
+            -   `src/platform/input.lisp` sends normalized input events, which are eventually published to `*main-event-channel*`.
         3.  **Event Consumption (Main Application Loop)**:
-            -   `src/platform/driver.lisp`'s `app-update-handler` now processes events from the dedicated consumer thread. This thread loops, calling `lparallel:receive-result *main-event-channel*` and then passes the received message to `app-update-handler`.
+            -   The `event-consumer-loop` in `src/core/loop.lisp` reads from `*main-event-channel*`.
+            -   `process-event (event-wrapper)` in `src/core/loop.lisp` handles these events:
+                -   If `event` is `(:app-message <actual-message>)`, it calls `elmtui.platform.driver:app-update-handler actual-message elmtui.core.globals:*app-state*`.
+                -   If `event` is an async command `(:async ...)` etc., it calls `elmtui.state.update:handle-async-command event elmtui.core.globals:*app-state*`.
+                -   Other events might be dispatched via `publish-sync-internal` to legacy subscribers.
+            -   The `app-update-handler` in `src/platform/driver.lisp` is thus called sequentially with messages from the channel.
         4.  **Lifecycle Management**:
             -   `elmtui.core.loop:start-loop` initializes the channel and starts the consumer thread.
             -   `elmtui.core.loop:elm-stop-loop` sends a special sentinel message to `*main-event-channel*` and joins the consumer thread.
@@ -278,14 +288,16 @@ This section details how key implementations from the completed tasks integrate 
 
 -   **`elmtui.runtime:run-application` (function, modified)**
     -   **Processing**:
-        -   Before main loop: `(elmtui.core.loop:publish 'app/lifecycle/start app-state)` (now sends to `*main-event-channel*`).
-        -   After main loop exits, before cleanup: `(elmtui.core.loop:publish 'app/lifecycle/shutdown/begin app-state)`.
-        -   After all cleanup: `(elmtui.core.loop:publish 'app/lifecycle/shutdown/complete app-state)`.
-    -   **Integration**: These published messages are processed by the main event loop consumer, which then uses `elmtui.core.topic-registry:dispatch-topic` (or similar) to invoke subscribed handlers.
+        -   Before main loop: `(elmtui.core.loop:publish (list 'app/lifecycle/start initial-app-state))`
+        -   After main loop exits, before cleanup: `(elmtui.core.loop:publish (list 'app/lifecycle/shutdown/begin current-app-state))`
+        -   After all cleanup: `(elmtui.core.loop:publish (list 'app/lifecycle/shutdown/complete final-app-state))`
+    -   **Integration**: These published events are processed by the `event-consumer-loop` in `src/core/loop.lisp`. The `process-event` function unwraps them (if they were wrapped as `(:app-message ...)` by `publish`) and passes the payload (e.g., `(list 'app/lifecycle/start initial-app-state)`) to `elmtui.platform.driver:app-update-handler`. The `app-update-handler` can then use `elmtui.core.topic-registry:dispatch-topic` (e.g., `(dispatch-topic 'app/lifecycle/start initial-app-state initial-app-state)`) to invoke handlers subscribed via the topic registry.
 
 -   **`elmtui.core.topic-registry:subscribe` (function, used for lifecycle)**
-    -   **Example Usage**: `(subscribe 'my-module 'app/lifecycle/start #'my-module-init-fn)`
-    -   **`my-module-init-fn` Signature**: `(lambda (topic payload app-state) ...)` where `topic` is `'app/lifecycle/start`, `payload` is `app-state`.
+    -   **Example Usage**: `(elmtui.core.topic-registry:subscribe 'app/lifecycle/start #'my-module-init-fn)`
+    -   **`my-module-init-fn` Signature**: `(lambda (payload app-state-context) ...)`
+        -   `payload`: The message payload associated with the topic (e.g., for `'app/lifecycle/start`, this would be `initial-app-state` if dispatched as shown above).
+        -   `app-state-context`: The current application state passed by `dispatch-topic` as the optional third argument.
 
 #### 3. Async Infrastructure (Topic-Based Channel Messaging, Promise Enhancements)
 
@@ -327,31 +339,44 @@ This section details how key implementations from the completed tasks integrate 
 This describes the *intended* architecture for the channel-based event core, as the implementation is pending.
 
 -   **`elmtui.core.globals:*main-event-channel*` (variable - *to be introduced*)**
-    -   **Type**: `lparallel:channel`
+    -   **Type**: `cleve-elm.channel:channel` (as per `src/core/loop.lisp` and `src/core/globals.lisp`)
     -   **Purpose**: Centralized, buffered queue for all TEA-cycle-triggering events/messages.
 
--   **`elmtui.core.loop:enqueue-event` (function - *to be refactored*)**
-    -   **Target Signature**: `(enqueue-event (event-data T)) -> unspecified`
-    -   **Target Processing**: `(lparallel:submit-task *main-event-channel* (lambda () event-data))` (or `lparallel:try-send-object` if non-blocking desired with error handling).
-    -   **Target Integration**: To be called by input sources (`platform/input.lisp`), async task completions, etc.
+-   **`elmtui.core.loop:enqueue-event` (function - *existing*)**
+    -   **Signature**: `(enqueue-event (event T)) -> unspecified`
+    -   **Processing**: Wraps `event` with a timestamp (e.g., `(:timestamped-event :received-at ... . ,event)`) and sends it to `*main-event-channel*` using `cleve-elm.channel:->`.
+    -   **Integration**: Called by `elmtui.core.loop:publish`, and potentially by other internal event sources that need to queue raw events.
 
--   **`elmtui.core.loop:publish` (function - *to be refactored for TEA messages*)**
-    -   **Target Signature**: `(publish (message T)) -> unspecified` (currently `(publish topic payload &optional app-state)`)
-    -   **Target Processing**: `(enqueue-event message)` - will send the message to `*main-event-channel*`.
-    -   **Target Integration**: `elmtui.core.globals:*app-sender*` will be this refactored `publish`.
+-   **`elmtui.core.loop:publish` (function - *existing, for TEA messages*)**
+    -   **Signature**: `(publish (event T)) -> unspecified`
+    -   **Processing**:
+        -   If `event` is already `(:app-message ...)` or a command like `(:async ...)` it calls `(enqueue-event event)`.
+        -   Otherwise, it wraps `event` as `(list :app-message event)` and then calls `(enqueue-event (list :app-message event))`.
+    -   **Integration**: `elmtui.core.globals:*app-sender*` is set to this `publish` function. This is the primary way application logic should send messages/commands into the TEA cycle.
 
--   **`src/platform/driver.lisp` (main loop consumer thread - *to be implemented*)**
-    -   **Target Logic**:
+-   **`src/core/loop.lisp` (main event consumer thread - *existing as `event-consumer-loop`*)**
+    -   **Logic**:
         ```lisp
-        (bt:make-thread
-          (lambda ()
-            (loop for message = (lparallel:receive-result *main-event-channel*) ; Assuming *main-event-channel* is defined
-                  until (eq message :shutdown-loop) ; Assuming :shutdown-loop is the sentinel
-                  do (handler-case (app-update-handler message app-state) ; app-state needs to be accessible
-                       (error (c) (log:error "Error in event loop: ~A" c))))))
+        ;; Simplified from src/core/loop.lisp
+        (defun event-consumer-loop ()
+          (loop
+            (when *shutdown-requested* (return))
+            (let ((event-wrapper (cleve-elm.channel:<- *main-event-channel*))) ; Blocking receive
+              (when event-wrapper
+                (cond ((eq event-wrapper :shutdown-loop) (return))
+                      (t (process-event event-wrapper)))))))
+
+        (defun process-event (event-wrapper)
+          ;; ... extracts event from event-wrapper ...
+          (typecase event
+            ((cons (eql :app-message) *) ; Matches (:app-message <actual-message>)
+             (elmtui.platform.driver:app-update-handler (second event) elmtui.core.globals:*app-state*))
+            ((cons (member :async :async-task :cmd-async :recurring-task) *)
+             (elmtui.state.update:handle-async-command event elmtui.core.globals:*app-state*))
+            (t (publish-sync-internal event)))) ; For legacy/other subscribers
         ```
-    -   **`app-update-handler` Signature (existing, but its caller changes)**: `(app-update-handler (message T) (app-state elmtui.state.model:application-state)) -> unspecified`
-        -   Internally calls keymap processing, then application's `:update-fn`, then `:view-fn`, styling, layout, rendering.
+    -   **`app-update-handler` Signature (called by `process-event`)**: `(app-update-handler (message T) (app-state elmtui.state.model:application-state)) -> unspecified`
+        -   Internally, this handler (in `src/platform/driver.lisp`) typically calls keymap processing, then the application's user-defined `:update-fn`, then `:view-fn`, styling, layout, and rendering.
 
 #### 5. Event Throttling and Debouncing
 
