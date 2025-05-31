@@ -16,6 +16,8 @@
                 #:mouse-event-p)
   (:import-from :elmtui.core.event-propagation
                 #:dispatch-event)
+  (:import-from :elmtui.core.event-channels
+                #:register-event-handler)
   (:import-from :cleve-elm.channel
    :make-channel
                 :make-filtered-channel
@@ -219,6 +221,7 @@
   ;; Get the current UI tree and app state
   (let ((ui-tree (funcall ui-tree-fn))
         (app-state (funcall app-state-fn)))
+    (declare (ignore app-state)) ; app-state might be needed for more complex processing
 
     ;; Process based on event type
     (typecase event
@@ -400,11 +403,12 @@
 ;;; Promise-Based Event Utilities
 ;;;-----------------------------------------------------------------------------
 
-(defun event-promise (event-type &key target timeout)
+(defun event-promise (event-type &key target timeout (channel *ui-event-channel*))
   "Creates a promise that resolves when an event of the specified type is received.
    EVENT-TYPE: Type of event to wait for.
    TARGET: Optional target to filter events.
    TIMEOUT: Optional timeout in milliseconds.
+   CHANNEL: The channel to listen for events on (default is *ui-event-channel*)
    Returns a promise that resolves with the event when received, or rejects on timeout."
   (let ((result-promise (make-promise))
         (timer-id nil))
@@ -430,7 +434,7 @@
                 (resolve-promise result-promise event)))))
 
       ;; Register the handler
-      ;; (register-event-handler handler-fn)
+      (register-event-handler channel handler-fn )
 
 
       ;; Return the promise
