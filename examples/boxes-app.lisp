@@ -83,7 +83,7 @@
     (cond
       ;; Handle scroll events
       ((and (listp message) (eq (first message) :scroll))
-       (let* ((current-offset (or (getf app-state :scroll-offset) 0))
+       (let* ((current-offset (or (state-ref app-state :scroll-offset) 0))
               (direction (getf (rest message) :direction))
               (amount (getf (rest message) :amount 1))
               (new-offset (if (eq direction :up)

@@ -88,7 +88,7 @@
                              (:file "topic-registry")
                              (:file "event-types") ; Event type definitions
                              (:file "events")
-                             ;;(:file "event-compat") ; Event compatibility layer
+                             (:file "event-compat") ; Event compatibility layer
                              (:file "event-propagation") ; Event propagation system
                              (:file "event-async") ; Async event handling
                              (:file "base-keymap")

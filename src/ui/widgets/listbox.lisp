@@ -72,10 +72,10 @@
 ;;; Init
 ;;;---------------------------------------------------------------
 (defun init-listbox (id &key
-                             (items nil)
-                             (selected-index nil)
-                             (height 10)
-                             (on-select nil))
+                          (items nil)
+                          (selected-index nil)
+                          (height 10)
+                          (on-select nil))
   "Initializes a new listbox model.
    Returns (values listbox-model initial-command)."
   (values (%make-listbox-model :id id
@@ -196,9 +196,9 @@
              (selected-item (when selected-idx (nth selected-idx (listbox-model-items new-model))))
              (on-select-msg (listbox-model-on-select new-model)))
         (push (cmd-async #'send-message
-                         (if (listp on-select-msg)
-                             (append on-select-msg (list :index selected-idx :item selected-item))
-                             on-select-msg))
+                         :args (if (listp on-select-msg)
+                                   (append on-select-msg (list :index selected-idx :item selected-item))
+                                   on-select-msg))
               commands)))
 
     (values new-model commands)))
@@ -207,17 +207,17 @@
 ;;; View (STANDARDIZED FORMAT)
 ;;;---------------------------------------------------------------
 (defwidget-view view-listbox (app-state
-                                 :model-var model
-                                 :widget-id-var widget-id
-                                 :add-args ( items
-                                             height
-                                             selected-index
-                                             on-select
-                                             empty-text
-                                             tooltip aria-label
-                                             class width)
-                                 :documentation
-                                 "Creates a UI representation of a listbox.
+                              :model-var model
+                              :widget-id-var widget-id
+                              :add-args ( items
+                                          height
+                                          selected-index
+                                          on-select
+                                          empty-text
+                                          tooltip aria-label
+                                          class width)
+                              :documentation
+                              "Creates a UI representation of a listbox.
    APP-STATE: The application state.
    WIDGET-ID: The unique ID for this listbox (required).
    ITEMS: List of items to display. Each item can be a string or a plist with :label.

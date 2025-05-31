@@ -16,24 +16,24 @@
                 #:topic-subscription-pattern
                 #:topic-subscription-handler
                 #:topic-subscription-priority)
-  (:export 
+  (:export
    ;; Subscription management
    #:subscribe
    #:subscribe-if
    #:unsubscribe
-   #:publish
+   #:publish-to-topic
    #:publish-to-channel
-   
+
    ;; Channel-based topic subscription
    #:subscribe-to-topic-on-channel
    #:unsubscribe-from-channel
    #:get-channel-subscriptions
-   
+
    ;; Subscription filtering
    #:find-subscriptions-for-topic
    #:find-handlers-for-topic
    #:dispatch-topic
-   
+
    ;; Registry management
    #:clear-registry
    #:list-subscriptions
@@ -65,31 +65,31 @@
   "Subscribe to a topic pattern with the given handler.
    Returns a subscription token that can be used for unsubscribing."
   (log-debug "Subscribing to pattern: ~A with priority: ~A" pattern priority)
-  (let* ((subscription (make-topic-subscription 
-                        :pattern pattern 
+  (let* ((subscription (make-topic-subscription
+                        :pattern pattern
                         :handler handler
                         :priority priority))
          (id (generate-subscription-id))
          (token (cons id subscription)))
-    
+
     ;; Store the subscription
     (push token (gethash pattern *topic-subscriptions* nil))
-    
+
     (log-debug "Created subscription with ID: ~A" id)
     ;; Return the token for later unsubscription
     token))
 
 (defun subscribe-if (pattern predicate-fn handler &key (priority :normal))
-  "Subscribe to a topic pattern with handler, but only invoke handler 
+  "Subscribe to a topic pattern with handler, but only invoke handler
    if the predicate function returns true when passed the message.
    Returns a subscription token that can be used for unsubscribing."
   (log-debug "Subscribing conditionally to pattern: ~A" pattern)
-  
+
   (let ((filtered-handler
-         (lambda (message)
-           (when (funcall predicate-fn message)
-             (funcall handler message)))))
-    
+          (lambda (message)
+            (when (funcall predicate-fn message)
+              (funcall handler message)))))
+
     (subscribe pattern filtered-handler :priority priority)))
 
 (defun unsubscribe (token)
@@ -98,9 +98,9 @@
     (let* ((pattern (topic-subscription-pattern subscription))
            (current-subs (gethash pattern *topic-subscriptions*))
            (updated-subs (remove id current-subs :key #'car)))
-      
+
       (log-debug "Unsubscribing ID: ~A from pattern: ~A" id pattern)
-      
+
       (if updated-subs
           (setf (gethash pattern *topic-subscriptions*) updated-subs)
           (remhash pattern *topic-subscriptions*))
@@ -114,7 +114,7 @@
                (when (topic-pattern-match-p pattern topic-name)
                  (setf result (append result subscriptions))))
              *topic-subscriptions*)
-    
+
     ;; Sort by priority
     (sort result #'subscription-priority-compare)
     result))
@@ -134,21 +134,21 @@
   (mapcar (lambda (sub) (topic-subscription-handler (cdr sub)))
           (find-subscriptions-for-topic topic-name)))
 
-(defun publish (topic-name message)
+(defun publish-to-topic (topic-name message)
   "Publish a message to a topic, invoking all matching subscription handlers."
   (log-debug "Publishing to topic: ~A" topic-name)
   (let ((handlers (find-handlers-for-topic topic-name))
         (results nil))
-    
-    (log-debug "Found ~A matching handlers" (length handlers))
-    
+
+    (log-debug "Found ~A matching handlers for topic ~A" (length handlers) topic-name)
+
     ;; Call each handler with the message
     (dolist (handler handlers)
       (handler-case
           (push (funcall handler message) results)
         (error (e)
           (log-warn "Error in topic handler for ~A: ~A" topic-name e))))
-    
+
     ;; Return results in order of handler execution (reverse of how we collected them)
     (nreverse results)))
 
@@ -158,7 +158,7 @@
   (log-debug "Dispatching to topic: ~A" topic)
   (let ((handlers (find-handlers-for-topic topic))
         (results nil))
-    
+
     ;; Call each handler with the message and optional app-state
     (dolist (handler handlers)
       (handler-case
@@ -167,7 +167,7 @@
               (push (funcall handler message) results))
         (error (e)
           (log-warn "Error in topic dispatch for ~A: ~A" topic e))))
-    
+
     (nreverse results)))
 
 ;;;-----------------------------------------------------------------------------
@@ -187,21 +187,19 @@
    Messages published to this topic on this channel will invoke the handler.
    Returns a subscription object that can be used for unsubscribing."
   (log-debug "Subscribing to topic ~A on channel ~A" topic channel-id)
-  
+
   (let* ((id (generate-subscription-id))
-         (subscription (make-channel-subscription 
-                       :id id
-                       :topic topic
-                       :channel-id channel-id
-                       :handler handler-fn)))
-    
-    ;; Store by composite key (topic . channel-id)
-    (let* ((key (cons topic channel-id))
-           (existing (gethash key *channel-subscriptions*)))
-      (push subscription (or existing nil))
-      (setf (gethash key *channel-subscriptions*) 
-            (gethash key *channel-subscriptions*)))
-    
+         (subscription (make-channel-subscription
+                        :id id
+                        :topic topic
+                        :channel-id channel-id
+                        :handler handler-fn))
+         ;; Store by composite key (topic . channel-id)
+         (key (cons topic channel-id))
+         (existing (gethash key *channel-subscriptions*)))
+    (push subscription existing)
+    (setf (gethash key *channel-subscriptions*) existing)
+
     ;; Return the subscription object
     subscription))
 
@@ -212,36 +210,36 @@
          (key (cons topic channel-id))
          (existing (gethash key *channel-subscriptions*))
          (subscription-id (channel-subscription-id subscription)))
-    
+
     (setf (gethash key *channel-subscriptions*)
-          (remove subscription-id existing 
+          (remove subscription-id existing
                   :key #'channel-subscription-id
                   :test #'=))
-    
+
     (when (null (gethash key *channel-subscriptions*))
       (remhash key *channel-subscriptions*))
-    
+
     t))
 
 (defun publish-to-channel (topic payload channel-id)
   "Publish a message to a topic on a specific channel.
    Only subscribers to this topic on this channel will receive it."
   (log-debug "Publishing to topic ~A on channel ~A" topic channel-id)
-  
+
   (let* ((key (cons topic channel-id))
          (subscriptions (gethash key *channel-subscriptions*))
          (results nil))
-    
+
     ;; Process exact matches first
     (dolist (subscription subscriptions)
       (when (channel-subscription-active subscription)
         (handler-case
-            (push (funcall (channel-subscription-handler subscription) 
+            (push (funcall (channel-subscription-handler subscription)
                            payload)
                   results)
           (error (e)
             (log-warn "Error in channel topic handler for ~A: ~A" topic e)))))
-    
+
     ;; Also check for wildcard subscriptions
     (maphash (lambda (k subs)
                (destructuring-bind (sub-topic . sub-channel) k
@@ -251,14 +249,14 @@
                    (dolist (subscription subs)
                      (when (channel-subscription-active subscription)
                        (handler-case
-                           (push (funcall (channel-subscription-handler subscription) 
+                           (push (funcall (channel-subscription-handler subscription)
                                           payload)
                                  results)
                          (error (e)
-                           (log-warn "Error in wildcard channel topic handler for ~A (~A): ~A" 
+                           (log-warn "Error in wildcard channel topic handler for ~A (~A): ~A"
                                      sub-topic topic e))))))))
              *channel-subscriptions*)
-    
+
     (nreverse results)))
 
 (defun get-channel-subscriptions (channel-id)
@@ -287,6 +285,7 @@
       (gethash pattern *topic-subscriptions*)
       (let ((all-subs nil))
         (maphash (lambda (pattern subscriptions)
+                   (declare (ignore pattern))
                    (setf all-subs (append all-subs subscriptions)))
                  *topic-subscriptions*)
         all-subs)))
@@ -321,13 +320,13 @@
   (let ((result nil))
     ;; Regular topic subscriptions
     (maphash (lambda (pattern subs)
-               (push (cons pattern 
-                           (mapcar (lambda (sub) 
+               (push (cons pattern
+                           (mapcar (lambda (sub)
                                      (topic-subscription-handler (cdr sub)))
                                    subs))
                      result))
              *topic-subscriptions*)
-    
+
     ;; Channel-based subscriptions
     (maphash (lambda (key subs)
                (destructuring-bind (topic . channel-id) key
@@ -335,8 +334,8 @@
                              (mapcar #'channel-subscription-handler subs))
                        result)))
              *channel-subscriptions*)
-    
-    (sort result #'string< :key (lambda (pair) 
+
+    (sort result #'string< :key (lambda (pair)
                                   (if (stringp (car pair))
                                       (car pair)
                                       (format nil "~A" (car pair)))))))
@@ -353,3 +352,4 @@
                (push (car key) topics))
              *channel-subscriptions*)
     (remove-duplicates (sort topics #'string<) :test #'equal)))
+

@@ -59,11 +59,11 @@
 ;;; Init
 ;;;---------------------------------------------------------------
 (defun init-textinput (id &key 
-                               (value "")
-                               (placeholder "")
-                               (on-change nil)
-                               (on-submit nil)
-                               (disabled nil))
+                            (value "")
+                            (placeholder "")
+                            (on-change nil)
+                            (on-submit nil)
+                            (disabled nil))
   "Initializes a new text input model.
    Returns (values textinput-model initial-command)."
   (values (%make-textinput-model :id id
@@ -134,7 +134,7 @@
               (setf (textinput-model-cursor-pos new-model) (length current-value)))
              ((eq key-sym :enter)
               (when (textinput-model-on-submit new-model)
-                (push (cmd-async #'send-message (textinput-model-on-submit new-model)) commands)))))))
+                (push (cmd-async #'send-message :args (textinput-model-on-submit new-model)) commands)))))))
 
       ;; (:textinput-set-value :value "new text")
       ((cons (eql msg-textinput-set-value))
@@ -148,7 +148,7 @@
       ((eql msg-textinput-submit) 
        (unless (textinput-model-disabled new-model)
          (when (textinput-model-on-submit new-model)
-           (push (cmd-async #'send-message (textinput-model-on-submit new-model)) commands)))))
+           (push (cmd-async #'send-message :args (textinput-model-on-submit new-model)) commands)))))
 
     ;; Handle on-change command if value changed
     (when value-changed
@@ -156,9 +156,9 @@
         (let ((on-change-msg (textinput-model-on-change new-model)))
           (if (listp on-change-msg) ; If it's a message template
               (push (cmd-async #'send-message
-                               (append on-change-msg (list :value (textinput-model-value new-model))))
+                               :args (append on-change-msg (list :value (textinput-model-value new-model))))
                     commands)
-              (push (cmd-async #'send-message on-change-msg) commands)))))
+              (push (cmd-async #'send-message :args on-change-msg) commands)))))
 
     (values new-model commands)))
 
@@ -166,16 +166,16 @@
 ;;; View (STANDARDIZED FORMAT)
 ;;;---------------------------------------------------------------
 (defwidget-view view-textinput (app-state
-                                   :model-var model
-                                   :widget-id-var widget-id
-                                   :add-args (
-                                              value placeholder
-                                              on-change on-submit
-                                              disabled
-                                              tooltip aria-label
-                                              class width height)
-                                   :documentation
-                                   "Creates a UI representation of a text input field.
+                                :model-var model
+                                :widget-id-var widget-id
+                                :add-args (
+                                           value placeholder
+                                           on-change on-submit
+                                           disabled
+                                           tooltip aria-label
+                                           class width height)
+                                :documentation
+                                "Creates a UI representation of a text input field.
    APP-STATE: The application state.
    WIDGET-ID: The unique ID for this text input (required).
    VALUE: Text content. Defaults to model's value if not provided.

@@ -9,8 +9,8 @@
            :redo-last-transaction :clear-transaction-history
            :selective-undo ; Added
            ;; Transaction history utilities
-           :print-transaction-history :format-transaction-summary
-           :export-transaction-history
+   :print-transaction-history :format-transaction-summary
+   :export-transaction-history
            :visualize-transaction-history ; Added
            ;; :notify-observers ; No longer exporting from here
            ))
@@ -26,6 +26,7 @@
   (changes (list) :type list) ; List of (key old-value new-value) tuples
   (timestamp (get-universal-time) :type integer)
   (name nil :type (or null symbol string)) ; Optional name for the transaction
+  (categories (list) :type list) ; List of categories for the transaction)
   (description nil :type (or null string))) ; Optional longer description
 
 (defmethod print-object ((tx transaction) stream)
@@ -330,10 +331,10 @@ Example:
     (loop for tx in history
           for i from 1
           do (format stream "~&~3D: [~A] ~A~@[ Cats: ~{~S~^,~}~]~%"
-                    i
-                    (format-universal-time (transaction-timestamp tx))
-                    (or (transaction-name tx) "Unnamed transaction")
-                    (transaction-categories tx))
+                     i
+                     (format-universal-time (transaction-timestamp tx))
+                     (or (transaction-name tx) "Unnamed transaction")
+                     (transaction-categories tx))
              (format stream "     Changes: ~A~%" (length (transaction-changes tx)))
              (format stream "     ID: ~A~%~%" (transaction-id tx)))
     (when output-file (close stream))
@@ -355,10 +356,10 @@ Example:
   "Basic HTML escaping for text content."
   (if (stringp text)
       (cl-ppcre:regex-replace-all "&"
-       (cl-ppcre:regex-replace-all "<"
-        (cl-ppcre:regex-replace-all ">" text ">")
-        "<")
-       "&")
+                                  (cl-ppcre:regex-replace-all "<"
+                                                              (cl-ppcre:regex-replace-all ">" text ">")
+                                                              "<")
+                                  "&")
       (princ-to-string text)))
 
 (defun export-transaction-history (app-state &key (stream *standard-output*) (format :text) (include-changes nil))
@@ -420,7 +421,7 @@ Example:
   (log-info "Clearing transaction history.")
   (setf (application-state-transaction-history app-state) nil)
   (setf (application-state-undone-history app-state) nil)
-  (setf (application-state-transaction-log app-state) nil)))
+  (setf (application-state-transaction-log app-state) nil))
 
 ;; Placeholder for advanced filtering
 (defun filter-transaction-history (app-state &key category time-start time-end name-regex affected-key)

@@ -5,7 +5,8 @@
   (:use :cl)
   (:import-from :cleve-elm.async
    :async-task :new-task :async-exec :cancel-async-task
-   :async-task-finished-p :async-task-result :async-task-status
+   :async-task-finished-p :async-task-result :async-task-status :promise-cancel
+   :async-task-error :promise-cancelled-p :promise-cancelled-condition
                 :promise :resolve-promise :reject-promise :await)
   (:import-from :elmtui.core.globals #:*app-sender*) ; Import *app-sender* from globals
   (:export :cmd-async
@@ -76,13 +77,15 @@
                (handler-case
                    (let ((result (apply function progress-callback args)))
                      ;; Check if the promise was cancelled during execution
-                     (if (cleve-elm.async:promise-cancelled-p promise)
+                     (if (promise-cancelled-p promise)
                          (progn
                            (log:info "Task ~A was cancelled, not resolving promise" task-id)
                            ;; If on-error callback provided, call it with the cancelled condition
                            (when on-error
-                             (let ((error-msg (make-condition 'cleve-elm.async:promise-cancelled-condition
-                                                              :message "Task cancelled")))
+                             (let ((error-msg
+                                     (make-condition
+                                      'promise-cancelled-condition
+                                      :message "Task cancelled")))
                                (funcall *app-sender* (funcall on-error error-msg)))))
                          (progn
                            ;; Task completed successfully
@@ -294,9 +297,9 @@
            (unless task (error "Invalid :async command structure for cancel: ~S" cmd))
            (log:info "Cancelling async task ~A" task-id)
            ;; First cancel the promise if present
-           (when (and promise (fboundp 'cleve-elm.async:cancel))
+           (when promise
              (handler-case
-                 (cleve-elm.async:cancel promise)
+                 (promise-cancel promise)
                (error (e)
                  (log:warn "Error cancelling promise for task ~A: ~A" task-id e))))
            ;; Then cancel the task itself

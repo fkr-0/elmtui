@@ -80,16 +80,16 @@
 ;;; Init
 ;;;---------------------------------------------------------------
 (defun init-scrollable-container (id &key
-                                          (scroll-top 0)
-                                          (scroll-left 0)
-                                          (viewport-width 0)
-                                          (viewport-height 0)
-                                          (content-width 0)
-                                          (content-height 0)
-                                          (disabled nil)
-                                          (show-scrollbar-x :auto)
-                                          (show-scrollbar-y :auto)
-                                          (on-scroll nil))
+                                       (scroll-top 0)
+                                       (scroll-left 0)
+                                       (viewport-width 0)
+                                       (viewport-height 0)
+                                       (content-width 0)
+                                       (content-height 0)
+                                       (disabled nil)
+                                       (show-scrollbar-x :auto)
+                                       (show-scrollbar-y :auto)
+                                       (on-scroll nil))
   "Initializes a new scrollable container model.
    Returns (values scrollable-container-model initial-command)."
   (values (%make-scrollable-container-model
@@ -210,11 +210,11 @@
           (let ((on-scroll-msg (scrollable-container-model-on-scroll new-model)))
             (if (listp on-scroll-msg)
                 (push (cmd-async #'send-message
-                                 (append on-scroll-msg
-                                         (list :scroll-left (scrollable-container-model-scroll-left new-model)
-                                               :scroll-top (scrollable-container-model-scroll-top new-model))))
+                                 :args (append on-scroll-msg
+                                               (list :scroll-left (scrollable-container-model-scroll-left new-model)
+                                                     :scroll-top (scrollable-container-model-scroll-top new-model))))
                       commands)
-                (push (cmd-async #'send-message on-scroll-msg) commands))))))
+                (push (cmd-async #'send-message :args on-scroll-msg) commands))))))
 
     (values new-model commands)))
 

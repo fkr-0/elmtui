@@ -209,10 +209,29 @@
 
   ;;     ;; Any other key is a keyword
   ;;     (t (setf key last-part-sym)))
-  (let ((modifiers nil)
-        (key nil)
-        (butlast-parts (butlast (str:split "-" key-string))))
+  (let* ((modifiers nil)
+         (key nil)
+         (parts  (str:split "-" key-string))
+         (last-part (car (last parts)))
+         (last-part-sym (make-keyword (string-upcase last-part)))
+         (butlast-parts (butlast parts)))
+    (setf key
+          (cond
+            ;; Special keys
+            ((eql last-part-sym :ESCAPE) :esc)
+            ((eql last-part-sym :ENTER) :enter)
+            ((eql last-part-sym :DELETE) :delete)
+            ((eql last-part-sym :BACKSPACE) :backspace)
+            ((eql last-part-sym :TAB) :tab)
+            ((eql last-part-sym :SPACE) :space)
 
+            ;; Single character keys
+            ((and (= (length (symbol-name last-part-sym)) 1)
+                  (alpha-char-p (char (symbol-name last-part-sym) 0)))
+             (char (symbol-name last-part-sym) 0))
+
+            ;; Any other key is a keyword
+            (t last-part-sym)))
     ;; Handle modifiers and key
     (loop for part in butlast-parts
           ;; (loop for part in (str:split "-" key-string) ;:regex t)

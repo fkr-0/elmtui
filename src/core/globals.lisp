@@ -1,31 +1,34 @@
-;;;===============================================================
-;;; File: src/core/globals.lisp
-;;; Global Variables and Definitions needed early
-;;;===============================================================
 (uiop:define-package :elmtui.core.globals
   (:use :cl)
-  (:export :*app-sender* :*app-state*
-           :*event-loop* :*subscribers*
-           :*debug-layout-outlines* ; Export the new debug flag
-           :*main-event-channel*    ; Export the main event channel
-           ))
+  (:export #:*debug-mode*
+           #:*config*
+           #:*event-loop*
+           #:*main-event-channel* ; Central channel for TEA messages
+           #:*app-sender*          ; Function to send messages into the TEA loop (e.g., elmtui.core.loop:publish)
+           #:*app-message-processor* ; Function to process a decoded app message (e.g., by platform/driver)
+           #:*app-state*           ; The global application state object
+           #:*subscribers*         ; For legacy/direct event subscriptions
+           #:*current-backend*
+           #:*current-program*
+           #:*focus-manager*
+           #:*keymap-registry*
+           #:*theme*
+           #:*stylesheets*
+           #:*widget-registry*))
 (in-package :elmtui.core.globals)
 
-(defvar *app-sender* (lambda (msg) (format t "[WARN] *app-sender* not defined. Dropping msg: ~S~%" msg))
-  "Dynamically bound function to send messages back to the application's update loop.")
+(defvar *debug-mode* nil "Enable extensive debugging output if T.")
+(defvar *config* (make-hash-table :test 'equal) "Global configuration settings.")
 
-(defvar *app-state* nil
-  "The global application state instance.")
+(defvar *event-loop* nil "The main event loop instance (legacy).")
+(defvar *main-event-channel* nil "The main channel for TEA-style event/message processing.")
+(defvar *app-sender* nil "Holds the function (e.g., #'elmtui.core.loop:publish) to send messages into the TEA loop.")
+(defvar *app-message-processor* nil "Holds the function (message app-state) to process application messages.")
+(defvar *app-state* nil "The current application state (ut.state:application-state instance).")
+(defvar *subscribers* (make-hash-table :test 'equal) "Hash table for legacy event subscribers.")
 
-(defvar *event-loop* nil "The main event loop instance.")
-(defvar *subscribers* (make-hash-table :test 'equal) "Registered event subscribers.")
-
-(defvar *debug-layout-outlines* nil
-  "When T, enables rendering of layout box outlines (margin, border, padding, content) for debugging.")
-
-(defvar *main-event-channel* nil
-  "Central event channel for all TEA-cycle-triggering events and messages.
-   This is an lparallel:channel that serves as a single, serialized entry point
-   for all events that should trigger the update function of the application.
-   All events must be submitted to this channel to ensure proper TEA compliance
-   with sequential updates to application state.")
+(defvar *current-backend* nil "The active platform backend instance.")
+(defvar *current-program* nil "The top-level program or application object.")
+(defvar *focus-manager* nil "The active focus manager instance.")
+(defvar *keymap-registry* nil "The global keymap registry.")
+(defvar *theme* (make-hash-table :test 'equal) "Global theme settings.")
