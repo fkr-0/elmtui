@@ -5,6 +5,8 @@
 (uiop:define-package :elmtui.core.topic-registry
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn)
+  (:import-from :elmtui.state.update
+                #:publish-to-topic)
   (:import-from :elmtui.core.topics
                 #:topic
                 #:topic-name
@@ -134,7 +136,7 @@
   (mapcar (lambda (sub) (topic-subscription-handler (cdr sub)))
           (find-subscriptions-for-topic topic-name)))
 
-(defun publish-to-topic (topic-name message)
+(defmethod publish-to-topic (topic-name message)
   "Publish a message to a topic, invoking all matching subscription handlers."
   (log-debug "Publishing to topic: ~A" topic-name)
   (let ((handlers (find-handlers-for-topic topic-name))

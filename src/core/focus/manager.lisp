@@ -399,10 +399,27 @@
   DIRECTION: One of :UP, :DOWN, :LEFT, :RIGHT.
   UI-TREE: The current UI tree.
   Returns an element node or NIL."
-  (declare (ignorable source-grid-coords direction ui-tree))
-  ;; TODO: Implement actual grid navigation logic.
-  (log-warn "find-grid-adjacent is not yet implemented.")
-  nil)
+  (let* ( ;; TODO this cant be right?
+         (next-in-ui-tree
+           (find-nearest-in-direction
+            ui-tree
+            (element-grid-coordinates-col source-grid-coords)
+            direction)))
+    (when next-in-ui-tree
+      (let ((next-coords (element-grid-coordinates next-in-ui-tree)))
+        ;; Check if the next element is actually adjacent in the grid
+        (when (and next-coords
+                   (case direction
+                     (:up (= (element-grid-coordinates-row next-coords)
+                             (1- (element-grid-coordinates-row source-grid-coords))))
+                     (:down (= (element-grid-coordinates-row next-coords)
+                               (1+ (element-grid-coordinates-row source-grid-coords))))
+                     (:left (= (element-grid-coordinates-col next-coords)
+                               (1- (element-grid-coordinates-col source-grid-coords))))
+                     (:right (= (element-grid-coordinates-col next-coords)
+                                (1+ (element-grid-coordinates-col source-grid-coords))))))
+          next-in-ui-tree)))))
+
 
 (defun find-closest-in-direction (focus-manager source-id direction ui-tree)
   "Finds the closest element to source-id in the specified direction.

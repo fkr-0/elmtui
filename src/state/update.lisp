@@ -6,12 +6,11 @@
   (:use :cl :alexandria)
   (:import-from :ut.state.state #:application-state #:state-data-data #:application-state-data #:state-ref)
   (:import-from :ut.state.transaction #:with-transaction) ; Removed record-change, assuming set-state! handles it
-  (:import-from :elmtui.core.topic-registry #:publish-to-topic) ; Corrected import
   (:import-from :cleve-elm.async #:with-promise #:then) ; For async command
   (:import-from :elmtui.core.globals #:*app-sender*) ; Use *app-sender*
-  (:export :defupdate :dispatch-to-topic :handle-async-command))
+  (:export :publish-to-topic :defupdate :dispatch-to-topic :handle-async-command))
 (in-package :elmtui.state.update)
-
+(defgeneric publish-to-topic (topic-name message))
 ;; Helper for the basic macroexpansion-time check (simple walker)
 (defun %walk-tree (fn tree)
   "Recursively applies FN to each node (cons or atom) in TREE."
@@ -48,7 +47,7 @@
          (when (and result (listp result))
            (dolist (cmd result)
              (when (topic-command-p cmd)
-               (elmtui.core.topic-registry:publish-to-topic
+               (publish-to-topic
                 (topic-command-topic cmd)
                 (topic-command-payload cmd)))))
          ;; Return all results from the body (which should be commands)

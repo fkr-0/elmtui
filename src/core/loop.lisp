@@ -8,8 +8,8 @@
   (:import-from :elmtui.core.globals
    :*event-loop* :*app-state* :*app-message-processor* :*app-sender*) ; Removed *subscribers*, *main-event-channel*
   (:import-from :elmtui.core.conditions
-                ;; Removed :signal-subscriber-error, :subscriber-handler-error
-                :event-loop-dispatch-error :async-task-error)
+   ;; Removed :signal-subscriber-error, :subscriber-handler-error
+   :event-loop-dispatch-error :async-task-error)
   ;; Removed :cleve-elm.message import as message-type not directly used here after legacy removal
   ;; Removed :elmtui.core.keymap.event-integration #:subscribe (legacy)
   ;; Removed :elmtui.core.event-types import (legacy publish-sync-internal used it)
@@ -24,11 +24,11 @@
                 #:select-from-channels #:standard-event-channels)
   (:import-from :elmtui.state.update #:handle-async-command)
   (:export :start-loop
-           :elm-stop-loop
+   :elm-stop-loop
            :publish
            ;; Removed :enqueue-event, :dispatch-event, :subscribe-with-priority, :unsubscribe, :subscribe, :publish-sync-internal
            ;; Removed :*lifecycle-hooks*, :*subscribers*, :*main-event-channel*
-           :*event-loop* ; *event-loop* is the cleve-elm.event-loop:event-loop instance, might still be relevant
+   :*event-loop* ; *event-loop* is the cleve-elm.event-loop:event-loop instance, might still be relevant
            :get-event-loop-status :get-event-queue-length
            :instrument-event-loop)) ; Removed :elm-event-loop-active-p (use get-event-loop-status)
 (in-package :elmtui.core.loop)
@@ -98,7 +98,7 @@
                   (elmtui.core.event-channels:select-from-channels clevelib-channels :timeout 1.0))
               (when event
                 (let ((wrapper-channel-object
-                       (find source-clevelib-channel *active-event-channels* :key #'elmtui.core.event-channels:channel-of :test #'eq)))
+                        (find source-clevelib-channel *active-event-channels* :key #'elmtui.core.event-channels:channel-of :test #'eq)))
                   (cond
                     ((eq event :shutdown-loop) ; Special signal to break loop, sent by elm-stop-loop
                      (log-info "EVENT-CONSUMER: Received :shutdown-loop signal on channel ~A."
@@ -135,22 +135,39 @@
     (setf (gethash :last-event *event-loop-metrics*) event-to-process)
     (setf (gethash :last-event-time *event-loop-metrics*) (get-universal-time))
 
-    (typecase event-to-process
-      (:shutdown-command ;; Special command to stop the application
-       (log-info "PROCESS-CHANNEL-EVENT: Received :shutdown-command. Initiating application shutdown via elm-stop-loop.")
+    ;; Fail fast if EVENT isn't one of the shapes we understand.
+    (etypecase event
+      ;; ──────────────────────────────────────────────────────────────
+      ;; 1.  Simple keyword command
+      ((eql :shutdown-command)
+       (log-info "Received :shutdown-command. Stopping application loop.")
        (elm-stop-loop))
-      ((cons (eql :app-message) *)
-       (let ((actual-message (second event-to-process)))
-         (log-debug "EVENT-CONSUMER: Calling *app-message-processor* for: ~S" actual-message)
-         (if elmtui.core.globals:*app-message-processor*
-             (funcall elmtui.core.globals:*app-message-processor* actual-message elmtui.core.globals:*app-state*)
-             (log-error "EVENT-CONSUMER: *app-message-processor* is not set! Cannot process message: ~S" actual-message))))
-      ((cons (member :async :async-task :cmd-async :recurring-task) *)
-       (log-debug "EVENT-CONSUMER: Handling async command: ~S" event-to-process)
-       (elmtui.state.update:handle-async-command event-to-process elmtui.core.globals:*app-state*))
-      (t
-       (log-warn "EVENT-CONSUMER: Event ~S from channel ~S is not an :app-message, :shutdown-command, or known async command. It might be dropped or require specific handling by channel handlers."
-                 event-to-process (elmtui.core.event-channels:name source-event-channel-object))))
+      ;; ──────────────────────────────────────────────────────────────
+      ;; 2.  Every other legal event *must* be a CONS cell whose CAR is a keyword
+      (cons
+       ;; Break out the tag and data for readability
+       (destructuring-bind (tag &rest payload) event
+         (case tag
+           ;; ────────────────────────────────────────────────
+           (:app-message
+            (let ((msg (first payload)))
+              (log-debug "Dispatching :app-message ~S" msg)
+              (if elmtui.core.globals:*app-message-processor*
+                  (funcall elmtui.core.globals:*app-message-processor*
+                           msg
+                           elmtui.core.globals:*app-state*)
+                  (log-error "*app-message-processor* is not set—cannot process: ~S"
+                             msg))))
+           ;; ────────────────────────────────────────────────
+           ((:async :async-task :cmd-async :recurring-task)
+            (log-debug "Handling async command ~S" event)
+            (elmtui.state.update:handle-async-command event
+                                                      elmtui.core.globals:*app-state*))
+           ;; ────────────────────────────────────────────────
+           (otherwise
+            (log-warn "Unknown event tag ~S on channel ~S"
+                      tag
+                      (elmtui.core.event-channels:name source-event-channel-object)))))))
 
     (let* ((processing-time-ms (/ (* (- (get-internal-real-time) start-time) 1000.0)
                                   internal-time-units-per-second)))
@@ -169,31 +186,32 @@
     (setf *shutdown-requested* t)
 
     (log-info "LOOP: Sending :shutdown-loop signal to an active event channel (if any).")
-    (when-let* ((ch-obj (first *active-event-channels*))
-                (clevelib-ch (elmtui.core.event-channels:channel-of ch-obj)))
-      (unless (cleve-elm.channel:channel-closed clevelib-ch)
-        (ignore-errors (cleve-elm.channel:-> clevelib-ch :shutdown-loop))))
+    (when *active-event-channels*
+      (let* ((ch-obj (first *active-event-channels*))
+             (clevelib-ch (elmtui.core.event-channels:channel-of ch-obj)))
+        (unless (cleve-elm.channel:channel-closed clevelib-ch)
+          (ignore-errors (cleve-elm.channel:-> clevelib-ch :shutdown-loop))))
 
-    (when *consumer-thread*
-      (log-info "LOOP: Waiting for consumer thread to join...")
-      (ignore-errors (bt:join-thread *consumer-thread*))
-      (if (bt:thread-alive-p *consumer-thread*)
-          (log-warn "LOOP: Consumer thread did not join in time.")
-          (progn
-            (log-info "LOOP: Consumer thread joined.")
-            (setf *consumer-thread* nil))))
+      (when *consumer-thread*
+        (log-info "LOOP: Waiting for consumer thread to join...")
+        (ignore-errors (bt:join-thread *consumer-thread*))
+        (if (bt:thread-alive-p *consumer-thread*)
+            (log-warn "LOOP: Consumer thread did not join in time.")
+            (progn
+              (log-info "LOOP: Consumer thread joined.")
+              (setf *consumer-thread* nil))))
 
-    (log-info "LOOP: Closing event channels.")
-    (dolist (ch-obj *active-event-channels*)
-      (ignore-errors (cleve-elm.channel:channel-close (elmtui.core.event-channels:channel-of ch-obj))))
-    (setf *active-event-channels* nil)
+      (log-info "LOOP: Closing event channels.")
+      (dolist (ch-obj *active-event-channels*)
+        (ignore-errors (cleve-elm.channel:channel-close (elmtui.core.event-channels:channel-of ch-obj))))
+      (setf *active-event-channels* nil)
 
-    (when *event-loop* ; If cleve-elm.event-loop is still used
-      (log-info "LOOP: Stopping legacy cleve-elm.event-loop instance.")
-      (cleve-elm.event-loop:stop-loop *event-loop*)
-      (setf *event-loop* nil))
-    (log-info "LOOP: Event system shutdown sequence complete."))
-  (log-info "LOOP: elm-stop-loop call finished (shutdown already in progress or completed)."))
+      (when *event-loop* ; If cleve-elm.event-loop is still used
+        (log-info "LOOP: Stopping legacy cleve-elm.event-loop instance.")
+        (cleve-elm.event-loop:stop-loop *event-loop*)
+        (setf *event-loop* nil))
+      (log-info "LOOP: Event system shutdown sequence complete."))
+    (log-info "LOOP: elm-stop-loop call finished (shutdown already in progress or completed).")))
 
 
 (defun publish (event &key target-channel-name)

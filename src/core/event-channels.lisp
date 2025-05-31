@@ -9,34 +9,37 @@
   (:import-from :cleve-elm.queue
    :make-priority-queue)
   (:export :make-keyboard-channel
-   :make-mouse-channel
-           :make-system-channel
-   :make-ui-channel
-           :make-focus-channel
-   :make-command-channel
-           :make-message-channel
-   :standard-event-channels
-           :event-channel
-   :keyboard-channel
-           :mouse-channel
-   :system-channel
-           :ui-channel
-   :command-channel
-           :focus-channel
-   :message-channel
-           :register-event-handler
-   :unregister-event-handler
-           :send-event
-   :receive-event
-           :event-type-p
-           ;; New exports for enhanced system
-   :channel-priority
-           :set-channel-priority
-   :add-event-filter
-           :remove-event-filter
-   :select-from-channels
-           :wait-for-event
-   :try-receive-event))
+   :channel-of
+           :handlers
+   :name
+           :make-mouse-channel
+   :make-system-channel
+           :make-ui-channel
+   :make-focus-channel
+           :make-command-channel
+   :make-message-channel
+           :standard-event-channels
+   :event-channel
+           :keyboard-channel
+   :mouse-channel
+           :system-channel
+   :ui-channel
+           :command-channel
+   :focus-channel
+           :message-channel
+   :register-event-handler
+           :unregister-event-handler
+   :send-event
+           :receive-event
+   :event-type-p
+   ;; New exports for enhanced system
+           :channel-priority
+   :set-channel-priority
+           :add-event-filter
+   :remove-event-filter
+           :select-from-channels
+   :wait-for-event
+           :try-receive-event))
 
 (in-package :cleve-elm.core.event-channels)
 

@@ -169,6 +169,8 @@
                              (:file "api")
                              (:file "backend/common/virtual-buffer")
                              (:file "canvas")
+                             (:file "input")
+                             (:file "output")
                              ;; Backend Implementations
                              (:module "backend"
                               :pathname "backend/"
@@ -198,8 +200,6 @@
                                            ))
 
                              ;; Original driver/input/output
-                             (:file "input")
-                             (:file "output")
 
                              (:file "driver")))
 
