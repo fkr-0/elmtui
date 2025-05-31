@@ -32,6 +32,7 @@
    :get-cursor-position
    :hide-cursor
    :show-cursor
+   :handle-backend-resize ; New
 
    ;; Drawing Primitives
    :draw-text-at
@@ -42,6 +43,9 @@
    :set-cell-style
    :clear-area
 
+   ;; Rendering
+   :render-and-present ; New
+
    ;; Color and Style Management
    :make-color
    :make-style
@@ -51,7 +55,7 @@
    :supports-truecolor-p
    :max-colors
 
-   ;; Terminal Instance
+   ;; Terminal Instance Accessors (Generic)
    :term-w
    :term-h
    :term-stream
@@ -70,9 +74,6 @@
    :query-feature
    :supports-unicode-p
    :supports-mouse-p
-
-   ;; terminal stats
-
 
    ;; Raw Access (Escape Hatch)
    :get-native-handle))
@@ -119,23 +120,19 @@ lock count. Otherwise, release the lock and set the lock owner to nil."
   `(progn
      (acquire-lock ,lockable)
      (unwind-protect (progn ,@body) (release-lock ,lockable))))
-(defgeneric term-w (term))
-(defgeneric term-h (term))
-(defgeneric (setf term-w) (new-value term))
-(defgeneric (setf term-h) (new-value term))
-(defgeneric term-stream (term))
-(defgeneric term-style (term))
+
 ;;;---------------------------------------------------------------
 ;;; Backend Lifecycle
 ;;;---------------------------------------------------------------
 
-(defgeneric initialize-backend (backend-type &key &allow-other-keys)
+(defgeneric initialize-backend (backend-type &key publish-fn &allow-other-keys) ; Added publish-fn
   (:documentation "Initializes and configures the specified platform backend.
 This function should perform any necessary setup, such as opening a connection
 to the terminal, setting up initial modes, or allocating resources.
 It should return an opaque backend instance handle that will be passed to
 other platform API functions.
 BACKEND-TYPE: A symbol or keyword identifying the backend to initialize (e.g., :ncurses, :cl-charms).
+PUBLISH-FN: An optional function the backend can use to publish events (e.g., for signals).
 ALLOW-OTHER-KEYS: Backend-specific initialization options can be passed.
 Returns the backend instance or signals an error on failure."))
 
@@ -197,6 +194,14 @@ BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
 (defgeneric show-cursor (backend-instance)
   (:documentation "Convenience function to show the terminal cursor. Equivalent to (set-cursor-visibility backend-instance t).
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
+
+(defgeneric handle-backend-resize (backend-instance width height)
+  (:documentation "Notifies the backend that its display area has changed.
+The backend should update its internal state, dimensions, buffers,
+and potentially clear/reset its display to prepare for a full redraw.
+BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
+WIDTH: The new width.
+HEIGHT: The new height."))
 
 ;;;---------------------------------------------------------------
 ;;; Drawing Primitives
@@ -273,6 +278,18 @@ WIDTH: The width of the area.
 STYLE: An optional backend-specific style object (often just background color). If NIL, uses default background."))
 
 ;;;---------------------------------------------------------------
+;;; Rendering
+;;;---------------------------------------------------------------
+
+(defgeneric render-and-present (backend-instance laid-tree &optional canvas-instance)
+  (:documentation "Instructs the backend to render the laid-out UI tree and present it to the display.
+If CANVAS-INSTANCE is provided, its content should be incorporated into the rendering.
+The backend is responsible for its own buffering, diffing, and display update mechanisms.
+LAID-TREE: The fully laid-out UI node tree.
+CANVAS-INSTANCE: An optional canvas object whose content should be rendered.
+Returns T on success, or NIL/error on failure."))
+
+;;;---------------------------------------------------------------
 ;;; Color and Style Management
 ;;;---------------------------------------------------------------
 
@@ -320,6 +337,17 @@ BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
   (:documentation "Returns the maximum number of distinct colors supported by the backend.
 For truecolor backends, this might return a very large number (e.g., 2^24) or a special value.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
+
+;;;---------------------------------------------------------------
+;;; Terminal Instance Accessors (Generic)
+;;;---------------------------------------------------------------
+(defgeneric term-w (term))
+(defgeneric term-h (term))
+(defgeneric (setf term-w) (new-value term))
+(defgeneric (setf term-h) (new-value term))
+(defgeneric term-stream (term))
+(defgeneric term-style (term))
+(defgeneric (setf term-style) (new-style term)) ; Added for completeness if needed
 
 ;;;---------------------------------------------------------------
 ;;; Input Handling
@@ -396,23 +424,9 @@ Returns a native handle, or NIL if not applicable or not exposed."))
 (defmacro with-terminal-output ((backend stream-var) &body body)
   "Execute BODY with STREAM-VAR bound to the terminal output stream from BACKEND.
    Provides safe access to the terminal output stream for direct writing.
-   
+
    Example:
      (with-terminal-output (backend out)
        (format out \"~c[0m\" #\\Escape))"
   `(let ((,stream-var (term-stream ,backend)))
      ,@body))
-
-;; (defgeneric terminal-instance-width (backend-instance)
-;;   (:documentation "Returns the width of the terminal instance in character cells."))
-
-;; (defgeneric terminal-instance-height (backend-instance)
-;;   (:documentation "Returns the height of the terminal instance in character cells."))
-
-;; (defgeneric terminal-instance-stream (backend-instance)
-;;   (:documentation "Returns the stream associated with the terminal instance."))
-
-;; (defgeneric terminal-instance-current-style (backend-instance)
-;;   (:documentation "Returns the current style applied to the terminal instance."))
-
-;;;--------------------------------------------------------------- ;;; Recovery and Reset ;;;---------------------------------------------------------------

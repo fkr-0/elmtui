@@ -9,7 +9,19 @@
 
 (uiop:define-package :elmtui.platform.backend.terminal.diff-renderer
   (:use :cl :log4cl)
+
+  (:import-from #:elmtui.platform.api #:term-w #:term-h #:term-style #:term-stream)
+  (:import-from #:elmtui.platform.canvas
+                #:canvas
+                #:make-terminal-canvas
+                #:initialize-terminal-canvas
+                #:get-canvas-viewport
+                #:apply-canvas-to-buffer
+                #:restore-terminal-state
+                #:canvas-buffer) ; For render-and-present
   (:import-from :elmtui.platform.backend.common.virtual-buffer
+                #:virtual-terminal-buffer #:make-virtual-terminal-buffer
+                #:with-virtual-buffer-lock #:clear-buffer
                 #:virtual-terminal-buffer #:buffer-width #:buffer-height
                 #:buffer-cell-at #:buffer-cell-equal-p
                 #:buffer-cell-char #:buffer-cell-style) ; For accessing cell components
@@ -17,6 +29,8 @@
                 #:ansi-seqs #:copy-term-style
                 #:exec-sequence #:update-style! #:make-terminal-style)
   (:import-from :elmtui.platform.backend.terminal
+                #:terminal-instance-front-buffer
+                #:terminal-instance-back-buffer
                 #:terminal-instance #:send-sequence #:apply-style-diff
                 #:terminal-instance-stream #:with-terminal-lock
                 #:terminal-instance-lock
@@ -109,7 +123,7 @@ Optimizes by batching contiguous character updates with the same style."
            :front-buffer front-buffer
            :back-buffer back-buffer
            :reason "Buffer dimensions do not match."))
-  
+
   ;; Debug comparison of front and back buffers
   (debug-buffer-diff front-buffer back-buffer)
 
@@ -120,14 +134,14 @@ Optimizes by batching contiguous character updates with the same style."
         (diff-count 0))
 
     (log-info "BUFFER DIFF: Starting diff computation for buffers of size ~Ax~A" width height)
-    
+
     (loop for r from 0 below height do
       (let ((current-batch nil)) ; To hold (:type :write-chars :row r :start-col c :chars string :style s)
         (log-info "BUFFER DIFF: Processing row ~A" r)
         (loop for c from 0 below width do
           (let ((cell-front (buffer-cell-at front-buffer r c))
                 (cell-back (buffer-cell-at back-buffer r c)))
-            
+
             ;; Log details about first few cells in each row
             (when (< c 3)
               (log-info "BUFFER DIFF: [Row ~A, Col ~A] Front style: ~S, Back style: ~S"
@@ -178,7 +192,7 @@ Optimizes by batching contiguous character updates with the same style."
         (when current-batch
           (push current-batch diff-ops)
           (setf current-batch nil))))
-    
+
     (log-info "BUFFER DIFF: Cells compared - Equal: ~A, Different: ~A" equal-count diff-count)
     (log-info "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
     (log-info "BUFFER DIFF: Final diff-ops: ~A" diff-ops)
@@ -188,10 +202,10 @@ Optimizes by batching contiguous character updates with the same style."
   "Log a sample of buffer contents for debugging."
   (let ((height (min 10 (buffer-height buffer)))  ; Log at most 10 rows
         (width (min 5 (buffer-width buffer))))    ; Log at most 5 columns per row
-    
+
     (log-info "~A: Buffer size: ~Ax~A (showing ~Ax~A sample)"
               message (buffer-width buffer) (buffer-height buffer) width height)
-    
+
     (loop for r from 0 below height do
       (log-info "~A: Row ~A styles:" message r)
       (let ((row-styles (loop for c from 0 below width
@@ -201,19 +215,19 @@ Optimizes by batching contiguous character updates with the same style."
 (defun debug-buffer-diff (front-buffer back-buffer)
   "Print detailed buffer comparison for debugging."
   (log-info "DEBUG-BUFFER-DIFF: Beginning comparison of front and back buffers")
-  
+
   (log-buffer-contents front-buffer "FRONT")
   (log-buffer-contents back-buffer "BACK")
-  
+
   ;; Compare first few rows more thoroughly
   (loop for r from 0 below (min 8 (buffer-height front-buffer)) do
     (let ((first-front-style (buffer-cell-style (buffer-cell-at front-buffer r 0)))
           (first-back-style (buffer-cell-style (buffer-cell-at back-buffer r 0))))
-      
+
       (log-info "ROW ~A COMPARISON: Front style: ~S, Back style: ~S, Equal: ~A"
                 r first-front-style first-back-style
                 (equalp first-front-style first-back-style))
-      
+
       ;; If they're claimed to be equal but look different, investigate further
       (when (and (equalp first-front-style first-back-style)
                  (not (equal first-front-style first-back-style)))
@@ -233,12 +247,12 @@ Optimizes by batching contiguous character updates with the same style."
   "Safe version of equalp that logs details and handles edge cases."
   (handler-case
       (let ((result (equalp a b)))
-        (when (and (not result) 
-                   (or (and (listp a) (listp b)) 
+        (when (and (not result)
+                   (or (and (listp a) (listp b))
                        (and (vectorp a) (vectorp b))))
           (log-info "SAFE-EQUALP: Comparison failed between: ~S and ~S" a b))
         result)
-    (error (e) 
+    (error (e)
       (log-error "SAFE-EQUALP: Error comparing ~S and ~S: ~A" a b e)
       nil)))
 
@@ -276,7 +290,7 @@ Optimizes by batching contiguous character updates with the same style."
            ;; Always reset style when moving to a new row or new position
            (when (or (not (= last-row op-row))
                      (not (and (= op-row logical-cursor-row)
-                              (= op-start-col logical-cursor-col))))
+                               (= op-start-col logical-cursor-col))))
              (elmtui.platform.backend.terminal:write-style-reset-to-stream stream)
              (setf last-row op-row))
 
@@ -291,8 +305,8 @@ Optimizes by batching contiguous character updates with the same style."
 
            ;; Apply the style directly - no need to track delta or update a current style
            (when op-style
-             (log:debug "APPLY-TERMINAL-DIFF: Applying style for position (~A,~A): ~S" 
-                       op-row op-start-col op-style)
+             (log:debug "APPLY-TERMINAL-DIFF: Applying style for position (~A,~A): ~S"
+                        op-row op-start-col op-style)
              (elmtui.platform.backend.terminal:write-style-to-stream stream op-style))
 
            ;; Write the characters for this op
@@ -306,3 +320,47 @@ Optimizes by batching contiguous character updates with the same style."
     (log:debug "APPLY-TERMINAL-DIFF: All ops processed. Flushing output.")
     (finish-output stream))
   t)
+
+(defmethod render-and-present ((instance terminal-instance) laid-tree &optional canvas-instance)
+  (let* ((front-buffer (terminal-instance-front-buffer instance))
+         (back-buffer (terminal-instance-back-buffer instance))
+         (original-back-buffer-for-canvas back-buffer)) ; Save original back-buffer if canvas is used
+
+    (unless (and front-buffer back-buffer)
+      (log:error "TERMINAL: Buffers not initialized. Skipping render.")
+      (return-from render-and-present nil))
+
+    ;; 1. Prepare back-buffer (clear it, potentially use canvas buffer)
+    (if canvas-instance
+        (let ((canvas-buf (canvas-buffer canvas-instance)))
+          (with-virtual-buffer-lock (canvas-buf) (clear-buffer canvas-buf))
+          (setf back-buffer canvas-buf)) ; Temporarily use canvas buffer as the back buffer for render-frame
+        (with-virtual-buffer-lock (back-buffer) (clear-buffer back-buffer))) ; Clear normal back-buffer
+
+    ;; 2. Render the laid-out tree to the (potentially temporary) back-buffer
+    ;; render-frame uses generic drawing primitives which draw to the backend's back-buffer.
+    (elmtui.platform.output:render-frame laid-tree instance back-buffer) ; Pass explicit back-buffer
+
+    ;; 3. If canvas was used, apply its content to the original back-buffer
+    (when canvas-instance
+      (setf back-buffer original-back-buffer-for-canvas) ; Restore original back-buffer
+      ;; Now 'canvas-buf' has the canvas content, 'back-buffer' is the main screen back-buffer.
+      (apply-canvas-to-buffer canvas-instance back-buffer))
+
+    ;; 4. Compute diff between front and (final) back buffer, and apply to terminal
+    (if (and front-buffer back-buffer
+             (= (buffer-width front-buffer) (buffer-width back-buffer))
+             (= (buffer-height front-buffer) (buffer-height back-buffer)))
+        (let ((diff-ops (compute-buffer-diff front-buffer back-buffer)))
+          (when diff-ops
+            (with-terminal-lock (instance)
+              (apply-terminal-diff instance diff-ops) ; apply-terminal-diff writes to instance's stream
+              (finish-output (term-stream instance)))) ; Ensure changes are flushed
+          ;; 5. Swap front and back buffers
+          (rotatef (terminal-instance-front-buffer instance)
+                   (terminal-instance-back-buffer instance)) ; The old front becomes new back
+          t)
+        (progn
+          (log:error "TERMINAL: Buffer mismatch or invalid buffers. Skipping diff/swap. Front: ~S, Back: ~S"
+                     front-buffer back-buffer)
+          nil))))
