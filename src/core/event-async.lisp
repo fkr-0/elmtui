@@ -412,7 +412,7 @@
     ;; Set up timeout if specified
     (when timeout
       (setf timer-id
-            (schedule-event
+            (schedule-timer
              (lambda ()
                (reject-promise result-promise :timeout))
              timeout)))

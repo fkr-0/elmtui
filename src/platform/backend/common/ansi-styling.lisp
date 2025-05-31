@@ -204,6 +204,7 @@ bg or fg, that causes the terminal to use the default color.
    - ATTRS: The attributes to convert.
    Returns:
    - A list of ANSI escape sequences."
+  (declare (ignore attrs))
   nil)
 (defmethod ansi-seqs ((s list) &rest attrs)
   "Should accept a list of attributes and return the ANSI escape

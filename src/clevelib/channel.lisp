@@ -1,9 +1,9 @@
 (uiop:define-package :cleve-elm.channel
-  (:export :go :-> :<- :channel :channel-close
-   :make-channel :channel-closed :channel-capacity :channel-length :channel-empty-p :channel-full-p :gogo
-           :channel-add-filter :channel-remove-filter :filter-channel :filtered-channel :make-filtered-channel
-   :channel-take! :channel-put!
-   :apply-filter :pass-through-p)
+  (:export :go :-> :<- :channel :channel-close :channel-queue
+           :make-channel :channel-closed :channel-capacity :channel-length :channel-empty-p :channel-full-p :gogo
+   :channel-add-filter :channel-remove-filter :filter-channel :filtered-channel :make-filtered-channel
+           :channel-take! :channel-put!
+           :apply-filter :pass-through-p)
   (:use :cl :bt :cleve-elm.queue))
 (in-package :cleve-elm.channel)
 

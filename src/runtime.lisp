@@ -32,7 +32,7 @@
   "Defines an ElmTUI application.
    [Original documentation]
    
-   Added support for terminal canvas positioning."
+   Added support for terminal canvas positioning.
  
     Args:
       NAME: Symbol naming the application.
@@ -56,21 +56,21 @@ Example:
     ;; Removed unused gensyms
     `(progn
        (defun ,run-func-name (&key 
-                            (platform :terminal) 
-                            platform-options
-                            ;; Add canvas options
-                            (use-canvas nil)
-                            (canvas-anchor :cursor)
-                            (canvas-growth :down)
-                            (canvas-initial-size nil)
-                            (canvas-max-size nil))
+                                (platform :terminal)
+                                platform-options
+                                ;; Add canvas options
+                                (use-canvas nil)
+                                (canvas-anchor :cursor)
+                                (canvas-growth :down)
+                                (canvas-initial-size nil)
+                                (canvas-max-size nil))
          ;; Bind function designators locally
          (let ((effective-init-fn ,init)
                (effective-update-fn ,update)
                (effective-view-fn ,view)
                (effective-subscriptions-fn ,subscriptions))
            (log:info "Running ElmTUI application: ~A via elmtui.platform.driver:run-application (Platform: ~A, Canvas: ~A)"
-                    ',name platform use-canvas)
+                     ',name platform use-canvas)
            (let ((app-spec (list :name ',name
                                  :init-fn effective-init-fn
                                  :update-fn effective-update-fn

@@ -6,9 +6,9 @@
   (:use :cl :alexandria)
   (:import-from :ut.state.state #:application-state #:state-data-data #:application-state-data #:state-ref)
   (:import-from :ut.state.transaction #:with-transaction) ; Removed record-change, assuming set-state! handles it
-  (:import-from :elmtui.core.topic-registry #:publish) ; Assuming this exists
-  (:import-from :elmtui.clevelib.async #:with-promise #:then) ; For async command
-  (:import-from :elmtui.core.loop #:publish) ; For async command callback, assuming publish is the correct function
+  (:import-from :elmtui.core.topic-registry #:publish-to-topic) ; Corrected import
+  (:import-from :cleve-elm.async #:with-promise #:then) ; For async command
+  (:import-from :elmtui.core.globals #:*app-sender*) ; Use *app-sender*
   (:export :defupdate :dispatch-to-topic :handle-async-command))
 (in-package :elmtui.state.update)
 
@@ -48,7 +48,7 @@
          (when (and result (listp result))
            (dolist (cmd result)
              (when (topic-command-p cmd)
-               (elmtui.core.topic-registry:publish
+               (elmtui.core.topic-registry:publish-to-topic
                 (topic-command-topic cmd)
                 (topic-command-payload cmd)))))
          ;; Return all results from the body (which should be commands)
@@ -65,20 +65,20 @@
     (:async-task
      (let ((task-fn (second command))
            (on-complete-msg-fn (third command))) ; Renamed for clarity: expects a function that returns a message
-       (elmtui.clevelib.async:with-promise (promise)
+       (with-promise (promise)
          ;; Execute the async task
          (funcall task-fn promise)
          ;; When the promise resolves, construct and publish the completion message
-         (elmtui.clevelib.async:then
+         (then
           promise
           (lambda (result)
             (when on-complete-msg-fn
-              ;; Assuming elmtui.core.loop:publish takes a topic and a message
-              ;; and that the application's main loop subscribes to "app/update"
-              ;; to feed messages back into an update function.
-              (elmtui.core.loop:publish
-               "app/update" ; This topic needs to be conventional or configurable
-               (funcall on-complete-msg-fn result))))))))
+              ;; Use *app-sender* (which is elmtui.core.loop:publish at runtime)
+              ;; This takes a single event argument.
+              ;; This event will be wrapped as (:app-message <event>) if necessary
+              ;; and enqueued to the main event channel.
+              (funcall elmtui.core.globals:*app-sender*
+                       (funcall on-complete-msg-fn result))))))))
     ;; Potentially handle other async command types here
     (:another-async-type
      (log:warn "Unhandled async command type: ~A" (first command)))

@@ -10,6 +10,7 @@
    :event-loop-dispatch-error
    :async-task-error
    :with-message-restarts
+   :signal-subscriber-error
    :with-async-restarts
    :with-render-restarts
    :state-update-error
@@ -88,6 +89,12 @@
              (format s "Render error: ~A~%Reason: ~A"
                      (message c) (reason c)))))
 
+(define-condition signal-subscriber-error (error)
+  ((signal :initarg :signal :reader subscriber-signal)
+   (reason :initarg :reason :reader reason))
+  (:report (lambda (c s)
+             (format s "Signal subscriber error: ~A~%Reason: ~A"
+                     (signal c) (reason c)))))
 
 (defvar *log-condition* (lambda (c) (log-condition c)))
 

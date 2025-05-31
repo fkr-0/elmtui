@@ -55,7 +55,7 @@
   (case msg
     (:click
      (if (and (button-model-on-click-msg model) (not (button-model-disabled model)))
-         (values model (list (cmd-async #'send-message (button-model-on-click-msg model))))
+         (values model (list (cmd-async #'send-message :args (button-model-on-click-msg model))))
          (values model nil))) ; No action if no on-click-msg or button is disabled
     (otherwise
      (values model nil)))) ; Ignore other messages
@@ -64,11 +64,11 @@
 ;;; View (NEW STANDARDIZED FORMAT)
 ;;;---------------------------------------------------------------
 (defwidget-view view-button (app-state
-                                :widget-id-var widget-id :model-var model
-                                :add-args (label on-click disabled
-                                                 tooltip aria-label class)
-                                :documentation
-                                "Creates a UI-NODE representation of a button.
+                             :widget-id-var widget-id :model-var model
+                             :add-args (label on-click disabled
+                                              tooltip aria-label class)
+                             :documentation
+                             "Creates a UI-NODE representation of a button.
    APP-STATE: The application state.
    WIDGET-ID: The unique ID for this button (required).
    LABEL: Text to display on the button. Defaults to model's label if not provided.
