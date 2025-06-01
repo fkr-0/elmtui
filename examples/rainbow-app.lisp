@@ -13,6 +13,7 @@
   (:import-from :elmtui.style-lib.rule #:defrule)
   (:import-from :elmtui.style-lib.sheet #:defstylesheet)
   (:import-from :elmtui.state.update #:defupdate)
+  (:import-from :elmtui.core.event-types #:key-event) ; Added import for key-event
   (:export
    :main
    :run-rainbow-example-app))
@@ -56,13 +57,20 @@
 (defupdate app-update (app-state message)
   "Handles updates to the application state based on messages.
    Any key press will quit the application."
+  (log-info "RAINBOW-APP: app-update called with message: ~S (Type: ~A)" message (type-of message))
   (cond
     ;; Handle key events to quit the app
-    ((and (listp message) (eq (first message) :key-event))
-     (values (list :should-quit t) nil))
+    ;; ((and (listp message) (eq (first message) :key-event))
+    ;;  (values (list :should-quit t) nil))
 
     ;; Handle struct-based key events
-    ((typep message 'elmtui.core.event-types:key-event)
+    ((typep message 'elmtui.core.event-types:key-event) ; Check for key event using fully qualified name
+     (log-info "RAINBOW-APP: Key event condition met for ~A, setting :should-quit to t." message)
+     (values (list :should-quit t) nil)) ; Update state to quit, NO commands
+
+    ;; Handle :APP-QUIT-REQUESTED from SIGINT
+    ((and (listp message) (eq (first message) :app-quit-requested))
+     (log-info "RAINBOW-APP: :APP-QUIT-REQUESTED condition met for ~A, setting :should-quit to t." message)
      (values (list :should-quit t) nil))
 
     ;; Default: no state change

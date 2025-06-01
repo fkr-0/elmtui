@@ -547,11 +547,11 @@
   (values nil 0 0))
 
 ;; --- Grid layout method ---
-(defmethod dispatch-layout ((display (eql :grid)) node available-rect)
-  (log:debug "LAYOUT: dispatch-layout (:grid) for ~S, Available: ~S"
-             (getf (ui-node-props node) :id) available-rect)
-  ;; Calls the main grid layout function from the grid package
-  (layout-grid-container-impl node available-rect))
+;; (defmethod dispatch-layout ((display (eql :grid)) node available-rect)
+;;   (log:debug "LAYOUT: dispatch-layout (:grid) for ~S, Available: ~S"
+;;              (getf (ui-node-props node) :id) available-rect)
+;;   ;; Calls the main grid layout function from the grid package
+;;   (layout-grid-container-impl node available-rect))
 
 
 ;;;-----------------------------------------------------------------------------

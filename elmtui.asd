@@ -12,7 +12,8 @@
                               #:bordeaux-threads)
   :pathname "./src/"
   :serial t
-  :components ((:module "cleve-elm"
+  :components ((:file "core/logging")
+               (:module "cleve-elm"
                 :pathname "clevelib/"
                 :serial t
                 :components ((:file "api")

@@ -361,37 +361,30 @@
 ;; For this integration, we'll assume functions like `get-element-position`
 ;; and `get-all-element-positions` are available and work on the UI tree or a registry.
 
-(defun calculate-nav-distance (x1 y1 x2 y2 direction)
+(defun calculate-nav-distance (rect1-x rect1-y rect2-x rect2-y direction)
   "Calculate a weighted distance score for navigation.
    Prefer elements that are directly in the specified direction.
    Returns a weighted score considering both primary direction and orthogonal deviation."
-  (let* ((dx (- x2 x1))
-         (dy (- y2 y1))
+  (let* ((dx (- rect2-x rect1-x))
+         (dy (- rect2-y rect1-y))
          (dx-abs (abs dx))
          (dy-abs (abs dy))
-         (primary-axis-distance
-           (case direction
-             ((:up :down) dy-abs)
-             ((:left :right) dx-abs)))
-         (secondary-axis-distance
-           (case direction
-             ((:up :down) dx-abs)
-             ((:left :right) dy-abs)))
-         ;; Increase penalty for deviation from the primary axis of navigation
-         (penalty-factor 3.0) ; Higher penalty to prefer more aligned elements
-         ;; Check if the element is actually in the right direction
-         (wrong-direction-p
-           (case direction
-             (:up (>= dy 0))    ; Should be negative (target above source)
-             (:down (<= dy 0))  ; Should be positive (target below source)
-             (:left (>= dx 0))  ; Should be negative (target left of source)
-             (:right (<= dx 0)))) ; Should be positive (target right of source))))
-         (direction-penalty (if wrong-direction-p 10000.0 0.0))) ; Huge penalty for wrong direction
-
-    ;; Total score: primary distance + penalized deviation + wrong direction penalty
-    (+ primary-axis-distance
-       (* secondary-axis-distance penalty-factor)
-       direction-penalty)))
+         ;; Primary distance along the axis of navigation
+         (primary-dist (case direction
+                         ((:up :down) dy-abs)
+                         ((:left :right) dx-abs)
+                         (otherwise most-positive-fixnum))) ; Handle unexpected directions
+         ;; Secondary distance perpendicular to the axis of navigation
+         (secondary-dist (case direction
+                           ((:up :down) dx-abs)
+                           ((:left :right) dy-abs)
+                           (otherwise most-positive-fixnum)))) ; Handle unexpected directions
+    ;; ... rest of your distance calculation logic using primary-dist and secondary-dist ...
+    ;; For example, a weighted sum or a more complex heuristic:
+    (if (or (= primary-dist most-positive-fixnum)
+            (= secondary-dist most-positive-fixnum))
+        most-positive-fixnum ; Propagate if direction was invalid
+        (+ (* primary-dist 2) secondary-dist)))) ; Example heuristic
 
 (defun find-grid-adjacent (source-grid-coords direction ui-tree)
   "Placeholder for finding an adjacent element in a grid layout.
@@ -941,7 +934,7 @@
    in depth-first traversal order.
    This function expects the `ui-tree-node` to be the root of the UI tree,
    typically obtained from `(state-ref app-state :ui-tree)`."
-  (let ((focusable-nodes '())) ; Changed from focusable-ids
+  (let* ((focusable-nodes '())) ; Changed from focusable-ids
     (labels ((is-element-node (node)
                "Checks if a node is an element (keyword type, props, children)."
                (and (listp node) (keywordp (first node))))
@@ -967,11 +960,11 @@
 
                    ;; Check if current node is focusable and has an ID
                    (when (and node-id is-focusable (not is-disabled))
-                     (push node focusable-nodes))) ; Push the node itself
+                     (push node focusable-nodes)) ; Push the node itself
 
-                 ;; Traverse children
-                 (dolist (child (get-node-children node))
-                   (traverse child)))))
+                   ;; Traverse children
+                   (dolist (child (get-node-children node))
+                     (traverse child))))))
 
       (traverse ui-tree-node)
       (nreverse focusable-nodes)))) ; Reverse to get depth-first order
