@@ -1,5 +1,6 @@
 (uiop:define-package :cleve-elm.queue
   (:use :cl :bt)
+  (:import-from :log4cl #:log-debug) ; Added log-debug import
   (:export
    :priority-queue
    :typed-queue
@@ -34,13 +35,28 @@
 (defclass priority-queue ()
   ((items :accessor items :initform (make-hash-table) :documentation "Hash table containing items organized by priority")
    (max-priority :accessor max-priority :initform 0 :documentation "Current maximum priority in the queue")
-   (counter :accessor counter :initform 0)
+   (counter :reader %counter ; Internal reader
+            :writer (setf %counter) ; Internal writer
+            :initform 0)
    (lock :accessor queue-lock :initform (bt:make-lock))
    (item-added  :accessor item-added :initform (bt:make-condition-variable)))
   (:documentation "A priority queue with multiple priority levels."))
 
+;; Thread-safe accessor for the counter
+(defmethod counter ((queue priority-queue))
+  (bt:with-lock-held ((queue-lock queue))
+    (let ((c (%counter queue)))
+      ;; Reduced verbosity: Log only if the counter is non-zero, as zero is the common case during polling.
+      (when (> c 0)
+        (log-debug :cleve.queue "COUNTER for ~A #<ID ~X>: lock held, %counter is ~D"
+                   (class-name (class-of queue))
+                   (sb-kernel:get-lisp-obj-address queue) ; Or sxhash, or similar for identity
+                   c))
+      c)))
+
 (defmethod print-object ((queue priority-queue) stream)
   (print-unreadable-object (queue stream :type t :identity t)
+    ;; Use the thread-safe accessor in print-object as well
     (format stream "Q[~A]" (counter queue))))
 
 (defun make-queue ()
@@ -67,7 +83,7 @@ Higher priority items are dequeued before lower priority items."
     (when (> priority (max-priority queue))
       (setf (max-priority queue) priority))
     
-    (incf (counter queue))
+    (incf (%counter queue)) ; Use internal reader for incf
     (bt:condition-notify (item-added queue))))
 
 (defun enqueue-with-priority (queue item priority)
@@ -108,19 +124,19 @@ Higher priority items are dequeued before lower priority items."
   "Wait until an item is available and return the highest priority item."
   (bt:with-lock-held ((queue-lock queue))
     (loop
-      while (zerop (counter queue))
+      while (zerop (%counter queue)) ; Use internal reader
       do (bt:condition-wait (item-added queue) (queue-lock queue)))
     
     (let ((item (pop-highest-priority-item queue)))
-      (decf (counter queue))
+      (decf (%counter queue)) ; Use internal reader for decf
       item)))
 
 (defmethod dequeue-no-wait ((queue priority-queue))
   "Return the highest priority item or nil if no item is available."
   (bt:with-lock-held ((queue-lock queue))
-    (when (> (counter queue) 0)
+    (when (> (%counter queue) 0) ; Use internal reader
       (let ((item (pop-highest-priority-item queue)))
-        (decf (counter queue))
+        (decf (%counter queue)) ; Use internal reader for decf
         item))))
 
 (defmethod dequeue ((queue priority-queue) &optional (wait t))
@@ -131,8 +147,10 @@ Higher priority items are dequeued before lower priority items."
 
 (defmethod queue-empty-p ((queue priority-queue))
   "Check if the queue is empty."
+  ;; This will now use the thread-safe counter method
   (zerop (counter queue)))
 
 (defmethod queue-length ((queue priority-queue))
   "Return the number of items in the queue."
+  ;; This will now use the thread-safe counter method
   (counter queue))

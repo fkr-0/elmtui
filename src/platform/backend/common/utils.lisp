@@ -222,46 +222,6 @@
      (default-args :initarg :default-args :reader default-args
                    :documentation "Default arguments for the sequence."))
     (:documentation "Ansi Escape Sequence to be sent to the terminal."))
-  ;; (defmethod render-seq ((seq ansi-sequence) &rest args)
-  ;;   "Render the sequence SEQ with the arguments ARGS."
-  ;;   (let ((control-string (prerender seq)) ; Get the prerendered format string
-  ;;         (seq-id (identifier seq))) ; Cache identifier for logging
-  ;;     (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string: ~S, args: ~S"
-  ;;                seq-id control-string args)
-
-  ;;     ;; Validate control-string
-  ;;     (unless (stringp control-string)
-  ;;       (log:error "RENDER-SEQ: CRITICAL! Prerendered control-string for ~S is NOT a string: ~S (type ~A). This usually means (prerender seq) was not set correctly during ansi-sequence initialization."
-  ;;                  seq-id control-string (type-of control-string))
-  ;;       ;; Attempt to build a basic string if it's a simple sequence with no args, as a last resort.
-  ;;       ;; This recovery is fragile and indicates a deeper problem if reached.
-  ;;       (if (and (listp (seq seq)) (every #'stringp (seq seq)) (null args))
-  ;;           (progn
-  ;;             (log:warn "RENDER-SEQ: Attempting emergency fallback construction for ~S from (seq seq)." seq-id)
-  ;;             (setf control-string
-  ;;                   (apply #'concatenate 'string
-  ;;                          (mapcar (lambda (p) (if (string= p "ESC")
-  ;;                                                  (string (code-char 27))
-  ;;                                                  p))
-  ;;                                  (seq seq)))))
-  ;;           (progn
-  ;;             (log:error "RENDER-SEQ: Cannot recover non-string control-string for ~S. Returning empty string." seq-id)
-  ;;             (return-from render-seq "")))) ; Return empty string on unrecoverable error
-
-  ;;     ;; Now, control-string should be a valid format string (either from prerender or emergency fallback)
-  ;;     (unless (stringp control-string) ; Final check after potential recovery
-  ;;       (log:error "RENDER-SEQ: CRITICAL! control-string still not a string after recovery attempt for ~S. Returning empty string." seq-id)
-  ;;       (return-from render-seq ""))
-
-  ;;     (let ((formatted-result (apply #'format nil control-string args)))
-  ;;       (unless (stringp formatted-result)
-  ;;         (log:error "RENDER-SEQ: CRITICAL! FORMAT for ~S (control ~S, args ~S) returned non-string: ~S (type ~A). Returning empty string."
-  ;;                    seq-id control-string args formatted-result (type-of formatted-result))
-  ;;         (return-from render-seq ""))
-
-  ;;       (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S" seq-id formatted-result)
-  ;;       formatted-result)))
-
 
   (defun make-ansi-sequence (&key seq description identifier response-parser reset-sequence)
     (make-instance 'ansi-sequence
@@ -305,72 +265,80 @@
 
 (defmethod render-seq ((seq ansi-sequence) &rest args)
   "Render the ANSI control sequence with args."
-  (let ((control-parts (slot-value seq 'seq)))
-    (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string: ~S, args: ~S"
-               (slot-value seq 'identifier) control-parts args)
+  (let ((control-parts (slot-value seq 'seq))
+        (identifier (slot-value seq 'identifier)))
+    (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string template: ~S, args: ~S"
+               identifier control-parts args)
 
-    ;; Build a string with ESC prefix and properly formatted parts
-    (let ((result
-            (with-output-to-string (s)
-              ;; Always write the ESC character first (regardless of what's in the sequence)
-              (write-char (code-char 27) s)
+    (let* ((string-builder (list (string (code-char 27))))) ; Start with ESC
+      (let ((arg-index 0))
+        (dolist (part control-parts)
+          (cond
+            ((and (stringp part) (string= part "ESC"))
+             ;; The initial ESC character is already added.
+             ;; This part of the sequence definition is effectively a marker.
+             )
+            ((stringp part)
+             (push part string-builder))
+            ((null part) ; Placeholder for an argument
+             (if (< arg-index (length args))
+                 (let ((arg-value (nth arg-index args)))
+                   ;; Ensure arguments are converted to strings.
+                   ;; NIL arguments become empty strings in the sequence.
+                   (push (if arg-value (princ-to-string arg-value) "") string-builder)
+                   (incf arg-index))
+                 (progn
+                   (log:warn "RENDER-SEQ: Not enough arguments for sequence ~S. Expected placeholder at index ~D, but no more arguments provided. Inserting empty string."
+                             identifier arg-index)
+                   (push "" string-builder)))) ; Insert empty string if not enough args
+            (t
+             (log:error "RENDER-SEQ: Unknown part ~S in sequence definition for ~S. Skipping part." part identifier)
+             ;; Optionally, insert an error marker or an empty string
+             (push "" string-builder)))))
 
-              ;; Process each part
-              (let ((arg-index 0))
-                (dolist (part control-parts)
-                  (cond
-                    ;; Skip "ESC" strings since we already added the ESC character
-                    ((and (stringp part) (string= part "ESC")))
-
-                    ;; Regular string part - write it directly
-                    ((stringp part)
-                     (write-string part s))
-
-                    ;; NIL means insert an argument
-                    ((null part)
-                     (when (< arg-index (length args))
-                       (format s "~A" (nth arg-index args))
-                       (incf arg-index)))
-
-                    ;; Anything else is an error
-                    (t (error "Unknown part in sequence: ~S" part))))))))
-
-      ;; Show what we're returning for debugging
-      (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S"
-                 (slot-value seq 'identifier) result)
-
-      ;; Return the formatted string with ESC prefix
-      result)))
+      (let ((final-string (apply #'concatenate 'string (nreverse string-builder))))
+        (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S (char-codes: ~S)"
+                   identifier (sanitize-string-for-logging
+                               final-string)
+                   (when (> (length final-string) 0) (map 'list #'char-code final-string)))
+        final-string))))
 ;; (defmethod render-seq ((seq ansi-sequence) &rest args)
 ;;   "Render the ANSI control sequence with args."
 ;;   (let ((control-parts (slot-value seq 'seq)))
 ;;     (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string: ~S, args: ~S"
 ;;                (slot-value seq 'identifier) control-parts args)
 
-;;     ;; We need to build a string with the ESC character and any args
-;;     (let ((result (with-output-to-string (s)
-;;                     ;; Always start with the ESC character
-;;                     (write-char (code-char 27) s)
+;;     ;; Build a string with ESC prefix and properly formatted parts
+;;     (let ((result
+;;             (with-output-to-string (s)
+;;               ;; Always write the ESC character first (regardless of what's in the sequence)
+;;               (write-char (code-char 27) s)
 
-;;                     ;; Process each part of the control sequence
-;;                     (let ((arg-index 0))
-;;                       (dolist (part control-parts)
-;;                         (cond
-;;                           ((string= part "ESC")
-;;                            ;; Additional ESC if needed (rare case)
-;;                            (write-char (code-char 27) s))
-;;                           ((stringp part)
-;;                            ;; String components go as-is
-;;                            (write-string part s))
-;;                           ((null part)
-;;                            ;; NIL means insert an argument value
-;;                            (when (< arg-index (length args))
-;;                              (format s "~A" (nth arg-index args))
-;;                              (incf arg-index)))
-;;                           (t (error "Unknown part in ANSI sequence: ~S" part))))))))
+;;               ;; Process each part
+;;               (let ((arg-index 0))
+;;                 (dolist (part control-parts)
+;;                   (cond
+;;                     ;; Skip "ESC" strings since we already added the ESC character
+;;                     ((and (stringp part) (string= part "ESC")))
 
+;;                     ;; Regular string part - write it directly
+;;                     ((stringp part)
+;;                      (write-string part s))
+
+;;                     ;; NIL means insert an argument
+;;                     ((null part)
+;;                      (when (< arg-index (length args))
+;;                        (format s "~A" (nth arg-index args))
+;;                        (incf arg-index)))
+
+;;                     ;; Anything else is an error
+;;                     (t (error "Unknown part in sequence: ~S" part))))))))
+
+;;       ;; Show what we're returning for debugging
 ;;       (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S"
 ;;                  (slot-value seq 'identifier) result)
+
+;;       ;; Return the formatted string with ESC prefix
 ;;       result)))
 
 (defmethod initialize-instance :after ((obj ansi-sequence) &key)
@@ -386,86 +354,12 @@
   (loop for char across string
         collect (char-code char)))
 
-;; (defmethod initialize-instance :after ((obj ansi-sequence) &rest initargs)
-;;   "Initialize the sequence with default values."
-;;   (declare (ignore initargs))
-;;   (let* ((ident (identifier obj)) ; Get identifier for logging
-;;          (raw-seq-parts (seq obj))) ; Get raw sequence parts
-;;     (log:debug "ANSI-SEQ INIT [~S]: START. Raw parts from (seq obj): ~S"
-;;                ident raw-seq-parts)
-;;     (setf (prerender obj) ; Set the prerender slot
-;;           (with-output-to-string (s)
-;;             (dolist (part raw-seq-parts)
-;;               (cond
-;;                 ((string= part "ESC")
-;;                  (log:trace "ANSI-SEQ INIT [~A]: Writing ESC char." ident)
-;;                  (write-char (code-char 27) s))
-;;                 ((stringp part)
-;;                  (log:trace "ANSI-SEQ INIT [~A]: Writing string part: ~A" ident part)
-;;                  (write-string part s))
-;;                 ((null part)
-;;                  (log:trace "ANSI-SEQ INIT [~A]: Writing ~A placeholder." ident part)
-;;                  (write-string "~A" s)) ; Placeholder for argument
-;;                 (t (error "Unknown part in ANSI sequence definition: ~S for ~S" part ident))))))
-;;     (log:debug "ANSI-SEQ INIT [~S]: END. Computed prerender: ~S" ident (prerender obj))
-;;     (setf (slot-value obj 'default-args) ; Bypassing reader for direct slot write
-;;           (make-list (count-if #'null raw-seq-parts) :initial-element 0))))
-                                        ; Count only nulls for args
-
-;; (defmethod initialize-instance :after ((seq ansi-sequence) &rest args)
-;;   "Initialize the sequence with default values."
-;;   (declare (ignore args))
-;;   (let ((parts (seq seq)))
-;;     (setf (prerender seq)
-;;           (with-output-to-string (s)
-;;             (dolist (part parts)
-;;               (cond
-;;                 ((string= part "ESC") (write-char (code-char 27) s))
-;;                 ((stringp part) (write-string part s))
-;;                 ((null part) (write-string "~A" s)) ; Placeholder for argument
-;;                 (t (error "Unknown part in ANSI sequence definition: ~S for ~S" part (identifier seq)))))))
-;;     (setf (slot-value seq 'default-args) ; Bypassing reader for direct slot write
-;;           (make-list (count-if #'null (seq seq)) :initial-element 0))))
-                                        ; Count only nulls for args
 
 
 (defmethod number-of-arguments ((seq ansi-sequence))
   (count-if-not #'stringp (seq seq)))
 ;; Find the render-seq function and update it to ensure proper formatting of escape codes
 (append nil '(ansi-sequence) (list 'render-seq))
-
-;; (defmethod render-seq ((seq ansi-sequence) &rest args)
-;;   "Render the sequence SEQ with the arguments ARGS."
-;;   (let* ((control-string (prerender seq))
-;;           (result nil))
-;;     (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string: ~S, args: ~S"
-;;       (identifier seq) control-string args)
-;;     (unless (stringp control-string)
-;;       (log:error "RENDER-SEQ: CRITICAL! Prerendered control-string for ~S is NOT a string: ~S (type ~A)"
-;;         (identifier seq) control-string (type-of control-string))
-;;       ;; Attempt to recover if (seq seq) is simple and has no params
-;;       (if (and (listp (seq seq)) (every #'stringp (seq seq)) (null args))
-;;         (setf result (apply #'concatenate 'string (mapcar (lambda (p) (if (string= p "ESC") (string (code-char 27)) p)) (seq seq))))
-;;         (progn
-;;           (log:error "RENDER-SEQ: Cannot recover for ~S. Returning object itself!" (identifier seq))
-;;           (return-from render-seq seq)))) ; THIS IS BAD, BUT FOR DIAGNOSIS
-
-;;     (setf result (apply #'format nil control-string args))
-
-;;     (unless (stringp result)
-;;       (log:error "RENDER-SEQ: CRITICAL! FORMAT for ~S (control ~S, args ~S) returned non-string: ~S (type ~A)"
-;;         (identifier seq) control-string args result (type-of result))
-;;       ;; If format failed, try to return the raw control string if it was a string
-;;       (if (stringp control-string)
-;;         (progn
-;;           (log:warn "RENDER-SEQ: FORMAT failed, returning raw control-string: ~S" control-string)
-;;           (return-from render-seq control-string))
-;;         (progn
-;;           (log:error "RENDER-SEQ: FORMAT failed AND control-string was bad. Returning object for ~S!" (identifier seq))
-;;           (return-from render-seq seq)))) ; THIS IS VERY BAD
-
-;;     (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S" (identifier seq) result)
-;;     result))
 
 (defmethod print-object ((seq ansi-sequence) stream)
   (print-unreadable-object (seq stream :type t :identity t)
@@ -815,9 +709,21 @@
   (let ((seq-obj (get-sequence (find-symbol (format nil "~A~A" attr-keyword (if activep "" "-OFF")) :keyword))))
     (when seq-obj (render-seq seq-obj))))
 
-
-;; IMPORTANT: For any future changes to this file, use the final_file_content shown
-;; above as your reference. This content reflects the current state of the file,
-;; including any auto-formatting (e.g., if you used single quotes but the formatter
-;; converted them to double quotes). Always base your SEARCH/REPLACE operations on this
-;; final version to ensure accuracy.
+(defun sanitize-string-for-logging (input-string)
+  "Replaces non-printable characters in a string with their readable representations
+    (e.g., , <0x07>) for safe logging."
+  (check-type input-string string)
+  (with-output-to-string (s)
+    (loop for char across input-string
+          do (let ((code (char-code char)))
+               (cond
+                 ((= code 27) (write-string "" s))
+                 ((= code 7)  (write-string "" s))
+                 ((= code 8)  (write-string "" s))
+                 ((= code 9)  (write-char #\Tab s)) ; Tab is usually fine in logs
+                 ((= code 10) (write-char #\Newline s)) ; Newline is usually fine
+                 ((= code 13) (write-string "" s))
+                 ((and (>= code 32) (<= code 126)) ; Printable ASCII
+                  (write-char char s))
+                 ;; For characters outside printable ASCII, or other control codes:
+                 (t (format s "<0x~2,'0X>" code)))))))

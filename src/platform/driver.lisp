@@ -3,8 +3,8 @@
 ;;;============================================================================
 
 (uiop:define-package :elmtui.platform.driver
-  (:use :cl
-   :elmtui.platform.input) ; For start-reader
+  (:use :cl :bt
+        :elmtui.platform.input) ; For start-reader
   ;; Removed :elmtui.platform.output
   (:import-from :log4cl
                 #:log-debug #:log-info #:log-warn #:log-error)
@@ -18,7 +18,8 @@
                 #:*app-state* #:*app-message-processor*
                 #:*app-sender*)
   (:import-from :elmtui.core.focus
-                #:get-current-focus)
+                #:get-current-focus
+                #:make-focus-manager) ; Added make-focus-manager
   (:import-from :elmtui.core.keymap
                 #:key-event->normalized-key
                 #:lookup-keymap)
@@ -84,7 +85,8 @@
          (subs-fn   (getf app-spec :subscriptions-fn)))
     (unless (and init-fn update-fn view-fn)
       (error "App spec missing required functions: :init-fn, :update-fn, :view-fn"))
-    (log:info "DRIVER: Initializing application state for ~A..." (getf app-spec :name))
+    (log:info "DRIVER: Initializing application state for ~A..." ;; (getf app-spec :name)
+              app-spec)
     (multiple-value-bind (initial-model cmds) (funcall init-fn)
       (let ((st (make-application-state)))
         (merge-state st initial-model)
@@ -118,7 +120,7 @@
           (event-handled-by-widget-keymap nil))
       ;; 1. Key-event routing to focused widget
       (when (typep event 'key-event)
-        (let ((wid (get-current-focus app-state)))
+        (let ((wid (get-current-focus elmtui.core.globals:*focus-manager*)))
           (when wid
             (let* ((widget-model-path (list :widgets wid))
                    (widget-model      (state-ref app-state widget-model-path)))
@@ -169,7 +171,7 @@
                 (setf *driver-initiated-shutdown-p* t)
                 (log:info "DRIVER: Initiating shutdown due to quit condition.")
                 ;; Publish the standard shutdown command for the loop
-                (funcall publish-fn :shutdown-command :target-channel-name :system)))
+                (funcall publish-fn :shutdown-command :target-channel-name :system-channel))) ; Corrected target
             ;; Normal render cycle
             (when (not (state-ref app-state :driver-shutdown-initiated))
               (let* ((tree      (funcall view-fn app-state publish-fn))
@@ -229,7 +231,7 @@
                                                               :initial-size      canvas-initial-size
                                                               :max-size          canvas-max-size)))
          init-fn update-fn view-fn subs-fn app-state initial-cmds)
-    
+
     (unless backend
       (log:error "DRIVER: Failed to initialize backend ~A. Aborting." backend-type)
       (return-from run-application (values nil "Backend initialization failed.")))
@@ -243,9 +245,13 @@
 
                (multiple-value-setq (init-fn update-fn view-fn subs-fn app-state initial-cmds)
                  (initialize-app-state app-spec publish-fn))
-               
+
+               ;; Initialize the focus manager
+               (setf elmtui.core.globals:*focus-manager* (make-focus-manager))
+
+               (elmtui.core.loop:start-loop :wait t) ; Start the channel-based loop
                (funcall publish-fn (list :set-app-name (getf app-spec :name :unknown)))
-               (funcall publish-fn (list :set-driver-shutdown-initiated nil))
+               (funcall publish-fn (list :set-driver-shutdown-initiated nil)) ;;
 
                (multiple-value-bind (th stop-fn) (start-input-reader-thread backend publish-fn)
                  (setf *input-thread* th *stop-input-fn* stop-fn))
@@ -259,31 +265,56 @@
                                                   view-fn update-fn publish-fn)))
                (when subs-fn
                  (let ((app-subscriptions (funcall subs-fn app-state)))
-                   (log:info "DRIVER: Application subscriptions declared: ~S (Note: Ensure events are published to channels)" app-subscriptions)))
-               
+                   (log:info "DRIVER: Application subscriptions declared: ~A (Note: Ensure events are published to channels)" app-subscriptions)))
+
                ;; No explicit subscribe for shutdown needed here;
                ;; :shutdown-command published by process-event-from-driver
                ;; will be handled by loop.lisp's process-channel-event.
 
                (funcall publish-fn '(:force-render)) ; Initial render
-               (elmtui.core.loop:start-loop :wait t) ; Start the channel-based loop
+
+               ;; Wait for the event consumer loop to terminate.
+               ;; The event consumer loop terminates when *shutdown-requested* (in core.loop) is true.
+               (log:info "DRIVER: Main thread now waiting for event consumer loop to terminate...")
+               (loop while (and elmtui.core.loop:*consumer-thread* ; Ensure thread object exists
+                                (bt:thread-alive-p elmtui.core.loop:*consumer-thread*))
+                     do (sleep 0.05)) ; Poll periodically
+               (log:info "DRIVER: Event consumer loop has terminated or was not active. Proceeding to cleanup.")
                )
-          ;; Unwind
+          ;; Unwind clause
           (progn
-            (unless (or *driver-initiated-shutdown-p*
-                        (and *app-state* (state-ref *app-state* :should-quit)))
-              (log:info "DRIVER: Unwinding, ensuring event loop is stopped.")
-              (ignore-errors (elmtui.core.loop:elm-stop-loop)))
-            (cleanup-application backend canvas use-canvas)))
+            (log:info "DRIVER: Entering unwind-protect cleanup clause.")
+            ;; 1. Stop the input reader thread first.
+            (when *stop-input-fn*
+              (log:info "DRIVER: Stopping input reader thread...")
+              (ignore-errors (funcall *stop-input-fn*))
+              (when (and *input-thread* (bt:thread-alive-p *input-thread*))
+                (log:info "DRIVER: Waiting for input thread to join...")
+                (let ((joined-p (bt:join-thread *input-thread*))) ; Add a timeout
+                  (if joined-p
+                      (log:info "DRIVER: Input thread joined.")
+                      (log:warn "DRIVER: Input thread did not join in time."))))
+              (setf *input-thread* nil *stop-input-fn* nil))
+
+            ;; 2. Ensure the core event loop is stopped (this also joins the consumer thread).
+            (log:info "DRIVER: Ensuring core event loop is stopped...")
+            (ignore-errors (elmtui.core.loop:elm-stop-loop))
+            (log:info "DRIVER: Core event loop stop requested/confirmed.")
+
+            ;; 3. Perform final platform cleanup.
+            (cleanup-application backend canvas use-canvas)
+            (log:info "DRIVER: Unwind-protect cleanup finished.")))
       ;; Fatal error
       (error (e)
-        (log:error "DRIVER: Unhandled error in run-application: ~A~%Backtrace: ~A" e
-                   #+sbcl (with-output-to-string (s) (sb-debug:print-backtrace :stream s :count 10))
-                   #-sbcl "Backtrace not available for this Lisp implementation in this context.")
+        (log:error "DRIVER: Unhandled error in run-application: ~A~%Backtrace: ~A"
+                   e
+                   (if (member :sbcl *features*)
+                       (with-output-to-string (s) (sb-debug:print-backtrace :stream s :count 10)) ; Removed :condition e
+                       "Backtrace not available for this Lisp implementation in this context."))
         (ignore-errors (elmtui.core.loop:elm-stop-loop))
         (cleanup-application backend canvas use-canvas)
         (uiop:quit 1 e)))
-    
+
     (when (or *driver-initiated-shutdown-p*
               (and *app-state* (state-ref *app-state* :should-quit)))
       (log:info "DRIVER: Exiting cleanly.")

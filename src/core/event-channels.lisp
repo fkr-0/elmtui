@@ -8,250 +8,226 @@
    :make-channel :make-filtered-channel :channel-add-filter :-> :<- :select)
   (:import-from :cleve-elm.queue
    :make-priority-queue)
-  (:export :make-keyboard-channel
-   :channel-of
-           :handlers
-   :name
-           :make-mouse-channel
-   :make-system-channel
-           :make-ui-channel
-   :make-focus-channel
-           :make-command-channel
-   :make-message-channel
-           :standard-event-channels
-   :event-channel
-           :keyboard-channel
-   :mouse-channel
-           :system-channel
-   :ui-channel
-           :command-channel
-   :focus-channel
-           :message-channel
-   :register-event-handler
-           :unregister-event-handler
-   :send-event
-           :receive-event
-   :event-type-p
-   ;; New exports for enhanced system
-           :channel-priority
-   :set-channel-priority
-           :add-event-filter
-   :remove-event-filter
-           :select-from-channels
-   :wait-for-event
-           :try-receive-event))
+  ;; Removed duplicate :nicknames, :use, and :import-from clauses that were here
+  (:export
+   ;; class names
+   #:event-channel #:keyboard-channel #:mouse-channel #:system-channel
+   #:ui-channel #:command-channel #:focus-channel #:message-channel
+   #:no-wait
+   ;; instance readers
+   #:channel-of #:name #:priority #:filters #:handlers
+   ;; constructors / helpers
+   #:make-event-channel #:standard-event-channels #:wait-for-event
+   #:add-event-filter #:remove-event-filter
+   #:register-event-handler #:unregister-event-handler
+   #:send-event #:receive-event #:try-receive-event
+   #:channel-priority #:set-channel-priority))
+(in-package #:cleve-elm.core.event-channels)
 
-(in-package :cleve-elm.core.event-channels)
+;;; ------------------------------------------------------------------
+;;; Basic event-channel prototype
+;;; ------------------------------------------------------------------
 
-;; Define event channel types with priority support
 (defclass event-channel ()
-  ((channel :accessor channel-of :initform (make-channel) :documentation "The underlying channel")
-   (priority :accessor priority :initarg :priority :initform :normal 
-             :type (member :high :normal :low) :documentation "Channel priority")
-   (filters :accessor filters :initform nil :type list :documentation "List of event filters")
-   (handlers :accessor handlers :initform nil :type list :documentation "List of event handlers")
-   (name :accessor name :initarg :name :initform nil :type symbol :documentation "Name of the channel"))
-  (:documentation "Base class for event channels with priority support"))
+  ((%channel   :accessor channel-of ; Removed :initarg, will be set in initialize-instance
+               :documentation "Underlying raw channel object.")
+   (%name      :initarg  :name :reader name  :type symbol
+               :documentation "Symbolic identifier (e.g. :keyboard).")
+   (%priority  :initarg  :priority
+               :accessor priority          :type (member :high :normal :low)
+               :initform :normal
+               :documentation "Dispatch priority.")
+   (%channel-capacity :initarg :channel-capacity :reader channel-capacity :type fixnum :initform 0
+                      :documentation "Capacity of the underlying channel. 0 for unbuffered.")
+   (%filters   :initarg :filters ; Allow passing filters to make-instance
+               :initform nil :accessor filters  :type list)
+   (%handlers  :initform nil :accessor handlers :type list))
+  (:documentation "Common superclass for all typed event channels."))
 
-;; Implement channel sub-types with priority support
-(defclass keyboard-channel (event-channel)
-  ()
-  (:default-initargs :name :keyboard :priority :high)
-  (:documentation "Channel for keyboard events"))
+(defmethod initialize-instance :after ((ec event-channel) &key)
+  ;; Create the underlying channel after the event-channel instance is initialized,
+  ;; so (name ec) and (filters ec) are available.
+  (let ((channel-name-string (string (name ec)))
+        (ec-filters (filters ec))
+        (ec-capacity (channel-capacity ec))) ; Get capacity from the event-channel instance
+    (setf (channel-of ec)
+          (if ec-filters
+              (make-filtered-channel :filters ec-filters :name channel-name-string :capacity ec-capacity)
+              (make-channel :name channel-name-string :capacity ec-capacity)))))
 
-(defclass mouse-channel (event-channel)
-  ()
-  (:default-initargs :name :mouse :priority :normal)
-  (:documentation "Channel for mouse events"))
+(defun %priority-weight (p)
+  "Translate symbolic PRIORITY into an integer for `sort` / `<`."
+  (ecase p
+    (:high   0)
+    (:normal 1)
+    (:low    2)))
 
-(defclass system-channel (event-channel)
-  ()
-  (:default-initargs :name :system :priority :high)
-  (:documentation "Channel for system events"))
+;;; ------------------------------------------------------------------
+;;; Concrete subclasses – they differ only in :name / :priority defaults
+;;; ------------------------------------------------------------------
 
-(defclass ui-channel (event-channel)
-  ()
-  (:default-initargs :name :ui :priority :normal)
-  (:documentation "Channel for UI events"))
+(defmacro define-event-channel-class (name default-priority &optional (default-capacity 0))
+  `(defclass ,name (event-channel) ()
+     (:default-initargs :name ,(intern (string name) :keyword)
+                        :priority ,default-priority
+                        :channel-capacity ,default-capacity)
+     (:documentation ,(format nil "~A events." (string-capitalize name)))))
 
-(defclass command-channel (event-channel)
-  ()
-  (:default-initargs :name :command :priority :high)
-  (:documentation "Channel for command events"))
+(define-event-channel-class keyboard-channel :high 10) ;; Input channels might benefit from small buffer
+(define-event-channel-class mouse-channel    :normal 10)
+(define-event-channel-class system-channel   :high 5)   ;; Critical for shutdown, needs buffer
+(define-event-channel-class ui-channel       :normal 5)  ;; UI events, buffer might be good
+(define-event-channel-class command-channel  :high 5)   ;; For app commands, buffer is good
+(define-event-channel-class focus-channel    :high 1)   ;; Focus events are usually singular
+(define-event-channel-class message-channel  :normal 5) ;; Generic messages
 
-(defclass focus-channel (event-channel)
-  ()
-  (:default-initargs :name :focus :priority :high)
-  (:documentation "Channel for focus events"))
+;;; ------------------------------------------------------------------
+;;; Constructor helper & typed wrappers --------------------------------
 
-(defclass message-channel (event-channel)
-  ()
-  (:default-initargs :name :message :priority :normal)
-  (:documentation "Channel for general messages"))
+(defun make-event-channel (class &key priority filters capacity)
+  "Low-level helper – CLASS is a subclass symbol of `event-channel'."
+  ;; The :name and default :channel-capacity for the event-channel are set by
+  ;; :default-initargs in define-event-channel-class.
+  ;; The initialize-instance :after method for event-channel will create the
+  ;; underlying cleve-elm.channel using (name instance), (filters instance), and (channel-capacity instance).
+  (let ((initargs (list :priority (or priority :normal))))
+    (when filters (setf (getf initargs :filters) filters))
+    (when capacity (setf (getf initargs :channel-capacity) capacity))
+    (apply #'make-instance class initargs)))
 
-;; Enhanced factory functions with priority and filtering support
-(defun make-keyboard-channel (&key (priority :high) (filters nil))
-  "Create a new keyboard event channel with specified priority and filters"
-  (let ((channel (make-instance 'keyboard-channel :priority priority)))
-    (when filters
-      (setf (filters channel) filters)
-      (setf (channel-of channel) (make-filtered-channel :filters filters)))
-    channel))
+;;; Thin convenience wrappers --------------------------------------------------
+(macrolet ((defwrapper (name class)
+             `(defun ,name (&rest args)
+                (apply #'make-event-channel ',class args))))
+  (defwrapper make-keyboard-channel keyboard-channel)
+  (defwrapper make-mouse-channel    mouse-channel)
+  (defwrapper make-system-channel   system-channel)
+  (defwrapper make-ui-channel       ui-channel)
+  (defwrapper make-command-channel  command-channel)
+  (defwrapper make-focus-channel    focus-channel)
+  (defwrapper make-message-channel  message-channel))
 
-(defun make-mouse-channel (&key (priority :normal) (filters nil))
-  "Create a new mouse event channel with specified priority and filters"
-  (let ((channel (make-instance 'mouse-channel :priority priority)))
-    (when filters
-      (setf (filters channel) filters)
-      (setf (channel-of channel) (make-filtered-channel :filters filters)))
-    channel))
+;;; ------------------------------------------------------------------
+;;; Filtering helpers -------------------------------------------------
 
-(defun make-system-channel (&key (priority :high) (filters nil))
-  "Create a new system event channel with specified priority and filters"
-  (let ((channel (make-instance 'system-channel :priority priority)))
-    (when filters
-      (setf (filters channel) filters)
-      (setf (channel-of channel) (make-filtered-channel :filters filters)))
-    channel))
+(defun add-event-filter (chan fn)
+  (push fn (filters chan))
+  (setf (channel-of chan)
+        (channel-add-filter (channel-of chan) fn))
+  chan)
 
-(defun make-ui-channel (&key (priority :normal) (filters nil))
-  "Create a new UI event channel with specified priority and filters"
-  (let ((channel (make-instance 'ui-channel :priority priority)))
-    (when filters
-      (setf (filters channel) filters)
-      (setf (channel-of channel) (make-filtered-channel :filters filters)))
-    channel))
-
-(defun make-focus-channel (&key (priority :high) (filters nil))
-  "Create a new focus event channel with specified priority and filters"
-  (let ((channel (make-instance 'focus-channel :priority priority)))
-    (when filters
-      (setf (filters channel) filters)
-      (setf (channel-of channel) (make-filtered-channel :filters filters)))
-    channel))
-
-(defun make-command-channel (&key (priority :high) (filters nil))
-  "Create a new command event channel with specified priority and filters"
-  (let ((channel (make-instance 'command-channel :priority priority)))
-    (when filters
-      (setf (filters channel) filters)
-      (setf (channel-of channel) (make-filtered-channel :filters filters)))
-    channel))
-
-(defun make-message-channel (&key (priority :normal) (filters nil))
-  "Create a new general message channel with specified priority and filters"
-  (let ((channel (make-instance 'message-channel :priority priority)))
-    (when filters
-      (setf (filters channel) filters)
-      (setf (channel-of channel) (make-filtered-channel :filters filters)))
-    channel))
-
-;; Priority management
-(defun channel-priority (event-channel)
-  "Get the priority of an event channel"
-  (priority event-channel))
-
-(defun set-channel-priority (event-channel priority)
-  "Set the priority of an event channel"
-  (setf (priority event-channel) priority))
-
-;; Filter management
-(defun add-event-filter (event-channel filter-fn)
-  "Add a filter function to an event channel"
-  (push filter-fn (filters event-channel))
-  (let ((current-channel (channel-of event-channel)))
-    (setf (channel-of event-channel)
-          (channel-add-filter current-channel filter-fn)))
-  event-channel)
-
-(defun remove-event-filter (event-channel filter-fn)
-  "Remove a filter function from an event channel"
-  (setf (filters event-channel) 
-        (remove filter-fn (filters event-channel)))
-  ;; Recreate the filtered channel with updated filters
-  (setf (channel-of event-channel)
-        (if (filters event-channel)
-            (make-filtered-channel :filters (filters event-channel))
+(defun remove-event-filter (chan fn)
+  (setf (filters chan) (remove fn (filters chan)))
+  (setf (channel-of chan)
+        (if (filters chan)
+            (make-filtered-channel :filters (filters chan))
             (make-channel)))
-  event-channel)
+  chan)
 
-;; Event type checking
-(defun event-type-p (event type)
-  "Check if an event is of a specific type"
-  (and (typep event 'cleve-elm.message:message)
-       (eq (cleve-elm.message:message-type event) type)))
+;;; ------------------------------------------------------------------
+;;; Dispatch & utility API -------------------------------------------
 
-;; Handler management
-(defun register-event-handler (event-channel handler-fn)
-  "Register an event handler function with the channel"
-  (push handler-fn (handlers event-channel))
-  event-channel)
+(defun register-event-handler (chan fn) (push fn (handlers chan)) chan)
+(defun unregister-event-handler (chan fn) (setf (handlers chan) (remove fn (handlers chan))) chan)
 
-(defun unregister-event-handler (event-channel handler-fn)
-  "Remove an event handler function from the channel"
-  (setf (handlers event-channel) 
-        (remove handler-fn (handlers event-channel)))
-  event-channel)
+(defun send-event (chan ev) (-> (channel-of chan) ev))
+(defun receive-event (chan)  (<- (channel-of chan)))
 
-;; Event sending/receiving
-(defun send-event (event-channel event)
-  "Send an event to the channel"
-  (-> (channel-of event-channel) event))
 
-(defun receive-event (event-channel)
-  "Receive an event from the channel (blocking)"
-  (<- (channel-of event-channel)))
+(defun try-receive-event (chan &optional timeout)
+  "Attempt to pull a message from CHAN.
+Returns the message, or NIL on timeout / no data."
+  (let* ((raw       (channel-of chan))
+         (deadline  (when (and timeout (plusp timeout)) ; Ensure timeout is positive
+                      (+ (get-internal-real-time)
+                         (* timeout internal-time-units-per-second)))))
+    (loop
+      ;; fast path: data already waiting?
+      (when (cleve-elm.channel:no-wait raw :send nil)
+        (return (receive-event chan)))
+      ;; timed-out?
+      (when (and deadline ; Only check deadline if it was calculated
+                 (> (get-internal-real-time) deadline))
+        (return nil))
+      ;; If no timeout, and no data, this loop would be infinite without a break.
+      ;; However, try-receive-event is typically called when a timeout is expected
+      ;; or in a context where blocking indefinitely is not desired.
+      ;; For a non-timeout scenario, one might expect receive-event.
+      ;; If timeout is nil or not positive, and no data, this will busy-wait with sleep.
+      ;; This behavior might need further review based on intended use cases of try-receive-event without a valid timeout.
+      (unless deadline ; If no valid timeout, and no data, don't loop indefinitely if not intended.
+        (return nil)) ; Or, if it should block, this part needs rethinking. Assuming non-blocking intent if no valid timeout.
 
-(defun try-receive-event (event-channel &optional timeout)
-  "Try to receive an event from the channel (non-blocking or with timeout)"
-  ;; Implementation would depend on clevelib features
-  (let ((result
-          (select :timeout timeout
-                  (receive-event event-channel)))) ; kj:timeout timeout
-    (when result
-      (second (first result)))))
+      ;; back-off a touch to avoid a busy loop
+      (sleep 0.001))))
 
-;; Multi-channel selection
-(defun select-from-channels (event-channels &key timeout)
-  "Select an event from multiple channels based on priority"
-  (let* (
-         (result (select :timeout timeout
-                         ;; The mapcar here might still be an issue for how 'select'
-                         ;; expects individual operations, but this change fixes
-                         ;; the :timeout parsing.
-                         (mapcar #'receive-event
-                                 event-channels) ;kjall-channels ;; :timeout timeout
-                         )))
-    (when result
-      (destructuring-bind (channel value) (first result)
-        ;; Find which event-channel this belongs to
-        (let ((source-channel (find channel event-channels 
-                                    :key #'channel-of :test #'eq)))
-          (values value source-channel))))))
-
-;; Wait for event with priority handling
-(defun wait-for-event (event-channels)
-  "Wait for an event from any channel, respecting priorities"
-  ;; Sort channels by priority
-  (let* ((sorted-channels 
-           (sort (copy-seq event-channels)
-                 (lambda (a b)
-                   (let ((prio-a (priority a))
-                         (prio-b (priority b)))
-                     (cond
-                       ((eq prio-a :high) t)
-                       ((eq prio-b :high) nil)
-                       ((eq prio-a :normal) t)
-                       (t nil))))))
-         (result (select-from-channels sorted-channels)))
-    result))
+(defun set-channel-priority (chan new) (setf (priority chan) new))
+(defun channel-priority      (chan)    (priority chan))
 
 (defun standard-event-channels ()
-  "Create a standard set of event channels with proper priorities"
-  (list (cons :keyboard (make-keyboard-channel :priority :high))
-        (cons :mouse (make-mouse-channel :priority :normal))
-        (cons :system (make-system-channel :priority :high))
-        (cons :ui (make-ui-channel :priority :normal))
-        (cons :command (make-command-channel :priority :high))
-        (cons :focus (make-focus-channel :priority :high))
-        (cons :message (make-message-channel :priority :normal))))
+  "Return an alist (KEY . CHANNEL) for all built-ins."
+  (list (cons :keyboard (make-keyboard-channel))
+        (cons :mouse    (make-mouse-channel))
+        (cons :system   (make-system-channel))
+        (cons :ui       (make-ui-channel))
+        (cons :command  (make-command-channel))
+        (cons :focus    (make-focus-channel))
+        (cons :message  (make-message-channel))))
+
+;; (defun wait-for-event (channels &key timeout)
+;;   "Block until the **first ready event** arrives on one of CHANNELS.
+;; Channels are probed in priority order.
+;; Returns two values: *EVENT* and the originating *CHANNEL* object,
+;; or NIL if TIMEOUT (seconds) expires."
+;;   (let* ((sorted    (stable-sort (copy-seq channels)
+;;                                  #'<
+;;                                  :key (lambda (c)
+;;                                         (%priority-weight (priority c)))))
+;;          (deadline  (when timeout
+;;                       (+ (get-internal-real-time)
+;;                          (* timeout internal-time-units-per-second)))))
+;;     (loop
+;;       ;; 1) scan in priority order ---------------------------------
+;;       (dolist (ec sorted)
+;;         (when (cleve-elm.channel:no-wait (channel-of ec) :send nil)
+;;           (return (values (receive-event ec) ec))))
+;;       ;; 2) maybe timeout? -----------------------------------------
+;;       (when (and timeout
+;;                  (> (get-internal-real-time) deadline))
+;;         (return nil))
+;;       ;; 3) short pause – avoids pegging a core --------------------
+;;       (sleep 0.001))))
+(defun wait-for-event (event-channels &key timeout) ; Argument is now list of event-channel wrapper objects
+  "Block until the **first ready event** arrives on one of EVENT-CHANNELS.
+   Channels are probed in priority order.
+   Returns two values: *EVENT* and the originating *EVENT-CHANNEL* object,
+   or NIL if TIMEOUT (seconds) expires."
+  (let* ((sorted-event-channels (stable-sort (copy-seq event-channels) ; Sort the wrapper objects
+                                             #'<
+                                             :key (lambda (ec) ; ec is an event-channel object
+                                                    (%priority-weight (priority ec)))))
+        (deadline  (when (and timeout (plusp timeout)) ; Ensure timeout is positive
+                     (+ (get-internal-real-time)
+                        (* timeout internal-time-units-per-second)))))
+   (log-debug :event-channels.wait "WAIT-FOR-EVENT: Starting polling loop. Timeout: ~A s. Deadline: ~A" timeout deadline)
+   (loop named event-poll-loop
+         ;; 1) scan in priority order ---------------------------------
+         do (dolist (ec sorted-event-channels) ; ec is an event-channel wrapper object
+              (let ((raw-channel (channel-of ec)))
+                (if (cleve-elm.channel:no-wait raw-channel :send nil) ; Use channel-of to get raw channel
+                    (progn
+                      (log-info :event-channels.wait "WAIT-FOR-EVENT: Channel ~S indicated data via no-wait. Attempting receive." (name ec))
+                      (let ((event (receive-event ec)))
+                        (log-info :event-channels.wait "WAIT-FOR-EVENT: Received event ~S from channel ~S." event (name ec))
+                        (return-from event-poll-loop (values event ec))))
+                    nil
+                    )))
+         ;; 2) maybe timeout? -----------------------------------------
+         when (and deadline ; Only check deadline if it was calculated
+                   (> (get-internal-real-time) deadline))
+           do (progn
+                (log-info :event-channels.wait "WAIT-FOR-EVENT: Timeout expired.")
+                (return-from event-poll-loop nil))
+         ;; 3) short pause – avoids pegging a core --------------------
+         do (progn
+              (sleep 0.001)))))
