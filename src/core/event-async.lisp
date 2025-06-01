@@ -17,6 +17,7 @@
   (:import-from :elmtui.core.event-propagation
                 #:dispatch-event)
   (:import-from :elmtui.core.event-channels
+                #:wait-for-event
                 #:register-event-handler)
   (:import-from :cleve-elm.channel
    :make-channel
@@ -189,26 +190,34 @@
   (log-info "Event processing system stopped")
   t)
 
-(defun event-processing-loop (ui-tree-fn app-state-fn)
-  "Main event processing loop. Continuously monitors all channels for events.
-   UI-TREE-FN: Function to get the current UI tree.
-   APP-STATE-FN: Function to get the current application state."
-  (log-debug "Starting event processing loop")
+(defun event-processing-loop (ui-tree-fn app-state-fn
+                              &key (idle-sleep 0.1))
+  "Main dispatcher.
+   • *ui-tree-fn*   — thunk returning the current UI tree
+   • *app-state-fn* — thunk returning the current application state
+   The loop polls all standard event channels in priority order.
+   When no event is ready within IDLE-SLEEP seconds we simply iterate
+   again; this prevents busy-spinning when the application is idle."
+  (log:debug "Starting event-processing loop")
 
-  (loop while *event-processing-active* do
-    (let ((channels (list *main-event-channel*
-                          *key-event-channel*
-                          *mouse-event-channel*
-                          *ui-event-channel*
-                          *delayed-event-channel*
-                          *focus-event-channel*
-                          *command-event-channel*)))
+  ;; Gather the channels just once; they are stable for the lifetime
+  ;; of the application.  (If your app can *add* channels on the fly,
+  ;; move this binding inside the LOOP and refresh as needed.)
+  (let ((channels (list *main-event-channel*
+                        *key-event-channel*
+                        *mouse-event-channel*
+                        *ui-event-channel*
+                        *delayed-event-channel*
+                        *focus-event-channel*
+                        *command-event-channel*)))
 
-      ;; Use select to wait for an event from any channel
-      (let ((result (select channels :timeout 100)))
-        (when result
-          (destructuring-bind (channel value) (first result)
-            (process-event channel value ui-tree-fn app-state-fn)))))))
+    (loop while *event-processing-active*
+          for result = (wait-for-event channels
+                                       :timeout idle-sleep)
+          do (when result
+               ;; WAIT-FOR-EVENT returns two values: EVENT  and  CHANNEL
+               (multiple-value-bind (event src) result
+                 (process-event src event ui-tree-fn app-state-fn))))))
 
 (defun process-event (channel event ui-tree-fn app-state-fn)
   "Process an event received from a channel.

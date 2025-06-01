@@ -10,7 +10,8 @@
 (uiop:define-package :elmtui.platform.backend.terminal.diff-renderer
   (:use :cl :log4cl)
 
-  (:import-from #:elmtui.platform.api #:term-w #:term-h #:term-style #:term-stream)
+  (:import-from #:elmtui.platform.api #:term-w #:term-h #:term-style #:term-stream
+                #:render-and-present #:clear-screen #:flush-output)
   (:import-from #:elmtui.platform.canvas
                 #:canvas
                 #:make-terminal-canvas
@@ -21,6 +22,7 @@
                 #:canvas-buffer) ; For render-and-present
   (:import-from :elmtui.platform.backend.common.virtual-buffer
                 #:virtual-terminal-buffer #:make-virtual-terminal-buffer
+                #:virtual-terminal-buffer-cells
                 #:with-virtual-buffer-lock #:clear-buffer
                 #:virtual-terminal-buffer #:buffer-width #:buffer-height
                 #:buffer-cell-at #:buffer-cell-equal-p
@@ -29,6 +31,8 @@
                 #:ansi-seqs #:copy-term-style
                 #:exec-sequence #:update-style! #:make-terminal-style)
   (:import-from :elmtui.platform.backend.terminal
+                #:write-output
+                #:render-ui-tree-to-buffer
                 #:terminal-instance-front-buffer
                 #:terminal-instance-back-buffer
                 #:terminal-instance #:send-sequence #:apply-style-diff
@@ -46,10 +50,11 @@
    (back-buffer :initarg :back-buffer :reader buffers-not-compatible-error-back)
    (reason :initarg :reason :reader buffers-not-compatible-error-reason))
   (:report (lambda (condition stream)
-             (format stream "Buffers are not compatible for diffing. Front: ~A, Back: ~A. Reason: ~A"
-                     (buffers-not-compatible-error-front condition)
-                     (buffers-not-compatible-error-back condition)
-                     (buffers-not-compatible-error-reason condition)))))
+             (write-output (format nil "Buffers are not compatible for diffing. Front: ~A, Back: ~A. Reason: ~A"
+                                   (buffers-not-compatible-error-front condition)
+                                   (buffers-not-compatible-error-back condition)
+                                   (buffers-not-compatible-error-reason condition))
+                           stream))))
 ;; (defun apply-terminal-diff (terminal-instance diff-ops)
 ;;   "Applies the computed Doperations to the terminal.
 ;; Assumes it's called within WITH-TERMINAL-LOCK."
@@ -299,7 +304,7 @@ Optimizes by batching contiguous character updates with the same style."
                         (= op-start-col logical-cursor-col))
              (log:debug "APPLY-TERMINAL-DIFF: Cursor move. Row: ~A, Col: ~A" op-row op-start-col)
              ;; Direct cursor positioning - doesn't go through ANSI styling
-             (format stream "~A[~A;~AH" (code-char 27) (1+ op-row) (1+ op-start-col))
+             (write-output (format nil "~A[~A;~AH" (code-char 27) (1+ op-row) (1+ op-start-col)) stream)
              (setf logical-cursor-row op-row
                    logical-cursor-col op-start-col))
 
@@ -311,7 +316,7 @@ Optimizes by batching contiguous character updates with the same style."
 
            ;; Write the characters for this op
            (log:debug "APPLY-TERMINAL-DIFF: Writing chars at (~A,~A): ~S" op-row op-start-col op-chars)
-           (write-string op-chars stream)
+           (write-output op-chars stream)
            (setf logical-cursor-col (+ logical-cursor-col (length op-chars)))))))
 
     ;; Final style reset
@@ -321,46 +326,88 @@ Optimizes by batching contiguous character updates with the same style."
     (finish-output stream))
   t)
 
-(defmethod render-and-present ((instance terminal-instance) laid-tree &optional canvas-instance)
-  (let* ((front-buffer (terminal-instance-front-buffer instance))
-         (back-buffer (terminal-instance-back-buffer instance))
-         (original-back-buffer-for-canvas back-buffer)) ; Save original back-buffer if canvas is used
+;; (defmethod render-and-present ((instance terminal-instance) laid-tree &optional canvas-instance)
+;;   (let* ((front-buffer (terminal-instance-front-buffer instance))
+;;          (back-buffer (terminal-instance-back-buffer instance))
+;;          (original-back-buffer-for-canvas back-buffer)) ; Save original back-buffer if canvas is used
 
-    (unless (and front-buffer back-buffer)
-      (log:error "TERMINAL: Buffers not initialized. Skipping render.")
-      (return-from render-and-present nil))
+;;     (unless (and front-buffer back-buffer)
+;;       (log:error "TERMINAL: Buffers not initialized. Skipping render.")
+;;       (return-from render-and-present nil))
 
-    ;; 1. Prepare back-buffer (clear it, potentially use canvas buffer)
-    (if canvas-instance
-        (let ((canvas-buf (canvas-buffer canvas-instance)))
-          (with-virtual-buffer-lock (canvas-buf) (clear-buffer canvas-buf))
-          (setf back-buffer canvas-buf)) ; Temporarily use canvas buffer as the back buffer for render-frame
-        (with-virtual-buffer-lock (back-buffer) (clear-buffer back-buffer))) ; Clear normal back-buffer
+;;     ;; 1. Prepare back-buffer (clear it, potentially use canvas buffer)
+;;     (if canvas-instance
+;;         (let ((canvas-buf (canvas-buffer canvas-instance)))
+;;           (with-virtual-buffer-lock (canvas-buf) (clear-buffer canvas-buf))
+;;           (setf back-buffer canvas-buf)) ; Temporarily use canvas buffer as the back buffer for render-frame
+;;         (with-virtual-buffer-lock (back-buffer) (clear-buffer back-buffer))) ; Clear normal back-buffer
 
-    ;; 2. Render the laid-out tree to the (potentially temporary) back-buffer
-    ;; render-frame uses generic drawing primitives which draw to the backend's back-buffer.
-    (elmtui.platform.output:render-frame laid-tree instance back-buffer) ; Pass explicit back-buffer
+;;     ;; 2. Render the laid-out tree to the (potentially temporary) back-buffer
+;;     ;; render-frame uses generic drawing primitives which draw to the backend's back-buffer.
+;;     (elmtui.platform.output:render-frame laid-tree instance back-buffer) ; Pass explicit back-buffer
 
-    ;; 3. If canvas was used, apply its content to the original back-buffer
-    (when canvas-instance
-      (setf back-buffer original-back-buffer-for-canvas) ; Restore original back-buffer
-      ;; Now 'canvas-buf' has the canvas content, 'back-buffer' is the main screen back-buffer.
-      (apply-canvas-to-buffer canvas-instance back-buffer))
+;;     ;; 3. If canvas was used, apply its content to the original back-buffer
+;;     (when canvas-instance
+;;       (setf back-buffer original-back-buffer-for-canvas) ; Restore original back-buffer
+;;       ;; Now 'canvas-buf' has the canvas content, 'back-buffer' is the main screen back-buffer.
+;;       (apply-canvas-to-buffer canvas-instance back-buffer))
 
-    ;; 4. Compute diff between front and (final) back buffer, and apply to terminal
-    (if (and front-buffer back-buffer
-             (= (buffer-width front-buffer) (buffer-width back-buffer))
-             (= (buffer-height front-buffer) (buffer-height back-buffer)))
-        (let ((diff-ops (compute-buffer-diff front-buffer back-buffer)))
-          (when diff-ops
-            (with-terminal-lock (instance)
-              (apply-terminal-diff instance diff-ops) ; apply-terminal-diff writes to instance's stream
-              (finish-output (term-stream instance)))) ; Ensure changes are flushed
-          ;; 5. Swap front and back buffers
-          (rotatef (terminal-instance-front-buffer instance)
-                   (terminal-instance-back-buffer instance)) ; The old front becomes new back
-          t)
+;;     ;; 4. Compute diff between front and (final) back buffer, and apply to terminal
+;;     (if (and front-buffer back-buffer
+;;              (= (buffer-width front-buffer) (buffer-width back-buffer))
+;;              (= (buffer-height front-buffer) (buffer-height back-buffer)))
+;;         (let ((diff-ops (compute-buffer-diff front-buffer back-buffer)))
+;;           (when diff-ops
+;;             (with-terminal-lock (instance)
+;;               (apply-terminal-diff instance diff-ops) ; apply-terminal-diff writes to instance's stream
+;;               (finish-output (term-stream instance)))) ; Ensure changes are flushed
+;;           ;; 5. Swap front and back buffers
+;;           (rotatef (terminal-instance-front-buffer instance)
+;;                    (terminal-instance-back-buffer instance)) ; The old front becomes new back
+;;           t)
+;;         (progn
+;;           (log:error "TERMINAL: Buffer mismatch or invalid buffers. Skipping diff/swap. Front: ~S, Back: ~S"
+;;                      front-buffer back-buffer)
+;;           nil))))
+;; Implementation of the API function for the terminal backend
+(defmethod render-and-present ((backend terminal-instance) laid-out-tree &optional canvas)
+  (declare (ignore canvas)) ; Canvas might be used for viewport calculations if applicable
+  (log:info "TERMINAL: render-and-present called for tree ID: ~S" (getf (elmtui.view.core:ui-node-props laid-out-tree) :id))
+
+  ;; 1. Clear the back-buffer
+  (clear-screen backend) ; This clears the backend's back-buffer
+
+  ;; 2. Render the laid-out-tree to the back-buffer
+  (render-ui-tree-to-buffer backend laid-out-tree)
+
+  ;; 3. Compute diff between back-buffer and front-buffer, then apply to terminal stream
+  (let ((front-buffer (terminal-instance-front-buffer backend))
+        (back-buffer (terminal-instance-back-buffer backend))
+        (stream (term-stream backend)))
+    (if (and front-buffer back-buffer stream)
         (progn
-          (log:error "TERMINAL: Buffer mismatch or invalid buffers. Skipping diff/swap. Front: ~S, Back: ~S"
-                     front-buffer back-buffer)
-          nil))))
+          (let ((diffs (compute-buffer-diff front-buffer back-buffer)))
+            (log:debug "TERMINAL: Computed buffer diffs: ~A" (if diffs (length diffs) 0))
+            (when diffs
+              (apply-terminal-diff backend diffs)
+              (flush-output backend)))
+
+          ;; Swap buffers: copy content of back-buffer to front-buffer
+          (with-virtual-buffer-lock (front-buffer)
+            (with-virtual-buffer-lock (back-buffer)
+              (let* ((fb-cells (virtual-terminal-buffer-cells front-buffer))
+                     (bb-cells (virtual-terminal-buffer-cells back-buffer))
+                     ;; Ensure we don't go out of bounds if buffer sizes differ (e.g. during resize)
+                     (height (min (array-dimension bb-cells 0) (array-dimension fb-cells 0)))
+                     (width (min (array-dimension bb-cells 1) (array-dimension fb-cells 1))))
+                (loop for r from 0 below height
+                      do (loop for c from 0 below width
+                               do (let ((source-cell (aref bb-cells r c))
+                                        (target-cell (aref fb-cells r c)))
+                                    (setf (buffer-cell-char target-cell) (buffer-cell-char source-cell))
+                                    ;; Styles are plists, copy-list is appropriate for shallow copy of the plist structure.
+                                    ;; buffer-cell-style itself should be a fresh list if deep-copy-style was used when setting it.
+                                    (setf (buffer-cell-style target-cell) (copy-list (buffer-cell-style source-cell))))))))))
+        (log:warn "TERMINAL: render-and-present - Buffers or stream not available. Front~A, Back~A, Stream: ~A"
+                  (if (null front-buffer) "FRONTBUFFER is NIL" "") (if (null back-buffer) "BACKBUFFER is NIL" "") (if (null stream) "STREAM is NIL" ""))))
+  (log:info "TERMINAL: render-and-present completed."))

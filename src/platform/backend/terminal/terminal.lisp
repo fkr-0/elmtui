@@ -33,6 +33,11 @@
                 #:make-raw-input-event
                 #:make-key-event)
   (:import-from #:elmtui.platform.api #:term-w #:term-h #:term-style #:term-stream)
+  (:import-from :elmtui.view.styled #:styled-ui-node #:styles)
+  (:import-from :elmtui.view.core #:ui-node-props #:ui-node-type #:ui-node-children)
+  (:import-from :elmtui.view.geo #:x #:y #:w #:h #:rectangle-pos)
+  (:import-from :elmtui.style-lib.api #:style-set) ; Added for typep check
+  (:import-from :elmtui.style-lib.style-set #:styles-list) ; Added for conversion
   (:import-from #:elmtui.backend.common.ansi-styling
                 #:make-terminal-style #:make-termcolor #:exec-sequence
                 #:update-style! #:copy-term-style
@@ -55,6 +60,8 @@
   (:export #:terminal-instance
            #:initialize-backend
            #:shutdown-backend
+           #:render-ui-tree-to-buffer
+           #:write-output
            #:get-screen-dimensions
            #:send-sequence
            #:clear-screen
@@ -80,7 +87,7 @@
 (in-package :elmtui.platform.backend.terminal)
 
 (defstruct terminal-instance
-  (fd -1 :type integer)
+  (fd -1 )
   (stream nil :type (or null stream))
   (original-termios nil :type (or null termios))
   (current-termios nil :type (or null termios))
@@ -177,16 +184,21 @@
 ;;;---------------------------------------------------------------
 (defmethod initialize-backend ((backend-type (eql :terminal)) &key publish-fn (tty-path "/dev/tty") &allow-other-keys)
   (let ((fd (sb-unix:unix-open tty-path sb-posix:o-rdwr 0)))
-    (unless (and fd (>= fd 0))
-      (error "Could not open terminal TTY: ~A" tty-path))
+    ;; (unless (and fd (>= fd 0))
+    ;;   (error "Could not open terminal TTY: ~A" tty-path))
     (let* ((orig-termios  (enable-raw-mode fd))
-           (stream        (sb-sys:make-fd-stream fd :input t :output t :element-type 'character :buffering :none))
+           (stream        (open "/dev/tty"
+                                :direction :io
+                                :if-exists :append
+                                :if-does-not-exist :create
+                                :element-type '(unsigned-byte 8)))
            (curr-termios  (sb-posix:tcgetattr fd))
            (instance      (make-terminal-instance
                            :fd fd :stream stream
                            :original-termios orig-termios
                            :current-termios curr-termios
                            :publish-fn publish-fn)))
+      (log-info "TERMINAL: Initialized backend instance with fd ~A, stream ~S" fd stream)
       (multiple-value-bind (w h) (get-screen-dimensions instance)
         (setf (terminal-instance-width instance) w
               (terminal-instance-height instance) h)
@@ -209,7 +221,7 @@
         (send-sequence instance :reset) ; SGR 0
         ;; Restore normal screen buffer if alt screen was used
         ;; (send-sequence instance :normal-screen-buffer)
-        (format (term-stream instance) "~c[?25h~c[0m~c[J~c[H" #\Escape #\Escape #\Escape #\Escape) ; Show cursor, reset, clear, home
+        (write-output  (format nil "~c[?25h~c[0m~c[J~c[H" #\Escape #\Escape #\Escape #\Escape) (term-stream instance)) ; Show cursor, reset, clear, home
         (flush-output instance)
         (disable-raw-mode (terminal-instance-fd instance)
                           (terminal-instance-original-termios instance))
@@ -268,31 +280,71 @@
   (let ((seq-obj (get-sequence seq-id)))
     (when seq-obj
       (let ((rendered (apply #'render-seq seq-obj args)))
-        (write-string rendered (terminal-instance-stream instance))))))
+        (write-output rendered (terminal-instance-stream instance))))))
 
 (defmethod get-screen-dimensions ((instance terminal-instance))
-  (with-terminal-lock (instance)
-    (send-sequence instance :cursor-save)
-    (send-sequence instance :cursor-set-position 999 999)
-    (send-sequence instance :cursor-report)
-    (finish-output (terminal-instance-stream instance)))
-  (let ((response-chars '()))
-    (loop for i from 1 to 20 ; Increased limit slightly
-          for char = (read-char (terminal-instance-stream instance) nil nil)
-          while char
-          do (push char response-chars)
-          when (char= char #\R) do (return)
-            finally (progn
-                      (log:warn "Timeout or incomplete cursor report response. Read: ~S" (coerce (nreverse (copy-list response-chars)) 'string))
-                      (return-from get-screen-dimensions (values (term-w instance) (term-h instance))))) ; Fallback
+  (let ((response-str nil)
+        (default-w (term-w instance))
+        (default-h (term-h instance)))
+    (with-terminal-lock (instance)
+      (send-sequence instance :cursor-save)
+      (send-sequence instance :cursor-set-position 999 999) ; Standard way to request dimensions
+      (send-sequence instance :cursor-report)
+      (finish-output (terminal-instance-stream instance))
+
+      (let ((response-chars '())
+            (stream (terminal-instance-stream instance))
+            (deadline (+ (get-internal-real-time) (* 0.5 internal-time-units-per-second)))) ; 0.5s total timeout
+        (loop
+          (when (> (get-internal-real-time) deadline)
+            (log:warn "Timeout waiting for cursor report. Read so far: ~S" (coerce (nreverse (copy-list response-chars)) 'string))
+            (return)) ; Exit loop, response-str will be nil or partial
+
+          (let ((char (read-byte stream nil :eof)))
+            (cond
+              ((eq char :eof)
+               (log:warn "EOF encountered while reading cursor report. Read so far: ~S" (coerce (nreverse (copy-list response-chars)) 'string))
+               (return)) ; Exit loop
+              ;; ((null char) ; No character available right now
+              ;;  (sleep 0.01))
+                                        ; Wait a bit (10ms) and retry
+              (t ; Character read
+               (push char response-chars)
+               (when (= char (char-code #\R))
+                 (setq response-str (coerce (mapcar #'code-char (nreverse response-chars)) 'string))
+                 (log:debug "Cursor report full response read: ~S" response-str)
+                 (return)))))))) ; Exit loop, proceed to parse
+
+    ;; Always restore cursor, regardless of whether we got a response
     (with-terminal-lock (instance)
       (send-sequence instance :cursor-restore)
       (finish-output (terminal-instance-stream instance)))
-    (let* ((str (coerce (nreverse response-chars) 'string))
-           (parts (uiop:split-string (subseq str 2 (1- (length str))) :separator '(#\;))))
-      (if (= (length parts) 2)
-          (values (parse-integer (second parts)) (parse-integer (first parts)))
-          (values (term-w instance) (term-h instance))))))
+
+    (when response-str
+      (handler-case
+          (let* ((esc-pos (position #\Esc response-str))
+                 (bracket-pos (position #\[ response-str :start (if esc-pos (1+ esc-pos) 0)))
+                 (r-pos (position #\R response-str :from-end t)))
+            (if (and esc-pos bracket-pos r-pos (< bracket-pos r-pos) (> r-pos (1+ bracket-pos))) ; Ensure content between [ and R
+                (let* ((content (subseq response-str (1+ bracket-pos) r-pos))
+                       (parts (uiop:split-string content :separator '(#\;))))
+                  (if (and (= (length parts) 2)
+                           (every #'digit-char-p (first parts))
+                           (plusp (length (first parts))) ; Ensure not empty string
+                           (every #'digit-char-p (second parts))
+                           (plusp (length (second parts)))) ; Ensure not empty string
+                      (let ((parsed-h (parse-integer (first parts)))
+                            (parsed-w (parse-integer (second parts))))
+                        (log:info "Parsed dimensions: W=~A, H=~A from ~S" parsed-w parsed-h response-str)
+                        (return-from get-screen-dimensions (values parsed-w parsed-h)))
+                      (log:warn "Could not parse dimensions from report parts: ~S (original: ~S)" parts response-str)))
+                (log:warn "Malformed cursor report: ~S. ESC:~S, [:~S, R:~S" response-str esc-pos bracket-pos r-pos)))
+        (error (e)
+          (log:error "Error parsing cursor report string ~S: ~A" response-str e))))
+
+    ;; Fallback if parsing failed or no response
+    (log:warn "Failed to get screen dimensions from terminal, using defaults: W=~A, H=~A" default-w default-h)
+    (values default-w default-h))) ; Exit loop, proceed to parse
 
 (defmethod clear-screen ((instance terminal-instance))
   (log:debug "TERMINAL clear-screen: Clearing back-buffer.")
@@ -459,10 +511,39 @@
     (let ((ts (style-to-terminal-style style)))
       (when ts
         (let ((seqs (elmtui.backend.common.ansi-styling:ansi-seqs ts :fg-color :bg-color :bold :italic :underline)))
-          (dolist (seq seqs) (write-string (concatenate 'string (string #\Esc) seq) stream)))))))
+          (dolist (seq seqs) (write-output (concatenate 'string (string #\Esc) seq) stream)))))))
+(defmacro as-utf-8-bytes (char writer)
+  "Given the character CHAR, call the WRITER for every byte in the
+  UTF-8 encoded form of that character. WRITER may a function or a
+  macro."
+  (let ((char-code (gensym)))
+    `(let ((,char-code (char-code ,char)))
+       (declare (type fixnum ,char-code))
+       (cond ((< ,char-code 128) (,writer ,char-code))
+             ((< ,char-code 2048)
+              (,writer (logior #b11000000 (ldb (byte 5 6) ,char-code)))
+              (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))
+             ((< ,char-code 65536)
+              (,writer (logior #b11100000 (ldb (byte 4 12) ,char-code)))
+              (,writer (logior #b10000000 (ldb (byte 6 6) ,char-code)))
+              (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))
+             (t
+              (,writer (logior #b11110000 (ldb (byte 3 18) ,char-code)))
+              (,writer (logior #b10000000 (ldb (byte 6 12) ,char-code)))
+              (,writer (logior #b10000000 (ldb (byte 6 6) ,char-code)))
+              (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))))))
+
+(defun write-output (output stream )
+  "Write output to the terminal
+This method should be implemented by subclasses of low-level-terminal."
+  ;; (declare (ignore style))
+  ;; ;; (with-lock (term)
+  ;; (exec-sequence term :cursor-set-position y x)
+  (dotimes (i (length output))
+    (as-utf-8-bytes (char output i) (lambda (x) (write-byte x stream)))))
 
 (defun write-style-reset-to-stream (stream)
-  (write-string (concatenate 'string (string #\Esc) "[0m") stream))
+  (write-output (concatenate 'string (string #\Esc) "[0m") stream))
 
 (defmethod apply-style-diff ((instance terminal-instance) new-style)
   (log:info "APPLY-STYLE-DIFF CALLED. Current: ~S, New: ~S" (term-style instance) new-style)
@@ -499,7 +580,8 @@
 ;;;---------------------------------------------------------------
 ;;; Input Handling (existing methods)
 ;;;---------------------------------------------------------------
-(defun read-char-nonblock (stream) (read-char-no-hang stream nil nil))
+(defun read-char-nonblock (stream) (read-byte stream nil nil))
+
 
 (defun parse-sgr-mouse-event (params raw-bytes final-char-code)
   (let* ((button-code (first params)) (col (second params)) (row (third params))
@@ -559,24 +641,70 @@
         (error (e) (warn "Error parsing input bytes ~A: ~A." bytes-vector e) (make-raw-input-event :bytes raw))))))
 
 (defmethod poll-input-event ((instance terminal-instance) &key timeout)
-  (let ((stream (terminal-instance-stream instance)) (buffer (terminal-instance-input-buffer instance)) (start-time (get-internal-real-time)))
+  ;; timeout: nil (block), 0 (non-block), >0 (timeout in seconds)
+  (let ((stream (terminal-instance-stream instance))
+        (buffer (terminal-instance-input-buffer instance)))
+    ;; (deadline (if (and timeout (> timeout 0)) ; Commented out as it's unused
+    ;;               (+ (get-internal-real-time) (* timeout internal-time-units-per-second))
+    ;;               nil)))
     (with-terminal-lock (instance) (setf (fill-pointer buffer) 0))
-    (loop
-      (let ((char (if (zerop (fill-pointer buffer))
-                      (if timeout (read-char stream nil :eof (if (= timeout 0) :nonblock-peek)) (read-char stream nil :eof))
-                      (read-char-nonblock stream))))
-        (cond
-          ((eq char :eof) (return nil))
-          ((eq char :nonblock-peek) (return nil))
-          ((null char) (if (plusp (fill-pointer buffer)) (return (parse-input-bytes-to-message buffer))
-                           (if (and timeout (> timeout 0) (> (/ (- (get-internal-real-time) start-time) internal-time-units-per-second) timeout))
-                               (return nil))))
-          (t (with-terminal-lock (instance) (vector-push-extend (char-code char) buffer))))
-        (when (plusp (fill-pointer buffer))
-          (when (= (aref buffer 0) #o33)
-            (loop for i from 1 to 7 for next-char = (read-char-nonblock stream) while next-char
-                  do (with-terminal-lock (instance) (vector-push-extend (char-code next-char) buffer))))
-          (return (parse-input-bytes-to-message buffer)))))))
+
+    ;; 1. Read the first character
+    (let ((first-char
+            (cond
+              ((null timeout) ; Block indefinitely
+               (read-byte stream nil :eof))
+              ((= timeout 0) ; Non-blocking
+               (read-byte stream nil :eof))
+              (t ; Timed read - relies on VTIME set by enable-raw-mode
+               ;; read-char will wait up to VTIME (0.1s)
+               ;; We also have an overall 'deadline' for the whole poll-input-event
+               (read-byte stream nil :eof)))))
+
+      (cond
+        ((or (eq first-char :eof) (null first-char)) ; EOF or no char (for non-blocking/timed)
+         (return-from poll-input-event nil))
+        (t
+         (with-terminal-lock (instance) (vector-push-extend   first-char buffer)))))
+
+    ;; 2. If the first char was ESC, try to read the rest of the sequence non-blockingly
+    (when (and (> (length buffer) 0) (= (aref buffer 0) #o33)) ; ESC
+      ;; (format t "TERMINAL: ESC sequence detected, reading further characters non-blocking.")
+      (loop with escape-deadline = (+ (get-internal-real-time) (* 0.05 internal-time-units-per-second)) ; Short (50ms) deadline for escape sequence
+            for i from 1 to 7 ; Max typical escape sequence length
+            do
+               (when (> (get-internal-real-time) escape-deadline) (loop-finish))
+               (let ((next-char (read-byte stream nil :eof)))
+                 (if next-char
+                     (with-terminal-lock (instance) (vector-push-extend  next-char buffer))
+                     nil
+                     ;; (loop-finish)
+                     )))) ; No more chars for ESC sequence
+
+    ;; 3. Parse whatever is in the buffer
+    (if (plusp (fill-pointer buffer))
+        (parse-input-bytes-to-message buffer)
+        nil))) ; Should not happen if first-char was read
+
+;; (defmethod poll-input-event ((instance terminal-instance) &key timeout)
+;;   (let ((stream (terminal-instance-stream instance)) (buffer (terminal-instance-input-buffer instance)) (start-time (get-internal-real-time)))
+;;     (with-terminal-lock (instance) (setf (fill-pointer buffer) 0))
+;;     (loop
+;;       (let ((char (if (zerop (fill-pointer buffer))
+;;                       (if timeout (read-char stream nil :eof (if (= timeout 0) :nonblock-peek)) (read-char stream nil :eof))
+;;                       (read-char-nonblock stream))))
+;;         (cond
+;;           ((eq char :eof) (return nil))
+;;           ((eq char :nonblock-peek) (return nil))
+;;           ((null char) (if (plusp (fill-pointer buffer)) (return (parse-input-bytes-to-message buffer))
+;;                            (if (and timeout (> timeout 0) (> (/ (- (get-internal-real-time) start-time) internal-time-units-per-second) timeout))
+;;                                (return nil))))
+;;           (t (with-terminal-lock (instance) (vector-push-extend (char-code char) buffer))))
+;;         (when (plusp (fill-pointer buffer))
+;;           (when (= (aref buffer 0) #o33)
+;;             (loop for i from 1 to 7 for next-char = (read-char-nonblock stream) while next-char
+;;                   do (with-terminal-lock (instance) (vector-push-extend (char-code next-char) buffer))))
+;;           (return (parse-input-bytes-to-message buffer)))))))
 
 (defmethod peek-input-event ((instance terminal-instance))
   (warn "peek-input-event not reliably implemented for terminal backend.") nil)
@@ -596,3 +724,74 @@
 (defmethod set-input-mode ((instance terminal-instance) mode)
   (declare (ignore mode)) ; Raw mode is handled by initialize/shutdown.
   t)
+
+;; Forward declaration
+(declaim (ftype (function (terminal-instance t) t) render-ui-tree-to-buffer))
+
+;; Helper function to render the UI tree to the back-buffer
+;; This function will recursively traverse the tree and draw nodes.
+(defun render-ui-tree-to-buffer (backend ui-node)
+  (when ui-node
+    (let* ((props (elmtui.view.core:ui-node-props ui-node))
+           (node-type (elmtui.view.core:ui-node-type ui-node))
+           (node-id (getf props :id))
+           (layout-rect (getf props :layout-rect))
+           ;; Get the raw style object, which might be a style-set
+           (style-object (if (typep ui-node 'elmtui.view.styled:styled-ui-node)
+                             (elmtui.view.styled:styles ui-node)
+                             nil))
+           ;; Convert to plist if it's a style-set, otherwise use as is (expecting nil or already a plist)
+           (node-computed-styles (cond
+                                   ((null style-object) nil)
+                                   ((typep style-object 'style-set) ; style-set type imported
+                                    (styles-list style-object))     ; styles-list function imported
+                                   ((listp style-object) style-object) ; Already a plist (defensive)
+                                   (t
+                                    (log:warn "render-ui-tree-to-buffer: Unexpected style object type ~A for node type ~A, ID: ~A"
+                                              (type-of style-object) node-type node-id)
+                                    nil))))
+
+      (log:debug "OUTPUT: render-node - Type: ~S, ID: ~S, LayoutRect: ~S, StyleObject: ~S, ComputedStylesPlist: ~S"
+                 node-type node-id layout-rect style-object node-computed-styles)
+
+      (when layout-rect
+        (let ((rect-x (elmtui.view.geo:x layout-rect))
+              (rect-y (elmtui.view.geo:y layout-rect))
+              (rect-w (elmtui.view.geo:w layout-rect))
+              (rect-h (elmtui.view.geo:h layout-rect)))
+
+          ;; Proceed only if width and height are positive
+          (when (and rect-w rect-h (> rect-w 0) (> rect-h 0))
+            (let* ((bg-color (getf node-computed-styles :background-color)) ; Key from stylesheet
+                   (fg-color (getf node-computed-styles :color))          ; Standard key for text color
+                   ;; Construct the style plist for buffer cell (expects :bg, :fg, :attrs)
+                   (cell-style-plist ()))
+              (when bg-color (setf cell-style-plist (list* :bg bg-color cell-style-plist)))
+              (when fg-color (setf cell-style-plist (list* :fg fg-color cell-style-plist)))
+              ;; TODO: Add other attributes if necessary, e.g. :bold, :italic from node-computed-styles
+              ;; (let ((attrs ()))
+              ;;   (when (getf node-computed-styles :font-weight-bold) (push :bold attrs)) ; Example
+              ;;   (when attrs (setf cell-style-plist (list* :attrs attrs cell-style-plist))))
+
+              (log:debug "RENDER-UI-TREE: Node ~S (~S), Rect (~A,~A ~Ax~A), using cell-style ~S"
+                         node-id node-type rect-x rect-y rect-w rect-h cell-style-plist)
+
+              (cond
+                ((or (eq node-type :container) (eq node-type :div)) ; For rainbow stripes and other general containers
+                 (fill-rectangle backend rect-y rect-x rect-h rect-w
+                                 :char #\Space ; Default char for background
+                                 :style cell-style-plist))
+                ;; Add handling for :text-node or other specific types if needed
+                ;; ((eq node-type :text-node)
+                ;;  (let ((text-content (getf props :text "")))
+                ;;    (draw-text-at backend rect-y rect-x text-content :style cell-style-plist)))
+                (t
+                 ;; Default behavior for other node types: if it has a background, fill it.
+                 (when bg-color
+                   (fill-rectangle backend rect-y rect-x rect-h rect-w
+                                   :char #\Space
+                                   :style cell-style-plist))))))))
+
+      ;; Recursively render children
+      (dolist (child (elmtui.view.core:ui-node-children ui-node))
+        (render-ui-tree-to-buffer backend child)))))

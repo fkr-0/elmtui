@@ -1,252 +1,214 @@
 (uiop:define-package :cleve-elm.channel
-  (:export :go :-> :<- :channel :channel-close :channel-queue
-           :make-channel :channel-closed :channel-capacity :channel-length :channel-empty-p :channel-full-p :gogo
+  (:export :go :-> :<- :channel :channel-close :channel-queue :select
+   :make-channel :channel-closed :channel-capacity :channel-length :channel-empty-p :channel-full-p :gogo
+   #:no-wait
    :channel-add-filter :channel-remove-filter :filter-channel :filtered-channel :make-filtered-channel
-           :channel-take! :channel-put!
-           :apply-filter :pass-through-p)
-  (:use :cl :bt :cleve-elm.queue))
+   :channel-take! :channel-put!
+   :apply-filter :pass-through-p)
+  (:use :cl :bt :cleve-elm.queue :log4cl))
 (in-package :cleve-elm.channel)
 
-;; ======================================================================
-;; Channels
-;; ======================================================================
-;; The implementation is based on go channels.
+;;; INTERNAL SUPPORT -----------------------------------------------------------
 
-;; Channels are a synchronization primitive that allow one thread to
-;; send a value to another thread.  A channel is a queue with a lock
-;; and a condition variable.  The lock is used to protect the queue
-;; from concurrent access.  The condition variable is used to signal
-;; when the queue is empty.
-
-;; Here is a comparison between channels and the priority queue implementation
-;; in queue.lisp:
-
-;; Purpose: Channels enable communication between goroutines. Queues allow
-;; concurrent producers/consumers to safely add and remove items.
-
-;; Implementation: Channels have send and receive operations built into Go. The
-;; queue uses locks and condition variables for synchronization.
-
-;; Blocking: Both channels and the queue implementation support blocking and
-;; non-blocking variants of send/receive and enqueue/dequeue.
-
-;; Prioritization: The queue supports prioritized items using separate queues.
-;; Channels typically treat all messages equally.
-
-;; Buffering: Channels have configurable buffering capacity. The queue size is
-;; unbounded.
-
-;; Closing: Channels can be closed to indicate no more sends. The queue has no
-;; equivalent.
-
-;; Select: Go's select statement allows selecting over multiple channels. The
-;; queue does not offer an equivalent.
-
-
-
-;; (defclass channel ()
-;;   ((closed :initform nil :type boolean)
-;;     (lock :type bt:lock)
-;;     (queue :type cleve-elm.queue:priority-queue)
-;;     ;; (channel-empty-condition :type bt:condition-variable)
-;;     )
-;;   (:documentation "A channel is a queue with modified behaviour and "))
-
-
-
-;; (defun make-channel ()
-;;   (make-channel))
-
-;; ;; (defmethod receive ((value t) (channel channel)
-;; ;;   (bt:with-lock-held ((channel-lock channel))
-;; ;;     (enqueue value (channel-queue channel))
-;; ;;     (bt:condition-notify (channel-empty-condition channel))))
-
-;; ;; (defmethod send ((value t) (queue cleve-elm.queue:priority-queue))
-;; ;;   (bt:with-lock-held ((channel-lock channel))
-;; ;;     (loop while (null (channel-queue channel))
-;; ;;       do (bt:condition-wait (channel-empty-condition channel) (channel-lock channel)))
-;; ;;     (dequeue (channel-queue channel))))
-
-;; ;; (defun channel-close (channel)
-;; ;;   (bt:with-lock-held ((channel-lock channel))
-;; ;;     (setf (channel-closed channel) t)
-;; ;;     (bt:condition-notify-all (channel-empty-condition channel))))
-
-;; send(value) - Send a value through the channel. This may block if the channel's buffer is full.
-
-;; receive() - Receive a value from the channel. This may block if the channel is empty.
-
-;; close() - Close the channel, indicating no more values will be sent. Further send attempts will fail.
-
-;; Additional methods a channel may provide include:
-
-;; capacity() - Get the channel's buffer capacity.
-
-;; len() - Get the current buffer length/number of elements queued.
-
-;; is_closed() - Check if the channel is closed.
-;; (defmethod send ((value t) (channel channel))
-;;   (bt:with-lock-held ((channel-lock channel))
-;;     (enqueue value (channel-queue channel))
-;;     (bt:condition-notify (channel-empty-condition channel))))
-
-;; (defmethod receive ((channel channel))
-;;   (bt:with-lock-held ((channel-lock channel))
-;;     (loop while (null (channel-queue channel))
-;;       do (bt:condition-wait (channel-empty-condition channel) (channel-lock channel)))
-;;     (dequeue (channel-queue channel))))
-
-;; (defmethod channel-close ((channel channel))
-;;   (bt:with-lock-held ((channel-lock channel))
-;;     (setf (channel-closed channel) t)
-;;     (bt:condition-notify-all (channel-empty-condition channel))))
-
-;; (defmethod channel-closed-p ((channel channel))
-;;   (channel-closed channel))
-
-;; (defmethod channel-capacity ((channel channel))
-;;   (queue-capacity (channel-queue channel)))
-
-;; (defmethod channel-length ((channel channel))
-;;   (queue-length (channel-queue channel)))
-
-;; (defmethod channel-empty-p ((channel channel))
-;;   (queue-empty-p (channel-queue channel)))
-
-;; (defmethod channel-full-p ((channel channel))
-;;   (queue-full-p (channel-queue channel)))
-
-;; ;; ======================================================================
-;; ;; Select
-;; ;; ======================================================================
-;; ;;
-;; ;; The select statement lets a goroutine wait on multiple communication
-;; ;; operations. E.g.:
-;; ;;
-;; ;; (select
-;; ;;  (send channel1 value1)
-;; ;;  (send channel2 value2)
-;; ;;  (receive channel3)
-;; ;;  (receive channel4))
-;; ;;  (default (print "no communication"))
-;; ;;  )
-;; ;;
-;; ;; The select statement blocks until one of the operations can proceed.
-;; ;; If multiple operations can proceed, one is chosen at random.
-;; ;; If none of the operations can proceed and a default clause is present,
-;; ;; the default clause is executed.
-;; ;;
-;; ;; In Go, the select statement is typically used to implement timeouts
-;; ;; and non-blocking communication.  The select statement is also used
-;; ;; to implement the default case of a switch statement.
-;; ;;
-;; ;; Timeout Example:
-;; ;; (select
-;; ;; (send channel value) ;; Either send the value or block
-;; ;; (default (print "timeout")) ;; If the send blocks, print timeout
-;; ;; )
-;; ;;
-;; ;; Non-blocking Example:
-;; ;; (select
-;; ;; (send channel value) ;; Either send the value or block
-;; ;; (default (print "channel full")) ;; If the send blocks, print timeout
-;; ;; )
-;; ;;
-;; ;; The select statement is implemented using a priority queue of
-;; ;; operations.  The priority queue is ordered by the time the operation
-;; ;; was added to the queue.  The select statement adds operations to the
-;; ;; queue and then blocks until an operation can proceed.  When an
-;; ;; operation can proceed, it is removed from the queue and executed.
-;; ;; If the operation is a send or receive, the value is returned.
-;; ;;
-;; ;;
-;; ;; The select statement blocks until one of the operations can proceed.
 (defclass operation ()
-  ((priority                :initform 0     :type fixnum   :accessor priority)
-   (operation               :type function   :accessor operation)
-   (send-operation-p        :initform nil   :type boolean  :accessor send-operation-p)
-   (send-operation-result   :initform nil   :type t        :accessor send-operation-result)
-   (receive-operation-p     :initform nil   :type boolean  :accessor receive-operation-p)
-   (receive-operation-result :initform nil   :type t        :accessor receive-operation-result)
-   (default-operation-p     :initform nil   :type boolean  :accessor default-operation-p)))
+  ((thunk     :initarg :thunk     :reader thunk)
+   (channel   :initarg :channel   :reader channel)
+   (sendp     :initarg :sendp     :reader sendp))
+  (:documentation "Wrapper used by SELECT’s dispatcher."))
 
-(defclass select ()
-  ((operations :type cleve-elm.queue:priority-queue
-               :initarg :operations :accessor operations)
-   (lock       :type bt:lock
-               :initarg :lock       :accessor lock)
-   (condition-v :initform (bt:make-condition-variable)
-                :type bt::condition-variable
-                :initarg :condition-v :accessor condition-v)
-   (result     :type t :initform nil :accessor result)
-   (closed     :initform nil :type boolean :accessor closed))
-  (:documentation "A select statement is a priority queue of operations with optional timeout."))
+(defun %make-op (form)
+  "Turn `(<- ch)` or `(-> ch val)` into an OPERATION."
+  (etypecase form
+    ;; receive
+    ((cons (eql <-) (cons t null))
+     (let ((chan (second form)))
+       (make-instance 'operation
+                      :channel chan
+                      :sendp   nil
+                      :thunk   (lambda () (list (<- chan) chan)))))
+    ;; send
+    ((cons (eql ->) (cons t (cons t null)))
+     (let ((chan (second form))
+           (val  (third form)))
+       (make-instance 'operation
+                      :channel chan
+                      :sendp   t
+                      :thunk   (lambda () (progn (-> chan val)
+                                                 (list t chan))))))
+    (t (error "Unsupported SELECT clause: ~S" form))))
 
-(defun make-select ()
-  (make-instance 'select
-                 :operations (cleve-elm.queue:make-queue)
-                 :lock       (bt:make-lock)
-                 :condition-v (bt:make-condition-variable)))
+;;; PUBLIC MACRO ---------------------------------------------------------------
 
-;;;; exampleproject/src/select.lisp
 
-(defmethod select-wait ((sel select) &optional timeout)
-  "Wait until an operation completes or TIMEOUT seconds elapse.
-Returns T if an operation completed, NIL on timeout or if closed."
-  (bt:with-lock-held ((lock sel))
-    (if timeout
-        ;; timed wait
-        (loop while (and (null (result sel)) (not (closed sel)))
-              do
-                 ;; sb-thread:condition-wait returns NIL on timeout
-                 (unless (bt:condition-wait (condition-v sel) (lock sel) :timeout timeout)
-                   (return nil)))
-        ;; infinite wait
-        (loop while (and (null (result sel)) (not (closed sel)))
-              do (bt:condition-wait (condition-v sel) (lock sel))))
-    t))
-
-(defmethod select-result ((sel select))
-  "Non-blocking accessor for the result slot."
-  (result sel))
-(defmethod select-add-operation ((sel select) (op operation))
-  "Add an operation to the select. Returns t if added."  ;;
-  (unless (closed sel)
-    (bt:with-lock-held ((lock sel))
-      (cleve-elm.queue:enqueue op (operations sel))
-      (bt:condition-notify (condition-v sel))
-      t)))
 
 (defmacro select (&rest args)
-  "Like `make-select`+`select-wait`+`select-result`, but inlined.
-Accepts an optional keyword `:timeout SECS`.  Returns the operation result
-or NIL on timeout or if closed before any op fires."
-  (let ((timeout nil)
-        (ops '()))
-    ;; parse KEYWORDS vs operations
-    (loop while args
-          if (keywordp (first args))
-            do (case (first args)
-                 (:timeout
-                  (setq timeout (second args))
-                  (setq args (cddr args)))
-                 (otherwise
-                  (error "SELECT: unexpected keyword ~S" (first args))))
-          else
-            do (push (pop args) ops))
-    (setq ops (nreverse ops))
-    `(let ((sel (make-select)))
-       ;; enqueue each operation under lock
-       (bt:with-lock-held ((lock sel))
-         ,@(mapcar (lambda (op)
-                     `(select-add-operation sel ,op))
-                   ops))
-       ;; wait (with optional timeout)
-       (if (select-wait sel ,timeout)
-           (select-result sel)
-           ;; timed out
-           nil))))
+  "Usage: (select [:timeout SEC] (<- ch) (-> ch val) …)
+Returns 2 values  –  DATA and CHANNEL  –  or NIL on timeout."
+  (let* ((timeout-pos (position :timeout args))
+         (timeout-form (when timeout-pos (nth (1+ timeout-pos) args)))
+         (clause-forms (if timeout-pos
+                           (append (subseq args 0 timeout-pos)
+                                   (subseq args (+ timeout-pos 2)))
+                           args)))
+    ;; All heavy lifting happens *at run time* to keep fasls dump-able.
+    `(let* ((deadline
+              ,(when timeout-form
+                 `(+ (get-internal-real-time)
+                   (* ,timeout-form internal-time-units-per-second))))
+            ;; Build OPERATION instances now, **not** during macroexpansion!
+            (ops (mapcar #'%make-op ',clause-forms)))
+       (loop
+         ;; 1) try every op non-blocking ---------------------------
+         (dolist (op ops)
+           (let ((res (funcall (thunk op)))) ; -> (list data chan)  |  NIL
+             (when res (return (values (first res) (second res))))))
+         ;; 2) maybe timeout? --------------------------------------
+         ,@(when timeout-form
+             `((when (> (get-internal-real-time) deadline)
+                 (return nil))))
+         ;; 3) tiny nap to avoid busy-wait -------------------------
+         (sleep 0.001)))))
+;; (defclass operation ()
+;;   ((priority                :initform 0     :type fixnum   :accessor priority)
+;;    (operation               :type function   :accessor operation)
+;;    (send-operation-p        :initform nil   :type boolean  :accessor send-operation-p)
+;;    (send-operation-result   :initform nil   :type t        :accessor send-operation-result)
+;;    (receive-operation-p     :initform nil   :type boolean  :accessor receive-operation-p)
+;;    (receive-operation-result :initform nil   :type t        :accessor receive-operation-result)
+;;    (default-operation-p     :initform nil   :type boolean  :accessor default-operation-p)))
+
+;; (defclass select ()
+;;   ((operations :type cleve-elm.queue:priority-queue
+;;                :initarg :operations :accessor operations)
+;;    (lock       :type bt:lock
+;;                :initarg :lock       :accessor lock)
+;;    (condition-v :initform (bt:make-condition-variable)
+;;                 :type bt::condition-variable
+;;                 :initarg :condition-v :accessor condition-v)
+;;    (result     :type t :initform nil :accessor result)
+;;    (closed     :initform nil :type boolean :accessor closed))
+;;   (:documentation "A select statement is a priority queue of operations with optional timeout."))
+
+;; (defun make-select ()
+;;   (make-instance 'select
+;;                  :operations (cleve-elm.queue:make-queue)
+;;                  :lock       (bt:make-lock)
+;;                  :condition-v (bt:make-condition-variable)))
+
+;; (defmethod select-wait ((sel select) &optional timeout)
+;;   "Wait until an operation completes or TIMEOUT seconds elapse.
+;; Returns T if an operation completed, NIL on timeout or if closed.
+;; Sets (result sel) to (list channel-object value) or (list channel-object t) for send."
+;;   (bt:with-lock-held ((lock sel))
+;;     (labels ((process-ready-operation ()
+;;                ;; This is a simplified model. A real select would need to
+;;                ;; check non-blockingly if any channel op is ready.
+;;                ;; For this fix, we assume condition-wait signals when *some* op might be ready.
+;;                ;; Then we'd iterate through (operations sel) to find one that can proceed.
+;;                ;; This part is complex and depends on how channel readiness is determined.
+;;                ;; Let's assume for now that when condition-v is signaled,
+;;                ;; the first operation in the queue is the one that became ready,
+;;                ;; and we execute it. This is a major simplification.
+;;                (unless (cleve-elm.queue:queue-empty-p (operations sel))
+;;                  (let ((op (cleve-elm.queue:dequeue (operations sel))))
+;;                    (when op
+;;                      ;; The (operation op) lambda is expected to return (list channel-object actual-value/t)
+;;                      (let ((op-result (funcall (operation op))))
+;;                        (setf (result sel) op-result)
+;;                        (return-from process-ready-operation t))))))
+;;              (timed-wait ()
+;;                (loop while (and (null (result sel)) (not (closed sel)))
+;;                      do (unless (bt:condition-wait (condition-v sel) (lock sel) :timeout timeout)
+;;                           (return nil)) ; Timeout
+;;                         ;; After condition-wait, try to process an operation
+;;                         (when (process-ready-operation) (return t))))
+;;              (infinite-wait ()
+;;                (loop while (and (null (result sel)) (not (closed sel)))
+;;                      do (bt:condition-wait (condition-v sel) (lock sel))
+;;                         ;; After condition-wait, try to process an operation
+;;                         (when (process-ready-operation) (return t)))))
+;;       (if timeout
+;;           (timed-wait)
+;;           (infinite-wait)))))
+
+;; (defmethod select-result ((sel select))
+;;   "Non-blocking accessor for the result slot."
+;;   (result sel))
+;; (defmethod select-add-operation ((sel select) (op operation))
+;;   "Add an operation to the select. Returns t if added."  ;;
+;;   (unless (closed sel)
+;;     (bt:with-lock-held ((lock sel))
+;;       (cleve-elm.queue:enqueue op (operations sel))
+;;       (bt:condition-notify (condition-v sel))
+;;       t)))
+
+;; (defmacro select (&rest args)
+;;   "Like `make-select`+`select-wait`+`select-result`, but inlined.
+;; Accepts an optional keyword `:timeout SECS`.  Returns the operation result
+;; or NIL on timeout or if closed before any op fires."
+;;   (let ((timeout nil)
+;;         (ops '()))
+;;     ;; parse KEYWORDS vs operations
+;;     (loop while args
+;;           if (keywordp (first args))
+;;             do (case (first args)
+;;                  (:timeout
+;;                   (setq timeout (second args))
+;;                   (setq args (cddr args)))
+;;                  (otherwise
+;;                   (error "SELECT: unexpected keyword ~S" (first args))))
+;;           else
+;;             do (push (pop args) ops))
+;;     (setq ops (nreverse ops))
+;;     `(let ((sel (make-select)))
+;;        ;; enqueue each operation under lock
+;;        (bt:with-lock-held ((lock sel))
+;;          ,@(mapcar (lambda (op-form)
+;;                      ;; Convert op-form to an operation object before adding
+;;                      ;; This is a simplified conversion; actual parsing of op-form is needed
+;;                      ;; to determine if it's send/receive and extract channel/value.
+;;                      ;; For now, assuming op-form is a pre-constructed operation object
+;;                      ;; or this part needs more elaborate parsing.
+;;                      ;; Given the current structure, op-form is likely (<- channel) or (-> channel value)
+;;                      ;; A proper implementation would parse these forms.
+;;                      ;; As a placeholder for the fix, let's assume op-form IS an operation object
+;;                      ;; or that select-add-operation can handle these forms (which it can't currently).
+;;                      ;; The fundamental issue is that `ops` contains forms, not operation instances.
+;;                      ;; A more robust fix would involve parsing each op-form:
+;;                      (let* ((is-send (eq (first op-form) '->))
+;;                             (is-receive (eq (first op-form) '<-))
+;;                             (channel-expr (second op-form))
+;;                             (value-expr (if is-send (third op-form) nil)))
+;;                        ;; Create the 'op' instance first, then define the lambda closing over it.
+;;                        `(let ((op (make-instance 'operation)))
+;;                           (setf (send-operation-p op) ,is-send)
+;;                           (setf (receive-operation-p op) ,is-receive)
+;;                           ;; Define the lambda here, closing over 'op'
+;;                           (setf (operation op)
+;;                                 ,(cond (is-receive
+;;                                         `(lambda ()
+;;                                            (let ((val (<- ,channel-expr)))
+;;                                              (setf (receive-operation-result op) val)
+;;                                              ;; The lambda now returns a list: (channel-object value)
+;;                                              (list ,channel-expr val))))
+;;                                        (is-send
+;;                                         `(lambda ()
+;;                                            (-> ,channel-expr ,value-expr)
+;;                                            (setf (send-operation-result op) t)
+;;                                            ;; The lambda now returns a list: (channel-object t)
+;;                                            (list ,channel-expr t))))
+;;                                 ;; If op-form is not '->' or '<-', it might be a default case or already a thunk
+;;                                 ;; Default case should return a specific marker or handle itself.
+;;                                 ((and (listp op-form) (eq (first op-form) :default)) ;; Check if op-form is like (:default ...)
+;;                                  `(lambda () (list :default (progn ,@(rest op-form))))) ;; Execute the default form and wrap its result
+;;                                 (t `(lambda () (error "Unsupported select operation form: ~S" ',op-form))))
+;;                           (select-add-operation sel op))))
+;;                    ops))
+;;        ;; wait (with optional timeout)
+;;        (if (select-wait sel ,timeout)
+;;            (select-result sel)
+;;            ;; timed out
+;;            nil))))
 
 
 
@@ -374,29 +336,40 @@ Buffered channels have a capacity.  CLOSED is t if the channel is closed,"
 
 (defmethod no-wait ((channel channel) &key (send t))
   "Return t if waiting on send/receive may skip blocking"
-  (if send
-      (and (< 0 (channel-capacity channel)) (< (cleve-elm.queue:counter (channel-queue channel))(channel-capacity channel) ))
-      (not (zerop (cleve-elm.queue:counter (channel-queue channel))))))
+  (let* ((q (channel-queue channel))
+         (q-count (cleve-elm.queue:counter q))
+         (capacity (channel-capacity channel))
+         (result (if send
+                     (and (< 0 capacity) (< q-count capacity))
+                     (not (zerop q-count)))))
+    ;; Reduced verbosity: Log only if the result is true (meaning data is available or send is possible)
+    ;; or if the count is unexpectedly non-zero when result is false (for receive checks).
+    (when (or result (and (not send) (> q-count 0)))
+      (log-debug :channel.no-wait "Channel ~A (send=~A): queue=~A, count=~D, capacity=~D. Result: ~A"
+                 (channel-name channel) send q q-count capacity result))
+    result))
 
 (defmethod channel-send ((channel channel) value)
   "Send a value to the channel.  If the channel is closed, an error is signaled."
+  (log-debug :channel.send "Attempting to send to channel ~A: value=~S. Queue before: ~A, count: ~D"
+             (channel-name channel) value (channel-queue channel) (cleve-elm.queue:counter (channel-queue channel)))
   (bt:with-lock-held ((channel-lock-s channel))
-                                        ;format t "entered send lock value ~a~%" value)
     (when (channel-closed channel)
+      (log-error :channel.send "Channel ~A is closed. Cannot send value ~S." (channel-name channel) value)
       (error "Channel is closed."))
-                                        ;format t "waiting on send condition value ~a~%" value)
-                                        ;format t "sending value ~a~%" value)
     (let ((nw (no-wait channel :send t)))
-      (cleve-elm.queue:enqueue  (channel-queue channel)value)
-                                        ;format t "enqueuing finished. waiting on receive confirm ~a" value)
-      (unless nw (bt:condition-wait (channel-condition-wait-receive channel) (channel-lock-s channel)))
-      ;; (bt:condition-wait (channel-condition channel) (cleve-elm.queue:queue-lock (channel-queue channel)) )
-
+      (cleve-elm.queue:enqueue (channel-queue channel) value)
+      (log-debug :channel.send "Enqueued to channel ~A: value=~S. Queue after: ~A, count: ~D. No-wait was: ~A"
+                 (channel-name channel) value (channel-queue channel) (cleve-elm.queue:counter (channel-queue channel)) nw)
+      (unless nw
+        (log-debug :channel.send "Channel ~A: Send requires wait (nw=~A). Waiting on condition-wait-receive." (channel-name channel) nw)
+        (bt:condition-wait (channel-condition-wait-receive channel) (channel-lock-s channel))
+        (log-debug :channel.send "Channel ~A: Send condition-wait-receive finished." (channel-name channel)))
       (when (channel-closed channel)
+        (log-error :channel.send "Channel ~A became closed during send. Value ~S might not have been fully processed." (channel-name channel) value)
         (error "Channel is closed."))
-      ))
-  ;; (sb-thread:condition-broadcast (channel-condition channel))
-  )
+      )))
+;; (sb-thread:condition-broadcast (channel-condition channel))
 
 (defmethod channel-receive ((channel channel))
   "Receive a value from the channel.  If the channel is closed, an error is signaled."
@@ -490,7 +463,7 @@ Buffered channels have a capacity.  CLOSED is t if the channel is closed,"
   ((filters :initform nil :accessor channel-filters :type list :documentation "List of filter functions that messages must pass through"))
   (:documentation "A channel that can filter messages before they are processed. Each filter function should return T if the message should be processed, NIL otherwise."))
 
-(defun make-filtered-channel (&key (capacity 0) (closed nil) (filters nil))
+(defun make-filtered-channel (&key (capacity 0) (closed nil) (filters nil) (name nil))
   "Create a filtered channel with the given capacity, closed state, and filter functions.
 Each filter function should take a message as argument and return T if the message should pass, NIL otherwise."
   (let ((channel (make-instance 'filtered-channel
@@ -499,6 +472,8 @@ Each filter function should take a message as argument and return T if the messa
                                 :lock-r (bt:make-lock)
                                 :lock-s (bt:make-lock)
                                 :condition (bt:make-condition-variable))))
+    (when name
+      (setf (channel-name channel) name))
     (when filters
       (setf (channel-filters channel) filters))
     channel))
@@ -590,3 +565,4 @@ The new channel will receive only messages that pass the filter."
   (if (pass-through-p value (channel-filters channel))
       (channel-send channel value)
       nil))
+
