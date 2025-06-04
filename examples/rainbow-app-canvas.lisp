@@ -31,51 +31,43 @@
 
 (defparameter *canvas-configs* 
   '((:below-cursor  
-     :use-canvas t
-     :canvas-anchor :top-left 
+     :canvas-anchor :top-left
      :canvas-growth :down
      :canvas-initial-size (20 10)
      :title "Below Cursor")
     
     (:above-cursor  
-     :use-canvas t
-     :canvas-anchor :bottom-left 
+     :canvas-anchor :bottom-left
      :canvas-growth :up
      :canvas-initial-size (20 10)
      :title "Above Cursor")
     
     (:top-left      
-     :use-canvas t
      :canvas-anchor :top-left
      :canvas-growth :fixed
      :canvas-initial-size (20 10)
      :title "Top Left")
     
     (:top-right     
-     :use-canvas t
      :canvas-anchor :top-right
      :canvas-growth :fixed
      :canvas-initial-size (20 10)
      :title "Top Right")
     
     (:bottom-middle 
-     :use-canvas t
-     :canvas-anchor :bottom
      :canvas-growth :fixed
      :canvas-initial-size (30 8)
      :title "Bottom Middle")
     
     (:center        
-     :use-canvas t
      :canvas-anchor :center
      :canvas-growth :fixed
      :canvas-initial-size (25 15)
      :title "Center")
     
     (:interactive   
-     :use-canvas t
      :canvas-anchor :cursor
-     :canvas-growth :dynamic
+     :canvas-growth :below-cursor
      :canvas-initial-size (30 10)
      :title "Interactive - Resize with Arrow Keys"))
   "Different canvas configurations for demonstration.")
@@ -85,13 +77,13 @@
 ;;;--------------------------------------------------------------
 
 (defvar *rainbow-colors-with-names* '((:red "red-stripe" (255 0 0))
-                                     (:pink "pink-stripe" (255 192 203))
-                                     (:orange "orange-stripe" (255 165 0))
-                                     (:yellow "yellow-stripe" (255 255 0))
-                                     (:green "green-stripe" (0 255 0))
-                                     (:blue "blue-stripe" (0 0 255))
-                                     (:indigo "indigo-stripe" (75 0 130))
-                                     (:violet "violet-stripe" (238 130 238)))
+                                      (:pink "pink-stripe" (255 192 203))
+                                      (:orange "orange-stripe" (255 165 0))
+                                      (:yellow "yellow-stripe" (255 255 0))
+                                      (:green "green-stripe" (0 255 0))
+                                      (:blue "blue-stripe" (0 0 255))
+                                      (:indigo "indigo-stripe" (75 0 130))
+                                      (:violet "violet-stripe" (238 130 238)))
   "List of colors and their corresponding class names for stripes.")
 
 ;; Add canvas-specific styles
@@ -186,8 +178,8 @@
 (defun rainbow-canvas-view (app-state dispatch-fn)
   "Creates the UI view with rainbow stripes in a canvas."
   (log-info "Creating rainbow canvas view. Config: ~S" 
-           (elmtui.state:state-ref app-state :canvas-config))
-  
+            (elmtui.state:state-ref app-state :canvas-config))
+
   (let ((canvas-title (elmtui.state:state-ref app-state :canvas-title))
         (resize-mode (elmtui.state:state-ref app-state :resize-mode)))
     
@@ -215,12 +207,12 @@
                     :height :fill
                     :width :fill)
        :children (loop for (color-name class-name rgb-val) in *rainbow-colors-with-names*
-                      collect (make-styled-node
-                               :type :container
-                               :props (list :id (intern (format nil "STRIPE-~A" (string color-name)) :keyword)
-                                           :classes class-name)
-                               :children nil)))
-      
+                       collect (make-styled-node
+                                :type :container
+                                :props (list :id (intern (format nil "STRIPE-~A" (string color-name)) :keyword)
+                                             :classes class-name)
+                                :children nil)))
+
       ;; Instruction hint at bottom if in resize mode
       (when resize-mode
         (make-styled-node
@@ -242,7 +234,7 @@
 (defun run-with-config (config-key)
   "Run the rainbow canvas app with the specified configuration."
   (let* ((config (cdr (assoc config-key *canvas-configs*)))
-         (use-canvas (getf config :use-canvas t))
+         ;; (use-canvas (getf config :use-canvas t))
          (canvas-anchor (getf config :canvas-anchor :cursor))
          (canvas-growth (getf config :canvas-growth :down))
          (canvas-size (getf config :canvas-initial-size '(30 10))))
@@ -253,8 +245,7 @@
     
     (elmtui.runtime:run-app 
      :app-name 'rainbow-canvas-app
-     :init-fn (lambda () (app-init config-key))
-     :use-canvas use-canvas
+     ;; :init-fn (lambda () (app-init config-key))
      :canvas-anchor canvas-anchor
      :canvas-growth canvas-growth
      :canvas-initial-size canvas-size)))

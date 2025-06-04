@@ -21,20 +21,20 @@
 (in-package :elmtui.backend.faketerm)
 
 (defstruct faketerm-cell
- (char #\Space :type character)
- (style nil :type list)) ; Store style plist directly
+  (char #\Space :type character)
+  (style nil :type list)) ; Store style plist directly
 
 (defstruct faketerm-instance
- (filepath nil :type (or null string pathname))
- (stream nil :type (or null stream))
- (width 80 :type integer)
- (height 24 :type integer)
- (screen-buffer nil :type (or null array)) ; 2D array of faketerm-cell
- (cursor-visible-p t :type boolean)
- (cursor-row 0 :type integer)
- (cursor-col 0 :type integer)
- (current-style nil :type list) ; To store style from apply-style
- (input-queue (make-list 0) :type list)) ; For simulating input
+  (filepath nil :type (or null string pathname))
+  (stream nil :type (or null stream))
+  (width 80 :type integer)
+  (height 24 :type integer)
+  (screen-buffer nil :type (or null array)) ; 2D array of faketerm-cell
+  (cursor-visible-p t :type boolean)
+  (cursor-row 0 :type integer)
+  (cursor-col 0 :type integer)
+  (current-style nil :type list) ; To store style from apply-style
+  (input-queue (make-list 0) :type list)) ; For simulating input
 
 ;;;---------------------------------------------------------------
 ;;; Backend Lifecycle
@@ -65,7 +65,7 @@
       (loop for r below height do
         (loop for c below width do
           (setf (aref screen-buf r c) (make-faketerm-cell :style (faketerm-instance-current-style instance)))))
-          
+
       (format (faketerm-instance-stream instance)
               "; Faketerm Initialized: ~A (Width: ~D, Height: ~D)~%"
               (faketerm-instance-filepath instance)
@@ -137,7 +137,7 @@
 ;;; Drawing Primitives
 ;;;---------------------------------------------------------------
 
-(defmethod draw-text-at ((instance faketerm-instance) row col text &key style)
+(defmethod draw-text-at ((instance faketerm-instance) target-buffer row col text &key style)
   (let ((stream (faketerm-instance-stream instance))
         (buffer (faketerm-instance-screen-buffer instance))
         (effective-style (or style (faketerm-instance-current-style instance)))
@@ -147,11 +147,11 @@
     (loop for i from 0 below (length text)
           for c = (+ col i)
           when (and (>= row 0) (<= row max-row) (>= c 0) (<= c max-col))
-          do (setf (aref buffer row c) (make-faketerm-cell :char (char text i) :style effective-style)))
+            do (setf (aref buffer row c) (make-faketerm-cell :char (char text i) :style effective-style)))
     (finish-output stream))
   t)
 
-(defmethod draw-char-at ((instance faketerm-instance) row col char &key style)
+(defmethod draw-char-at ((instance faketerm-instance) target-buffer row col char &key style)
   (let ((stream (faketerm-instance-stream instance))
         (buffer (faketerm-instance-screen-buffer instance))
         (effective-style (or style (faketerm-instance-current-style instance)))
@@ -163,7 +163,7 @@
     (finish-output stream))
   t)
 
-(defmethod fill-rectangle ((instance faketerm-instance) row col height width &key char style)
+(defmethod fill-rectangle ((instance faketerm-instance) target-buffer  row col height width &key char style)
   (let ((stream (faketerm-instance-stream instance))
         (buffer (faketerm-instance-screen-buffer instance))
         (fill-char (or char #\Space))
@@ -175,11 +175,11 @@
     (loop for r from row below (min (+ row height) (1+ max-row))
           do (loop for c from col below (min (+ col width) (1+ max-col))
                    when (and (>= r 0) (>= c 0))
-                   do (setf (aref buffer r c) (make-faketerm-cell :char fill-char :style effective-style))))
+                     do (setf (aref buffer r c) (make-faketerm-cell :char fill-char :style effective-style))))
     (finish-output stream))
   t)
 
-(defmethod draw-box-outline ((instance faketerm-instance) row col height width &key style corners sides)
+(defmethod draw-box-outline ((instance faketerm-instance) target-buffer row col height width &key style corners sides)
   (let ((stream (faketerm-instance-stream instance))
         (effective-style (or style (faketerm-instance-current-style instance))))
     (format stream "; DRAW_BOX_OUTLINE Row: ~D Col: ~D Height: ~D Width: ~D Style: ~S Corners: ~S Sides: ~S~%"
@@ -187,20 +187,20 @@
     ;; This is a simplified version for logging; actual drawing would call draw-char-at
     (let ((cs (or corners '(#\+ #\+ #\+ #\+)))
           (sds (or sides '(#\- #\|))))
-      (draw-char-at instance row col (first cs) :style effective-style)
-      (draw-char-at instance row (+ col width -1) (second cs) :style effective-style)
-      (draw-char-at instance (+ row height -1) col (third cs) :style effective-style)
-      (draw-char-at instance (+ row height -1) (+ col width -1) (fourth cs) :style effective-style)
+      (draw-char-at instance target-buffer row col (first cs) :style effective-style)
+      (draw-char-at instance target-buffer row (+ col width -1) (second cs) :style effective-style)
+      (draw-char-at instance target-buffer (+ row height -1) col (third cs) :style effective-style)
+      (draw-char-at instance target-buffer (+ row height -1) (+ col width -1) (fourth cs) :style effective-style)
       (loop for c from (1+ col) below (+ col width -1)
-            do (draw-char-at instance row c (first sds) :style effective-style)
-               (draw-char-at instance (+ row height -1) c (first sds) :style effective-style))
+            do (draw-char-at instance target-buffer row c (first sds) :style effective-style)
+               (draw-char-at instance target-buffer (+ row height -1) c (first sds) :style effective-style))
       (loop for r from (1+ row) below (+ row height -1)
-            do (draw-char-at instance r col (second sds) :style effective-style)
-               (draw-char-at instance r (+ col width -1) (second sds) :style effective-style)))
+            do (draw-char-at instance target-buffer r col (second sds) :style effective-style)
+               (draw-char-at instance target-buffer r (+ col width -1) (second sds) :style effective-style)))
     (finish-output stream))
   t)
 
-(defmethod draw-styled-box ((instance faketerm-instance) row col height width &key border-style border-color box-char-set style)
+(defmethod draw-styled-box ((instance faketerm-instance) target-buffer row col height width &key border-style border-color box-char-set style)
   (declare (ignore box-char-set)) ; Not using custom char sets for faketerm yet
   (let* ((stream (faketerm-instance-stream instance))
          (effective-style (if border-color
@@ -213,18 +213,18 @@
     (format stream "; DRAW_STYLED_BOX Row: ~D Col: ~D H: ~D W: ~D BorderStyle: ~S BorderColor: ~S Style: ~S~%"
             row col height width border-style border-color effective-style)
     (apply-style instance effective-style) ; Set current style for subsequent draw-char-at calls
-    (draw-box-outline instance row col height width :style effective-style :corners (subseq chars 0 4) :sides (subseq chars 4 6))
+    (draw-box-outline instance target-buffer row col height width :style effective-style :corners (subseq chars 0 4) :sides (subseq chars 4 6))
     (apply-style instance (faketerm-instance-current-style instance)) ; Restore previous style
     (finish-output stream))
   t)
 
-(defmethod set-cell-style ((instance faketerm-instance) row col &key style)
+(defmethod set-cell-style ((instance faketerm-instance) target-buffer row col &key style)
   (let ((stream (faketerm-instance-stream instance)))
     (format stream "; SET_CELL_STYLE Row: ~D Col: ~D Style: ~S~%" row col (or style (faketerm-instance-current-style instance)))
     (finish-output stream))
   t)
 
-(defmethod clear-area ((instance faketerm-instance) row col height width &key style)
+(defmethod clear-area ((instance faketerm-instance) target-buffer row col height width &key style)
   (let ((stream (faketerm-instance-stream instance))
         (buffer (faketerm-instance-screen-buffer instance))
         (effective-style (or style (list :fg (default-foreground-color instance) :bg (default-background-color instance) :attrs nil)))
@@ -235,7 +235,7 @@
     (loop for r from row below (min (+ row height) (1+ max-row))
           do (loop for c from col below (min (+ col width) (1+ max-col))
                    when (and (>= r 0) (>= c 0))
-                   do (setf (aref buffer r c) (make-faketerm-cell :char #\Space :style effective-style))))
+                     do (setf (aref buffer r c) (make-faketerm-cell :char #\Space :style effective-style))))
     (finish-output stream))
   t)
 

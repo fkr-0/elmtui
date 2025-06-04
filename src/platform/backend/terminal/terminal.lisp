@@ -42,6 +42,9 @@
                 #:make-terminal-style #:make-termcolor #:exec-sequence
                 #:update-style! #:copy-term-style
                 #:terminal-style-fg-color #:terminal-style-bg-color
+                #:make-terminal-color
+                #:terminal-style
+                #:make-terminal-style
                 #:terminal-style-bold #:terminal-style-italic
                 #:terminal-style-underline #:terminal-style-inverse
                 #:ansi-seqs #:stringify-sgr)
@@ -96,7 +99,9 @@
   (cursor-visible-p t :type boolean)
   (cursor-row 0 :type integer)
   (cursor-col 0 :type integer)
-  (current-style '(:fg :white :bg :black :attrs nil))
+  (current-style (make-terminal-style )
+   :type (or null terminal-style)) ; Default terminal style
+  ;; '(:fg :white :bg :black :attrs nil))
   (input-buffer (make-array 0 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0))
   (lock (make-instance 'lockable) :type lockable)
   (front-buffer nil :type (or null virtual-terminal-buffer))
@@ -135,7 +140,7 @@
       (when back-buffer
         (with-virtual-buffer-lock (back-buffer)
           (clear-buffer back-buffer))))
-    (setf (terminal-instance-current-style instance) '(:fg :white :bg :black :attrs nil))
+    (setf (terminal-instance-current-style instance) (make-terminal-style))
     (finish-output (terminal-instance-stream instance)))
   t)
 
@@ -381,66 +386,62 @@
 (defmethod show-cursor ((instance terminal-instance)) (set-cursor-visibility instance t))
 
 ;;;---------------------------------------------------------------
-;;; Drawing Primitives (draw to back-buffer)
+;;; Drawing Primitives (draw to a specified target-buffer)
 ;;;---------------------------------------------------------------
-(defmethod draw-text-at ((instance terminal-instance) row col text &key style)
-  (log:debug "BUFFER: draw-text-at - Row: ~A, Col: ~A, Text: \"~A\", Style: ~S" row col text style)
-  (let ((back-buffer (terminal-instance-back-buffer instance)))
-    (when back-buffer
-      (with-virtual-buffer-lock (back-buffer)
-        (let ((buffer-w (buffer-width back-buffer))
-              (buffer-h (buffer-height back-buffer)))
-          (loop for i from 0 below (length text)
-                for char = (aref text i)
-                for current-col = (+ col i)
-                when (and (>= row 0) (< row buffer-h)
-                          (>= current-col 0) (< current-col buffer-w))
-                  do (set-buffer-cell-at back-buffer row current-col char style)
-                else do (log:warn "draw-text-at: Clipping char '~C' at (~A,~A)" char row current-col) (loop-finish))))))
+(defmethod draw-text-at ((instance terminal-instance) target-buffer row col text &key style)
+  (log:debug "BUFFER: draw-text-at on target-buffer - Row: ~A, Col: ~A, Text: \"~A\", Style: ~S" row col text style)
+  (when target-buffer
+    (with-virtual-buffer-lock (target-buffer)
+      (let ((buffer-w (buffer-width target-buffer))
+            (buffer-h (buffer-height target-buffer)))
+        (loop for i from 0 below (length text)
+              for char = (aref text i)
+              for current-col = (+ col i)
+              when (and (>= row 0) (< row buffer-h)
+                        (>= current-col 0) (< current-col buffer-w))
+                do (set-buffer-cell-at target-buffer row current-col char style)
+              else do (log:warn "draw-text-at: Clipping char '~C' at (~A,~A) for target buffer" char row current-col) (loop-finish)))))
   t)
 
-(defmethod draw-char-at ((instance terminal-instance) row col char &key style)
-  (log:debug "BUFFER: draw-char-at - Row: ~A, Col: ~A, Char: ~C, Style: ~S" row col char style)
-  (let ((back-buffer (terminal-instance-back-buffer instance)))
-    (when back-buffer
-      (with-virtual-buffer-lock (back-buffer)
-        (let ((buffer-w (buffer-width back-buffer))
-              (buffer-h (buffer-height back-buffer)))
-          (if (and (>= row 0) (< row buffer-h) (>= col 0) (< col buffer-w))
-              (set-buffer-cell-at back-buffer row col char style)
-              (log:warn "draw-char-at: Clipping char '~C' at (~A,~A)" char row col))))))
+(defmethod draw-char-at ((instance terminal-instance) target-buffer row col char &key style)
+  (log:debug "BUFFER: draw-char-at on target-buffer - Row: ~A, Col: ~A, Char: ~C, Style: ~S" row col char style)
+  (when target-buffer
+    (with-virtual-buffer-lock (target-buffer)
+      (let ((buffer-w (buffer-width target-buffer))
+            (buffer-h (buffer-height target-buffer)))
+        (if (and (>= row 0) (< row buffer-h) (>= col 0) (< col buffer-w))
+            (set-buffer-cell-at target-buffer row col char style)
+            (log:warn "draw-char-at: Clipping char '~C' at (~A,~A) for target buffer" char row col)))))
   t)
 
-(defmethod fill-rectangle ((instance terminal-instance) row col height width &key char style)
-  (log:debug "BUFFER: fill-rectangle - Row: ~A, Col: ~A, H: ~A, W: ~A, Char: ~C, Style: ~S" row col height width char style)
-  (let ((back-buffer (terminal-instance-back-buffer instance)))
-    (when back-buffer
-      (with-virtual-buffer-lock (back-buffer)
-        (fill-buffer-region back-buffer row col width height (or char #\Space) style))))
+(defmethod fill-rectangle ((instance terminal-instance) target-buffer row col height width &key char style)
+  (log:debug "BUFFER: fill-rectangle on target-buffer - Row: ~A, Col: ~A, H: ~A, W: ~A, Char: ~C, Style: ~S" row col height width char style)
+  (when target-buffer
+    (with-virtual-buffer-lock (target-buffer)
+      (fill-buffer-region target-buffer row col width height (or char #\Space) style)))
   t)
 
-(defmethod draw-box-outline ((instance terminal-instance) row col height width &key style corners sides)
+(defmethod draw-box-outline ((instance terminal-instance) target-buffer row col height width &key style corners sides)
   (declare (ignore corners sides)) ; Simple ASCII box for now
-  (log:debug "BUFFER: draw-box-outline - Row: ~A, Col: ~A, H: ~A, W: ~A, Style: ~S" row col height width style)
+  (log:debug "BUFFER: draw-box-outline on target-buffer - Row: ~A, Col: ~A, H: ~A, W: ~A, Style: ~S" row col height width style)
   (when (and (> width 1) (> height 1))
-    (let ((back-buffer (terminal-instance-back-buffer instance)))
-      (when back-buffer
-        (with-virtual-buffer-lock (back-buffer)
-          (draw-char-at instance row col #\+ :style style)
-          (draw-char-at instance row (+ col width -1) #\+ :style style)
-          (draw-char-at instance (+ row height -1) col #\+ :style style)
-          (draw-char-at instance (+ row height -1) (+ col width -1) #\+ :style style)
-          (loop for c from (1+ col) below (+ col width -1)
-                do (draw-char-at instance row c #\- :style style)
-                   (draw-char-at instance (+ row height -1) c #\- :style style))
-          (loop for r from (1+ row) below (+ row height -1)
-                do (draw-char-at instance r col #\| :style style)
-                   (draw-char-at instance r (+ col width -1) #\| :style style))))))
+    (when target-buffer
+      (with-virtual-buffer-lock (target-buffer)
+        (draw-char-at instance target-buffer row col #\+ :style style)
+        (draw-char-at instance target-buffer row (+ col width -1) #\+ :style style)
+        (draw-char-at instance target-buffer (+ row height -1) col #\+ :style style)
+        (draw-char-at instance target-buffer (+ row height -1) (+ col width -1) #\+ :style style)
+        (loop for c from (1+ col) below (+ col width -1)
+              do (draw-char-at instance target-buffer row c #\- :style style)
+                 (draw-char-at instance target-buffer (+ row height -1) c #\- :style style))
+        (loop for r from (1+ row) below (+ row height -1)
+              do (draw-char-at instance target-buffer r col #\| :style style)
+                 (draw-char-at instance target-buffer r (+ col width -1) #\| :style style)))))
   t)
 
-(defmethod draw-styled-box ((instance terminal-instance) row col height width &key border-style border-color box-char-set style)
+(defmethod draw-styled-box ((instance terminal-instance) target-buffer row col height width &key border-style border-color box-char-set style)
   (declare (ignore box-char-set))
-  (log:debug "BUFFER: draw-styled-box - Pos: (~A,~A), Size: (~A,~A), Style: ~S, BorderStyle: ~S, BorderColor: ~S"
+  (log:debug "BUFFER: draw-styled-box on target-buffer - Pos: (~A,~A), Size: (~A,~A), Style: ~S, BorderStyle: ~S, BorderColor: ~S"
              row col height width style border-style border-color)
   (when (and (> width 1) (> height 1))
     (let* ((effective-style (if border-color (list :fg border-color) (getf style :attrs)))
@@ -449,69 +450,120 @@
                     (:double '(#\╔ #\╗ #\╚ #\╝ #\═ #\║))
                     (otherwise '(#\+ #\+ #\+ #\+ #\- #\|))))
            (tl (first chars)) (tr (second chars)) (bl (third chars)) (br (fourth chars))
-           (horiz (fifth chars)) (vert (sixth chars))
-           (back-buffer (terminal-instance-back-buffer instance)))
-      (when back-buffer
-        (with-virtual-buffer-lock (back-buffer)
-          (draw-char-at instance row col tl :style effective-style)
-          (draw-char-at instance row (+ col width -1) tr :style effective-style)
-          (draw-char-at instance (+ row height -1) col bl :style effective-style)
-          (draw-char-at instance (+ row height -1) (+ col width -1) br :style effective-style)
+           (horiz (fifth chars)) (vert (sixth chars)))
+      (when target-buffer
+        (with-virtual-buffer-lock (target-buffer)
+          (draw-char-at instance target-buffer row col tl :style effective-style)
+          (draw-char-at instance target-buffer row (+ col width -1) tr :style effective-style)
+          (draw-char-at instance target-buffer (+ row height -1) col bl :style effective-style)
+          (draw-char-at instance target-buffer (+ row height -1) (+ col width -1) br :style effective-style)
           (loop for c from (1+ col) below (+ col width -1)
-                do (draw-char-at instance row c horiz :style effective-style)
-                   (draw-char-at instance (+ row height -1) c horiz :style effective-style))
+                do (draw-char-at instance target-buffer row c horiz :style effective-style)
+                   (draw-char-at instance target-buffer (+ row height -1) c horiz :style effective-style))
           (loop for r from (1+ row) below (+ row height -1)
-                do (draw-char-at instance r col vert :style effective-style)
-                   (draw-char-at instance r (+ col width -1) vert :style effective-style))))))
+                do (draw-char-at instance target-buffer r col vert :style effective-style)
+                   (draw-char-at instance target-buffer r (+ col width -1) vert :style effective-style))))))
   t)
 
-(defmethod set-cell-style ((instance terminal-instance) row col &key style)
-  (log:debug "BUFFER: set-cell-style - Row: ~A, Col: ~A, Style: ~S" row col style)
-  (let ((back-buffer (terminal-instance-back-buffer instance)))
-    (when back-buffer
-      (with-virtual-buffer-lock (back-buffer)
-        (let ((buffer-w (buffer-width back-buffer)) (buffer-h (buffer-height back-buffer)))
-          (if (and (>= row 0) (< row buffer-h) (>= col 0) (< col buffer-w))
-              (let ((current-cell (buffer-cell-at back-buffer row col)))
-                (set-buffer-cell-at back-buffer row col (elmtui.platform.backend.common.virtual-buffer::buffer-cell-char current-cell) style))
-              (log:warn "set-cell-style: Clipping style at (~A,~A)" row col))))))
+(defmethod set-cell-style ((instance terminal-instance) target-buffer row col &key style)
+  (log:debug "BUFFER: set-cell-style on target-buffer - Row: ~A, Col: ~A, Style: ~S" row col style)
+  (when target-buffer
+    (with-virtual-buffer-lock (target-buffer)
+      (let ((buffer-w (buffer-width target-buffer)) (buffer-h (buffer-height target-buffer)))
+        (if (and (>= row 0) (< row buffer-h) (>= col 0) (< col buffer-w))
+            (let ((current-cell (buffer-cell-at target-buffer row col)))
+              (set-buffer-cell-at target-buffer row col (elmtui.platform.backend.common.virtual-buffer::buffer-cell-char current-cell) style))
+            (log:warn "set-cell-style: Clipping style at (~A,~A) for target buffer" row col)))))
   t)
 
-(defmethod clear-area ((instance terminal-instance) row col height width &key style)
-  (log:debug "BUFFER: clear-area - Row: ~A, Col: ~A, H: ~A, W: ~A, Style: ~S" row col height width style)
-  (let ((back-buffer (terminal-instance-back-buffer instance)))
-    (when back-buffer
-      (with-virtual-buffer-lock (back-buffer)
-        (fill-buffer-region back-buffer row col width height #\Space style))))
+(defmethod clear-area ((instance terminal-instance) target-buffer row col height width &key style)
+  (log:debug "BUFFER: clear-area on target-buffer - Row: ~A, Col: ~A, H: ~A, W: ~A, Style: ~S" row col height width style)
+  (when target-buffer
+    (with-virtual-buffer-lock (target-buffer)
+      (fill-buffer-region target-buffer row col width height #\Space style)))
   t)
 
 ;;;---------------------------------------------------------------
 ;;; Color and Style Management (existing methods)
 ;;;---------------------------------------------------------------
 (defun style-to-terminal-style (style-plist)
+  (log-info "Converting style plist to terminal style: ~S" style-plist)
   (when style-plist
     (let ((ts (make-terminal-style)))
-      (let ((bg (getf style-plist :bg)))
-        (when bg (if (listp bg) (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :r (first bg) :g (second bg) :b (third bg)))
-                     (if (numberp bg) (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :color-256 bg))
-                         (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :simple bg))))))
-      (let ((fg (getf style-plist :fg)))
-        (when fg (if (listp fg) (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :r (first fg) :g (second fg) :b (third fg)))
-                     (if (numberp fg) (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :color-256 fg))
-                         (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :simple fg))))))
+      ;; Support both :bg and :bg-color keys, and terminal-color instances
+      ;; Extract background color allowing uppercase or lowercase keys
+      (let ((bg (or (getf style-plist :bg)
+                    (getf style-plist :bg-color)
+                    (getf style-plist :BG)
+                    (getf style-plist :BG-COLOR))))
+        (cond
+          ((typep bg 'elmtui.backend.common.ansi-styling:terminal-color)
+           (setf (terminal-style-bg-color ts) bg))
+          ((and (listp bg) (= (length bg) 3))
+           (destructuring-bind (r g b) bg
+             (setf (terminal-style-bg-color ts)
+                   (elmtui.backend.common.ansi-styling:make-termcolor
+                    :bg t :r r :g g :b b))))
+          ((integerp bg)
+           (setf (terminal-style-bg-color ts)
+                 (elmtui.backend.common.ansi-styling:make-termcolor
+                  :bg t :color-256 bg)))
+          ((keywordp bg)
+           (setf (terminal-style-bg-color ts)
+                 (elmtui.backend.common.ansi-styling:make-termcolor
+                  :bg t :simple bg)))
+          (t
+           ;; No background color specified; leave as default
+           )))
+      ;; Support both :fg and :fg-color keys, and terminal-color instances
+      ;; Extract foreground color allowing uppercase or lowercase keys
+      (let ((fg (or (getf style-plist :fg)
+                    (getf style-plist :fg-color)
+                    (getf style-plist :FG)
+                    (getf style-plist :FG-COLOR))))
+        (cond
+          ((typep fg 'elmtui.backend.common.ansi-styling:terminal-color)
+           (setf (terminal-style-fg-color ts) fg))
+          ((and (listp fg) (= (length fg) 3))
+           (destructuring-bind (r g b) fg
+             (setf (terminal-style-fg-color ts)
+                   (elmtui.backend.common.ansi-styling:make-termcolor
+                    :r r :g g :b b))))
+          ((integerp fg)
+           (setf (terminal-style-fg-color ts)
+                 (elmtui.backend.common.ansi-styling:make-termcolor
+                  :color-256 fg)))
+          ((keywordp fg)
+           (setf (terminal-style-fg-color ts)
+                 (elmtui.backend.common.ansi-styling:make-termcolor
+                  :simple fg)))
+          (t
+           ;; No foreground color specified; leave default
+           )))
       (let ((attrs (getf style-plist :attrs)))
         (when (member :bold attrs) (setf (terminal-style-bold ts) t))
         (when (member :italic attrs) (setf (terminal-style-italic ts) t))
         (when (member :underline attrs) (setf (terminal-style-underline ts) t))
         (when (member :inverse attrs) (setf (terminal-style-inverse ts) t)))
+      (log:debug "APPLY-STYLE-DIFF CALLED. Current: conveeeert tadaaaaa  ~A" ts)
       ts)))
 
 (defun write-style-to-stream (stream style)
+  "Write ANSI escape sequences for STYLE to STREAM. STYLE may be a style plist or a terminal-style instance."
   (when style
-    (let ((ts (style-to-terminal-style style)))
+    (let ((ts (if (typep style 'elmtui.backend.common.ansi-styling:terminal-style)
+                  style
+                  (style-to-terminal-style style))))
       (when ts
-        (let ((seqs (elmtui.backend.common.ansi-styling:ansi-seqs ts :fg-color :bg-color :bold :italic :underline)))
-          (dolist (seq seqs) (write-output (concatenate 'string (string #\Esc) seq) stream)))))))
+        (let ((seqs (elmtui.backend.common.ansi-styling:ansi-seqs ts
+                                                                  :fg-color
+                                                                  :bg-color
+                                                                  :bold
+                                                                  :italic
+                                                                  :underline)))
+          ;; Each seq is a full ESC[…m sequence; write directly
+          (dolist (seq seqs)
+            (write-output seq stream)))))))
 (defmacro as-utf-8-bytes (char writer)
   "Given the character CHAR, call the WRITER for every byte in the
   UTF-8 encoded form of that character. WRITER may a function or a
@@ -547,15 +599,30 @@ This method should be implemented by subclasses of low-level-terminal."
 
 (defmethod apply-style-diff ((instance terminal-instance) new-style)
   (log:info "APPLY-STYLE-DIFF CALLED. Current: ~S, New: ~S" (term-style instance) new-style)
-  (let ((current-style (term-style instance)) (stream (term-stream instance)))
-    (when (equal current-style new-style) (return-from apply-style-diff t))
-    (log:debug "APPLY-STYLE-DIFF: Transitioning. Current: ~S, New: ~S" current-style new-style)
-    (let* ((new-style-ts (if new-style (style-to-terminal-style new-style) (make-terminal-style)))
-           (styles-to-upgrade (update-style! current-style new-style-ts)))
-      (setf current-style (copy-term-style current-style)) ; This was problematic, should be (term-style instance)
-      (dolist (s (ansi-seqs styles-to-upgrade))
-        (log:debug "APPLY-STYLE-DIFF: Writing ANSI sequence: ~S" s)
-        (exec-sequence (terminal-instance-lock instance) (terminal-instance-fd instance) s))
+  (let* ((current-style (term-style instance))
+         (stream (term-stream instance))
+         ;; If new-style is already a terminal-style, use it directly
+         (new-style-ts (cond
+                         ((typep new-style 'elmtui.backend.common.ansi-styling:terminal-style)
+                          new-style)
+                         (new-style (progn
+                                      (log:debug "APPLY-STYLE-DIFF: Converting plist to terminal-style: ~S" new-style)
+                                      (style-to-terminal-style new-style)))
+                         (t (make-terminal-style)))))
+    (when (equal current-style new-style-ts)
+      (return-from apply-style-diff t))
+    (log:debug "APPLY-STYLE-DIFF: Transitioning. Current: ~S, New: ~S" current-style new-style-ts)
+    (let ((changes (update-style! current-style new-style-ts)))
+      ;; Emit ANSI sequences only for changed attributes
+      (dolist (change changes)
+        (destructuring-bind (attr val) change
+          (let ((seqs (elmtui.backend.common.ansi-styling:ansi-seqs current-style attr)))
+            (dolist (seq seqs)
+              (log:debug "APPLY-STYLE-DIFF: Writing ANSI sequence for ~S: ~S" attr seq)
+              (exec-sequence (terminal-instance-lock instance)
+                             (terminal-instance-stream instance)
+                             seq)))))
+      ;; current-style is mutated in-place by update-style!
       (setf (term-style instance) current-style)) ; Update instance's current style
     (finish-output stream) t))
 
@@ -726,32 +793,30 @@ This method should be implemented by subclasses of low-level-terminal."
   t)
 
 ;; Forward declaration
-(declaim (ftype (function (terminal-instance t) t) render-ui-tree-to-buffer))
+(declaim (ftype (function (terminal-instance virtual-terminal-buffer t) t) render-ui-tree-to-buffer))
 
-;; Helper function to render the UI tree to the back-buffer
+;; Helper function to render the UI tree to the target-buffer
 ;; This function will recursively traverse the tree and draw nodes.
-(defun render-ui-tree-to-buffer (backend ui-node)
+(defun render-ui-tree-to-buffer (backend target-buffer ui-node)
   (when ui-node
     (let* ((props (elmtui.view.core:ui-node-props ui-node))
            (node-type (elmtui.view.core:ui-node-type ui-node))
            (node-id (getf props :id))
            (layout-rect (getf props :layout-rect))
-           ;; Get the raw style object, which might be a style-set
            (style-object (if (typep ui-node 'elmtui.view.styled:styled-ui-node)
                              (elmtui.view.styled:styles ui-node)
                              nil))
-           ;; Convert to plist if it's a style-set, otherwise use as is (expecting nil or already a plist)
            (node-computed-styles (cond
                                    ((null style-object) nil)
-                                   ((typep style-object 'style-set) ; style-set type imported
-                                    (styles-list style-object))     ; styles-list function imported
-                                   ((listp style-object) style-object) ; Already a plist (defensive)
+                                   ((typep style-object 'style-set)
+                                    (styles-list style-object))
+                                   ((listp style-object) style-object)
                                    (t
                                     (log:warn "render-ui-tree-to-buffer: Unexpected style object type ~A for node type ~A, ID: ~A"
                                               (type-of style-object) node-type node-id)
                                     nil))))
 
-      (log:debug "OUTPUT: render-node - Type: ~S, ID: ~S, LayoutRect: ~S, StyleObject: ~S, ComputedStylesPlist: ~S"
+      (log:debug "OUTPUT: render-node to target-buffer - Type: ~S, ID: ~S, LayoutRect: ~S, StyleObject: ~S, ComputedStylesPlist: ~S"
                  node-type node-id layout-rect style-object node-computed-styles)
 
       (when layout-rect
@@ -760,38 +825,29 @@ This method should be implemented by subclasses of low-level-terminal."
               (rect-w (elmtui.view.geo:w layout-rect))
               (rect-h (elmtui.view.geo:h layout-rect)))
 
-          ;; Proceed only if width and height are positive
           (when (and rect-w rect-h (> rect-w 0) (> rect-h 0))
-            (let* ((bg-color (getf node-computed-styles :background-color)) ; Key from stylesheet
-                   (fg-color (getf node-computed-styles :color))          ; Standard key for text color
-                   ;; Construct the style plist for buffer cell (expects :bg, :fg, :attrs)
+            (let* ((bg-color (getf node-computed-styles :background-color))
+                   (fg-color (getf node-computed-styles :color))
                    (cell-style-plist ()))
               (when bg-color (setf cell-style-plist (list* :bg bg-color cell-style-plist)))
               (when fg-color (setf cell-style-plist (list* :fg fg-color cell-style-plist)))
-              ;; TODO: Add other attributes if necessary, e.g. :bold, :italic from node-computed-styles
-              ;; (let ((attrs ()))
-              ;;   (when (getf node-computed-styles :font-weight-bold) (push :bold attrs)) ; Example
-              ;;   (when attrs (setf cell-style-plist (list* :attrs attrs cell-style-plist))))
 
-              (log:debug "RENDER-UI-TREE: Node ~S (~S), Rect (~A,~A ~Ax~A), using cell-style ~S"
+              (log:debug "RENDER-UI-TREE to target-buffer: Node ~S (~S), Rect (~A,~A ~Ax~A), using cell-style ~S"
                          node-id node-type rect-x rect-y rect-w rect-h cell-style-plist)
 
               (cond
-                ((or (eq node-type :container) (eq node-type :div)) ; For rainbow stripes and other general containers
-                 (fill-rectangle backend rect-y rect-x rect-h rect-w
-                                 :char #\Space ; Default char for background
+                ((or (eq node-type :container) (eq node-type :div))
+                 (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
+                                 :char #\Space
                                  :style cell-style-plist))
-                ;; Add handling for :text-node or other specific types if needed
-                ;; ((eq node-type :text-node)
+                ;; ((eq node-type :text-node) ; Example for text
                 ;;  (let ((text-content (getf props :text "")))
-                ;;    (draw-text-at backend rect-y rect-x text-content :style cell-style-plist)))
+                ;;    (draw-text-at backend target-buffer rect-y rect-x text-content :style cell-style-plist)))
                 (t
-                 ;; Default behavior for other node types: if it has a background, fill it.
                  (when bg-color
-                   (fill-rectangle backend rect-y rect-x rect-h rect-w
+                   (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
                                    :char #\Space
                                    :style cell-style-plist))))))))
 
-      ;; Recursively render children
       (dolist (child (elmtui.view.core:ui-node-children ui-node))
-        (render-ui-tree-to-buffer backend child)))))
+        (render-ui-tree-to-buffer backend target-buffer child)))))

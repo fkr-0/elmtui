@@ -36,9 +36,10 @@
                 #:term-w #:term-h #:handle-backend-resize
                 ;; Rendering
                 #:render-and-present)
-  (:import-from :elmtui.platform.canvas ; For canvas object type and specific canvas functions
+  (:import-from :elmtui.platform.canvas
                 #:canvas #:initialize-canvas #:restore-terminal-state
-                #:canvas-content-rectangle)
+                #:canvas-content-rectangle #:canvas-buffer #:clear-canvas
+                #:+position-strategy-fixed+ #:+anchor-top-left+) ; Import defaults if used directly
   ;; Removed direct backend imports (e.g., elmtui.platform.backend.terminal)
   (:import-from :elmtui.core.loop
                 #:publish #:start-loop #:elm-stop-loop)
@@ -98,16 +99,26 @@
   (when cmds
     (log:debug "DRIVER: Processing initial commands...")
     (dolist (cmd cmds)
-      (if (and (consp cmd) (eq (first cmd) :command)) ; Check if it's an async command
-          (interpret-cmd cmd)
-          (funcall publish-fn cmd))))) ; publish will auto-wrap as :app-message
+      (cond
+        ((and (consp cmd) (eq (first cmd) :command)) ; Check if it's an async command
+         (interpret-cmd cmd))
+        ((and (consp cmd)
+              (keywordp (first cmd))
+              (>= (length cmd) 2))
+         (funcall publish-fn cmd))
+        ((and (consp cmd)
+              (keywordp (first cmd))
+              (= (length cmd) 1))
+         (log:error "DRIVER: Skipping malformed initial command (missing value): ~S" cmd))
+        (t
+         (funcall publish-fn cmd))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Main event handler (becomes *app-message-processor*)
 ;;; ---------------------------------------------------------------------------
 
 (defun process-event-from-driver
-    (event app-state backend canvas use-canvas view-fn update-fn publish-fn)
+    (event app-state backend canvas view-fn update-fn publish-fn)
   "Core dispatcher for every EVENT, now as *app-message-processor*."
   (block handler-block
     (log:info "DRIVER: EVENT (via *app-message-processor*): ~S" event)
@@ -176,21 +187,19 @@
             (when (not (state-ref app-state :driver-shutdown-initiated))
               (let* ((tree      (funcall view-fn app-state publish-fn))
                      (styled    (apply-stylesheet-to-tree tree (state-ref app-state :current-stylesheet)))
-                     (rect      (if (and use-canvas canvas)
-                                    (canvas-content-rectangle canvas)
-                                    (make-rectangle :pos (make-pos :x 0 :y 0)
-                                                    :size (make-size :w (elmtui.platform.api:term-w backend)
-                                                                     :h (elmtui.platform.api:term-h backend)))))
+                     ;; Canvas is always present, layout within its content rectangle
+                     (rect      (canvas-content-rectangle canvas))
                      (laid      (layout-tree styled rect)))
                 (when laid
-                  ;; Backend handles rendering, diffing, and canvas integration
-                  (elmtui.platform.api:render-and-present backend laid (when use-canvas canvas))))))))))
+                  ;; Backend handles rendering laid out tree onto the canvas,
+                  ;; then presenting the canvas.
+                  (elmtui.platform.api:render-and-present backend laid canvas)))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Cleanup helpers
 ;;; ---------------------------------------------------------------------------
 
-(defun cleanup-application (backend canvas use-canvas)
+(defun cleanup-application (backend canvas)
   (log:info "DRIVER: Starting cleanup...")
   ;; Stop input reader
   (when *stop-input-fn*
@@ -198,7 +207,7 @@
     (setf *input-thread* nil *stop-input-fn* nil))
 
   ;; Canvas restore (if used) - this might involve terminal operations via canvas API
-  (when (and backend use-canvas canvas)
+  (when (and backend canvas) ; Canvas is always present if backend was initialized
     (handler-case (elmtui.platform.canvas:restore-terminal-state canvas)
       (error (e) (log:error "DRIVER: Canvas restore failed: ~A" e))))
 
@@ -216,26 +225,42 @@
 (defun run-application (app-spec &key
                                    (backend-type         :terminal)
                                    (tty-path             "/dev/tty")
-                                   (use-canvas           nil)
-                                   (canvas-anchor        :cursor)
-                                   (canvas-growth        :down)
+                                   ;; Canvas parameters (use-canvas removed)
+                                   (canvas-anchor        :top-left)
+                                   (canvas-growth        :fixed)
+                                   (canvas-fixed-pos     nil) ; Let initialize-canvas use its (0,0) default if this is nil and growth is :fixed
                                    (canvas-initial-size  nil)
                                    (canvas-max-size      nil))
   (let* ((publish-fn #'elmtui.core.loop:publish)
          ;; Initialize backend using the API, passing publish-fn for backend-initiated events (e.g., signals)
          (backend (initialize-backend-with-publish-fn backend-type tty-path publish-fn))
-         (canvas  (when (and backend use-canvas) ; Ensure backend initialized before canvas
-                    (elmtui.platform.canvas:initialize-canvas backend
-                                                              :position-strategy canvas-growth
-                                                              :anchor-point      canvas-anchor
-                                                              :initial-size      canvas-initial-size
-                                                              :max-size          canvas-max-size)))
+         ;; Canvas is now mandatory. Initialize it after backend.
+         ;; Determine effective initial size for the canvas.
+         (effective-canvas-initial-size (if backend
+                                            (or canvas-initial-size
+                                                (make-size :w (term-w backend) :h (term-h backend)))
+                                            nil))
+         (canvas  (when backend ; Only initialize canvas if backend succeeded
+                    (elmtui.platform.canvas:initialize-canvas
+                     backend
+                     :position-strategy canvas-growth
+                     :anchor-point      canvas-anchor
+                     :fixed-position    (if (eq canvas-growth :fixed)
+                                            (or canvas-fixed-pos (make-pos :x 0 :y 0))
+                                            canvas-fixed-pos)
+                     :initial-size      effective-canvas-initial-size
+                     :max-size          canvas-max-size)))
          init-fn update-fn view-fn subs-fn app-state initial-cmds)
 
     (unless backend
       (log:error "DRIVER: Failed to initialize backend ~A. Aborting." backend-type)
       (return-from run-application (values nil "Backend initialization failed.")))
 
+    +    (unless canvas
+           +      (log:error "DRIVER: Failed to initialize canvas. Aborting.")
+           +      (when backend (ignore-errors (elmtui.platform.api:shutdown-backend backend)))
+           +      (return-from run-application (values nil "Canvas initialization failed.")))
+    +
     (setf *driver-initiated-shutdown-p* nil)
     (handler-case
         (unwind-protect
@@ -261,7 +286,7 @@
                (setf elmtui.core.globals:*app-message-processor*
                      (lambda (msg current-app-state)
                        (process-event-from-driver msg current-app-state
-                                                  backend canvas use-canvas
+                                                  backend canvas
                                                   view-fn update-fn publish-fn)))
                (when subs-fn
                  (let ((app-subscriptions (funcall subs-fn app-state)))
@@ -302,7 +327,7 @@
             (log:info "DRIVER: Core event loop stop requested/confirmed.")
 
             ;; 3. Perform final platform cleanup.
-            (cleanup-application backend canvas use-canvas)
+            (cleanup-application backend canvas)
             (log:info "DRIVER: Unwind-protect cleanup finished.")))
       ;; Fatal error
       (error (e)
@@ -312,7 +337,7 @@
                        (with-output-to-string (s) (sb-debug:print-backtrace :stream s :count 10)) ; Removed :condition e
                        "Backtrace not available for this Lisp implementation in this context."))
         (ignore-errors (elmtui.core.loop:elm-stop-loop))
-        (cleanup-application backend canvas use-canvas)
+        (cleanup-application backend canvas)
         (uiop:quit 1 e)))
 
     (when (or *driver-initiated-shutdown-p*
