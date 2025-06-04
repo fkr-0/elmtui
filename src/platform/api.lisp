@@ -207,7 +207,7 @@ HEIGHT: The new height."))
 ;;; Drawing Primitives
 ;;;---------------------------------------------------------------
 
-(defgeneric draw-text-at (backend-instance row col text &key style)
+(defgeneric draw-text-at (backend-instance target-buffer row col text &key style)
   (:documentation "Draws a string of text at the specified row and column.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 ROW: The starting row for the text.
@@ -216,7 +216,7 @@ TEXT: The string to draw.
 STYLE: An optional backend-specific style object (e.g., color, attributes) created by MAKE-STYLE.
 If NIL, backend default style is used."))
 
-(defgeneric draw-char-at (backend-instance row col char &key style)
+(defgeneric draw-char-at (backend-instance target-buffer row col char &key style)
   (:documentation "Draws a single character at the specified row and column.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 ROW: The row for the character.
@@ -224,7 +224,7 @@ COL: The column for the character.
 CHAR: The character to draw.
 STYLE: An optional backend-specific style object. If NIL, backend default style is used."))
 
-(defgeneric fill-rectangle (backend-instance row col height width &key char style)
+(defgeneric fill-rectangle (backend-instance target-buffer row col height width &key char style)
   (:documentation "Fills a rectangular area of the screen with a specified character and style.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 ROW: The top row of the rectangle.
@@ -234,7 +234,7 @@ WIDTH: The width of the rectangle in character cells.
 CHAR: The character to fill with. Defaults to a space if not provided by the backend.
 STYLE: An optional backend-specific style object. If NIL, backend default style is used."))
 
-(defgeneric draw-box-outline (backend-instance row col height width &key style corners sides)
+(defgeneric draw-box-outline (backend-instance target-buffer row col height width &key style corners sides)
   (:documentation "Draws the outline of a box using line-drawing characters.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 ROW: The top row of the box.
@@ -247,7 +247,7 @@ CORNERS: A list of four characters for top-left, top-right, bottom-left, bottom-
 SIDES: A list of two characters for horizontal and vertical lines.
        Defaults to backend-specific line drawing characters."))
 
-(defgeneric draw-styled-box (backend-instance row col height width &key border-style border-color box-char-set style)
+(defgeneric draw-styled-box (backend-instance target-buffer row col height width &key border-style border-color box-char-set style)
   (:documentation "Draws a box with potentially different styles for each side/corner.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 ROW: The top row of the box.
@@ -261,14 +261,14 @@ BOX-CHAR-SET: (Optional) A specific set of characters to use for corners and lin
 STYLE: An optional backend-specific style object (primarily for foreground color of the border).
        If BORDER-COLOR is provided, it should take precedence for the border lines themselves."))
 
-(defgeneric set-cell-style (backend-instance row col &key style)
+(defgeneric set-cell-style (backend-instance target-buffer row col &key style)
   (:documentation "Applies a style to the character cell at the given coordinates without changing the character itself.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 ROW: The row of the cell.
 COL: The column of the cell.
 STYLE: The backend-specific style object to apply."))
 
-(defgeneric clear-area (backend-instance row col height width &key style)
+(defgeneric clear-area (backend-instance target-buffer row col height width &key style)
   (:documentation "Clears a rectangular area of the screen, typically filling it with spaces using a given style.
 BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
 ROW: The top row of the area.
@@ -281,73 +281,13 @@ STYLE: An optional backend-specific style object (often just background color). 
 ;;; Rendering
 ;;;---------------------------------------------------------------
 
-(defgeneric render-and-present (backend-instance laid-tree &optional canvas-instance)
-  (:documentation "Instructs the backend to render the laid-out UI tree and present it to the display.
-If CANVAS-INSTANCE is provided, its content should be incorporated into the rendering.
-The backend is responsible for its own buffering, diffing, and display update mechanisms.
-LAID-TREE: The fully laid-out UI node tree.
-CANVAS-INSTANCE: An optional canvas object whose content should be rendered.
-Returns T on success, or NIL/error on failure."))
-
-;;;---------------------------------------------------------------
-;;; Color and Style Management
-;;;---------------------------------------------------------------
-
-(defgeneric make-color (backend-instance r-or-name &optional g b)
-  (:documentation "Creates a backend-specific representation of a color.
-Supports named colors (e.g., :RED, :BLUE), or RGB values if the backend supports truecolor.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-R-OR-NAME: A keyword for a named color (e.g., :BLACK, :WHITE, :RED, :GREEN, :YELLOW, :BLUE, :MAGENTA, :CYAN)
-             or the red component (0-255) if G and B are also provided.
-G: The green component (0-255), if using RGB.
-B: The blue component (0-255), if using RGB.
-Returns a backend-specific color object or representation."))
-
-(defgeneric make-style (backend-instance &key foreground-color background-color attributes)
-  (:documentation "Creates a backend-specific style object from color and text attributes.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-FOREGROUND-COLOR: A color object created by MAKE-COLOR for the text.
-BACKGROUND-COLOR: A color object created by MAKE-COLOR for the background.
-ATTRIBUTES: A list of keywords representing text attributes (e.g., :BOLD, :ITALIC, :UNDERLINE, :REVERSE).
-            Supported attributes are backend-dependent.
-Returns a backend-specific style object."))
-
-(defgeneric apply-style (backend-instance style)
-  (:documentation "Sets the current drawing style for subsequent drawing operations.
-This is an alternative to passing :STYLE to each drawing function if multiple
-operations share the same style. Not all backends may support a global current style.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-STYLE: The backend-specific style object created by MAKE-STYLE."))
-
-(defgeneric default-foreground-color (backend-instance)
-  (:documentation "Returns the backend's default foreground color.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-Returns a backend-specific color object."))
-
-(defgeneric default-background-color (backend-instance)
-  (:documentation "Returns the backend's default background color.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-Returns a backend-specific color object."))
-
-(defgeneric supports-truecolor-p (backend-instance)
-  (:documentation "Returns T if the backend supports 24-bit truecolor (RGB), NIL otherwise.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric max-colors (backend-instance)
-  (:documentation "Returns the maximum number of distinct colors supported by the backend.
-For truecolor backends, this might return a very large number (e.g., 2^24) or a special value.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-;;;---------------------------------------------------------------
-;;; Terminal Instance Accessors (Generic)
-;;;---------------------------------------------------------------
-(defgeneric term-w (term))
-(defgeneric term-h (term))
-(defgeneric (setf term-w) (new-value term))
-(defgeneric (setf term-h) (new-value term))
-(defgeneric term-stream (term))
-(defgeneric term-style (term))
-(defgeneric (setf term-style) (new-style term)) ; Added for completeness if needed
+(defgeneric render-and-present (backend-instance layout-root canvas)
+  (:documentation "Renders the given LAYOUT-ROOT and presents it on the screen.
+ BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
+ LAYOUT-ROOT: The root of the laid-out view tree to render.
+CANVAS: The canvas object to render onto and present. Rendering is confined
+        to the canvas's content-rectangle, populating its virtual buffer.
+        The backend then transfers this to its main screen buffer and flushes."))
 
 ;;;---------------------------------------------------------------
 ;;; Input Handling

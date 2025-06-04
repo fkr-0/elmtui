@@ -16,7 +16,8 @@
 
                 #:style-set #:stylesheet-name) ; Removed query-stylesheet, copy-set. Added stylesheet-name
   ;; Import default style set, value-of, and copy-set from style-set package
-  (:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set #:set-style) ; Added copy-set
+  (:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set #:set-style
+                #:style-list) ; Added copy-set
   ;; Import query-stylesheet from sheet package
   (:import-from :elmtui.style-lib.sheet #:query-stylesheet)
   (:export
@@ -29,6 +30,17 @@
    :mark-tree-dirty-for-styling ; New function to mark tree as dirty
    :with-attributes))       ; Renamed from with-styles
 (in-package :elmtui.view.styled)
+;; (defmethod as-plist ((node styled-ui-node))
+;;   "Convert a styled-ui-node to a property list, including style information."
+;;   (let ((props (ui-node-props node)))
+;;     (append
+;;      (list :type (ui-node-type node)
+;;            :id (stylable-id node)
+;;            :classes (classes node)
+;;            :parents (parents-of node)
+;;            :styles (styles node)
+;;            :dirty (dirty-p node))
+;;      props)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Styled UI Node Class

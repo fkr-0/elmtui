@@ -8,6 +8,12 @@
   (:import-from :log4cl #:log-debug #:log-error #:log-warn #:log-info)
   (:import-from :elmtui.core.globals
                 #:*event-loop* #:*app-state* #:*app-message-processor* #:*app-sender*)
+  (:import-from :elmtui.style-lib.api
+                #:style-set ) ; Removed query-stylesheet, copy-set. Added stylesheet-name
+  (:import-from :elmtui.style-lib.api
+                #:style-set )
+  (:import-from :elmtui.style-lib.style-set
+                #:styles-list )
   (:import-from :elmtui.core.conditions
                 #:event-loop-dispatch-error #:async-task-error)
   (:import-from :cleve-elm.event-loop
@@ -21,10 +27,10 @@
                 #:standard-event-channels)
   (:import-from :elmtui.state.update
                 #:handle-async-command)
-  (:export :start-loop :elm-stop-loop :publish :*event-loop*
-           :get-event-loop-status :get-event-queue-length :instrument-event-loop
-           ;; Make *consumer-thread* accessible for joining in driver.lisp
-   :*consumer-thread*))
+  (:export :start-loop :elm-stop-loop :publish :*event-loop* :as-plists
+   :get-event-loop-status :get-event-queue-length :instrument-event-loop
+   ;; Make *consumer-thread* accessible for joining in driver.lisp
+           :*consumer-thread*))
 
 (in-package :elmtui.core.loop)
 
@@ -158,12 +164,25 @@
       ;;          (log-warn "EVENT-CONSUMER: Received event ~S from an unknown clevelib channel ~S."
       ;;                    event source-clevelib-channel))))))
       (error (err) ; Changed 'e' to 'err'
-        (log-error "EVENT-CONSUMER: Error in event consumer loop: ~A~%Backtrace: ~A"
-                   err (with-output-to-string (s)
-                         (uiop:print-backtrace :stream s :count 10 :condition err)))
+        (let ((bt (with-output-to-string (s)
+                    (uiop:print-backtrace :stream s :count 50 :condition err))))
+          (log-error "EVENT-CONSUMER: Error in event consumer loop: ~A~%Backtrace:~%~A"
+                     err bt)
+          (format *error-output* "~%EVENT-CONSUMER: Error in background thread: ~A~%Backtrace:~%~A~%" err bt)
+          (finish-output *error-output*)
+          (break "EVENT-CONSUMER: Unhandled error in background thread. See log and *error-output* for details.")
+          ;; Optionally, terminate the main thread/process:
+          ;; (uiop:quit 1)
+          )
         (setf *shutdown-requested* t) ; Ensure loop terminates on error
         (return))))
   (log-info "EVENT-CONSUMER: Event consumer loop terminated"))
+
+(defgeneric as-plist (style)
+  (:method ((styles list))
+    "Convert a style object to a property list. This method should be overridden by specific style objects."
+    styles)
+  (:documentation "Convert a style object to a property list."))
 
 (defun process-channel-event (event source-event-channel-object)
   "Process an event received from an event-channel. Invokes handlers registered on the
@@ -177,7 +196,19 @@ source-event-channel-object, then processes the event further."
 
     (dolist (handler (elmtui.core.event-channels:handlers source-event-channel-object))
       (handler-case
-          (funcall handler event-to-process)
+          (funcall handler
+                   (if (and (consp event-to-process)
+                            (find :style event-to-process)
+                            (let ((style-val (getf event-to-process :style)))
+                              (and style-val (not (listp style-val)))
+                              ))
+                       (let* ((style-val (getf event-to-process :style))
+                              (style-plist (as-plist style-val))
+
+                              (copy (copy-list event-to-process)))
+                         (setf (getf copy :style) style-plist)
+                         copy))
+                   event-to-process)
         (error (e)
           (log-error "EVENT-CONSUMER: Error in channel-specific handler for ~S on channel ~S: ~A"
                      event-to-process channel-name e))))
@@ -234,13 +265,13 @@ source-event-channel-object, then processes the event further."
           (let ((clevelib-ch (elmtui.core.event-channels:channel-of ch-obj)))
             (unless (cleve-elm.channel:channel-closed clevelib-ch)
               (ignore-errors (cleve-elm.channel:-> clevelib-ch :shutdown-loop))))))
-    ;; The responsibility of joining *consumer-thread* lies with the code that spawned it (e.g., driver.lisp).
-    ;; This function's role is to signal shutdown and clean up loop-specific resources like channels.
-    ;; The *consumer-thread* variable itself will be nulled by the spawning thread after it confirms termination.
+      ;; The responsibility of joining *consumer-thread* lies with the code that spawned it (e.g., driver.lisp).
+      ;; This function's role is to signal shutdown and clean up loop-specific resources like channels.
+      ;; The *consumer-thread* variable itself will be nulled by the spawning thread after it confirms termination.
 
-    (log-info "LOOP: Closing event channels. Current *active-event-channels* ID: #x~X"
-              (if *active-event-channels* (sb-kernel:get-lisp-obj-address *active-event-channels*) 0))
-    (dolist (ch-obj *active-event-channels*) ; ch-obj is a channel object
+      (log-info "LOOP: Closing event channels. Current *active-event-channels* ID: #x~X"
+                (if *active-event-channels* (sb-kernel:get-lisp-obj-address *active-event-channels*) 0))
+      (dolist (ch-obj *active-event-channels*) ; ch-obj is a channel object
         (ignore-errors (cleve-elm.channel:channel-close (elmtui.core.event-channels:channel-of ch-obj))))
       (setf *active-event-channels* nil)
       (log-info "LOOP: *active-event-channels* set to NIL.")
@@ -266,26 +297,26 @@ source-event-channel-object, then processes the event further."
           (if (and target-channel-name (symbolp target-channel-name) (not (keywordp target-channel-name)))
               (intern (symbol-name target-channel-name) :keyword)
               target-channel-name)))
-;; Find expects the item itself if :key is not used, or the result of :key.
-(when effective-target-name
-(log-debug "PUBLISH: Pre-find check. Effective target: ~S. *active-event-channels* (len ~D): ~S"
-effective-target-name
-(if *active-event-channels* (length *active-event-channels*) 0)
-(if *active-event-channels*
-(mapcar (lambda (ch) (list (elmtui.core.event-channels:name ch)
-                         (type-of ch)
-                         (sb-kernel:get-lisp-obj-address ch)))
-      *active-event-channels*)
-"NIL_LIST")))
-(if effective-target-name
-(setf channel-obj
-(find effective-target-name *active-event-channels*
-:key #'elmtui.core.event-channels:name
-:test #'eq)) ; EQ is fine for keywords
-;; If no target-channel-name, fallback to :message, then :system-channel, then first available
-(setf channel-obj (or (find :message *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eq)
-         (find :system-channel *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eq) ; Corrected here
-         (first *active-event-channels*))))
+    ;; Find expects the item itself if :key is not used, or the result of :key.
+    (when effective-target-name
+      (log-debug "PUBLISH: Pre-find check. Effective target: ~S. *active-event-channels* (len ~D): ~S"
+                 effective-target-name
+                 (if *active-event-channels* (length *active-event-channels*) 0)
+                 (if *active-event-channels*
+                     (mapcar (lambda (ch) (list (elmtui.core.event-channels:name ch)
+                                                (type-of ch)
+                                                (sb-kernel:get-lisp-obj-address ch)))
+                             *active-event-channels*)
+                     "NIL_LIST")))
+    (if effective-target-name
+        (setf channel-obj
+              (find effective-target-name *active-event-channels*
+                    :key #'elmtui.core.event-channels:name
+                    :test #'eq)) ; EQ is fine for keywords
+        ;; If no target-channel-name, fallback to :message, then :system-channel, then first available
+        (setf channel-obj (or (find :message *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eq)
+                              (find :system-channel *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eq) ; Corrected here
+                              (first *active-event-channels*))))
 
     (if channel-obj
         (log-debug "PUBLISH: Found target channel-obj: ~A (ID: #x~X), underlying clevelib channel ID: #x~X. Original target: ~S, Effective target: ~S"
@@ -317,12 +348,12 @@ effective-target-name
             (error (e)
               (log-error "PUBLISH: Failed to enqueue to channel ~S: ~A. Event: ~S"
                          ch-name e event-to-send))))
-       (log-warn "PUBLISH: Target channel (Original: ~S, Effective: ~S) not found, not active, or closed. Dropping event: ~S"
-                 target-channel-name
-                 (if (and target-channel-name (symbolp target-channel-name) (not (keywordp target-channel-name)))
-                     (intern (symbol-name target-channel-name) :keyword)
-                     target-channel-name)
-                 event))))
+        (log-warn "PUBLISH: Target channel (Original: ~S, Effective: ~S) not found, not active, or closed. Dropping event: ~S"
+                  target-channel-name
+                  (if (and target-channel-name (symbolp target-channel-name) (not (keywordp target-channel-name)))
+                      (intern (symbol-name target-channel-name) :keyword)
+                      target-channel-name)
+                  event))))
 
 ;; Status and metrics functions
 (defun get-event-loop-status ()
@@ -366,3 +397,7 @@ effective-target-name
   "Instrumentation hook for debugging/profiling."
   (dolist (hook *event-loop-instrumentation-hooks*)
     (funcall hook event)))
+
+(defmethod as-plist ((style style-set))
+  "Convert a style-set to a property list."
+  (styles-list style))

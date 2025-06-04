@@ -169,7 +169,10 @@
                              ;; Platform API Definition
                              (:file "api")
                              (:file "backend/common/virtual-buffer")
+                             (:file "backend/common/ansi-styling")
+                             (:file "backend/common/utils")
                              (:file "canvas")
+                             (:file "canvas-renderer")
                              (:file "input")
                              (:file "output")
                              ;; Backend Implementations
@@ -178,12 +181,12 @@
                               :serial t
                               :components (
                                            ;; Common utilities for backends
-                                           (:module "common"
-                                            :serial t
-                                            :pathname "common/"
-                                            :components ((:file "utils")
-                                                         (:file "ansi-styling")
-                                                         ))
+                                           ;; (:module "common"
+                                           ;;  :serial t
+                                           ;;  :pathname "common/"
+                                           ;;  :components ((:file "utils")
+                                           ;;               (:file "ansi-styling")
+                                           ;;               ))
                                            ;; Fake Terminal Backend
                                            (:module "faketerm"
                                             :pathname "faketerm/"
@@ -218,7 +221,9 @@
                 :pathname "../examples/"
                 :components ((:file "keymap-app")
                              (:file "rainbow-app")
+                             (:file "rainbow-app-canvas")
                              (:file "boxes-app")
+                             (:file "dirli")
                              (:file "colortext-app")))
                (:module "dirlister"
                 :serial t

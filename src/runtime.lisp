@@ -30,9 +30,7 @@
 
 (defmacro def-elm-app (name &key init update view subscriptions)
   "Defines an ElmTUI application.
-   [Original documentation]
-   
-   Added support for terminal canvas positioning.
+   Canvas is now used by default.
  
     Args:
       NAME: Symbol naming the application.
@@ -43,51 +41,44 @@
       VIEW: A function designator (#'my-view) that takes (app-state) and returns
             a UI-NODE tree.
       SUBSCRIPTIONS: (Optional) A function designator (#'my-subscriptions) that takes (app-state)
-                     and returns a list of subscriptions (e.g., for timers, external events). (Not fully implemented yet)
+                     and returns a list of subscriptions (e.g., for timers, external events).
  
     Generates:
       - A `run-<NAME>` function to start and manage the application lifecycle.
-     - Sets `*current-app-name*` and `*current-app-runner*` for the default `run-app`.
-Example:
-(def-elm-app my-app )
-
-   "
+     - Sets `*current-app-name*` and `*current-app-runner*` for the default `run-app`."
   (let ((run-func-name (symbolicate "RUN-" name)))
-    ;; Removed unused gensyms
     `(progn
        (defun ,run-func-name (&key 
                                 (platform :terminal)
                                 platform-options
-                                ;; Add canvas options
-                                (use-canvas nil)
-                                (canvas-anchor :cursor)
-                                (canvas-growth :down)
-                                (canvas-initial-size nil)
+                                ;; Canvas options (use-canvas removed)
+                                (canvas-anchor :top-left) ; Default anchor
+                                (canvas-growth :fixed)    ; Default strategy for full-screen/fixed
+                                (canvas-fixed-pos nil)    ; Default to (0,0) if strategy is :fixed & this is nil
+                                (canvas-initial-size nil) ; Default to full screen in driver if nil
                                 (canvas-max-size nil))
-         ;; Bind function designators locally
          (let ((effective-init-fn ,init)
                (effective-update-fn ,update)
                (effective-view-fn ,view)
                (effective-subscriptions-fn ,subscriptions))
-           (log:info "Running ElmTUI application: ~A via elmtui.platform.driver:run-application (Platform: ~A, Canvas: ~A)"
-                     ',name platform use-canvas)
+           (log:info "Running ElmTUI application: ~A via elmtui.platform.driver:run-application (Platform: ~A, Canvas is mandatory)"
+                     ',name platform)
            (let ((app-spec (list :name ',name
                                  :init-fn effective-init-fn
                                  :update-fn effective-update-fn
                                  :view-fn effective-view-fn
                                  :subscriptions-fn effective-subscriptions-fn)))
-             ;; Delegate to the platform driver with canvas options
              (elmtui.platform.driver:run-application 
               app-spec
               :backend-type platform
               :tty-path (getf platform-options :tty-path "/dev/tty")
-              :use-canvas use-canvas
+              ;; :use-canvas is removed
               :canvas-anchor canvas-anchor
               :canvas-growth canvas-growth
+              :canvas-fixed-pos canvas-fixed-pos
               :canvas-initial-size canvas-initial-size
               :canvas-max-size canvas-max-size))))
 
-       ;; Set this app as the default runnable one
        (setf *current-app-name* ',name)
        (setf *current-app-runner* #',run-func-name)
        ',name)))

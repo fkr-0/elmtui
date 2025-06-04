@@ -147,9 +147,9 @@ content-rectangle: The rectangle that represents the area where the canvas conte
 therefore the content is always a subset of the view rectangle, defining the area where
 the canvas content is rendered "
   (backend nil :type (or null t) :read-only t)
-  (position-strategy +position-strategy-below-cursor+ :type keyword)
+  (position-strategy +position-strategy-fixed+ :type keyword) ; Default to fixed
   (anchor-point +anchor-top-left+ :type keyword)
-  (fixed-position nil :type (or null pos))
+  (fixed-position (make-pos :x 0 :y 0) :type (or null pos)) ; Default to 0,0
   (initial-cursor-position nil :type (or null pos))
   (current-cursor-position nil :type (or null pos))
   (lines-added 0 :type integer)
@@ -158,7 +158,7 @@ the canvas content is rendered "
   (max-size nil :type (or null size))
   (visible-p t :type boolean)
   (initial-terminal-content nil :type (or null string))
-  (buffer nil :type (or null virtual-terminal-buffer) :read-only t))
+  (buffer nil :type (or null virtual-terminal-buffer))) ;:read-only t)) TODO
 
 ;;;-----------------------------------------------------------------------------
 ;;; Canvas Management
@@ -188,10 +188,10 @@ the canvas content is rendered "
   (when (canvas-content-rectangle canvas)
     (h (canvas-content-rectangle canvas))))
 (defun initialize-canvas (backend &key
-                                    (position-strategy +position-strategy-below-cursor+)
+                                    (position-strategy +position-strategy-fixed+) ; Updated default
                                     (anchor-point +anchor-top-left+)
-                                    (fixed-position nil)
-                                    (initial-size nil)
+                                    (fixed-position (make-pos :x 0 :y 0)) ; Updated default
+                                    (initial-size nil) ; Will default to full screen if nil
                                     (max-size nil))
   "Initialize a new canvas for the given backend with specified positioning strategy.
    Returns a canvas structure.
@@ -199,7 +199,7 @@ the canvas content is rendered "
    POSITION-STRATEGY: How to position the canvas (:below-cursor, :above-cursor, etc.)
    ANCHOR-POINT: The anchor point for canvas positioning and resizing
    FIXED-POSITION: For fixed position canvases, the absolute position
-   INITIAL-SIZE: The initial size of the canvas content area
+   INITIAL-SIZE: The initial size of the canvas content area. Defaults to full terminal if NIL.
    MAX-SIZE: The maximum size the canvas can grow to"
   (check-type backend t)
   (check-type position-strategy keyword)
@@ -210,11 +210,16 @@ the canvas content is rendered "
     (let* ((initial-cursor-pos (make-pos :x cursor-col :y cursor-row))
            (term-width (term-w backend))
            (term-height (term-h backend))
-           (canvas-width (if initial-size (w initial-size) term-width))
-           (canvas-height (if initial-size (h initial-size) (min 10 (- term-height cursor-row))))
+           ;; If initial-size is not provided, default to full terminal size.
+           (effective-initial-size (or initial-size (make-size :w term-width :h term-height)))
+           (canvas-width (w effective-initial-size))
+           (canvas-height (h effective-initial-size))
            (view-rect (make-rectangle :pos (make-pos :x 0 :y 0)
                                       :size (make-size :w term-width :h term-height)))
-           (content-rect nil))
+           (content-rect nil)
+           (effective-fixed-position (if (eq position-strategy +position-strategy-fixed+)
+                                         (or fixed-position (make-pos :x 0 :y 0))
+                                         fixed-position)))
 
       ;; Calculate the content rectangle based on positioning strategy
       (setf content-rect
@@ -235,12 +240,17 @@ the canvas content is rendered "
                                  :size (make-size :w canvas-width :h canvas-height))))
 
               (:fixed
-               (if fixed-position
-                   (make-rectangle :pos fixed-position
+               (if effective-fixed-position
+                   (make-rectangle :pos effective-fixed-position
                                    :size (make-size :w canvas-width :h canvas-height))
-                   (error "Position strategy is :fixed but fixed-position is NIL")))
+                   (error "Position strategy is :fixed but fixed-position is NIL and no default was applied.")))
 
               (t (error "Unknown position strategy: ~A" position-strategy))))
+
+      ;; Apply max size constraints to the content rectangle's size
+      (when max-size
+        (setf (w (elmtui.view.geo:size content-rect)) (min (w (elmtui.view.geo:size content-rect)) (w max-size)))
+        (setf (h (elmtui.view.geo:size content-rect)) (min (h (elmtui.view.geo:size content-rect)) (h max-size))))
 
       ;; Create and return the canvas structure with its own virtual buffer
       (let ((buf (make-virtual-buffer
@@ -250,52 +260,48 @@ the canvas content is rendered "
                      :max-size max-size
                      :position-strategy position-strategy
                      :anchor-point anchor-point
-                     :fixed-position fixed-position
+                     :fixed-position effective-fixed-position
                      :initial-cursor-position initial-cursor-pos
                      :current-cursor-position initial-cursor-pos
                      :view-rectangle view-rect
                      :content-rectangle content-rect
                      :buffer buf)))))
-
 (defun update-canvas-size (canvas new-width new-height)
   "Update the size of the canvas content rectangle based on the anchor point.
-   This ensures the canvas grows/shrinks in the desired direction."
+   This ensures the canvas grows/shrinks in the desired direction.
+   Also resizes the canvas's internal buffer."
   (check-type canvas canvas)
-  (check-type new-width integer)
-  (check-type new-height integer)
+  (check-type new-width (integer 0)) ; Ensure non-negative
+  (check-type new-height (integer 0)) ; Ensure non-negative
 
   (let* ((current-rect (canvas-content-rectangle canvas))
          (current-pos (rectangle-pos current-rect))
          (current-size (rectangle-size current-rect))
          (anchor (canvas-anchor-point canvas))
-         (new-pos current-pos))
+         (new-pos (copy-structure current-pos))) ; Make a copy to modify
 
     ;; Calculate the new position based on anchor point
     (case anchor
       (:bottom
        (setf (y new-pos) (- (+ (y current-pos) (h current-size)) new-height)))
-
       (:right
        (setf (x new-pos) (- (+ (x current-pos) (w current-size)) new-width)))
-
       (:center
        (setf (x new-pos) (+ (x current-pos)
                             (floor (- (w current-size) new-width) 2))
              (y new-pos) (+ (y current-pos)
                             (floor (- (h current-size) new-height) 2))))
-
       (:top-right
        (setf (x new-pos) (- (+ (x current-pos) (w current-size)) new-width)))
-
       (:bottom-left
        (setf (y new-pos) (- (+ (y current-pos) (h current-size)) new-height)))
-
       (:bottom-right
        (setf (x new-pos) (- (+ (x current-pos) (w current-size)) new-width)
              (y new-pos) (- (+ (y current-pos) (h current-size)) new-height)))
+      ;; :top, :left, :top-left and any others keep the same position by default
+      ((:top :left :top-left) nil)
+      (otherwise (log-warn "Unhandled anchor point ~S in update-canvas-size" anchor)))
 
-      ;; :top, :left, :top-left and any others keep the same position
-      (otherwise nil))
 
     ;; Apply max size constraints if provided
     (let* ((max-size (canvas-max-size canvas))
@@ -305,12 +311,29 @@ the canvas content is rendered "
            (constrained-height (if (and max-size (< (h max-size) new-height))
                                    (h max-size)
                                    new-height)))
+      
+      (setq constrained-width (max 0 constrained-width))
+      (setq constrained-height (max 0 constrained-height))
+
 
       ;; Create a new rectangle and update the canvas
       (let ((new-rect (make-rectangle :pos new-pos
                                       :size (make-size :w constrained-width :h constrained-height))))
-        (setf (canvas-content-rectangle canvas) new-rect)))
+        (setf (canvas-content-rectangle canvas) new-rect)
 
+        ;; Resize the canvas's internal buffer
+        (let ((current-buffer (canvas-buffer canvas)))
+          (when (and current-buffer
+                     (or (/= (buffer-width current-buffer) constrained-width)
+                         (/= (buffer-height current-buffer) constrained-height)))
+            (log-info "Resizing canvas buffer from ~Dx~D to ~Dx~D"
+                      (buffer-width current-buffer) (buffer-height current-buffer)
+                      constrained-width constrained-height)
+            ;; Assuming make-virtual-buffer creates a new buffer.
+            ;; If there's a resize method for virtual-terminal-buffer, use that.
+            ;; For now, creating a new one. Data is lost, which is typical for resize.
+            (setf (canvas-buffer canvas)
+                  (make-virtual-buffer constrained-width constrained-height))))))
     canvas))
 
 (defun clear-canvas (canvas)
@@ -323,7 +346,7 @@ the canvas content is rendered "
            (pos (rectangle-pos rect))
            (size (rectangle-size rect)))
 
-      (clear-area backend (y pos) (x pos) (h size) (w size))
+      (clear-area backend (canvas-buffer canvas) (y pos) (x pos) (h size) (w size))
 
       ;; Track that we've cleared this area
       (setf (canvas-lines-added canvas) (max (canvas-lines-added canvas) (h size)))))
@@ -444,5 +467,6 @@ the canvas content is rendered "
                   (let* ((cell (buffer-cell-at buf r c))
                          (ch   (buffer-cell-char cell))
                          (st   (buffer-cell-style cell)))
+                    ;; Style is always a terminal-style struct in the current rendering pipeline
                     (set-buffer-cell-at back-buffer target-y target-x ch st))))))))
       back-buffer)))

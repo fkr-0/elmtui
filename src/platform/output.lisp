@@ -8,7 +8,7 @@
   (:import-from :elmtui.core.globals #:*debug-layout-outlines*)
   (:import-from :elmtui.view.core #:ui-node #:ui-node-p #:ui-node-type #:ui-node-props #:ui-node-children)
   (:import-from :elmtui.view.geo #:rectangle #:pos #:size #:x #:y #:w #:h #:make-size #:make-pos #:make-rectangle)
-  (:import-from :elmtui.view.styled #:styled-ui-node #:style-value)
+  (:import-from :elmtui.view.styled #:styled-ui-node #:style-value #:apply-stylesheet-to-tree)
   (:import-from :elmtui.style-lib.api #:styles #:style-set) ; Ensure this is correct for your style system
   (:import-from :elmtui.platform.api
                 #:draw-text-at #:fill-rectangle #:draw-styled-box
@@ -38,7 +38,7 @@
         (when attrs-val (push attrs-val result) (push :attrs result))
         (nreverse result)))))
 
-(defun render-node-recursive (node backend-instance)
+(defun render-node-recursive (node backend-instance target-buffer)
   "Recursively renders a single laid-out UI node and its children."
   (when (and node (typep node 'ui-node))
     (let ((layout-rect (getf (ui-node-props node) :layout-rect)))
@@ -64,13 +64,13 @@
 
           (let ((bg-color (getf style-plist :bg)))
             (when bg-color
-              (fill-rectangle backend-instance pos-y pos-x height width :char #\Space :style (list :bg bg-color))))
+              (fill-rectangle backend-instance target-buffer pos-y pos-x height width :char #\Space :style (list :bg bg-color))))
 
           (let* ((border-s (style-value node :border-style :none))
                  (border-color-val (style-value node :border-color nil))
                  (effective-border-color (or border-color-val (getf style-plist :fg))))
             (when (and (not (eq border-s :none)))
-              (draw-styled-box backend-instance pos-y pos-x height width
+              (draw-styled-box backend-instance target-buffer pos-y pos-x height width
                                :border-style border-s
                                :border-color effective-border-color
                                :style style-plist)))
@@ -98,10 +98,10 @@
                                           text))
                         (text-style (list :fg (getf style-plist :fg)
                                           :attrs (getf style-plist :attrs))))
-                    (draw-text-at backend-instance content-y content-x clipped-text :style text-style))))))
+                    (draw-text-at backend-instance target-buffer content-y content-x clipped-text :style text-style))))))
 
           (dolist (child (ui-node-children node))
-            (render-node-recursive child backend-instance))
+            (render-node-recursive child backend-instance target-buffer))
 
           (when *debug-layout-outlines*
             (let* ((margin-top (style-value node :margin-top 0))
@@ -136,28 +136,28 @@
                                                   :h (max 0 (- (h padding-box) pad-top pad-bottom))))))
 
               (ignore-errors
-               (draw-styled-box backend-instance (y margin-box) (x margin-box) (h margin-box) (w margin-box)
+               (draw-styled-box backend-instance target-buffer (y margin-box) (x margin-box) (h margin-box) (w margin-box)
                                 :border-style :single :border-color :red)
-               (draw-styled-box backend-instance (y padding-box) (x padding-box) (h padding-box) (w padding-box)
+               (draw-styled-box backend-instance target-buffer (y padding-box) (x padding-box) (h padding-box) (w padding-box)
                                 :border-style :single :border-color :green)
-               (draw-styled-box backend-instance (y content-box) (x content-box) (h content-box) (w content-box)
+               (draw-styled-box backend-instance target-buffer (y content-box) (x content-box) (h content-box) (w content-box)
                                 :border-style :single :border-color :blue)))))))))
 
-(defun render-frame (laid-out-root-node backend-instance target-buffer)
+ (defun render-frame (laid-out-root-node backend-instance target-buffer &optional stylesheet)
   "Renders the complete, laid-out UI tree to the backend.
    LAID-OUT-ROOT-NODE: The root node returned by layout-tree.
    BACKEND-INSTANCE: The initialized platform backend.
    TARGET-BUFFER: Conceptually represents the backend's drawing target;
                   the backend's drawing primitives will use this implicitly or explicitly."
-  (declare (ignore target-buffer)) ; The backend's methods use their own internal buffer,
-                                        ; or this arg helps clarify intent if passed down.
   (log:info "OUTPUT: render-frame initiated for root node ID: ~S"
             (if laid-out-root-node (getf (ui-node-props laid-out-root-node) :id "NIL_ROOT") "NIL_ROOT"))
   (when backend-instance
     (handler-case
-        (progn
-          (log:debug "OUTPUT: Rendering node tree.")
-          (render-node-recursive laid-out-root-node backend-instance)
+        (let ((tree (if stylesheet
+                        (apply-stylesheet-to-tree laid-out-root-node stylesheet)
+                        laid-out-root-node)))
+          (log:debug "OUTPUT: Rendering styled node tree.")
+          (render-node-recursive tree backend-instance target-buffer)
           (log:info "OUTPUT: render-frame drawing calls completed."))
       (error (e)
         (log:error "OUTPUT: Error during render-frame's drawing calls: ~A~%Backtrace: ~A" e
@@ -167,5 +167,5 @@
          ;; Consider if clear-screen and flush-output are appropriate here,
          ;; or if the backend should handle error display.
          (elmtui.platform.api:clear-screen backend-instance) ; Assuming clear-screen is in API
-         (elmtui.platform.api:draw-text-at backend-instance 0 0 (format nil "Render Error: ~A" e) :style '(:fg "red" :bg "black"))
+         (elmtui.platform.api:draw-text-at backend-instance target-buffer 0 0 (format nil "Render Error: ~A" e) :style '(:fg "red" :bg "black"))
          (elmtui.platform.api:flush-output backend-instance)))))) ; Assuming flush-output is in API
