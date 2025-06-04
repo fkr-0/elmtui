@@ -151,7 +151,7 @@
   (cond
     ;; Quit on 'q' key
     ((and (typep message 'elmtui.core.event-types:key-event)
-          (eql (elmtui.core.event-types:key-event-key message) #\q))
+          (eql (elmtui.core.event-types:key-event-key message) #\\q))
      (values (list :should-quit t) nil))
     
     ;; Handle arrow keys for resizing in interactive mode
@@ -170,10 +170,10 @@
           (values (list :canvas-width (max 10 (1- current-width))) nil))
          ((eql key :right)
           (values (list :canvas-width (min 50 (1+ current-width))) nil))
-         (t nil))))
+         (t (values nil nil))))) ; Ensure two values are returned
     
-    ;; Default: no state change
-    (t nil)))
+    ;; Default: no state change, no commands
+    (t (values nil nil)))) ; Ensure two values are returned
 
 (defun rainbow-canvas-view (app-state dispatch-fn)
   "Creates the UI view with rainbow stripes in a canvas."
