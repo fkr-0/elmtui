@@ -9,7 +9,7 @@
   (:import-from :elmtui.view.styled #:styled-ui-node #:style-value)
   (:import-from :elmtui.view.geo
                 #:rectangle #:x #:y #:w #:h)
-  (:export 
+  (:export
    #:diff-nodes
    #:diff-patch
    #:apply-patches
@@ -77,7 +77,7 @@
       (let ((index (first path)))
         (when (< index (length (ui-node-children root)))
           (node-at-path (nth index (ui-node-children root))
-                       (rest path))))))
+                        (rest path))))))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Core Diffing Algorithm
@@ -100,7 +100,7 @@
   "Returns a list of updated properties from old-props to new-props.
    Result format: (:key1 new-val1 :key2 new-val2 ...)
    IGNORE-KEYS: List of keys to ignore in the comparison."
-  
+
   (let ((result nil))
     ;; Find changed and added props
     (loop for (key val) on new-props by #'cddr
@@ -108,14 +108,14 @@
             do (let ((old-val (getf old-props key 'not-found)))
                  (unless (equal val old-val)
                    (setf result (list* key val result)))))
-    
+
     ;; Find removed props (set to nil)
     (loop for (key val) on old-props by #'cddr
           unless (or (member key ignore-keys)
                      (member key result)
                      (getf new-props key 'not-found))
             do (setf result (list* key nil result)))
-    
+
     (nreverse result)))
 
 (defun calculate-edits (old-list new-list &key (key-fn #'node-key))
@@ -125,24 +125,24 @@
    1. Items only in old list (to be removed)
    2. Items only in new list (to be added)
    3. Pairs of matching items (old . new) (to be potentially updated)"
-  
+
   ;; Build key -> item maps
   (let ((old-map (make-hash-table :test 'equal))
         (new-map (make-hash-table :test 'equal)))
-    
+
     (loop for item in old-list
           for key = (funcall key-fn item)
           do (setf (gethash key old-map) item))
-    
+
     (loop for item in new-list
           for key = (funcall key-fn item)
           do (setf (gethash key new-map) item))
-    
+
     ;; Calculate differences
     (let ((removes nil)
           (adds nil)
           (updates nil))
-      
+
       ;; Find removes and updates
       (loop for old-item in old-list
             for key = (funcall key-fn old-item)
@@ -151,13 +151,13 @@
               do (push (cons old-item new-item) updates)
             else
               do (push old-item removes))
-      
+
       ;; Find adds
       (loop for new-item in new-list
             for key = (funcall key-fn new-item)
             unless (gethash key old-map)
               do (push new-item adds))
-      
+
       ;; Return results
       (values (nreverse removes) (nreverse adds) (nreverse updates)))))
 
@@ -165,32 +165,32 @@
   "Computes the difference between two UI node trees.
    Returns a list of diff-patch structures that can be applied to transform
    old-node into new-node.
-   
+
    PATH: Optional initial path context (for recursive calls)."
-  
+
   (let ((patches nil))
     (labels ((add-patch (type path data)
                (when *diff-debug*
                  (log:debug "Adding patch: ~A at ~A with ~A" type path data))
                (push (make-diff-patch :type type :path path :data data) patches))
-             
+
              (diff-node-children (old-children new-children parent-path)
                ;; Optimized child diffing using key-based matching
                (multiple-value-bind (removes adds updates)
                    (calculate-edits old-children new-children)
-                 
+
                  ;; Process removed children
                  (loop for item in removes
                        for index = (position item old-children)
                        when index
                          do (add-patch :remove (append parent-path (list index)) nil))
-                 
+
                  ;; Process added children
                  (loop for item in adds
                        for index = (position item new-children)
                        when index
                          do (add-patch :add (append parent-path (list index)) item))
-                 
+
                  ;; Process updated children
                  (loop for (old-item . new-item) in updates
                        for old-index = (position old-item old-children)
@@ -200,51 +200,51 @@
                               ;; Different node types - replace
                               ((not (same-node-type-p old-item new-item))
                                (add-patch :replace (append parent-path (list old-index)) new-item))
-                              
+
                               ;; Same type but different position - move
                               ((not (= old-index new-index))
                                (add-patch :move (append parent-path (list old-index)) new-index))
-                              
+
                               ;; Same type, same position - recursively diff
                               (t
-                               (let ((child-patches 
-                                      (diff-nodes old-item new-item 
-                                                :path (append parent-path (list old-index)))))
+                               (let ((child-patches
+                                       (diff-nodes old-item new-item
+                                                   :path (append parent-path (list old-index)))))
                                  (setf patches (append patches child-patches)))))))))
-      
+
       ;; Start the diff process
       (cond
         ;; Both nil - no diff
         ((and (null old-node) (null new-node))
          nil)
-        
+
         ;; Old nil, new exists - add
         ((null old-node)
          (add-patch :add path new-node))
-        
+
         ;; Old exists, new nil - remove
         ((null new-node)
          (add-patch :remove path nil))
-        
+
         ;; Different types - replace
         ((not (same-node-type-p old-node new-node))
          (add-patch :replace path new-node))
-        
+
         ;; Same type - check props and children
         (t
          ;; Check props
-         (let ((props-diff (diff-props (ui-node-props old-node) 
-                                      (ui-node-props new-node))))
+         (let ((props-diff (diff-props (ui-node-props old-node)
+                                       (ui-node-props new-node))))
            (when props-diff
              (add-patch :props path props-diff)))
-         
+
          ;; Check children
          (diff-node-children (ui-node-children old-node)
-                            (ui-node-children new-node)
-                            (or path '()))))))
-    
-    ;; Return all patches
-    (nreverse patches)))
+                             (ui-node-children new-node)
+                             (or path '()))))))
+
+  ;; Return all patches
+  (nreverse patches)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Patch Application
@@ -253,7 +253,7 @@
 (defun make-patch-applier (root-node)
   "Creates a closure that can apply patches to the given root node.
    Returns a function that takes a patch and returns the updated node tree."
-  
+
   (let ((current-tree root-node))
     (lambda (patch)
       (setf current-tree (apply-patch current-tree patch))
@@ -262,14 +262,14 @@
 (defun apply-patch (root patch)
   "Applies a single patch to the node tree.
    Returns the updated tree."
-  
+
   (let* ((path (patch-path patch))
          (parent-path (butlast path))
          (index (when (not (null path)) (car (last path))))
-         (parent (if parent-path 
+         (parent (if parent-path
                      (node-at-path root parent-path)
                      root)))
-    
+
     (case (patch-type patch)
       ;; Replace node
       (:replace
@@ -281,25 +281,25 @@
              (setf (nth index new-children) (patch-data patch))
              (setf (ui-node-children parent) new-children)
              root)))
-      
+
       ;; Update properties
       (:props
        (if (null path)
            ;; Root props update
            (let ((new-root (copy-ui-node root)))
-             (setf (ui-node-props new-root) 
+             (setf (ui-node-props new-root)
                    (apply #'append (ui-node-props root) (patch-data patch)))
              new-root)
            ;; Child props update
            (let* ((node (node-at-path root path))
                   (updated-node (copy-ui-node node)))
-             (setf (ui-node-props updated-node) 
+             (setf (ui-node-props updated-node)
                    (apply #'append (ui-node-props node) (patch-data patch)))
              (let ((new-children (copy-list (ui-node-children parent))))
                (setf (nth index new-children) updated-node)
                (setf (ui-node-children parent) new-children)
                root))))
-      
+
       ;; Add node
       (:add
        (if (null path)
@@ -310,11 +310,11 @@
              (if (>= index (length new-children))
                  (setf new-children (append new-children (list (patch-data patch))))
                  (setf new-children (append (subseq new-children 0 index)
-                                           (list (patch-data patch))
-                                           (subseq new-children index))))
+                                            (list (patch-data patch))
+                                            (subseq new-children index))))
              (setf (ui-node-children parent) new-children)
              root)))
-      
+
       ;; Remove node
       (:remove
        (if (null path)
@@ -323,10 +323,10 @@
            ;; Remove child
            (let ((new-children (copy-list (ui-node-children parent))))
              (setf new-children (append (subseq new-children 0 index)
-                                       (subseq new-children (1+ index))))
+                                        (subseq new-children (1+ index))))
              (setf (ui-node-children parent) new-children)
              root)))
-      
+
       ;; Move node
       (:move
        (if (null path)
@@ -338,14 +338,14 @@
                   (target-index (patch-data patch)))
              ;; Remove from original position
              (setf new-children (append (subseq new-children 0 index)
-                                       (subseq new-children (1+ index))))
+                                        (subseq new-children (1+ index))))
              ;; Insert at new position
              (setf new-children (append (subseq new-children 0 target-index)
-                                       (list node)
-                                       (subseq new-children target-index)))
+                                        (list node)
+                                        (subseq new-children target-index)))
              (setf (ui-node-children parent) new-children)
              root)))
-      
+
       ;; Unknown patch type
       (otherwise
        (error "Unknown patch type: ~A" (patch-type patch))))))
@@ -353,7 +353,7 @@
 (defun apply-patches (root patches)
   "Applies a list of patches to the node tree.
    Returns the updated tree."
-  
+
   (if (null patches)
       root
       (let ((applier (make-patch-applier root)))
@@ -368,20 +368,20 @@
 (defun copy-ui-node (node)
   "Creates a shallow copy of a UI node.
    Children are shared with the original node."
-  
+
   (let ((copy (make-instance (class-of node))))
     ;; Copy slots
     (setf (ui-node-type copy) (ui-node-type node))
     (setf (ui-node-props copy) (copy-list (ui-node-props node)))
     (setf (ui-node-children copy) (ui-node-children node))
-    
+
     ;; Copy additional slots for styled-ui-node
     (when (typep node 'styled-ui-node)
       (let ((slots '(style classes dirty layout-rect)))
         (dolist (slot slots)
           (when (slot-exists-p node slot)
             (setf (slot-value copy slot) (slot-value node slot))))))
-    
+
     copy))
 
 ;;;-----------------------------------------------------------------------------
@@ -391,10 +391,10 @@
 (defun optimize-patches (patches)
   "Optimizes a list of patches to minimize rendering operations.
    Returns an optimized list of patches."
-  
+
   (let ((result nil)
         (props-patches (make-hash-table :test 'equal)))
-    
+
     ;; Group property patches for the same node
     (dolist (patch patches)
       (if (eq (patch-type patch) :props)
@@ -408,22 +408,22 @@
                 (setf (gethash path props-patches) props)))
           ;; Non-props patch
           (push patch result)))
-    
+
     ;; Add the merged props patches
     (maphash (lambda (path props)
                (push (make-diff-patch :type :props :path path :data props) result))
              props-patches)
-    
+
     ;; Analyze patches to find more optimizations
     ;; (e.g., replace + props -> just replace)
     (let ((optimized nil)
           (replaced-paths nil))
-      
+
       ;; Find replacement patches
       (dolist (patch result)
         (when (eq (patch-type patch) :replace)
           (push (patch-path patch) replaced-paths)))
-      
+
       ;; Filter out redundant patches
       (dolist (patch result)
         (let ((path (patch-path patch)))
@@ -433,7 +433,7 @@
               nil
               ;; Keep this patch
               (push patch optimized))))
-      
+
       ;; Return optimized patches in original order
       (nreverse optimized))))
 
@@ -446,31 +446,31 @@
   (format t "~&Diff Patches:~%")
   (loop for patch in patches
         for i from 1
-        do (format t "  ~A. ~A at ~A: ~A~%" 
-                  i (patch-type patch) (patch-path patch)
-                  (case (patch-type patch)
-                    (:props (patch-data patch))
-                    (:replace (ui-node-type (patch-data patch)))
-                    (:add (ui-node-type (patch-data patch)))
-                    (:move (format nil "to position ~A" (patch-data patch)))
-                    (otherwise (patch-data patch))))))
+        do (format t "  ~A. ~A at ~A: ~A~%"
+                   i (patch-type patch) (patch-path patch)
+                   (case (patch-type patch)
+                     (:props (patch-data patch))
+                     (:replace (ui-node-type (patch-data patch)))
+                     (:add (ui-node-type (patch-data patch)))
+                     (:move (format nil "to position ~A" (patch-data patch)))
+                     (otherwise (patch-data patch))))))
 
 (defun export-patches-to-json (patches stream)
   "Exports patches to a JSON format for external visualization."
   (format stream "{\"patches\": [~%")
   (loop for patch in patches
         for i from 1
-        do (format stream "  {\"type\": \"~(~A~)\", \"path\": ~A, \"data\": ~A}~:[~;,~]~%" 
-                  (patch-type patch)
-                  (if (null (patch-path patch)) "[]" 
-                      (format nil "[~{~A~^, ~}]" (patch-path patch)))
-                  (case (patch-type patch)
-                    (:props "\"props\"") ; Simplified for this example
-                    (:replace (format nil "\"replace:~(~A~)\"" 
-                                     (ui-node-type (patch-data patch))))
-                    (:add (format nil "\"add:~(~A~)\"" 
-                                  (ui-node-type (patch-data patch))))
-                    (:move (format nil "\"to:~A\"" (patch-data patch)))
-                    (otherwise "null"))
-                  (< i (length patches))))
+        do (format stream "  {\"type\": \"~(~A~)\", \"path\": ~A, \"data\": ~A}~:[~;,~]~%"
+                   (patch-type patch)
+                   (if (null (patch-path patch)) "[]"
+                       (format nil "[~{~A~^, ~}]" (patch-path patch)))
+                   (case (patch-type patch)
+                     (:props "\"props\"") ; Simplified for this example
+                     (:replace (format nil "\"replace:~(~A~)\""
+                                       (ui-node-type (patch-data patch))))
+                     (:add (format nil "\"add:~(~A~)\""
+                                   (ui-node-type (patch-data patch))))
+                     (:move (format nil "\"to:~A\"" (patch-data patch)))
+                     (otherwise "null"))
+                   (< i (length patches))))
   (format stream "]}~%"))

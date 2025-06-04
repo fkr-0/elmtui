@@ -219,21 +219,21 @@
 ;;;---------------------------------------------------------------
 ;;; Drawing Primitives (delegates to terminal-like behavior)
 ;;;---------------------------------------------------------------
-(defmethod draw-text-at ((instance urxvt-instance) row col text &key style)
+(defmethod draw-text-at ((instance urxvt-instance) target-buffer  row col text &key style)
   (with-urxvt-lock (instance)
     (set-cursor-position instance row col)
     (when style (apply-style-diff instance style))
     (write-string text (urxvt-instance-stream instance)))
   t)
 
-(defmethod draw-char-at ((instance urxvt-instance) row col char &key style)
+(defmethod draw-char-at ((instance urxvt-instance) target-buffer row col char &key style)
   (with-urxvt-lock (instance)
     (set-cursor-position instance row col)
     (when style (apply-style-diff instance style))
     (write-char char (urxvt-instance-stream instance)))
   t)
 
-(defmethod fill-rectangle ((instance urxvt-instance) row col height width &key char style)
+(defmethod fill-rectangle ((instance urxvt-instance) target-buffer row col height width &key char style)
   (with-urxvt-lock (instance)
     (when style (apply-style-diff instance style))
     (let ((fill-char (or char #\Space)))
@@ -242,7 +242,7 @@
         (loop repeat width do (write-char fill-char (urxvt-instance-stream instance))))))
   t)
 
-(defmethod draw-box-outline ((instance urxvt-instance) row col height width &key style corners sides)
+(defmethod draw-box-outline ((instance urxvt-instance) target-buffer row col height width &key style corners sides)
   (declare (ignore corners sides)) ; Basic implementation
   (with-urxvt-lock (instance)
     (when style (apply-style-diff instance style))
@@ -255,13 +255,13 @@
     (loop repeat (- width 2) do (write-char #\- (urxvt-instance-stream instance))) (write-char #\+ (urxvt-instance-stream instance)))
   t)
 
-(defmethod set-cell-style ((instance urxvt-instance) row col &key style)
+(defmethod set-cell-style ((instance urxvt-instance)  target-buffer row col &key style)
   (with-urxvt-lock (instance)
     (set-cursor-position instance row col)
     (when style (apply-style-diff instance style)))
   t)
 
-(defmethod clear-area ((instance urxvt-instance) row col height width &key style)
+(defmethod clear-area ((instance urxvt-instance) target-buffer row col height width &key style)
   (with-urxvt-lock (instance)
     (let ((effective-style (or style `(:fg ,(default-foreground-color instance) :bg ,(default-background-color instance) :attrs nil))))
       (apply-style-diff instance effective-style)

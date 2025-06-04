@@ -87,7 +87,9 @@
 ;;                ,@(loop for (color class-name rgb) in *rainbow-colors-with-names*
 ;;                        collect `(:div :id ,(intern (format nil "STRIPE-~A" (string color)) :keyword)
 ;;                                       :class ,class-name))))
-
+;; (defvar uu "a")
+;; (sb-kernel:get-lisp-obj-address uu)
+;; (sb-kernel:get-lisp-obj-address "")
 ;; Redefine rainbow-view as a standard main view function
 (defun rainbow-view (app-state dispatch-fn)
   (declare (ignore dispatch-fn)) ; dispatch-fn is not used in this simple view yet

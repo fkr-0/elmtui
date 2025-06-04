@@ -1,8 +1,16 @@
 (uiop:define-package :elmtui.backend.common.ansi-styling
   (:use :cl :log4cl)
   (:import-from :elmtui.platform.api :with-lock :lockable)
+  (:import-from :elmtui.platform.backend.common.virtual-buffer
+   :deep-copy-style)
+  (:import-from :elmtui.core.loop :as-plist)
+  (:import-from :elmtui.platform.backend.common.virtual-buffer
+                #:is-term-style)
+  (:import-from :elmtui.view.geo :=?)
   (:export
    #:make-terminal-color
+   #:terminal-style
+   #:make-terminal-style
    #:terminal-color
    #:make-termcolor
    #:no-color-p
@@ -14,10 +22,27 @@
    #:copy-term-color
    #:copy-term-style
    #:ansi-seqs
+   #:as-plist
    ))
 (in-package :elmtui.backend.common.ansi-styling)
 (defstruct terminal-color red green blue simple bg color-256)
-
+(defun style-to-terminal-style (style-plist)
+  (when style-plist
+    (let ((ts (make-terminal-style)))
+      (let ((bg (getf style-plist :bg)))
+        (when bg (if (listp bg) (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :r (first bg) :g (second bg) :b (third bg)))
+                     (if (numberp bg) (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :color-256 bg))
+                         (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :simple bg))))))
+      (let ((fg (getf style-plist :fg)))
+        (when fg (if (listp fg) (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :r (first fg) :g (second fg) :b (third fg)))
+                     (if (numberp fg) (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :color-256 fg))
+                         (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :simple fg))))))
+      (let ((attrs (getf style-plist :attrs)))
+        (when (member :bold attrs) (setf (terminal-style-bold ts) t))
+        (when (member :italic attrs) (setf (terminal-style-italic ts) t))
+        (when (member :underline attrs) (setf (terminal-style-underline ts) t))
+        (when (member :inverse attrs) (setf (terminal-style-inverse ts) t)))
+      ts)))
 ;; (defgeneric copy-terminal-style (style))
 
 (defstruct terminal-style
@@ -31,7 +56,9 @@
   inverse
   strike
   invisible)
-
+(defmethod deep-copy-style ((style elmtui.backend.common.ansi-styling:terminal-style))
+  "Creates a deep copy of a terminal-style instance."
+  (copy-term-style style))
 ;; (defgeneric from-styles (styles)
 ;;   "Derives a Terminal-Style from regular styles object")
 
@@ -171,19 +198,26 @@ bg or fg, that causes the terminal to use the default color.
     (unless entry (error "Unknown attribute ~A" key))
     (if onp (second entry) (third entry))))
 (defmethod style-of ((s terminal-style) &rest attrs)
-  (loop for k in attrs collect
-                       (case k
-                         (:fg-color (terminal-style-fg-color s))
-                         (:bg-color (terminal-style-bg-color s))
-                         (:bold (terminal-style-bold s))
-                         (:italic (terminal-style-italic s))
-                         (:underline (terminal-style-underline s))
-                         (:faint (terminal-style-faint s))
-                         (:blink (terminal-style-blink s))
-                         (:inverse (terminal-style-inverse s))
-                         (:strike (terminal-style-strike s))
-                         (:invisible (terminal-style-invisible s))
-                         )))
+  "Return the value of STYLE attributes from terminal-style S.
+If a single attribute is requested, return its value (t or nil).
+If multiple attributes are requested, return a list of values in order."
+  (let ((values
+          (loop for k in attrs collect
+                               (case k
+                                 (:fg-color (terminal-style-fg-color s))
+                                 (:bg-color (terminal-style-bg-color s))
+                                 (:bold (terminal-style-bold s))
+                                 (:italic (terminal-style-italic s))
+                                 (:underline (terminal-style-underline s))
+                                 (:faint (terminal-style-faint s))
+                                 (:blink (terminal-style-blink s))
+                                 (:inverse (terminal-style-inverse s))
+                                 (:strike (terminal-style-strike s))
+                                 (:invisible (terminal-style-invisible s))
+                                 (t nil)))))
+    (if (= (length values) 1)
+        (first values)
+        values)))
 
 (defmethod ansi-seqs ((s terminal-style) &rest attrs)
   (loop for k in attrs collect
@@ -259,24 +293,30 @@ bg or fg, that causes the terminal to use the default color.
 ;;   nil)
 
 (defmethod =? ((c1 terminal-color) (c2 terminal-color))
-  (or (and  (integerp (terminal-color-red c1))
-            (integerp (terminal-color-red c2))
-            (= (terminal-color-red c1) (terminal-color-red c2))
-            (integerp (terminal-color-green c1))
-            (integerp (terminal-color-green c2))
-            (= (terminal-color-green c1) (terminal-color-green c2))
-            (integerp (terminal-color-blue c1))
-            (integerp (terminal-color-blue c2))
-            (= (terminal-color-blue c1) (terminal-color-blue c2)))
-      (or (and (not (keywordp (terminal-color-simple c1)))
-               (not (keywordp (terminal-color-simple c2))))
-          (equalp (terminal-color-simple c1) (terminal-color-simple c2)))
-      (and (keywordp (terminal-color-bg c1))
-           (keywordp (terminal-color-bg c2))
-           (equalp (terminal-color-bg c1) (terminal-color-bg c2)))
-      (and  (integerp (terminal-color-color-256 c1))
-            (integerp (terminal-color-color-256 c2))
-            (= (terminal-color-color-256 c1) (terminal-color-color-256 c2)))))
+  (and (eq (terminal-color-bg c1) (terminal-color-bg c2)) ; BG flag must match
+       (cond
+         ;; Both have RGB values
+         ((and (terminal-color-red c1) (terminal-color-green c1) (terminal-color-blue c1)
+               (terminal-color-red c2) (terminal-color-green c2) (terminal-color-blue c2))
+          (and (integerp (terminal-color-red c1)) (integerp (terminal-color-red c2))
+               (= (terminal-color-red c1) (terminal-color-red c2))
+               (integerp (terminal-color-green c1)) (integerp (terminal-color-green c2))
+               (= (terminal-color-green c1) (terminal-color-green c2))
+               (integerp (terminal-color-blue c1)) (integerp (terminal-color-blue c2))
+               (= (terminal-color-blue c1) (terminal-color-blue c2))))
+         ;; Both have simple keyword values
+         ((and (terminal-color-simple c1) (terminal-color-simple c2))
+          (and (keywordp (terminal-color-simple c1)) (keywordp (terminal-color-simple c2))
+               (eq (terminal-color-simple c1) (terminal-color-simple c2))))
+         ;; Both have 256-color values
+         ((and (terminal-color-color-256 c1) (terminal-color-color-256 c2))
+          (and (integerp (terminal-color-color-256 c1)) (integerp (terminal-color-color-256 c2))
+               (= (terminal-color-color-256 c1) (terminal-color-color-256 c2))))
+         ;; Both are "no color" (all specific color fields are nil)
+         ((and (no-color-p c1) (no-color-p c2))
+          t)
+         ;; Otherwise, they are different (e.g., one RGB, one simple, or one has color and other doesn't)
+         (t nil))))
 
 (defmethod =? ((style-1 terminal-style) (style-2 terminal-style))
   (and (=? (terminal-style-fg-color style-1) (terminal-style-fg-color style-2))
@@ -330,6 +370,15 @@ bg or fg, that causes the terminal to use the default color.
    - A list of changes made."
   (let ((style (make-terminal-style)))
     (update-style! style update-style)))
+;;; Handle cases where style is provided as a plist (list)
+(defmethod update-style! ((style list) (update-style terminal-style))
+  "Ignore update requests when STYLE is a raw plist; no in-place update."
+  (declare (ignore style update-style))
+  nil)
+(defmethod update-style! ((style list) (update-style null))
+  "Ignore reset requests when STYLE is a raw plist; no-op."
+  (declare (ignore style))
+  nil)
 (defmethod update-style! ((style terminal-style) (update-style null))
   "Update the style STYLE with the values from UPDATE-STYLE. Returns a list of changes made.
    The changes are represented as a list of key-value pairs.
@@ -416,8 +465,8 @@ the escape sequence as byte stream."
   (declare (ignore args))
   (with-lock (lockable)
     (loop for ch across seq
-          do ;; (write-byte (char-code ch) fd)
-             (write-char ch fd)
+          do  (write-byte (char-code ch) fd)
+                                        ;(write-char ch fd)
           )
     (finish-output fd)))
 (defun copy-term-color (tc)
@@ -460,3 +509,30 @@ the escape sequence as byte stream."
       (make-terminal-style)))
 ;; (dotimes (i (length output))
 ;;     (as-utf-8-bytes (char output i) (lambda (x) (write-byte x (fd term)))))
+
+(defmethod as-plist ((col null))
+  "Convert a null color to a plist."
+  nil)
+(defmethod as-plist ((col terminal-color))
+  "Convert a terminal-color object to a plist."
+  (list :red (terminal-color-red col)
+        :green (terminal-color-green col)
+        :blue (terminal-color-blue col)
+        :simple (terminal-color-simple col)
+        :bg (terminal-color-bg col)
+        :color-256 (terminal-color-color-256 col)))
+(defmethod as-plist ((style-val terminal-style))
+  (list :fg-color (slot-value style-val 'fg-color)
+        :bg-color (slot-value style-val 'bg-color)
+        :bold (slot-value style-val 'bold)
+        :italic (slot-value style-val 'italic)
+        :underline (slot-value style-val 'underline)
+        :faint (slot-value style-val 'faint)
+        :blink (slot-value style-val 'blink)
+        :inverse (slot-value style-val 'inverse)
+        :strike (slot-value style-val 'strike)
+        :invisible (slot-value style-val 'invisible)))
+(defmethod is-term-style ((style1 terminal-style))
+  "Check if STYLE1 is a terminal-style object and matches STYLE-VAL.
+   Returns a list of attributes that differ, or NIL if they match."
+  t)

@@ -9,4 +9,4 @@
 
   :build-operation "program-op"
   :build-pathname "dirlister_poc"
-  :entry-point "dirlister_poc:start-dirlister-poc")
+  :entry-point );"dirlister_poc:start-dirlister-poc")

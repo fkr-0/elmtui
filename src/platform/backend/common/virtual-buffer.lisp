@@ -1,7 +1,10 @@
 (uiop:define-package :elmtui.platform.backend.common.virtual-buffer
   (:use :cl :alexandria)
+  (:import-from :elmtui.core.loop #:as-plist)
+  (:import-from :elmtui.view.geo #:=?)
   (:import-from :bordeaux-threads #:make-recursive-lock #:with-recursive-lock-held)
   (:export
+   #:is-term-style
    ;; Conditions
    #:buffer-error
    #:invalid-buffer-coordinates-error
@@ -26,6 +29,7 @@
    #:buffer-lock
    ;; Macros
    #:with-virtual-buffer-lock
+   #:deep-copy-style
    ;; Cell functions
    #:default-buffer-cell
    #:buffer-cell-equal-p
@@ -44,6 +48,8 @@
 
 (in-package :elmtui.platform.backend.common.virtual-buffer)
 
+(defgeneric deep-copy-style (style)
+  (:documentation "Creates a deep copy of a style plist, including any nested lists like RGB values."))
 ;;;----------------------------------------------------------------------------------;;;
 ;;; Conditions                                                                       ;;;
 ;;;----------------------------------------------------------------------------------;;;
@@ -94,7 +100,7 @@
 ;;; Style Copying Utilities                                                          ;;;
 ;;;----------------------------------------------------------------------------------;;;
 
-(defun deep-copy-style (style)
+(defmethod deep-copy-style ((style list))
   "Creates a deep copy of a style plist, including any nested lists like RGB values.
 Returns a new plist with the same keys but new list instances for any list values."
   (loop for (key value) on style by #'cddr
@@ -103,6 +109,12 @@ Returns a new plist with the same keys but new list instances for any list value
           nconc (list key (copy-list value))
         else
           nconc (list key value)))
+
+(defmethod deep-copy-style ((style null))
+  "Returns an empty style plist if STYLE is NIL."
+  nil)
+
+
 
 ;;;----------------------------------------------------------------------------------;;;
 ;;; API Functions                                                                    ;;;
@@ -119,7 +131,7 @@ Initializes cells with (default-buffer-cell)."
     ;; Initialize each cell individually to avoid sharing the same buffer-cell instance
     (dotimes (r height)
       (dotimes (c width)
-        (setf (aref cells r c) (%make-buffer-cell))))
+        (setf (aref cells r c) (%make-buffer-cell :char #\Space :style nil))))
     (%make-virtual-terminal-buffer :width width :height height :cells cells)))
 
 (defun buffer-width (buffer)
@@ -143,28 +155,32 @@ Use with caution; prefer cell-level APIs for modification to ensure thread-safet
   (check-type buffer virtual-terminal-buffer)
   (virtual-terminal-buffer-lock buffer))
 
+(defgeneric is-term-style (s)
+  (:method (s) nil)
+  (:documentation "Checks if the given style S is a terminal style."))
 (defun buffer-cell-equal-p (cell1 cell2)
   "Compares two BUFFER-CELL instances for equality (char and style)."
   (check-type cell1 buffer-cell)
   (check-type cell2 buffer-cell)
   (and (char= (buffer-cell-char cell1) (buffer-cell-char cell2))
-       ;; Use a more explicit comparison for style plists
        (let ((style1 (buffer-cell-style cell1))
              (style2 (buffer-cell-style cell2)))
-         ;; First check if they have the same keys
-         (and (= (length style1) (length style2))
-              ;; Then check that each key-value pair matches
-              (loop for (key value) on style1 by #'cddr
-                    always (let ((other-value (getf style2 key :not-found)))
-                             (if (eq other-value :not-found)
-                                 nil  ; key not present in style2
-                                 (if (and (listp value) (every #'numberp value)
-                                          (listp other-value) (every #'numberp other-value))
-                                     ;; For color RGB lists, compare elements individually
-                                     (and (= (length value) (length other-value))
-                                          (every #'= value other-value))
-                                     ;; For other values, use equalp
-                                     (equalp value other-value)))))))))
+         (cond
+           ((and (null style1) (null style2)) t) ; Both nil, considered equal
+           ((or (null style1) (null style2)) nil) ; One nil, other not, considered different
+           ;; Both are terminal-style structs, use the specialized =? method
+           ((and (is-term-style style1)
+                 (is-term-style style2))
+            (elmtui.view.geo:=? style1 style2))
+           ;; Fallback for plist comparison if necessary, though ideally styles are always terminal-style structs
+           ((and (listp style1) (listp style2))
+            (and (= (length style1) (length style2))
+                 (loop for (key value) on style1 by #'cddr
+                       always (let ((other-value (getf style2 key :not-found)))
+                                (if (eq other-value :not-found)
+                                    nil
+                                    (elmtui.view.geo:=? value other-value))))))
+           (t nil))))) ; Different types or one is not a style representation
 
 (defun %check-bounds (buffer row col)
   (unless (and (<= 0 row (1- (buffer-height buffer)))
@@ -208,37 +224,40 @@ Returns the modified BUFFER."
   (check-type row (integer 0 *))
   (check-type col (integer 0 *))
   (check-type char character)
-  (check-type style list)
-  (with-virtual-buffer-lock (buffer)
-    (restart-case
-        (progn
-          (%check-bounds buffer row col)
-          (let ((cell (aref (virtual-terminal-buffer-cells buffer) row col)))
-            (setf (buffer-cell-char cell) char
-                  ;; Create a deep copy of the style to prevent shared references
-                  (buffer-cell-style cell) (deep-copy-style style)))
-          buffer)
-      (use-value (&optional new-char new-style) ; Allow ignoring the operation by not providing values
-        :report "Ignore the set operation or provide new char/style to use (or use defaults)."
-        :interactive (lambda ()
-                       (format *query-io* "~&Set operation for invalid coordinates (~A, ~A).~%" row col)
-                       (list (ignore-errors (read-char *query-io*))
-                             (ignore-errors (read *query-io* :prompt "Enter style list (or NIL to skip style): "))))
-        (when new-char (setf char new-char))
-        (when new-style (setf style new-style))
-        ;; If new-char/new-style are nil, this effectively becomes a skip if we don't proceed.
-        ;; For now, we just use the (potentially modified) char/style and let it error again if still invalid.
-        ;; A more robust `use-value` might allow specifying new coords or truly skipping.
-        ;; This restart is more for "ignore the error and don't set" or "try setting with this value if coords were okay".
-        ;; The primary use of `use-value` for `set-buffer-cell-at` is to effectively skip the operation.
-        buffer) ; Return buffer, operation might have been skipped or values changed for a valid coord.
-      (clip-coordinates ()
-        :report "Clip coordinates to the nearest valid boundary and set the cell there."
-        (let ((clipped-row (clamp row 0 (1- (buffer-height buffer))))
-              (clipped-col (clamp col 0 (1- (buffer-width buffer)))))
-          (unless (and (= clipped-row row) (= clipped-col col)) ; Only if clipping actually changed coords
-            (set-buffer-cell-at buffer clipped-row clipped-col char (copy-list style)))
-          buffer))))
+  (let ((style (as-plist style)))
+    (check-type style list)
+    (with-virtual-buffer-lock (buffer)
+      (restart-case
+          (progn
+            (%check-bounds buffer row col)
+            (let ((cell (aref (virtual-terminal-buffer-cells buffer) row col)))
+              (setf (aref (virtual-terminal-buffer-cells buffer) row col)
+                    (%make-buffer-cell :char char :style (deep-copy-style style)))
+              ;; (buffer-cell-char cell) char
+              ;;      ;; Create a deep copy of the style to prevent shared references
+              ;;      (buffer-cell-style cell) (deep-copy-style style)))
+              buffer))
+        (use-value (&optional new-char new-style) ; Allow ignoring the operation by not providing values
+          :report "Ignore the set operation or provide new char/style to use (or use defaults)."
+          :interactive (lambda ()
+                         (format *query-io* "~&Set operation for invalid coordinates (~A, ~A).~%" row col)
+                         (list (ignore-errors (read-char *query-io*))
+                               (ignore-errors (read *query-io* :prompt "Enter style list (or NIL to skip style): "))))
+          (when new-char (setf char new-char))
+          (when new-style (setf style new-style))
+          ;; If new-char/new-style are nil, this effectively becomes a skip if we don't proceed.
+          ;; For now, we just use the (potentially modified) char/style and let it error again if still invalid.
+          ;; A more robust `use-value` might allow specifying new coords or truly skipping.
+          ;; This restart is more for "ignore the error and don't set" or "try setting with this value if coords were okay".
+          ;; The primary use of `use-value` for `set-buffer-cell-at` is to effectively skip the operation.
+          buffer) ; Return buffer, operation might have been skipped or values changed for a valid coord.
+        (clip-coordinates ()
+          :report "Clip coordinates to the nearest valid boundary and set the cell there."
+          (let ((clipped-row (clamp row 0 (1- (buffer-height buffer))))
+                (clipped-col (clamp col 0 (1- (buffer-width buffer)))))
+            (unless (and (= clipped-row row) (= clipped-col col)) ; Only if clipping actually changed coords
+              (set-buffer-cell-at buffer clipped-row clipped-col char (copy-list style)))
+            buffer)))))
   buffer)
 
 (defun fill-buffer-region (buffer row col width height char style)
