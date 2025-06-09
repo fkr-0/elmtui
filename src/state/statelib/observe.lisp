@@ -1,6 +1,6 @@
 (uiop:define-package :elmtui.statelib.observe
   (:use :cl :log4cl)
-  (:import-from :elmtui.statelib.state
+  (:import-from :elmtui.state.api
    :application-state :application-state-observers :application-state-lock)
   (:export
    :observer ; Exporting struct name

@@ -320,26 +320,26 @@
 (test terminal-style-buffer-cell-roundtrip
       "Test writing, reading, and comparing buffer cells using terminal-style structs."
       (let* ((buf (make-virtual-buffer 3 2))
-             (style1 (elmtui.backend.common.ansi-styling:make-terminal-style
-                      :fg-color (elmtui.backend.common.ansi-styling:make-termcolor :simple :red)
-                      :bg-color (elmtui.backend.common.ansi-styling:make-termcolor :simple :blue)
+             (style1 (elmtui.platform.backend.common.ansi-styling:make-terminal-style
+                      :fg-color (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :red)
+                      :bg-color (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :blue)
                       :bold t
                       :underline t))
-             (style2 (elmtui.backend.common.ansi-styling:make-terminal-style
-                      :fg-color (elmtui.backend.common.ansi-styling:make-termcolor :simple :red)
-                      :bg-color (elmtui.backend.common.ansi-styling:make-termcolor :simple :blue)
+             (style2 (elmtui.platform.backend.common.ansi-styling:make-terminal-style
+                      :fg-color (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :red)
+                      :bg-color (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :blue)
                       :bold t
                       :underline t)))
         (set-buffer-cell-at buf 1 1 #\Z style1)
         (let ((cell (buffer-cell-at buf 1 1)))
           (is (char= (buffer-cell-char cell) #\Z))
-          (is (typep (buffer-cell-style cell) 'elmtui.backend.common.ansi-styling:terminal-style))
-          (is (equal (elmtui.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
-                     (elmtui.backend.common.ansi-styling:make-termcolor :simple :red)))
-          (is (equal (elmtui.backend.common.ansi-styling:terminal-style-bg-color (buffer-cell-style cell))
-                     (elmtui.backend.common.ansi-styling:make-termcolor :simple :blue)))
-          (is (eq (elmtui.backend.common.ansi-styling:terminal-style-bold (buffer-cell-style cell)) t))
-          (is (eq (elmtui.backend.common.ansi-styling:terminal-style-underline (buffer-cell-style cell)) t))
+          (is (typep (buffer-cell-style cell) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+          (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
+                     (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :red)))
+          (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color (buffer-cell-style cell))
+                     (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :blue)))
+          (is (eq (elmtui.platform.backend.common.ansi-styling:terminal-style-bold (buffer-cell-style cell)) t))
+          (is (eq (elmtui.platform.backend.common.ansi-styling:terminal-style-underline (buffer-cell-style cell)) t))
           ;; Compare two cells with identical terminal-style structs
           (let ((cell2 (elmtui.platform.backend.common.virtual-buffer::%make-buffer-cell :char #\Z :style style2)))
             (is (buffer-cell-equal-p cell cell2))))))

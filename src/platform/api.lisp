@@ -278,16 +278,6 @@ WIDTH: The width of the area.
 STYLE: An optional backend-specific style object (often just background color). If NIL, uses default background."))
 
 ;;;---------------------------------------------------------------
-;;; Rendering
-;;;---------------------------------------------------------------
-
-(defgeneric render-and-present (backend-instance layout-root canvas)
-  (:documentation "Renders the given LAYOUT-ROOT and presents it on the screen.
- BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
- LAYOUT-ROOT: The root of the laid-out view tree to render.
-CANVAS: The canvas object to render onto and present. Rendering is confined
-        to the canvas's content-rectangle, populating its virtual buffer.
-        The backend then transfers this to its main screen buffer and flushes."))
 
 ;;;---------------------------------------------------------------
 ;;; Input Handling
@@ -370,3 +360,8 @@ Returns a native handle, or NIL if not applicable or not exposed."))
        (format out \"~c[0m\" #\\Escape))"
   `(let ((,stream-var (term-stream ,backend)))
      ,@body))
+
+(defmethod make-style ((instance t) &key foreground-color background-color attributes)
+  (list :fg (or foreground-color (default-foreground-color instance))
+        :bg (or background-color (default-background-color instance))
+        :attrs (copy-list attributes)))

@@ -2,155 +2,135 @@
 ;;; File: examples/boxes-app.lisp
 ;;; Example application demonstrating a scrollable container
 ;;; with differently styled boxes, using stylesheets.
-;;; Adapted to modern app design.
+;;; Adapted to modern app design using defapplication.
 ;;;===============================================================
 (uiop:define-package :elmtui.examples.boxes-app
-  (:use :cl :alexandria)
+  (:use :cl :alexandria :elmtui.app)
   (:import-from :log4cl #:log-info #:log-debug)
-  (:import-from :elmtui.runtime #:def-elm-app #:run-app)
-  (:import-from :elmtui.style-lib.rule #:defrule)
-  (:import-from :elmtui.state #:application-state #:state-ref ) ; Added defmodel
-  (:import-from :elmtui.view.dsl #:define-view)
-  (:import-from :elmtui.ui.widgets.utils
-                #:widget-focused-p #:defwidget-view)
-  (:import-from :elmtui.style-lib.sheet #:defstylesheet)
-  (:import-from :elmtui.state.update #:defupdate)
-  (:export
-   :main
-   :run-boxes-example-app))
+  (:import-from :elmtui.view.dsl #:element #:vbox #:label #:viewport) ; Updated for DSL
+  (:import-from :elmtui.core.event-types
+                #:key-event #:key-event-key #:key-event-modifiers)
+  (:import-from :elmtui.style #:merge-styles #:make-style #:get-style-value)
+  (:import-from :elmtui.style.presets #:dark-theme)
+  (:export #:main #:run-boxes-example-app))
 
 (in-package :elmtui.examples.boxes-app)
 
-(defparameter *scroller-id* :my-scrollable-container)
+;;;--------------------------------------------------------------
+;;; Stylesheet Definition (as plists)
+;;;--------------------------------------------------------------
+(defparameter *style-scrollable-viewport*
+  (make-style :overflow-y :auto :height 15 :width :fill ; Changed :overflow to :overflow-y
+              :border-style :single :border-color '(:rgb 100 100 100)
+              :padding 0))
 
+(defparameter *style-container*
+  (make-style :display :flex :flex-direction :column :padding 1
+              :background-color '(:rgb 30 30 30) :color '(:rgb 200 200 200)
+              :width :fill :min-height :fill ; Use min-height for scrollable content
+              ))
 
-;; ;;;--------------------------------------------------------------
-;; ;;; Stylesheet Definition
-;; ;;;--------------------------------------------------------------
-;; (defvar boxes-stylesheet (defstylesheet
-;;                            (defrule ".container"
-;;                              :display :flex
-;;                              :flex-direction :column
-;;                              :padding 1
-;;                              :background (list 30 30 30)
-;;                              :color (list 200 200 200))
+(defparameter *style-box*
+  (make-style :margin-bottom 1 :padding 1 :width :fill
+              :background-color '(:rgb 60 60 60) :color '(:rgb 230 230 230)))
 
-;;                            (defrule ".box"
-;;                              :margin-bottom 1
-;;                              :padding 1
-;;                              :width 100
-;;                              :background (list 60 60 60)
-;;                              :color (list 230 230 230))
+(defparameter *style-box-red*
+  (make-style :border-style :single :border-color '(:rgb 255 100 100)))
 
-;;                            (defrule ".box-red"
-;;                              :border-style :single
-;;                              :border-color (list 255 100 100))
+(defparameter *style-box-green*
+  (make-style :border-style :double :border-color '(:rgb 100 255 100)))
 
-;;                            (defrule ".box-green"
-;;                              :border-style :double
-;;                              :border-color (list 100 255 100))
+(defparameter *style-box-blue*
+  (make-style :border-style :single :border-color '(:rgb 100 100 255)))
 
-;;                            (defrule ".box-blue"
-;;                              :border-style :single
-;;                              :border-color (list 100 100 255))
+(defparameter *app-stylesheet*
+  (merge-styles
+   dark-theme ; Base theme
+   `((:viewport . ,*style-scrollable-viewport*)
+     (:container . ,*style-container*)
+     (:box . ,*style-box*)
+     (:box-red . ,*style-box-red*)
+     (:box-green . ,*style-box-green*)
+     (:box-blue . ,*style-box-blue*))))
 
-;;                            (defrule ".scrollable"
-;;                              :overflow :auto
-;;                              :height 10
-;;                              :width 10)))
+;;;--------------------------------------------------------------
+;;; Application Definition using defapplication
+;;;--------------------------------------------------------------
+(defapplication boxes-app
+  :initial-state-fn
+  (lambda ()
+    (list :scroll-offset-y 0
+          :current-stylesheet *app-stylesheet*
+          :terminal-width 80 :terminal-height 24 ; Default, will be updated
+          ))
+  :update-fn
+  (lambda (app-state message)
+    (let ((patch nil)
+          (commands nil))
+      (typecase message
+        (key-event
+         (let ((key (key-event-key message)))
+           (cond
+             ((or (eql key #\q) (eql key :escape)
+                  (and (equal key "q") (member :control (key-event-modifiers message))))
+              (setf patch (list :should-quit t)))
+             ((eql key :up-arrow)
+              (setf patch (list :scroll-offset-y (max 0 (- (getf app-state :scroll-offset-y 0) 1)))))
+             ((eql key :down-arrow)
+              ;; For now, let viewport clamp. A more robust solution would check content height.
+              (setf patch (list :scroll-offset-y (+ (getf app-state :scroll-offset-y 0) 1))))
+             ((eql key :page-up)
+                (let ((vp-height (get-style-value (getf app-state :current-stylesheet) :viewport :height 15)))
+                  (setf patch (list :scroll-offset-y (max 0 (- (getf app-state :scroll-offset-y 0) vp-height))))))
+             ((eql key :page-down)
+                (let ((vp-height (get-style-value (getf app-state :current-stylesheet) :viewport :height 15)))
+                  (setf patch (list :scroll-offset-y (+ (getf app-state :scroll-offset-y 0) vp-height))))))))
+        (cons ; Handle list-based messages like :terminal-resized
+         (case (car message)
+           (:terminal-resized
+            (let ((new-width (getf (cdr message) :width))
+                  (new-height (getf (cdr message) :height)))
+              (setf patch (list :terminal-width new-width
+                                :terminal-height new-height
+                                ;; Potentially adjust viewport height based on terminal height
+                                ;; For now, keep it fixed as per style
+                                )))))))
+      (values patch commands)))
+  :view-fn
+  (lambda (app-state)
+    (viewport :id :my-scrollable-container
+              :style-id :viewport ; Use style ID from stylesheet
+              :content-offset-y (getf app-state :scroll-offset-y 0)
+              ;; :content-height could be calculated if needed for precise scrollbar
+              (vbox :id :main-content-container :style-id :container
+                    (label :id :box1 :style-id '(:box :box-red) :text (format nil "Box 1: Red Border~%This is Box 1 with a red border.~%Line 2 of Box 1~%Line 3 of Box 1~%Line 4 of Box 1~%Line 5 of Box 1"))
+                    (label :id :box2 :style-id '(:box :box-green) :text (format nil "Box 2: Green Border~%This is Box 2 with a green border.~% This box is a bit wider.~%And also has five lines.~%To test scrolling properly.~%The fifth line is here."))
+                    (label :id :box3 :style-id '(:box :box-blue) :text (format nil "Box 3: Blue Border~%This is Box 3 with a blue border.~%With a styled border.~%Content flows within.~%Making it all scrollable."))
+                    (label :id :box4 :style-id :box :text "Box 4: Standard")
+                    (label :id :box5 :style-id :box :text (format nil "Box 5: More Content~%L1~%L2~%L3~%L4~%L5~%L6~%L7~%L8~%L9~%L10"))
+                    (label :id :box6 :style-id '(:box :box-red) :text "Box 6: Another Red Box")
+                    (label :id :box7 :style-id '(:box :box-green) :text "Box 7: Another Green Box")
+                    (label :id :box8 :style-id :box :text "Box 8: Standard")
+                    (label :id :box9 :style-id :box :text "Box 9: Standard")
+                    (label :id :box10 :style-id :box :text "Box 10: Standard")
+                    (label :id :box11 :style-id :box :text "Box 11: Standard")
+                    (label :id :box12 :style-id :box :text "Box 12: Standard to make it scroll more"))))
+  :command-processor-fn nil
+  :event-translator-fn nil
+  :quit-flag-path '(:should-quit)
+  :style-sheet-path '(:current-stylesheet))
 
-
-;; ;;;--------------------------------------------------------------
-;; ;;; Application Definition
-;; ;;;--------------------------------------------------------------
-
-;; (defun app-init ()
-;;   "Initialize the boxes example application state."
-;;   (values
-;;    ;; Initial application state
-;;    (list :stylesheet boxes-stylesheet
-;;          :scroll-offset 0
-;;          :should-quit nil)
-;;    ;; No initial commands
-;;    nil))
-
-;; (defupdate app-update (app-state message)
-;;   "Handle updates to the boxes application state based on messages."
-;;   (let ((app-patch nil)
-;;         (commands nil))
-
-;;     ;; Handle different types of messages
-;;     (cond
-;;       ;; Handle scroll events
-;;       ((and (listp message) (eq (first message) :scroll))
-;;        (let* ((current-offset (or (state-ref app-state :scroll-offset) 0))
-;;               (direction (getf (rest message) :direction))
-;;               (amount (getf (rest message) :amount 1))
-;;               (new-offset (if (eq direction :up)
-;;                               (max 0 (- current-offset amount))
-;;                               (+ current-offset amount))))
-;;          (setf app-patch (list :scroll-offset new-offset))))
-
-;;       ;; Handle key events to quit (press 'q' or ESC)
-;;       ((and (listp message) (eq (first message) :key-event))
-;;        (let ((key (getf (rest message) :key)))
-;;          (when (or (eql key #\q) (eql key :escape))
-;;            (setf app-patch (list :should-quit t)))))
-
-;;       ;; Handle struct-based key events
-;;       ((typep message 'elmtui.core.event-types:key-event)
-;;        (let ((key (elmtui.core.event-types:key-event-key message)))
-;;          (when (or (eql key #\q) (eql key :escape))
-;;            (setf app-patch (list :should-quit t))))))
-
-;;     ;; Return state changes and commands
-;;     (values app-patch commands)))
-
-;; (define-view app-view (app-state dispatch-fn)
-;;   "Define the UI view for the boxes app."
-;;   (:scrollable :id *scroller-id*
-;;                :class "scrollable"
-;;                :scroll-offset (or (state-ref app-state :scroll-offset) 0)
-;;                :dispatch-fn dispatch-fn
-;;                (:container :class "container"
-;;                            :height :fill
-;;                            :width :fill
-
-;;                            ;; Box 1 - Red border
-;;                            (:box :id :box1
-;;                                  :class "box box-red"
-;;                                  :title "Box with Red Border"
-;;                                  (:p :id :box1-content
-;;                                      :value (format nil "This is Box 1 with a red border.~%
-;; Line 2 of Box 1~%
-;; Line 3 of Box 1~%
-;; Line 4 of Box 1~%
-;; Line 5 of Box 1")))
-
-;;                            ;; Box 2 - Green border
-;;                            (:box :id :box2
-;;                                  :class "box box-green"
-;;                                  :title "Box with Green Border"
-;;                                  (:p :id :box2-content
-;;                                      :value (format nil "This is Box 2 with a green border.~%
-;;  This box is a bit wider.~%And also has five lines.~%To test scrolling properly.~%
-;; The fifth line is here.")))
-
-;;                            ;; Box 3 - Blue border
-;;                            (:box :id :box3
-;;                                  :class "box box-blue"
-;;                                  :title "Box with Blue Border"
-;;                                  (:p :id :box3-content
-;;                                      :value (format nil "This is Box 3 with a blue border.~%
-;; With a styled border.~%
-;; Content flows within.~%
-;; Making it all scrollable."))))))
-
-;; (def-elm-app boxes-example-app
-;;   :init #'app-init
-;;   :update #'app-update
-;;   :view #'app-view)
-
+;;;--------------------------------------------------------------
+;;; Main Entry Point
+;;;--------------------------------------------------------------
 (defun main ()
   "Run the boxes example application."
-  (elmtui.runtime:run-app :app-name 'boxes-example-app))
+  (run-application #'boxes-app))
+
+(defun run-boxes-example-app ()
+  "Alias to run the boxes example application."
+  (main))
+
+;; To run from SLIME:
+;; (ql:quickload :elmtui.examples.boxes-app)
+;; (elmtui.examples.boxes-app:main)

@@ -12,7 +12,14 @@
                               #:bordeaux-threads)
   :pathname "./src/"
   :serial t
-  :components ((:file "core/logging")
+  :components ((:file "utils")
+               (:file "core/logging")
+               (:file "core/globals")
+               ;; ================= api =================
+               (:file "app/api")
+               (:file "state/api") ; Added state/api
+               (:file "ui/api")
+               (:file "view/api")
                (:module "cleve-elm"
                 :pathname "clevelib/"
                 :serial t
@@ -32,7 +39,7 @@
                              ;; (:file "relay")
                              (:file "ems")
                              (:file "clevelib")))
-               (:file "core/globals")
+
 
                ;; State Management (Load before Core/Conditions)
                (:module "state"
@@ -51,6 +58,7 @@
                              (:file "state")
                              (:file "msg")
                              (:file "model")
+                             (:file "transactions") ; Added transactions.lisp
                              (:file "elm")
                              (:file "update")))
 
@@ -65,8 +73,9 @@
                              (:file "styles")
                              (:file "style-set")
                              (:file "macros")
-                             (:file "properties")
                              (:file "selector")
+                             (:file "properties")
+
                              ;; Selector implementations moved after view/styled
                              (:file "rule")
                              (:file "stylable") ; Implementation details? Might depend on api.
@@ -125,23 +134,32 @@
                (:module "ui"
                 :serial t
                 :pathname "ui/"
-                :components ((:module "widgets"
+                :components (
+
+                             (:file "api") ; Correct filename to load widgets.lisp
+                             (:file "defcomponent")
+                             (:module "widgets"
                               :pathname "widgets/"
                               :serial t
                               :components (
                                            (:file "utils")
+                                           (:file "layout")
+                                           (:file "viewport")
+                                           (:file "root-viewport")
+                                           (:file "drawable-content")
                                            (:file "button")
                                            (:file "label")
                                            (:file "textinput")
                                            (:file "grid-container")
                                            (:file "form") ; Using v2 form widget
                                            (:file "listbox")
-                                           (:file "counter")
+                                           ;; (:file "counter")
                                            (:file "scrollable-container")))
                              ;; Load the main package file AFTER the individual widget files
                              (:file "widgets-pkg") ; Correct filename to load widgets.lisp
                              (:file "widget-registry")))
 
+               (:file "app/application")
                ;; Load remaining View components (depend on UI widgets, layout etc)
                (:file "view/memo")
                ;; (:file "view/dsl")
@@ -168,13 +186,32 @@
                 :components (
                              ;; Platform API Definition
                              (:file "api")
-                             (:file "backend/common/virtual-buffer")
                              (:file "backend/common/ansi-styling")
+                             (:file "backend/common/virtual-buffer")
+                             ;; (:file "canvas" :depends-on ("api"
+                             ;;                              "backend/common/virtual-buffer"))
                              (:file "backend/common/utils")
-                             (:file "canvas")
-                             (:file "canvas-renderer")
-                             (:file "input")
-                             (:file "output")
+                             (:file "backend/terminal/terminal")
+                             (:file "backend/terminal/diff-renderer") ;;; depends-on ("src/platform/backend/common/virtual-buffer"
+                             ;;             "src/platform/backend/common/ansi-styling"
+                             ;;             "src/platform/api")) ; Added dependency
+
+                             (:file "tree-renderer" :depends-on (
+                                                                 "backend/common/ansi-styling"))
+
+                             (:file "input") ;; :depends-on ("src/platform/api"
+                             (:file "driver" ;; :depends-on ("src/platform/api"
+                                    ;;              "src/platform/canvas"
+                                    ;;              "src/platform/tree-renderer"
+                                    ;;              "src/platform/backend/terminal/diff-renderer" ; Added dependency
+                                    ;;              "src/core/loop"
+                                    ;;              "src/core/async"
+                                    ;;              "src/core/focus"
+                                    ;;              "src/core/keymap"
+                                    ;;              "src/view/styled"
+                                    ;;              "src/view/layout"
+                                    ;;              "src/ui/widgets/root-viewport")
+                                    )
                              ;; Backend Implementations
                              (:module "backend"
                               :pathname "backend/"
@@ -205,7 +242,8 @@
 
                              ;; Original driver/input/output
 
-                             (:file "driver")))
+                             ;; (:file "driver")
+                             ))
 
                ;; Files loaded after modules
                (:file "runtime")
@@ -219,19 +257,57 @@
                (:module "examples"
                 :serial t
                 :pathname "../examples/"
-                :components ((:file "keymap-app")
+                :components (
+                             ;; (:file "keymap-app")
                              (:file "rainbow-app")
                              (:file "rainbow-app-canvas")
-                             (:file "boxes-app")
-                             (:file "dirli")
+                             ;; (:file "boxes-app")
+                             ;; (:file "dirli")
                              (:file "colortext-app")))
-               (:module "dirlister"
-                :serial t
-                :pathname "../examples/dirlister_poc/"
-                :components ((:file "dirlister_poc")))
+               ;; (:module "dirlister"
+               ;;  :serial t
+               ;;  :pathname "../examples/dirlister_poc/"
+               ;;  :components ((:file "dirlister_poc")))
                (:file "../dev-setup")
                (:file "elmtui"))
   ;; Build a binary:
   :build-operation "program-op"
   :build-pathname "elmtui"
   :entry-point "elmtui:dev-main")
+
+(asdf:defsystem "elmtui/examples"
+  :author "User <user@archlinux>"
+  :license "GNU GPL, version 3"
+  :depends-on (:elmtui)
+  :components ((:module "examples"
+                :pathname "../examples/"
+                :serial t
+                :components
+                ((:file "keymap-app")
+                 (:file "boxes-app") ; Added boxes-app
+                 ;; Add other example app files here as they are updated
+                 ;; (:file "rainbow-app")
+                 ;; (:file "rainbow-app-canvas")
+                 ;; (:file "dirli")
+                 ;; (:file "colortext-app")
+                 )))
+  :description "Examples for elmtui.")
+
+(asdf:defsystem "elmtui/tests"
+  :author "User <user@archlinux>"
+  :license "GNU GPL, version 3"
+  :depends-on (:elmtui :fiveam :alexandria)
+  :components ((:module "tests"
+                :serial t ; Ensure tests run in a defined order if necessary, or remove if not.
+                :components
+                ((:file "packages")
+                 (:file "test-utils")
+                 (:file "component-init-tests")
+                 (:file "application-init-tests")
+                 (:file "flex-layout-tests")
+                 (:file "grid-layout-engine-tests")
+                 (:file "tree-renderer-tests") ; Added tree-renderer tests
+                 ;; Add other test files here
+                 )))
+  :description "Test suite for elmtui."
+  :perform (test-op (op c) (symbol-call :fiveam :run! c)))

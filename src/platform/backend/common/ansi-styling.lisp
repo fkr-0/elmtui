@@ -1,20 +1,36 @@
-(uiop:define-package :elmtui.backend.common.ansi-styling
+(uiop:define-package :elmtui.platform.backend.common.ansi-styling
   (:use :cl :log4cl)
   (:import-from :elmtui.platform.api :with-lock :lockable)
-  (:import-from :elmtui.platform.backend.common.virtual-buffer
-   :deep-copy-style)
+  (:import-from :elmtui.utils :hex-str-to-rgb)
   (:import-from :elmtui.core.loop :as-plist)
-  (:import-from :elmtui.platform.backend.common.virtual-buffer
-                #:is-term-style)
   (:import-from :elmtui.view.geo :=?)
   (:export
+   #:fuzz-color
+   #:terminal-style-bg-color
    #:make-terminal-color
    #:terminal-style
    #:make-terminal-style
    #:terminal-color
    #:make-termcolor
    #:no-color-p
+   #:terminal-style-bold
+   #:terminal-style-italic
+   #:terminal-style-underline
+   #:terminal-style-faint
+   #:terminal-style-blink
+   #:terminal-style-inverse
+   #:terminal-style-strike
+   #:terminal-style-invisible
+   #:deep-copy-style
+   #:copy-term-color
+
+   #:terminal-color-simple
+   #:terminal-color-kv
+   #:terminal-color-bg
+   #:style-to-terminal-style
    #:terminal-style-kv
+   #:terminal-style-bg-color
+   #:terminal-style-fg-color
    #:terminal-style-bg-color-val
    #:terminal-style-fg-color-val
    #:update-style!
@@ -24,26 +40,76 @@
    #:ansi-seqs
    #:as-plist
    ))
-(in-package :elmtui.backend.common.ansi-styling)
+(in-package :elmtui.platform.backend.common.ansi-styling)
+
 (defstruct terminal-color red green blue simple bg color-256)
+
+(defun fuzz-color (in &optional (bg nil))
+  (unless (null in)
+    (etypecase in
+      (terminal-color in)
+      (list (if (or (and (listp in) (= (length in) 3))
+                    (and (listp in) (= (length in) 1)))
+                (or
+                 (and (= (length in) 3) (make-terminal-color :red (first in) :green (second in) :blue (third in) :bg bg))
+                 (if (integerp (car in))(make-terminal-color :color-256 (first in) :bg bg)
+                     (and (symbolp (first in))(make-terminal-color :simple (first in) :bg bg))))
+
+                ))
+      (integer (make-terminal-color :color-256 in :bg bg))
+      (keyword (make-terminal-color :simple in :bg bg))
+      (string (let ((rgb (hex-str-to-rgb in)))
+                (and rgb (make-terminal-color :bg bg
+                                              :red (first rgb)
+                                              :green (second rgb)
+                                              :blue (third rgb))))))))
 (defun style-to-terminal-style (style-plist)
+  "Converts a style plist to a terminal-style instance.
+   Args:
+   - STYLE-PLIST: A property list containing style attributes.
+   Returns:
+   - A terminal-style instance with the specified attributes.
+
+   Example:
+   (style-to-terminal-style '(:fg-color :blue :bg-color :green :attrs '(:bold :underline)))
+   => #<TERMINAL-STYLE fg-color: #<TERMINAL-COLOR red: 0 green: 0 blue: 255>
+                        bg-color: #<TERMINAL-COLOR red: 0 green: 128 blue: 0>
+                        bold: T italic: NIL underline: T faint: NIL blink: NIL inverse: NIL strike: NIL invisible: NIL>
+   "
   (when style-plist
     (let ((ts (make-terminal-style)))
-      (let ((bg (getf style-plist :bg)))
-        (when bg (if (listp bg) (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :r (first bg) :g (second bg) :b (third bg)))
-                     (if (numberp bg) (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :color-256 bg))
-                         (setf (terminal-style-bg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :bg t :simple bg))))))
-      (let ((fg (getf style-plist :fg)))
-        (when fg (if (listp fg) (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :r (first fg) :g (second fg) :b (third fg)))
-                     (if (numberp fg) (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :color-256 fg))
-                         (setf (terminal-style-fg-color ts) (elmtui.backend.common.ansi-styling:make-termcolor :simple fg))))))
+      (let ((bg (fuzz-color (or (getf style-plist :bg)
+                                (getf style-plist :bg-color)
+                                (getf style-plist :color)
+                                (getf style-plist :background-color)))))
+        (when bg
+          (setf (terminal-color-bg bg) t)
+          (setf (terminal-style-bg-color ts) bg)))
+      (let ((fg (fuzz-color (or (getf style-plist :fg)
+                                (getf style-plist :fg-color)
+                                (getf style-plist :color)
+                                (getf style-plist :foreground-color)))))
+        (when fg (setf (terminal-style-fg-color ts) fg)))
       (let ((attrs (getf style-plist :attrs)))
         (when (member :bold attrs) (setf (terminal-style-bold ts) t))
         (when (member :italic attrs) (setf (terminal-style-italic ts) t))
         (when (member :underline attrs) (setf (terminal-style-underline ts) t))
         (when (member :inverse attrs) (setf (terminal-style-inverse ts) t)))
       ts)))
-;; (defgeneric copy-terminal-style (style))
+;; (defgeneric mcopy-terminal-style (style)
+;;   (:method ((style terminal-style))
+;;     "Creates a deep copy of a terminal-style instance."
+;;     (make-terminal-style
+;;      :fg-color (copy-term-color (terminal-style-fg-color style))
+;;      :bg-color (copy-term-color (terminal-style-bg-color style))
+;;      :bold (terminal-style-bold style)
+;;      :italic (terminal-style-italic style)
+;;      :underline (terminal-style-underline style)
+;;      :faint (terminal-style-faint style)
+;;      :blink (terminal-style-blink style)
+;;      :inverse (terminal-style-inverse style)
+;;      :strike (terminal-style-strike style)
+;;      :invisible (terminal-style-invisible style))))
 
 (defstruct terminal-style
   fg-color
@@ -56,7 +122,16 @@
   inverse
   strike
   invisible)
-(defmethod deep-copy-style ((style elmtui.backend.common.ansi-styling:terminal-style))
+;; (defun terminal-style-fg-color-val (style)
+;;   "Get the simple color value from a terminal style's foreground color."
+;;   (when (and style (terminal-style-fg-color style))
+;;     (termcolor-simple (terminal-style-fg-color style))))
+
+;; (defun terminal-style-bg-color-val (style)
+;;   "Get the simple color value from a terminal style's background color."
+;;   (when (and style (terminal-style-bg-color style))
+;;     (termcolor-simple (terminal-style-bg-color style))))
+(defmethod deep-copy-style ((style elmtui.platform.backend.common.ansi-styling:terminal-style))
   "Creates a deep copy of a terminal-style instance."
   (copy-term-style style))
 ;; (defgeneric from-styles (styles)
@@ -469,44 +544,30 @@ the escape sequence as byte stream."
                                         ;(write-char ch fd)
           )
     (finish-output fd)))
-(defun copy-term-color (tc)
-  (if tc
-      (let ((term-color (make-terminal-color)))
-        (setf (terminal-color-red term-color)
-              (terminal-color-red tc))
-        (setf (terminal-color-green term-color)
-              (terminal-color-green tc))
-        (setf (terminal-color-blue term-color)
-              (terminal-color-blue tc))
-        (setf (terminal-color-simple term-color)
-              (terminal-color-simple tc))
-        (setf (terminal-color-bg term-color)
-              (terminal-color-bg tc))
-        (setf (terminal-color-color-256 term-color)
-              (terminal-color-color-256 tc))
-        term-color)
-      (make-terminal-color)))
-(defun copy-term-style (ts)
-  (if ts
-      (let ((term-style (make-terminal-style)))
-        (setf (terminal-style-fg-color term-style)
-              (copy-term-color (terminal-style-fg-color ts)))
-        (setf (terminal-style-bg-color term-style)
-              (copy-term-color (terminal-style-bg-color ts)))
-        (setf (terminal-style-bold term-style)
-              (terminal-style-bold ts))
-        (setf (terminal-style-italic term-style)
-              (terminal-style-italic ts))
-        (setf (terminal-style-underline term-style)
-              (terminal-style-underline ts))
-        (setf (terminal-style-faint term-style)
-              (terminal-style-faint ts))
-        (setf (terminal-style-blink term-style)
-              (terminal-style-blink ts))
-        (setf (terminal-style-inverse term-style)
-              (terminal-style-inverse ts))
-        term-style)
-      (make-terminal-style)))
+(defun copy-term-color (color)
+  "Creates a deep copy of a terminal-color instance."
+  (when color
+    (make-terminal-color
+     :red (terminal-color-red color)
+     :green (terminal-color-green color)
+     :blue (terminal-color-blue color)
+     :simple (terminal-color-simple color)
+     :bg (terminal-color-bg color)
+     :color-256 (terminal-color-color-256 color))))
+(defun copy-term-style (style)
+  "Creates a deep copy of a terminal-style instance."
+  (when style
+    (make-terminal-style
+     :fg-color (copy-term-color (terminal-style-fg-color style))
+     :bg-color (copy-term-color (terminal-style-bg-color style))
+     :bold (terminal-style-bold style)
+     :italic (terminal-style-italic style)
+     :underline (terminal-style-underline style)
+     :faint (terminal-style-faint style)
+     :blink (terminal-style-blink style)
+     :inverse (terminal-style-inverse style)
+     :strike (terminal-style-strike style)
+     :invisible (terminal-style-invisible style))))
 ;; (dotimes (i (length output))
 ;;     (as-utf-8-bytes (char output i) (lambda (x) (write-byte x (fd term)))))
 
@@ -532,7 +593,13 @@ the escape sequence as byte stream."
         :inverse (slot-value style-val 'inverse)
         :strike (slot-value style-val 'strike)
         :invisible (slot-value style-val 'invisible)))
+
 (defmethod is-term-style ((style1 terminal-style))
   "Check if STYLE1 is a terminal-style object and matches STYLE-VAL.
    Returns a list of attributes that differ, or NIL if they match."
   t)
+
+(defun termcolor-simple (color)
+  "Returns the simple color keyword from a terminal-color instance."
+  (when color
+    (terminal-color-simple color)))

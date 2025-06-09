@@ -4,114 +4,187 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.form
   (:use :cl :alexandria)
+  (:import-from :elmtui.ui.api #:component #:make-state-patch #:id-from-path #:get-path)
+  (:import-from :elmtui.state #:make-update-result)
   (:import-from :elmtui.view.styled #:make-styled-node)
-  (:import-from :elmtui.core.async #:cmd-async)
-  (:import-from :elmtui.core.events #:send-message)
-  (:import-from :elmtui.state.model #:application-state #:state-ref #:defmodel)
-  (:import-from :elmtui.ui.widgets.utils
-                #:defwidget-view
-                #:with-widget-model
-                #:widget-focused-p)
-  (:export #:form-model ; defmodel exports the type name
-           #:form-model-id #:form-model-fields #:form-model-on-submit #:form-model-on-change
-           #:form-model-validation #:form-model-validation-errors
-           #:init-form #:update-form #:view-form
-           ;; Message types
+  ;; (:import-from :elmtui.core.async #:cmd-async) ; Not used directly
+  ;; (:import-from :elmtui.core.events #:send-message) ; Not used directly
+  ;; (:import-from :elmtui.state.model #:application-state #:state-ref #:defmodel) ; Using standard component model
+  ;; (:import-from :elmtui.ui.widgets.utils ; Not using these legacy utils
+  ;;               #:defwidget-view
+  ;;               #:with-widget-model
+  ;;               #:widget-focused-p)
+  (:export #:form #:make-form ; Class name and constructor
+           ;; Messages (keywords)
            #:msg-form-field-update
            #:msg-form-submit
-           #:msg-form-validate))
+           #:msg-form-validate
+           #:msg-form-set-value ; For setting a field value externally
+           ))
 (in-package :elmtui.ui.widgets.form)
 
-;;;---------------------------------------------------------------
-;;; Model
-;;;---------------------------------------------------------------
-(defmodel form-model
-    (:docstring "")
-    (id :type T :documentation "Unique identifier for the form." :readonly t)
-    (fields :type hash-table :documentation "A hash table mapping field names to their values."
-            :initform (make-hash-table :test 'equal))
-    (on-submit :type T :documentation "A message to dispatch when the form is submitted."
-               :initform nil)
-    (on-change :type T :documentation "A message to dispatch when any field changes."
-               :initform nil)
-    (validation :type function :documentation "Function to validate form data, returns validation-errors."
-                :initform nil)
-    (validation-errors :type hash-table :documentation "A hash table mapping field names to error messages."
-                       :initform (make-hash-table :test 'equal)))
-;; "Model for a form widget.")
+;;;---------------------------------------------------------------\\\n;;; Form Component\\\n;;;---------------------------------------------------------------\\\n(defclass form (component) ()
+  (:documentation "A form component that groups child input components and manages form-level actions like submission and validation. Child components are defined in the DSL and their state is managed individually."))
 
-;;;---------------------------------------------------------------
-;;; Messages (Keywords)
-;;;---------------------------------------------------------------
-(defparameter msg-form-field-update :form-field-update)
+(defun make-form (&key id)
+  "Creates a new form component instance."
+  (make-instance 'form :id id))
+
+;;;---------------------------------------------------------------\\\n;;; Messages (Keywords)\\\
+;;;---------------------------------------------------------------\\\n(defparameter msg-form-field-update :form-field-update)
 (defparameter msg-form-submit :form-submit)
 (defparameter msg-form-validate :form-validate)
+(defparameter msg-form-set-value :form-set-value) ; (:form-set-value :field-name <field-name> :value <new-value>)
 
-;;;---------------------------------------------------------------
-;;; Helper Functions
-;;;---------------------------------------------------------------
-;; (defun validate-form (model)
-;;   "Validates the form model using its validation function if one is set.
-;;    Returns a new model with updated validation-errors."
-;;   (let ((validation-fn (form-model-validation model)))
-;;     (if validation-fn
-;;         (let ((new-validation-errors (funcall validation-fn (form-model-fields model))))
-;;           (make-form-model :id (form-model-id model)
-;;                            :fields (form-model-fields model)
-;;                            :on-submit (form-model-on-submit model)
-;;                            :on-change (form-model-on-change model)
-;;                            :validation (form-model-validation model)
-;;                            :validation-errors new-validation-errors))
-;;         model)))
+;;;---------------------------------------------------------------\\\n;;; Init Method\\\n;;;---------------------------------------------------------------\\\n(defmethod init ((component form) &key id-path
+                                    initial-field-values ; A plist (:field1 val1 :field2 val2)
+                                    initial-on-submit    ; Command/message for submit
+                                    initial-on-change    ; Command/message for field change (if form tracks overall change)
+                                    initial-validation-fn ; A symbol or lambda for validation
+                                    initial-child-specs  ; Children are defined via DSL, passed by layout
+                                    &allow-other-keys)
+  (let ((component-id (id-from-path id-path))
+        (field-values (make-hash-table :test 'equal))
+        (child-patches nil)
+        (child-commands nil)
+        (child-ids nil)) ; IDs of direct children managed by this form (if any, typically layout handles children)
 
-;; (defun form-valid-p (model)
-;;   "Returns true if the form has no validation errors."
-;;   (zerop (hash-table-count (form-model-validation-errors model))))
+    ;; Populate initial field values if provided
+    (loop for (key value) on initial-field-values by #'cddr
+          do (setf (gethash key field-values) value))
 
-;;;---------------------------------------------------------------
-;;; Init
-;;;---------------------------------------------------------------
-(defun init-form (id &key
-                          initial-values
-                          field-specs
-                          on-submit
-                          on-change
-                          validation-fn)
-  "Initializes a new form model.
-   ID: The ID for the form.
-   INITIAL-VALUES: A plist mapping field names to initial values.
-   FIELD-SPECS: A list of plists for advanced field configuration.
-   ON-SUBMIT: Message to send when the form is submitted.
-   ON-CHANGE: Message to send when any field changes.
-   VALIDATION-FN: Function to validate form data.
+    ;; Initialize children if form directly manages them (less common with layout components)
+    (dolist (child-spec initial-child-specs)
+      (let* ((child-type (first child-spec))
+             (child-id (second child-spec))
+             (child-initargs (cddr child-spec))
+             (child-instance (make-instance child-type))
+             (child-id-path-for-child-init (list :components child-id)))
+        (multiple-value-bind (initialized-child-instance patches-from-child commands-from-child)
+            (apply #'init child-instance :id-path child-id-path-for-child-init child-initargs)
+          (declare (ignore initialized-child-instance))
+          (push child-id child-ids)
+          (setf child-patches (append patches-from-child child-patches))
+          (setf child-commands (append commands-from-child child-commands)))))
 
-   Returns (values form-model initial-commands-list)."
-  (let ((fields (make-hash-table :test 'equal))
-        (validation-errors (make-hash-table :test 'equal)))
+    (values component
+            (append
+             (list (make-state-patch `(:components ,component-id)
+                                     `(:type ,(type-of component)
+                                       :id ,component-id
+                                       :field-values ,field-values ; Store actual values here
+                                       :on-submit ,initial-on-submit
+                                       :on-change ,initial-on-change
+                                       :validation-fn ,initial-validation-fn
+                                       :validation-errors ,(make-hash-table :test 'equal) ; Initially no errors
+                                       :children-ids ,(nreverse child-ids)))) ; If form has direct children
+             child-patches)
+            child-commands)))
 
-    ;; Initialize fields from initial-values if provided
-    (when initial-values
-      (loop for (key value) on initial-values by #'cddr
-            do (setf (gethash key fields) value)))
+;;;---------------------------------------------------------------\\\n;;; Update Method\\\n;;;---------------------------------------------------------------\\\n(defmethod update ((component form) state msg &key id-path)
+  (let* ((component-id (id-from-path id-path))
+         (component-state-path `(:components ,component-id))
+         (form-props (getf state component-state-path))
+         (patches nil)
+         (commands nil))\n
+    (unless form-props
+      (warn \"Form ~A state not found at ~S\" component-id component-state-path)\n      (return-from update (make-update-result :patches nil :commands nil)))
 
-    ;; Initialize fields from field-specs if provided
-    (when field-specs
-      (loop for spec in field-specs
-            for field-name = (getf spec :name)
-            for initial-value = (getf spec :value)
-            when field-name
-              do (setf (gethash field-name fields) initial-value)))
+    (let ((current-field-values (getf form-props :field-values))
+          (on-submit (getf form-props :on-submit))\n          (on-change (getf form-props :on-change))\n          (validation-fn (getf form-props :validation-fn)))
 
-    ;; Create and return the model
-    (values
-     (make-form-model :id id
-                      :fields fields
-                      :on-submit on-submit
-                      :on-change on-change
-                      :validation validation-fn
-                      :validation-errors validation-errors)
-     nil))) ; No initial commands
+      (etypecase msg
+        ;; (:form-field-update :field-name <field-name> :value <new-value>)
+        ;; This message is typically sent by child input components to the form
+        ((cons (eql msg-form-field-update) t)
+         (let ((field-name (getf (rest msg) :field-name))
+               (new-value (getf (rest msg) :value)))
+           (when field-name
+             (let ((updated-field-values (alexandria:copy-hash-table current-field-values)))
+               (setf (gethash field-name updated-field-values) new-value)
+               (push (make-state-patch (append component-state-path \'(:field-values)) updated-field-values) patches)
+               (when on-change ; If an on-change handler for the whole form is defined
+                 (push (append on-change (list :field-name field-name :value new-value)) commands))))))
 
-;;;---------------------------------------------------------------
-;;; Update
-;;;---------------------------------------------------------------
+        ;; (:form-set-value :field-name <field-name> :value <new-value>)
+        ;; For externally setting a form field\'s value (e.g. programmatically)
+        ((cons (eql msg-form-set-value) t)
+         (let ((field-name (getf (rest msg) :field-name))
+               (value (getf (rest msg) :value)))
+           (when field-name
+             (let ((updated-field-values (alexandria:copy-hash-table current-field-values)))
+               (setf (gethash field-name updated-field-values) value)
+               (push (make-state-patch (append component-state-path \'(:field-values)) updated-field-values) patches)
+               ;; Also, we might need to inform the actual child input component to update its view/internal state
+               ;; This assumes child components respond to a generic :set-value message or similar.
+               ;; The child-id here would need to be known or discoverable.
+               ;; For now, this only updates the form\'s record of the value.
+               ;; A more robust solution might involve a command that the application runner
+               ;; uses to find the child component by its role/name within the form and send it a message.
+               (let ((child-component-id field-name)) ; Assuming field-name is the child component ID
+                  (push `(:message-to ,child-component-id (:set-property :value ,value)) commands))
+               ))))
+
+        ;; :form-submit
+        ((eql msg-form-submit)
+         (let ((errors (if validation-fn
+                           (funcall validation-fn current-field-values)
+                           (make-hash-table :test 'equal))))
+           (push (make-state-patch (append component-state-path \'(:validation-errors)) errors) patches)
+           (if (zerop (hash-table-count errors))
+               (when on-submit
+                 ;; Submit command should carry the current field values
+                 (if (listp on-submit) ; If it\'s a message template
+                     (push (append on-submit (list :field-values current-field-values)) commands)
+                     (push (list on-submit :field-values current-field-values) commands))) ; Simple command
+               (warn \"Form ~A submission failed due to validation errors: ~S\" component-id errors))))
+
+        ;; :form-validate
+        ((eql msg-form-validate)
+         (when validation-fn
+           (let ((errors (funcall validation-fn current-field-values)))
+             (push (make-state-patch (append component-state-path \'(:validation-errors)) errors) patches))))
+
+        ;; Propagate other messages to children if the form has direct children
+        ;; This is less common if a layout component is used within the form DSL for children
+        ((cons (eql :message-to) t)
+         (let ((target-child-id (second msg))
+               (actual-message (cddr msg)))
+           (when (member target-child-id (getf form-props :children-ids))
+             (let* ((child-component-id-path (list :components target-child-id))
+                    (child-state (get-path state child-component-id-path))
+                    (child-type (getf child-state :type)))
+               (when child-type
+                 (let ((child-instance (make-instance child-type)))
+                   (let ((child-update-result (update child-instance state actual-message :id-path child-component-id-path)))
+                     (setf patches (append (getf child-update-result :patches) patches))
+                     (setf commands (append (getf child-update-result :commands) commands))))))))))
+
+    (make-update-result :patches (nreverse patches) :commands (nreverse commands))))
+
+;;;---------------------------------------------------------------\\\n;;; View Method\\\n;;;---------------------------------------------------------------\\\n(defmethod view ((component form) state &key id-path)
+  (let* ((component-id (id-from-path id-path))
+         (component-state-path `(:components ,component-id))
+         (form-props (getf state component-state-path)))
+
+    (unless form-props
+      (warn \"Form ~A state not found at ~S. Generating error view.\" component-id component-state-path)
+      (return-from view `(:error \"Form component state not found for ID: ~a\" ,component-id)))
+
+    ;; The form itself is often just a logical container. Its view might be minimal,
+    ;; or it might render form-level errors or a submit button if not handled by its children.
+    ;; Children are rendered by the layout system based on the DSL structure.
+    ;; This view method is for the form *element* itself, not its children directly.
+    ;; Children are part of the :children list of its parent layout in the view tree.
+
+    `(:ui-element ; Or :form if a specific renderer tag is desired
+      :id ,component-id
+      :type :form ; Semantic type for renderer or styling
+      :style '(:display :block) ; Forms are typically block-level
+      ;; :on-submit `(,msg-form-submit) ; If the renderer can map native form submit to this message
+      :properties `(:validation-errors ,(getf form-props :validation-errors))
+      ;; Children are handled by the parent layout that contains this form and its actual input fields.
+      ;; If the form had its own child components *not* part of a separate layout DSL inside it,
+      ;; they would be mapped here.
+      :children nil ; Typically, a <form> tag itself doesn\'t render children directly in this model
+      ))
