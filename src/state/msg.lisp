@@ -115,7 +115,29 @@
 
 (defmacro defmsg (name (&key docstring) &rest variant-specs)
   "Define a message type NAME with variants and auto-generated
-   constructor functions.  See source for full doc."
+   constructor functions.  See source for full doc.
+
+Example:
+  (defmsg AppMsg (:docstring \"Main application messages\")
+          IncrementCounter
+          DecrementCounter
+          (SetCounterLabel :new-label string)
+          (ActivateUser :user-id integer)
+          (DeactivateUser :user-id integer)
+          (RequestFocus :widget-id t))
+    This macro generates:
+    - Constructor functions for each variant, named `make-<variant-name>-<message-type-name>`.
+    - Each constructor checks argument types based on the variant specification.
+    - Registers the message type and its variants in the global *message-schemas* hash table.
+    The schema includes the name, variants, and an optional docstring.
+    The variants are stored as a list of variant-definition structs, each containing:
+    - The variant name (as a keyword
+    - The argument definitions (list of arg-def structs
+    - The original argument specification (for reference
+    - The constructor name (for the generated function
+    The constructor functions are generated at compile time, and the schema is registered
+    at load time to avoid dumping the struct object.
+"
   ;; sanity
   (unless (and (symbolp name) (not (keywordp name)))
     (error "Message type name must be a (non-keyword) symbol, not ~S" name))
@@ -295,8 +317,12 @@
 
 
 ;; Example StateChangeMsg definition (Alternative to :state-changed in AppMsg)
-(defmsg StateChangeMsg (:docstring "Wraps state changes detected by observers")
-        (Changed :model symbol :slot keyword :value t))
+;; (defmsg StateChangeMsg (:docstring "Wraps state changes detected by observers")
+;;         (Changed :model symbol :slot keyword :value t))
+
+;; Example: a button widget could define when clicked:
+;; (defmsg ButtonMsg (:docstring "Messages for button interactions")
+;;        ButtonClick)
 
 
 (defun message-variant-p (message-type message-instance)

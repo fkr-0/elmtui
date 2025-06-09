@@ -14,7 +14,9 @@
            #:*focus-manager*
            #:*keymap-registry*
            #:*theme*
+           #:*applications*
            #:*stylesheets*
+           #:*dsl-type-to-component-class*
            #:*widget-registry*))
 (in-package :elmtui.core.globals)
 
@@ -32,6 +34,16 @@
 (defvar *focus-manager* nil "The active focus manager instance.")
 (defvar *keymap-registry* nil "The global keymap registry.")
 (defvar *theme* (make-hash-table :test 'equal) "Global theme settings.")
+(defvar *applications* (make-hash-table :test 'equal)
+  "Hash table of registered applications, keyed by their names.")
+(defvar *stylesheets* (make-hash-table :test 'equal))
+(defvar *widget-registry* (make-hash-table :test 'equal)
+  "Registry of all widget classes, keyed by their DSL type keywords.
+   This is used to map DSL types to their corresponding component classes.")
+(defvar *dsl-type-to-component-class*
+  (make-hash-table :test 'equal)
+  "Maps DSL type keywords to their corresponding component class symbols.
+     This is used to resolve DSL types to actual component classes when rendering views.")
 
 (defvar *debug-layout-outlines* nil
   "If T, enables layout outlines for debugging purposes.

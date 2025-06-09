@@ -3,23 +3,30 @@
 ;;; Model Definition Macro (Schema-based for Application State)
 ;;;===============================================================
 (uiop:define-package :elmtui.state.model
-  (:use :cl :alexandria :log4cl) ; Added log4cl
-  (:import-from :elmtui.statelib.state #:application-state #:state-ref)
-  (:import-from :elmtui.statelib.observe #:add-observer) ; Import add-observer from main state package
-  (:import-from :elmtui.core.globals :*app-sender*) ; Import *app-sender* from globals
-  (:export :defmodel :make-model :model-slot-value :initialize-model-state
+  (:use :cl :alexandria :log4cl)
+  (:import-from :elmtui.state.api ; Import from the central API
+   :application-state :state-ref :make-model :initialize-model-state :get-slot :with-model-access
+   ;; Potentially :*-app-state* if needed directly, though usually passed as arg
+   )
+  (:import-from :elmtui.statelib.observe #:add-observer) ; Lower-level, not in main API
+  (:import-from :elmtui.core.globals :*app-sender*)
+  (:export ;; Symbols defined *in this file* that are part of the public API
+   ;; These are already exported by elmtui.state.api, but good practice to list them here too.
+   :defmodel
+   ;; :make-model ; Now imported from API, which exports this one
+   ;; :initialize-model-state ; Now imported from API
+   ;; :get-slot ; Now imported from API
+   ;; :with-model-access ; Now imported from API
 
-           :get-slot
-           ;; Model schema introspection helpers
-           :model-slot-names :model-slot-definition :model-slot-type
-           :model-slot-initform :model-slot-validator :model-slot-observe?
-           :model-schema-info
-           :with-model-access ; Added export
-           ;; Schema structs and accessors
-           :model-schema :model-schema-name :model-schema-slots :model-schema-docstring
-           :slot-definition :slot-definition-name :slot-definition-type
-           :slot-definition-initform :slot-definition-initarg :slot-definition-validator
-           :slot-definition-observe :slot-definition-accessor)) ; Export schema utilities
+   ;; Model schema introspection helpers (if they become part of the public API via elmtui.state.api)
+   :model-slot-names :model-slot-definition :model-slot-type
+   :model-slot-initform :model-slot-validator :model-slot-observe?
+   :model-schema-info
+   ;; Schema structs and accessors (if they become part of the public API)
+   :model-schema :model-schema-name :model-schema-slots :model-schema-docstring
+   :slot-definition :slot-definition-name :slot-definition-type
+   :slot-definition-initform :slot-definition-initarg :slot-definition-validator
+   :slot-definition-observe :slot-definition-accessor))
 (in-package :elmtui.state.model)
 
 (defvar *model-schemas* (make-hash-table :test 'eq)
@@ -40,6 +47,7 @@
   (validator nil :type (or null function symbol)) ; Validation function/lambda
   (observe nil :type boolean) ; Flag to auto-generate observer
   (accessor nil :type symbol)) ; Generated accessor function name
+
 (defun %canonicalise-validator (designator)
   "Return either a symbol or a function object, or NIL."
   (cond
@@ -65,6 +73,7 @@
 
     ;; Anything else is a programmer error
     (t (error "Unsupported :validate designator: ~S" designator))))
+
 (defun %parse-slot (slot-spec)
   "Parses a defmodel slot specification into a slot-definition struct."
   (let* ((name (if (listp slot-spec) (first slot-spec) slot-spec))
@@ -90,8 +99,8 @@
                     &rest slot-specs)
   "Define a model schema and all helper functions; see README."
   (let* ((schema-name     name)
-         (constructor     (symbolicate "MAKE-" name))
-         (initializer     (symbolicate "INITIALIZE-" name "-STATE"))
+         (constructor     (symbolicate "MAKE-" name)) ; This is the plist constructor
+         (initializer     (symbolicate "INITIALIZE-" name "-STATE")) ; This is for app-state
          (slots           (mapcar #'%parse-slot slot-specs))
          (schema          (make-model-schema :name schema-name
                                              :slots slots
@@ -106,7 +115,7 @@
            (log:info "Default Observer: Key=~S changed from ~S to ~S"
                      key old new)))
 
-       ;; ───────────────── constructor ─────────────────────────
+       ;; ───────────────── plist constructor (used by make-model) ───────────────────
        (defun ,constructor
            (&key
               ,@(mapcar (lambda (s)
@@ -137,43 +146,54 @@
               slots)
            (nreverse (nreverse plist))))
 
-       ;; ───────────────── state-initializer ────────────────────
-       (defun ,initializer (app-state initial-plist)
-         ,(format nil "Insert ~S into APP-STATE and register observers." name)
-         (check-type app-state application-state)
-         (ut.state.state::set-state app-state ',schema-name initial-plist)
+       ;; ───────────────── state-initializer (used by initialize-model-state) ───────────────
+       ;; This function is now primarily for setting up observers, as the actual
+       ;; state setting (plist into app-state) will be handled by the caller of initialize-model-state
+       ;; or by defupdate using merge-patches.
+       ;; However, initialize-model-state in the API should still handle putting the initial model plist
+       ;; into the application-state.
+       (defun ,initializer (app-state model-key initial-plist)
+         ,(format nil "Set initial state for ~S in APP-STATE at MODEL-KEY and register observers." name)
+         (check-type app-state elmtui.state.api:application-state) ; Use API type
+         ;; The API function `initialize-model-state` will handle the actual state setting.
+         ;; This generated function focuses on observer registration.
+         ;; (elmtui.state.api:set-state app-state model-key initial-plist) ; Done by the public API function
 
          ,@(loop for slot in slots
                  when (slot-definition-observe slot)
                    collect
                  `(progn
-                    (log:info "Registering observer for ~S slot ~S"
-                              ',name ',(slot-definition-name slot))
-                    (add-observer
-                     app-state ',schema-name
-                     (lambda (model-key old new)
-                       (declare (ignore model-key))
-                       (let* ((slot-key ,(slot-definition-initarg slot))
-                              (ov (getf old slot-key :%not-present%))
-                              (nv (getf new slot-key :%not-present%)))
+                    (log:info "Registering observer for ~S slot ~S on model ~S"
+                              ',name ',(slot-definition-name slot) model-key)
+                    (add-observer ; from elmtui.statelib.observe
+                     app-state model-key ; Observe the top-level model key in app-state
+                     (lambda (observed-key old-model-plist new-model-plist)
+                       (declare (ignore observed-key)) ; We know it's model-key
+                       (let* ((slot-initarg-key ,(slot-definition-initarg slot))
+                              (ov (getf old-model-plist slot-initarg-key :%not-present%))
+                              (nv (getf new-model-plist slot-initarg-key :%not-present%)))
                          (unless (equal ov nv)
-                           (log:debug "Observed change in ~S -> ~S"
-                                      ',name slot-key)
-                           (funcall *app-sender*
-                                    (list :state-changed
-                                          :model ',name
-                                          :slot  slot-key
-                                          :value nv))))))))
-         initial-plist)
+                           (log:debug "Observed change in ~S model (~S), slot ~S: ~S -> ~S"
+                                      model-key ',name slot-initarg-key ov nv)
+                           (funcall elmtui.core.globals:*app-sender*
+                                    (list :state-changed ; This should be a proper message constructor
+                                          :model model-key ; or schema-name?
+                                          :slot-name ',(slot-definition-name slot) ; actual slot name
+                                          :slot-key slot-initarg-key      ; keyword for the slot
+                                          :old-value ov
+                                          :new-value nv))))))))
+         initial-plist) ; Return the plist, though initialize-model-state (API) handles it.
 
-       ;; ───────────────── accessors ───────────────────────────
+       ;; ───────────────── accessors (used by get-slot) ───────────────────────────
+       ;; These accessors expect an application-state object and the model's key within it.
        ,@(mapcar
           (lambda (slot)
-            `(defun ,(slot-definition-accessor slot) (app-state)
-               ,(format nil "Accessor for ~S of ~S."
+            `(defun ,(slot-definition-accessor slot) (app-state model-key)
+               ,(format nil "Accessor for ~S of ~S model stored under MODEL-KEY."
                         (slot-definition-name slot) name)
-               (let ((model (state-ref app-state ',name)))
-                 (getf model ,(slot-definition-initarg slot)))))
+               (check-type app-state elmtui.state.api:application-state)
+               (let ((model-plist (elmtui.state.api:get-state app-state model-key)))
+                 (getf model-plist ,(slot-definition-initarg slot)))))
           slots)
 
        ;; expose the model symbol
@@ -184,293 +204,163 @@
    Warns when direct state-ref is used on the specified model variable.
    Usage: (with-model-access (my-model-instance) ... (state-ref my-model-instance :foo) ...)"
   `(locally
-     (declare (notinline state-ref)) ; Prevent inlining of the imported state-ref we are wrapping
-     (macrolet ((state-ref (object &rest args) ; This redefines the local meaning of 'state-ref'
-                  ;; 'object' is the first form passed to state-ref in the body.
-                  ;; 'model-var-symbol' is the symbol passed to with-model-access.
-                  (if (eq object ',model-var-symbol) ; Check if the form 'object' is literally the symbol 'model-var-symbol'
+       (declare (notinline elmtui.state.api:state-ref)) ; Prevent inlining of the imported state-ref we are wrapping
+     (macrolet ((elmtui.state.api:state-ref (object &rest args) ; This redefines the local meaning of 'state-ref'
+                  (if (eq object ',model-var-symbol)
                       (progn
                         (warn "Direct state-ref usage on model object '~A' detected. Consider using model-specific accessors or get-slot/set-slot instead." ',model-var-symbol)
-                        ;; Call the original state-ref from its package
-                        `(elmtui.statelib.state:state-ref ,object ,@args))
-                      ;; If 'object' is not the model symbol we are watching, call original state-ref
-                      `(elmtui.statelib.state:state-ref ,object ,@args))))
-       ,@body)))
+                        `(elmtui.state.api:state-ref ,object ,@args)) ; Call original from statelib
+                      `(elmtui.state.api:state-ref ,object ,@args)))))
+     ,@body))
 
-;; (defmacro defmodel (name (&key docstring (observe-changes-default-callback 'default-model-observer-callback))
-;;                     &rest slot-specs)
-;;   "Defines a model schema and associated functions for use with application-state.
+;; Public API functions (make-model, initialize-model-state, get-slot)
+;; These are now defined here and exported via elmtui.state.api.
 
-;;    Models defined with `defmodel` represent partitions or structures within the
-;;    central `application-state` hash table. This macro does NOT define a CLOS class
-;;    or a defstruct. Instead, it:
-
-;;    1. Registers a schema for the model, including slot names, types,
-;;       default initial values (:initform), validation predicates (:validate),
-;;       and an optional flag to automatically register an observer (:observe t).
-;;    2. Defines a constructor function `make-<model-name>` which takes keyword
-;;       arguments for slots, applies defaults, performs validation, and returns
-;;       a property list (plist) representing the initial state of the model.
-;;       This plist is intended to be stored in the `application-state`, typically
-;;       using the model's `name` symbol as the key.
-;;    3. Defines accessor functions `<slot-name>` to read slot values from the
-;;       model's plist stored in the `application-state`.
-;;    4. If `:observe t` is specified for a slot, the constructor will attempt to
-;;       register an observer using `ut.state:add-observer` when the model state
-;;       is first created and added to an `application-state`. This requires the
-;;       `application-state` instance to be available. A default callback function
-;;       `default-model-observer-callback` (or the one specified by the
-;;       `:observe-changes-default-callback` key in `defmodel`) will be used.
-;;    5. Intentionally DOES NOT define setter functions (`setf <accessor>`). All state
-;;       modifications MUST be performed within a `defupdate` form using its
-;;       local `set-state!` macro to ensure transactional integrity.
-
-;;    Slot Specification:
-;;      Each slot can be a symbol `slot-name` or a list
-;;      `(slot-name &key :type :initform :validate :observe)`.
-;;      - `:type`: A type specifier for `check-type`. Defaults to `T`.
-;;      - `:initform`: An expression evaluated *at construction time* to provide a
-;;                    default value if the slot is not supplied. Defaults to `NIL`.
-;;      - `:validate`: A function designator (symbol or lambda) that takes the
-;;                     proposed slot value and returns true if valid, false otherwise.
-;;                     Validation occurs *after* defaulting and type checking.
-;;      - `:observe`: If `t`, automatically register an observer for this slot's key
-;;                    when the model is initialized within an application state.
-
-;;    Usage with Application State:
-;;      ;; Define a default observer callback (optional)
-;;      (defun my-model-observer (key old-value new-value)
-;;        (log:info \"Model Change: Key=~S, Old=~S, New=~S\" key old-value new-value))
-
-;;      ;; Define the model schema
-;;      (defmodel counter (:docstring \"A simple counter model\"
-;;                         :observe-changes-default-callback 'my-model-observer)
-;;        (count :type integer :initform 0 :validate #'plusp :observe t) ; Observe count
-;;        (label :type string :initform \"Clicks\")) ; Don't observe label
-
-;;      ;; In application initialization:
-;;      (let* ((app-state (ut.state:make-application-state)) ; Need app-state for observers
-;;             (initial-counter-state (make-counter :count 1)))
-;;        ;; Store the plist in the application-state under the model name key
-;;        ;; AND register observers if specified
-;;        (initialize-model-state app-state 'counter initial-counter-state))
-
-;;      ;; In a view or other read-only context:
-;;      (let ((current-count (count app-state))) ; Use the generated accessor
-;;        (format t \"Current count: ~d\" current-count))
-
-;;      ;; In a defupdate function:
-;;      (defupdate increment-counter (app-state msg)
-;;        (declare (ignore msg))
-;;        (let* ((model-key 'counter)
-;;               (current-state (state-ref app-state model-key)))
-;;          (set-state! model-key ; Update the whole plist in the app-state
-;;                      (list* :count (1+ (getf current-state :count))
-;;                             :label (getf current-state :label)))) ; Preserve other slots
-;;        nil)
-
-;;    Args:
-;;      NAME: The symbol naming the model.
-;;      DOCSTRING: An optional documentation string for the model.
-;;      OBSERVE-CHANGES-DEFAULT-CALLBACK: Symbol naming the function to use for
-;;                                        auto-registered observers. Defaults to
-;;                                        `default-model-observer-callback`.
-;;      SLOT-SPECS: A list of slot specifications.
-
-;;    Returns:
-;;      The symbol `NAME`."
-;;   (let* ((schema-name name)
-;;          (constructor-name (symbolicate "MAKE-" name))
-;;          (initializer-name (symbolicate "INITIALIZE-" name "-STATE")) ; Helper for state init + observers
-;;          (slots (mapcar #'%parse-slot slot-specs))
-;;          (schema (make-model-schema :name schema-name :slots slots :docstring (or docstring ""))))
-
-;;     ;; Store the schema globally
-;;     (setf (gethash schema-name *model-schemas*) schema)
-
-;;     `(progn
-;;        ;; Define Default Observer Callback (if not already defined)
-;;        (unless (fboundp ',observe-changes-default-callback)
-;;          (defun ,observe-changes-default-callback (key old-value new-value)
-;;            (log:info "Default Observer: Key=~S changed from ~S to ~S" key old-value new-value)))
-
-;;        ;; Define Constructor (creates the initial plist)
-;;        (defun ,constructor-name (&key ,@(mapcar (lambda (s) `(,(slot-definition-name s) ',(slot-definition-initform s))) slots))
-;;          ,(format nil "Creates the initial state plist for a ~S model. Applies defaults and validation." name)
-;;          ;; Collect provided args, apply defaults, validate
-;;          (let ((plist (list)))
-;;            ,@(mapcar (lambda (slot)
-;;                        (let ((slot-name (slot-definition-name slot))
-;;                              (var (gensym (symbol-name (slot-definition-name slot)))))
-;;                          `(let ((,var ,slot-name)) ; Bind the keyword arg/default
-;;                             ;; 1. Type Check
-;;                             (check-type ,var ,(slot-definition-type slot))
-;;                             ;; 2. Validation Check
-;;                             ,(when (slot-definition-validator slot)
-;;                                `(unless (funcall ,(%canonicalise-validator (slot-definition-validator slot)) ,var)
-;;                                   (error "Validation failed for slot ~S with value ~S in ~S" ',slot-name ,var ',name)))
-;;                             ;; Add to plist
-;;                             (setf plist (list* ',slot-name ,var plist))))) ; Use keyword for key
-;;                      slots)
-;;            ;; Return the final plist (reversed for correct order)
-;;            (nreverse plist)))
-
-;;        ;; Define State Initializer (sets state and registers observers)
-;;        (defun ,initializer-name (app-state initial-plist)
-;;          ,(format nil "Initializes the state for ~S in APP-STATE using INITIAL-PLIST and registers observers." name)
-;;          (check-type app-state application-state)
-;;          ;; Set the initial state in the application-state hash table
-;;          ;; Use internal set-state to avoid triggering transactions/observers during init
-;;          (ut.state.state::set-state app-state ',schema-name initial-plist)
-
-;;          ;; Register observers for slots marked with :observe t
-;;          ,@(loop for slot in slots
-;;                  when (slot-definition-observe slot)
-;;                    collect `(progn
-;;                               (log:info "Registering observer for ~S slot ~S" ',name ',(slot-definition-name slot))
-;;                               (add-observer app-state
-;;                                             ;; The key observed is the main model key
-;;                                             ',schema-name
-;;                                             ;; The callback needs to handle plist changes
-;;                                             ;; Elm-style Observer: Dispatch a message instead of calling a direct callback.
-;;                                             (lambda (model-key old-plist new-plist)
-;;                                               (declare (ignore model-key)) ; Key observed is the top-level model symbol
-;;                                               (let ((slot-key ,(slot-definition-initarg slot)) ; Keyword for the specific slot
-;;                                                     (old-slot-val (getf old-plist slot-key :%not-present%))
-;;                                                     (new-slot-val (getf new-plist slot-key :%not-present%)))
-;;                                                 ;; If the specific slot value changed, dispatch a message
-;;                                                 (unless (equal old-slot-val new-slot-val)
-;;                                                   (log:debug "Observed change in ~S -> ~S. Dispatching message." ',name slot-key)
-;;                                                   ;; Assumes a message like (:state-changed :model <model-name> :slot <slot-key> :value <new-val>)
-;;                                                   ;; and *app-sender* is dynamically bound.
-;;                                                   (funcall *app-sender*
-;;                                                            `(:state-changed
-;;                                                              :model ',schema-name
-;;                                                              :slot ,slot-key
-;;                                                              :value ,new-slot-val))))))))
-;;          initial-plist) ; Return the initial plist
-
-;;        ;; Define Accessors
-;;        ,@(mapcar (lambda (slot)
-;;                    (let ((accessor-name (slot-definition-accessor slot)) ; Using just slot name for now
-;;                          (slot-key (slot-definition-initarg slot))) ; Use keyword
-;;                      `(defun ,accessor-name (app-state)
-;;                         ,(format nil "Accessor for the ~S slot of the ~S model. Reads from application-state."
-;;                                  (slot-definition-name slot) name)
-;;                         (let ((model-data (state-ref app-state ',name)))
-;;                           ;; Don't warn here, might be legitimately nil initially
-;;                           ;; (unless model-data
-;;                           ;;   (warn "Model data for '~A' not found in application-state." ',name))
-;;                           (getf model-data ,slot-key)))))
-;;                  slots)
-
-;;        ;; Return the model name symbol
-;;        ',name)))
-
-;; Helper functions (potentially useful outside the macro)
 (defun make-model (model-name &rest initargs)
-  "Generic constructor function to create initial model state plist.
-   Does NOT register observers. Use initialize-<model-name>-state for that."
+  "Generic constructor function to create an initial model state plist for MODEL-NAME.
+   MODEL-NAME must be a symbol previously defined with DEFMODEL.
+   INITARGS are keyword arguments corresponding to the model's slots.
+   This function calls the specific make-<model-name> plist constructor generated by DEFMODEL.
+   It performs type checking and validation as defined in the model schema.
+   Does NOT register observers or interact with application-state.
+   Use INITIALIZE-MODEL-STATE to integrate the model into an application-state."
   (let* ((schema (gethash model-name *model-schemas*))
-         (constructor-name (and schema (symbolicate "MAKE-" model-name))))
-    (unless schema
-      (error "Unknown model name: ~S" model-name))
-    (apply constructor-name initargs)))
-
-(defun initialize-model-state (app-state model-name initial-plist)
-  "Generic helper to initialize model state and register observers."
-  (let* ((schema (gethash model-name *model-schemas*))
-         (initializer-name (and schema (symbolicate "INITIALIZE-" model-name "-STATE"))))
-    (unless schema
-      (error "Unknown model name: ~S" model-name))
-    (unless (fboundp initializer-name)
-      (error "Initializer function ~S not found for model ~S." initializer-name model-name))
-    (funcall initializer-name app-state initial-plist)))
-
-
-(defun model-slot-value (app-state model-name slot-name)
-  "Generic accessor to get a slot value from a model in application-state."
-  (let* ((schema (gethash model-name *model-schemas*))
-         (slot (and schema (find slot-name (model-schema-slots schema) :key #'slot-definition-name))))
-    (unless schema
-      (error "Unknown model name: ~S" model-name))
-    (unless slot
-      (error "Unknown slot ~S for model ~S" slot-name model-name))
-    (let ((accessor-fn (slot-definition-accessor slot)))
-      (funcall accessor-fn app-state))))
-
-;;;===============================================================
-;;; Model Interface Functions
-;;;===============================================================
-
-(defun get-slot (model-object model-name slot-name)
-  "Retrieves the value of SLOT-NAME from MODEL-OBJECT of type MODEL-NAME.
-   MODEL-OBJECT can be an application-state instance or a direct model plist.
-   Uses the schema defined by 'defmodel' for lookup.
-   
-   Args:
-     model-object: Either an application-state instance or a model plist.
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     slot-name: The symbol naming the model slot (e.g., 'count).
-     
-   Returns:
-     The value of the specified slot.
-     
-   Signals:
-     ERROR: If model-name is not registered in *model-schemas*.
-     ERROR: If slot-name is not defined in the model schema.
-     
-   Examples:
-     (get-slot app-state 'counter-model 'count)     ; From application-state
-     (get-slot counter-plist 'counter-model 'count) ; From standalone model plist"
-  (let* ((schema (gethash model-name *model-schemas*))
-         (slot-def (and schema (find slot-name (model-schema-slots schema)
-                                     :key #'slot-definition-name))))
+         (constructor-name (and schema (symbolicate "MAKE-" (string model-name))))) ; Constructor for plist
     (unless schema
       (error "Unknown model name: ~S. Ensure it's defined with defmodel." model-name))
-    (unless slot-def
-      (error "Unknown slot ~S for model ~S. Check slot definition in defmodel." slot-name model-name))
+    (unless (and constructor-name (fboundp constructor-name))
+      (error "Internal error: Plist constructor ~S not found for model ~S." constructor-name model-name))
+    (apply constructor-name initargs)))
 
-    (if (typep model-object 'application-state)
-        ;; If model-object is application-state, use the generated accessor
-        ;; which reads from the state.
-        (funcall (slot-definition-accessor slot-def) model-object)
-        ;; Otherwise, assume model-object is a direct plist instance of the model.
-        (getf model-object (slot-definition-initarg slot-def)))))
+(defun initialize-model-state (app-state model-key model-name &rest initargs)
+  "Initializes a model of type MODEL-NAME within APP-STATE, stored under MODEL-KEY.
+   1. Creates the initial model state plist using MAKE-MODEL with INITARGS.
+   2. Stores this plist in APP-STATE at MODEL-KEY using SET-STATE.
+   3. Calls the model-specific <initialize-MODEL-NAME-state> function (generated by DEFMODEL)
+      to register any observers defined for the model's slots.
+   Returns the initialized model plist.
+
+   Args:
+     app-state: The application-state instance.
+     model-key: The key (symbol) under which this model instance will be stored in app-state.
+     model-name: The symbol naming the model type (e.g., 'counter), defined via DEFMODEL.
+     initargs: Keyword arguments for the model's slots, passed to MAKE-MODEL.
+
+   Example:
+     (initialize-model-state *app-state* :my-counter 'counter :count 10)"
+  (check-type app-state elmtui.state.api:application-state)
+  (check-type model-key symbol)
+  (check-type model-name symbol)
+
+  (let* ((schema (gethash model-name *model-schemas*))
+         (initializer-helper-name (and schema (symbolicate "INITIALIZE-" (string model-name) "-STATE"))))
+
+    (unless schema
+      (error "Unknown model name: ~S. Ensure it's defined with defmodel." model-name))
+    (unless (and initializer-helper-name (fboundp initializer-helper-name))
+      (error "Internal error: Observer initializer ~S not found for model ~S." initializer-helper-name model-name))
+
+    ;; 1. Create the initial model state plist
+    (let ((initial-plist (apply #'make-model model-name initargs)))
+      ;; 2. Store this plist in APP-STATE at MODEL-KEY
+      ;;    This should ideally happen within a transaction if called outside an update cycle.
+      ;;    For now, direct set-state. If called from defapplication, it's fine.
+      (elmtui.state.api:set-state app-state model-key initial-plist)
+
+      ;; 3. Call the generated helper to register observers
+      ;;    This helper now expects app-state, the model-key, and the plist.
+      (funcall initializer-helper-name app-state model-key initial-plist)
+
+      initial-plist)))
+
+
+(defun get-slot (model-object model-key-or-name slot-name)
+  "Retrieves the value of SLOT-NAME from a model instance.
+   If MODEL-OBJECT is an application-state, MODEL-KEY-OR-NAME is the key
+   where the model plist is stored, and its type is inferred from the schema
+   associated with that key (future improvement) or must be provided if ambiguous.
+   For now, assumes MODEL-KEY-OR-NAME is the model's schema name if MODEL-OBJECT is a plist,
+   or the key in app-state if MODEL-OBJECT is application-state.
+
+   More robustly:
+   - (get-slot app-state :my-counter 'count) -> app-state has a model under :my-counter, get its 'count slot.
+     (Requires knowing the model *type* at :my-counter, or assuming it from schema if unique).
+   - (get-slot counter-plist 'counter-schema 'count) -> counter-plist is of type 'counter-schema.
+
+Args:
+  model-object: An application-state instance or a direct model plist.
+  model-key-or-name:
+    - If model-object is application-state: The SYMBOL key where the model is stored.
+      The function will try to find a model schema associated with this key or
+      might require the schema name explicitly if ambiguous in the future.
+      For now, it might need the schema name if the accessor isn't unique.
+    - If model-object is a plist: The SYMBOL naming the model's schema (e.g., 'counter).
+  slot-name: The SYMBOL naming the slot.
+
+Returns:
+  The value of the slot.
+
+Example:
+  (defmodel my-counter () (value :type integer))
+  (initialize-model-state *app* :main-counter 'my-counter :value 10)
+  (get-slot *app* :main-counter 'value) ; => 10
+
+  (let ((p (make-model 'my-counter :value 5)))
+    (get-slot p 'my-counter 'value)) ; => 5
+"
+  (etypecase model-object
+    (elmtui.state.api:application-state
+     (let* ((app-state model-object)
+            (model-key model-key-or-name)
+            ;; We need to determine the model schema/type from the model-key.
+            ;; This is tricky if not explicitly stored. For now, assume accessors are unique enough
+            ;; or that the schema can be inferred if we had a registry of (app-state-key -> model-schema-name).
+            ;; Let's find an accessor that matches <slot-name>.
+            ;; This is a simplification. A robust system would need to know the model *type* at model-key.
+            (model-plist (elmtui.state.api:get-state app-state model-key)))
+       (unless model-plist
+         (warn "No model found at key ~S in application-state for get-slot." model-key)
+         (return-from get-slot nil))
+       ;; Try to find the schema for the model stored at model-key.
+       ;; This is a placeholder for a more robust mechanism.
+       ;; We'll iterate through all schemas and see if an accessor matches.
+       (dolist (schema-name (alexandria:hash-table-keys *model-schemas*))
+         (let* ((schema (gethash schema-name *model-schemas*))
+                (slot-def (find slot-name (model-schema-slots schema) :key #'slot-definition-name)))
+           (when slot-def
+             (let ((accessor-fn (slot-definition-accessor slot-def)))
+               (when (fboundp accessor-fn) ; Check if accessor is defined
+                 ;; The generated accessors take (app-state model-key)
+                 (return-from get-slot (funcall accessor-fn app-state model-key)))))))
+       ;; If no accessor found this way, try direct getf as a fallback (less safe)
+       (warn "Could not determine model type at key ~S to use specific accessor for slot ~S. Falling back to direct GETF." model-key slot-name)
+       (getf model-plist (make-keyword slot-name)))) ; Fallback, less safe
+
+    (list ; Assume it's a direct model plist
+     (let* ((model-plist model-object)
+            (model-schema-name model-key-or-name)
+            (schema (gethash model-schema-name *model-schemas*))
+            (slot-def (and schema (find slot-name (model-schema-slots schema) :key #'slot-definition-name))))
+       (unless schema
+         (error "Unknown model schema name: ~S for get-slot on a plist." model-schema-name))
+       (unless slot-def
+         (error "Unknown slot ~S for model schema ~S for get-slot on a plist." slot-name model-schema-name))
+       (getf model-plist (slot-definition-initarg slot-def))))))
+
 
 ;;;===============================================================
 ;;; Model Metadata and Introspection Functions
 ;;;===============================================================
 
 (defun model-slot-names (model-name)
-  "Returns a list of slot names defined for the specified model.
-   
-   Args:
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     
-   Returns:
-     A list of symbols representing the model's slot names.
-     
-   Signals:
-     ERROR: If model-name is not registered in *model-schemas*."
+  "Returns a list of slot names defined for the specified model."
   (let ((schema (gethash model-name *model-schemas*)))
     (unless schema
       (error "Unknown model name: ~S. Ensure it's defined with defmodel." model-name))
     (mapcar #'slot-definition-name (model-schema-slots schema))))
 
 (defun model-slot-definition (model-name slot-name)
-  "Returns the slot definition struct for a specific slot.
-   
-   Args:
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     slot-name: The symbol naming the model slot (e.g., 'count).
-     
-   Returns:
-     The slot-definition struct for the specified slot.
-     
-   Signals:
-     ERROR: If model-name is not registered in *model-schemas*.
-     ERROR: If slot-name is not defined in the model schema."
+  "Returns the slot definition struct for a specific slot."
   (let* ((schema (gethash model-name *model-schemas*))
          (slot-def (and schema (find slot-name (model-schema-slots schema)
                                      :key #'slot-definition-name))))
@@ -481,58 +371,23 @@
     slot-def))
 
 (defun model-slot-type (model-name slot-name)
-  "Returns the type specifier for a model slot.
-   
-   Args:
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     slot-name: The symbol naming the model slot (e.g., 'count).
-     
-   Returns:
-     The type specifier for the specified slot."
+  "Returns the type specifier for a model slot."
   (slot-definition-type (model-slot-definition model-name slot-name)))
 
 (defun model-slot-initform (model-name slot-name)
-  "Returns the default value expression for a model slot.
-   
-   Args:
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     slot-name: The symbol naming the model slot (e.g., 'count).
-     
-   Returns:
-     The initform expression for the specified slot."
+  "Returns the default value expression for a model slot."
   (slot-definition-initform (model-slot-definition model-name slot-name)))
 
 (defun model-slot-validator (model-name slot-name)
-  "Returns the validator function or symbol for a model slot.
-   
-   Args:
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     slot-name: The symbol naming the model slot (e.g., 'count).
-     
-   Returns:
-     The validator function or symbol for the specified slot, or NIL if none."
+  "Returns the validator function or symbol for a model slot."
   (slot-definition-validator (model-slot-definition model-name slot-name)))
 
 (defun model-slot-observe? (model-name slot-name)
-  "Returns whether a model slot has the observe flag set.
-   
-   Args:
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     slot-name: The symbol naming the model slot (e.g., 'count).
-     
-   Returns:
-     T if the slot is observed, NIL otherwise."
+  "Returns whether a model slot has the observe flag set."
   (slot-definition-observe (model-slot-definition model-name slot-name)))
 
 (defun model-schema-info (model-name)
-  "Returns a formatted string with information about a model's schema.
-   Useful for debugging and introspection.
-   
-   Args:
-     model-name: The symbol naming the model type (e.g., 'counter-model).
-     
-   Returns:
-     A formatted string with model details."
+  "Returns a formatted string with information about a model's schema."
   (let ((schema (gethash model-name *model-schemas*)))
     (unless schema
       (error "Unknown model name: ~S. Ensure it's defined with defmodel." model-name))

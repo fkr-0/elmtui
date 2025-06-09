@@ -14,8 +14,6 @@
                 #:set-buffer-cell-at #:fill-buffer-region #:buffer-cell-at)
   ;; (:import-from :elmtui.platform.backend.terminal.diff-renderer ; For render-and-present
   ;;               #:compute-buffer-diff #:apply-terminal-diff)
-  ;; (:import-from :elmtui.platform.output ; For render-frame
-  ;;               #:render-frame)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn #:log-error)
   (:import-from #:sb-posix #:o-rdwr
                 #:tcgetattr #:tcsetattr #:termios #:termios-lflag #:termios-cc
@@ -38,7 +36,7 @@
   (:import-from :elmtui.view.geo #:x #:y #:w #:h #:rectangle-pos)
   (:import-from :elmtui.style-lib.api #:style-set) ; Added for typep check
   (:import-from :elmtui.style-lib.style-set #:styles-list) ; Added for conversion
-  (:import-from #:elmtui.backend.common.ansi-styling
+  (:import-from #:elmtui.platform.backend.common.ansi-styling
                 #:make-terminal-style #:make-termcolor #:exec-sequence
                 #:update-style! #:copy-term-style
                 #:terminal-style-fg-color #:terminal-style-bg-color
@@ -52,17 +50,31 @@
                 #:get-sequence #:render-seq
                 #:ansi-fg-color-seq #:ansi-bg-color-seq
                 #:ansi-attr-seq)
-  (:import-from #:elmtui.platform.canvas
-                #:canvas
-                #:make-terminal-canvas
-                #:initialize-terminal-canvas
-                #:get-canvas-viewport
-                #:apply-canvas-to-buffer
-                #:restore-terminal-state
-                #:canvas-buffer) ; For render-and-present
+  ;; (:import-from #:elmtui.platform.canvas
+  ;;               #:canvas
+  ;;               #:make-terminal-canvas
+  ;;               #:initialize-terminal-canvas
+  ;;               #:get-canvas-viewport
+  ;;               #:apply-canvas-to-buffer
+  ;;               #:restore-terminal-state
+  ;;               #:canvas-buffer)
+                                        ; For render-and-present
   (:export #:terminal-instance
            #:initialize-backend
            #:shutdown-backend
+           #:terminal-instance-fd
+           #:terminal-instance-stream
+           #:terminal-instance-original-termios
+           #:terminal-instance-current-termios
+           #:terminal-instance-width
+           #:terminal-instance-height
+           #:terminal-instance-cursor-visible-p
+           #:terminal-instance-cursor-row
+           #:terminal-instance-cursor-col
+           #:terminal-instance-current-style
+           #:terminal-instance-input-buffer
+           #:terminal-instance-lock
+
            #:render-ui-tree-to-buffer
            #:write-output
            #:get-screen-dimensions
@@ -106,7 +118,6 @@
   (lock (make-instance 'lockable) :type lockable)
   (front-buffer nil :type (or null virtual-terminal-buffer))
   (back-buffer nil :type (or null virtual-terminal-buffer))
-  (canvas nil :type (or null canvas))
   (publish-fn nil :type (or null function))) ; For signal handlers
 
 (defmethod term-w ((instance terminal-instance)) (terminal-instance-width instance))
@@ -135,7 +146,7 @@
     (let ((front-buffer (terminal-instance-front-buffer instance)))
       (when front-buffer
         (with-virtual-buffer-lock (front-buffer)
-          (clear-buffer front-buffer :default-char #\Nul :default-style nil))))
+          (clear-buffer front-buffer :char #\Nul))))
     (let ((back-buffer (terminal-instance-back-buffer instance)))
       (when back-buffer
         (with-virtual-buffer-lock (back-buffer)
@@ -446,7 +457,7 @@
   (when (and (> width 1) (> height 1))
     (let* ((effective-style (if border-color (list :fg border-color) (getf style :attrs)))
            (chars (case border-style
-                    (:single '(#\┌ #\┐ #\└ #\┘ #\─ #\│))
+                    (:single '(#\┌ #\┐ #\└ #\╝ #\─ #\│))
                     (:double '(#\╔ #\╗ #\╚ #\╝ #\═ #\║))
                     (otherwise '(#\+ #\+ #\+ #\+ #\- #\|))))
            (tl (first chars)) (tr (second chars)) (bl (third chars)) (br (fourth chars))
@@ -497,20 +508,20 @@
                     (getf style-plist :BG)
                     (getf style-plist :BG-COLOR))))
         (cond
-          ((typep bg 'elmtui.backend.common.ansi-styling:terminal-color)
+          ((typep bg 'elmtui.platform.backend.common.ansi-styling:terminal-color)
            (setf (terminal-style-bg-color ts) bg))
           ((and (listp bg) (= (length bg) 3))
            (destructuring-bind (r g b) bg
              (setf (terminal-style-bg-color ts)
-                   (elmtui.backend.common.ansi-styling:make-termcolor
+                   (elmtui.platform.backend.common.ansi-styling:make-termcolor
                     :bg t :r r :g g :b b))))
           ((integerp bg)
            (setf (terminal-style-bg-color ts)
-                 (elmtui.backend.common.ansi-styling:make-termcolor
+                 (elmtui.platform.backend.common.ansi-styling:make-termcolor
                   :bg t :color-256 bg)))
           ((keywordp bg)
            (setf (terminal-style-bg-color ts)
-                 (elmtui.backend.common.ansi-styling:make-termcolor
+                 (elmtui.platform.backend.common.ansi-styling:make-termcolor
                   :bg t :simple bg)))
           (t
            ;; No background color specified; leave as default
@@ -522,20 +533,20 @@
                     (getf style-plist :FG)
                     (getf style-plist :FG-COLOR))))
         (cond
-          ((typep fg 'elmtui.backend.common.ansi-styling:terminal-color)
+          ((typep fg 'elmtui.platform.backend.common.ansi-styling:terminal-color)
            (setf (terminal-style-fg-color ts) fg))
           ((and (listp fg) (= (length fg) 3))
            (destructuring-bind (r g b) fg
              (setf (terminal-style-fg-color ts)
-                   (elmtui.backend.common.ansi-styling:make-termcolor
+                   (elmtui.platform.backend.common.ansi-styling:make-termcolor
                     :r r :g g :b b))))
           ((integerp fg)
            (setf (terminal-style-fg-color ts)
-                 (elmtui.backend.common.ansi-styling:make-termcolor
+                 (elmtui.platform.backend.common.ansi-styling:make-termcolor
                   :color-256 fg)))
           ((keywordp fg)
            (setf (terminal-style-fg-color ts)
-                 (elmtui.backend.common.ansi-styling:make-termcolor
+                 (elmtui.platform.backend.common.ansi-styling:make-termcolor
                   :simple fg)))
           (t
            ;; No foreground color specified; leave default
@@ -551,16 +562,16 @@
 (defun write-style-to-stream (stream style)
   "Write ANSI escape sequences for STYLE to STREAM. STYLE may be a style plist or a terminal-style instance."
   (when style
-    (let ((ts (if (typep style 'elmtui.backend.common.ansi-styling:terminal-style)
+    (let ((ts (if (typep style 'elmtui.platform.backend.common.ansi-styling:terminal-style)
                   style
                   (style-to-terminal-style style))))
       (when ts
-        (let ((seqs (elmtui.backend.common.ansi-styling:ansi-seqs ts
-                                                                  :fg-color
-                                                                  :bg-color
-                                                                  :bold
-                                                                  :italic
-                                                                  :underline)))
+        (let ((seqs (elmtui.platform.backend.common.ansi-styling:ansi-seqs ts
+                                                                           :fg-color
+                                                                           :bg-color
+                                                                           :bold
+                                                                           :italic
+                                                                           :underline)))
           ;; Each seq is a full ESC[…m sequence; write directly
           (dolist (seq seqs)
             (write-output seq stream)))))))
@@ -572,6 +583,9 @@
     `(let ((,char-code (char-code ,char)))
        (declare (type fixnum ,char-code))
        (cond ((< ,char-code 128) (,writer ,char-code))
+             ;; ((< ,char-code 2048)
+             ;;  (,writer (logior #b11000000 (ldb (byte 5 6) ,char-code)))
+             ;;  (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))
              ((< ,char-code 2048)
               (,writer (logior #b11000000 (ldb (byte 5 6) ,char-code)))
               (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))
@@ -603,7 +617,7 @@ This method should be implemented by subclasses of low-level-terminal."
          (stream (term-stream instance))
          ;; If new-style is already a terminal-style, use it directly
          (new-style-ts (cond
-                         ((typep new-style 'elmtui.backend.common.ansi-styling:terminal-style)
+                         ((typep new-style 'elmtui.platform.backend.common.ansi-styling:terminal-style)
                           new-style)
                          (new-style (progn
                                       (log:debug "APPLY-STYLE-DIFF: Converting plist to terminal-style: ~S" new-style)
@@ -616,7 +630,8 @@ This method should be implemented by subclasses of low-level-terminal."
       ;; Emit ANSI sequences only for changed attributes
       (dolist (change changes)
         (destructuring-bind (attr val) change
-          (let ((seqs (elmtui.backend.common.ansi-styling:ansi-seqs current-style attr)))
+          (declare (ignore val)) ; We don't need the value, just the attribute
+          (let ((seqs (elmtui.platform.backend.common.ansi-styling:ansi-seqs current-style attr)))
             (dolist (seq seqs)
               (log:debug "APPLY-STYLE-DIFF: Writing ANSI sequence for ~S: ~S" attr seq)
               (exec-sequence (terminal-instance-lock instance)

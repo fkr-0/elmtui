@@ -1,6 +1,17 @@
 (uiop:define-package :elmtui.statelib.transaction
-  (:use :cl :log4cl :ut.state.state)
+  (:use :cl :log4cl )
   (:import-from :elmtui.statelib.observe #:notify-observers) ; Import the real notify-observers
+  (:import-from :elmtui.state.api #:undo-last-transaction
+                #:application-state-undone-history
+                #:application-state-transaction-log
+                #:application-state-observers
+                #:application-state-lock
+                #:state-data-data
+                #:set-state
+                #:application-state-data
+                #:application-state-transaction-history
+                #:app-state
+                #:application-state)
   (:nicknames :ut.state.transaction)
   (:export :transaction :transaction-id :transaction-changes
    :transaction-timestamp :transaction-name :transaction-description
@@ -140,7 +151,7 @@ Example:
                (setf (application-state-transaction-log ,state-var)
                      ,saved-log)))))))
 
-(defun undo-last-transaction (app-state)
+(defmethod undo-last-transaction ((app-state application-state))
   "Undo the last transaction in the application state.
    This function reverts the last committed transaction and applies its changes
    in reverse order. The transaction is then pushed to the undone history for

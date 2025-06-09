@@ -4,275 +4,209 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.grid-container
   (:use :cl :alexandria)
+  (:import-from :elmtui.ui.api #:component #:make-state-patch #:id-from-path #:get-path)
+  (:import-from :elmtui.state #:make-update-result)
   (:import-from :elmtui.view.styled #:make-styled-node)
-  (:import-from :elmtui.ui.widgets.utils
-                #:defwidget-view
-                #:with-widget-model
-                #:widget-focused-p)
-  ;; (:import-from :elmtui.view.grid-layout
-  ;;               #:grid-template
-  ;;               #:grid-area
-  ;;               #:grid-auto-flow
-  ;;               #:compute-grid-layout)
-  (:export #:grid-container-model #:make-grid-container-model ; Struct and constructor
-           ;; Accessors
-           #:grid-container-model-id
-           #:grid-container-model-template-rows
-           #:grid-container-model-template-columns
-           #:grid-container-model-template-areas
-           #:grid-container-model-auto-flow
-           #:grid-container-model-gap
-           #:grid-container-model-row-gap
-           #:grid-container-model-column-gap
-           ;; Functions
-           #:init-grid-container #:view-grid-container))
+  ;; (:import-from :elmtui.ui.widgets.utils ; Not using these legacy utils
+  ;;               #:defwidget-view
+  ;;               #:with-widget-model
+  ;;               #:widget-focused-p)
+  (:export #:grid-container #:make-grid-container ; Class name and constructor
+           ;; Messages (if any specific to grid-container itself)
+           #:msg-set-grid-property
+           ))
+
 (in-package :elmtui.ui.widgets.grid-container)
 
-;;;---------------------------------------------------------------
-;;; Model
-;;;---------------------------------------------------------------
-(defstruct (grid-container-model (:constructor %make-grid-container-model))
-  "Model for a grid container widget.
-   ID: Unique identifier.
-   TEMPLATE-ROWS: Grid template rows specification.
-   TEMPLATE-COLUMNS: Grid template columns specification.
-   TEMPLATE-AREAS: Grid template areas specification.
-   AUTO-FLOW: Grid auto-flow property.
-   GAP: Grid gap.
-   ROW-GAP: Grid row gap.
-   COLUMN-GAP: Grid column gap."
-  (id (error "ID must be provided.") :type T :read-only t)
-  (template-rows '("auto") :type list)
-  (template-columns '("1fr") :type list)
-  (template-areas nil :type (or null string list))
-  (auto-flow "row" :type string)
-  (gap 0 :type number)
-  (row-gap nil :type (or null number))
-  (column-gap nil :type (or null number))
-  (justify-content "start" :type string)
-  (align-content "start" :type string)
-  (justify-items "stretch" :type string)
-  (align-items "stretch" :type string))
+;;;---------------------------------------------------------------\\\n;;; Grid Container Component\\\n;;;---------------------------------------------------------------\\\n(defclass grid-container (component) ()
+  (:documentation "A container that arranges its children in a grid. \\n   Its properties (template-rows, template-columns, gap, etc.) are stored in the application state.\\n   Children are typically defined via DSL and managed by a parent layout or this grid itself if it also acts as a layout."))
 
-;;;---------------------------------------------------------------
-;;; Init
-;;;---------------------------------------------------------------
-(defun init-grid-container (id &key
-                                    (template-rows '("auto"))
-                                    (template-columns '("1fr"))
-                                    template-areas
-                                    (auto-flow "row")
-                                    (gap 0)
-                                    row-gap
-                                    column-gap
-                                    (justify-content "start")
-                                    (align-content "start")
-                                    (justify-items "stretch")
-                                    (align-items "stretch"))
-  "Initializes a new grid container model.
-   Returns (values grid-container-model initial-command)."
-  (values (%make-grid-container-model :id id
-                                      :template-rows template-rows
-                                      :template-columns template-columns
-                                      :template-areas template-areas
-                                      :auto-flow auto-flow
-                                      :gap gap
-                                      :row-gap row-gap
-                                      :column-gap column-gap
-                                      :justify-content justify-content
-                                      :align-content align-content
-                                      :justify-items justify-items
-                                      :align-items align-items)
-          nil)) ; No initial commands
+(defun make-grid-container (&key id)
+  "Creates a new grid-container component instance."
+  (make-instance 'grid-container :id id))
 
-;;;---------------------------------------------------------------
-;;; View (STANDARDIZED FORMAT)
-;;;---------------------------------------------------------------
-(defwidget-view view-grid-container (app-state
-                                        :model-var model :widget-id-var widget-id
-                                        :add-args (template-rows
-                                                   template-columns
-                                                   template-areas
-                                                   auto-flow
-                                                   gap
-                                                   row-gap
-                                                   column-gap
-                                                   justify-content
-                                                   align-content
-                                                   justify-items
-                                                   align-items
-                                                   width
-                                                   height
-                                                   children
-                                                   class)
-                                        :documentation
-                                        "Creates a UI representation of a grid container.
-   APP-STATE: The application state.
-   WIDGET-ID: The unique ID for this grid container (required).
-   TEMPLATE-ROWS: Grid template rows specification.
-   TEMPLATE-COLUMNS: Grid template columns specification.
-   TEMPLATE-AREAS: Grid template areas specification.
-   AUTO-FLOW: Grid auto-flow property.
-   GAP: Grid gap.
-   ROW-GAP: Grid row gap.
-   COLUMN-GAP: Grid column gap.
-   JUSTIFY-CONTENT: Content justification along main axis.
-   ALIGN-CONTENT: Content alignment along cross axis.
-   JUSTIFY-ITEMS: Default item justification.
-   ALIGN-ITEMS: Default item alignment.
-   WIDTH: Container width.
-   HEIGHT: Container height.
-   CHILDREN: Child elements to place in the grid.
-   CLASS: Additional CSS classes to apply.")
+;;;---------------------------------------------------------------\\\n;;; Messages (Keywords)\\\
+;;;---------------------------------------------------------------\\\n;; Example: (:set-grid-property :template-columns \"1fr 2fr\")
+(defparameter msg-set-grid-property :set-grid-property)
 
-  ;; Determine effective values from model and/or provided props
-  (let* ((effective-template-rows (or template-rows
-                                      (when model (grid-container-model-template-rows model))
-                                      '("auto")))
-         (effective-template-columns (or template-columns
-                                         (when model (grid-container-model-template-columns model))
-                                         '("1fr")))
-         (effective-template-areas (or template-areas
-                                       (when model (grid-container-model-template-areas model))
-                                       nil))
-         (effective-auto-flow (or auto-flow
-                                  (when model (grid-container-model-auto-flow model))
-                                  "row"))
-         (effective-gap (or gap
-                            (when model (grid-container-model-gap model))
-                            0))
-         (effective-row-gap (or row-gap
-                                (when model (grid-container-model-row-gap model))
-                                effective-gap))
-         (effective-column-gap (or column-gap
-                                   (when model (grid-container-model-column-gap model))
-                                   effective-gap))
-         (effective-justify-content (or justify-content
-                                        (when model (grid-container-model-justify-content model))
-                                        "start"))
-         (effective-align-content (or align-content
-                                      (when model (grid-container-model-align-content model))
-                                      "start"))
-         (effective-justify-items (or justify-items
-                                      (when model (grid-container-model-justify-items model))
-                                      "stretch"))
-         (effective-align-items (or align-items
-                                    (when model (grid-container-model-align-items model))
-                                    "stretch"))
-         ;; Build CSS classes
-         (base-class "grid-container")
-         (custom-class class)
-         (all-classes (remove nil (list base-class custom-class))))
+;;;---------------------------------------------------------------\\\n;;; Init Method\\\n;;;---------------------------------------------------------------\\\n(defmethod init ((component grid-container) &key id-path
+                                              (initial-template-rows '(\"auto\"))
+                                              (initial-template-columns '(\"1fr\"))
+                                              initial-template-areas
+                                              (initial-auto-flow \"row\")
+                                              (initial-gap 0)
+                                              initial-row-gap
+                                              initial-column-gap
+                                              (initial-justify-content \"start\")
+                                              (initial-align-content \"start\")
+                                              (initial-justify-items \"stretch\")
+                                              (initial-align-items \"stretch\")
+                                              initial-child-specs ; Children managed by layout system
+                                              &allow-other-keys)
+  (let ((component-id (id-from-path id-path))
+        (child-patches nil)
+        (child-commands nil)
+        (child-ids nil)) ; IDs of direct children if this grid also lays them out
 
-    ;; Create the styled node representing the grid container
-    (make-styled-node
-     :type :div
-     :props (list* :id widget-id
-                   :display :grid
-                   :grid-template-rows effective-template-rows
-                   :grid-template-columns effective-template-columns
-                   :grid-auto-flow effective-auto-flow
-                   :gap effective-gap
-                   :row-gap effective-row-gap
-                   :column-gap effective-column-gap
-                   :justify-content effective-justify-content
-                   :align-content effective-align-content
-                   :justify-items effective-justify-items
-                   :align-items effective-align-items
-                   :class (format nil "~{~A~^ ~}" all-classes)
-                   (append
-                    (when effective-template-areas
-                      (list :grid-template-areas effective-template-areas))
-                    (when width (list :width width))
-                    (when height (list :height height))))
-     :children children)))
+    ;; Initialize children if this component is responsible for them
+    ;; This is similar to the layout component\'s init for children
+    (dolist (child-spec initial-child-specs)
+      (let* ((child-type (first child-spec))
+             (child-id (second child-spec))
+             (child-initargs (cddr child-spec))
+             (child-instance (make-instance child-type))
+             (child-id-path-for-child-init (list :components child-id)))
+        (multiple-value-bind (initialized-child-instance patches-from-child commands-from-child)
+            (apply #'init child-instance :id-path child-id-path-for-child-init child-initargs)
+          (declare (ignore initialized-child-instance))
+          (push child-id child-ids)
+          (setf child-patches (append patches-from-child child-patches))
+          (setf child-commands (append commands-from-child child-commands)))))
 
-;;;---------------------------------------------------------------
-;;; Standalone Grid Item Creator
-;;;---------------------------------------------------------------
-(defun grid-item (&key id area row row-span col col-span align justify class children)
-  "Creates a grid item with the specified properties.
-   ID: Item identifier.
-   AREA: Named grid area to place this item.
-   ROW: Starting row number.
-   ROW-SPAN: Number of rows to span.
-   COL: Starting column number.
-   COL-SPAN: Number of columns to span.
-   ALIGN: Self-alignment in cell.
-   JUSTIFY: Self-justification in cell.
-   CLASS: Additional CSS classes.
-   CHILDREN: Child elements.
+    (values component
+            (append
+             (list (make-state-patch `(:components ,component-id)
+                                     `(:type ,(type-of component)
+                                       :id ,component-id
+                                       :template-rows ,initial-template-rows
+                                       :template-columns ,initial-template-columns
+                                       :template-areas ,initial-template-areas
+                                       :auto-flow ,initial-auto-flow
+                                       :gap ,initial-gap
+                                       :row-gap ,(or initial-row-gap initial-gap) ; Default row-gap to gap
+                                       :column-gap ,(or initial-column-gap initial-gap) ; Default col-gap to gap
+                                       :justify-content ,initial-justify-content
+                                       :align-content ,initial-align-content
+                                       :justify-items ,initial-justify-items
+                                       :align-items ,initial-align-items
+                                       :children-ids ,(nreverse child-ids) ; Store child IDs
+                                       ;; Pass through common style props if provided in other-args
+                                       ,@(loop for prop in '(:width :height :min-width :min-height :max-width :max-height :padding :margin :background-color :color :border :border-radius :overflow)
+                                               for value = (getf other-args prop)
+                                               when value
+                                                 append `(,prop ,value)))))
+             child-patches)
+            child-commands)))
 
-   Returns a styled-node representing the grid item."
-  (let* ((row-start (or row 1))
-         (row-end (when row-span (+ row-start row-span)))
-         (col-start (or col 1))
-         (col-end (when col-span (+ col-start col-span)))
-         (base-class "grid-item")
-         (all-classes (remove nil (list base-class class))))
+;;;---------------------------------------------------------------\\\n;;; Update Method\\\n;;;---------------------------------------------------------------\\\n(defmethod update ((component grid-container) state msg &key id-path)
+  (let* ((component-id (id-from-path id-path))
+         (component-state-path `(:components ,component-id))
+         (grid-props (getf state component-state-path))
+         (patches nil)
+         (commands nil))\n
+    (unless grid-props
+      (warn \"Grid-container ~A state not found at ~S\" component-id component-state-path)\n      (return-from update (make-update-result :patches nil :commands nil)))
 
-    (make-styled-node
-     :type :div
-     :props (list* :class (format nil "~{~A~^ ~}" all-classes)
-                   (append
-                    (when id (list :id id))
-                    (when area (list :grid-area area))
-                    (when row-start (list :grid-row-start row-start))
-                    (when row-end (list :grid-row-end row-end))
-                    (when col-start (list :grid-column-start col-start))
-                    (when col-end (list :grid-column-end col-end))
-                    (when align (list :align-self align))
-                    (when justify (list :justify-self justify))))
-     :children children)))
+    (typecase msg
+      ((cons (eql msg-set-grid-property) t)
+       (let ((prop-name (second msg))
+             (prop-value (third msg)))
+         (if (member prop-name '(:template-rows :template-columns :template-areas :auto-flow
+                                 :gap :row-gap :column-gap
+                                 :justify-content :align-content :justify-items :align-items
+                                 :width :height :min-width :min-height :max-width :max-height 
+                                 :padding :margin :background-color :color :border :border-radius :overflow))
+             (push (make-state-patch (append component-state-path (list prop-name)) prop-value) patches)
+             (warn \"Grid-container ~A: Unknown property for set-grid-property: ~S\" component-id prop-name))))
+      
+      ;; Handle dynamic child addition/removal if grid-container manages children directly
+      ;; This would be similar to the layout component\'s :add-child / :remove-child handling
+      ((cons (eql :add-child) t) ; Message format: (:add-child child-type child-id . child-initargs)
+       (let ((child-spec (cdr message)))
+         (push `(:command-add-child-to-layout ,component-id ,child-spec) commands)
+         (log-info \"Grid-container ~A: Queued command to add child with spec: ~S\" component-id child-spec)))
 
-;;;---------------------------------------------------------------
-;;; Helper Functions for Responsive Grids
-;;;---------------------------------------------------------------
-(defun responsive-grid (id &key
-                             (base-config '(:template-columns ("1fr")))
-                             breakpoints
-                             gap
-                             class
-                             children)
-  "Creates a responsive grid container that changes layout based on viewport width.
-   ID: Container identifier.
-   BASE-CONFIG: Default grid configuration for all viewport sizes.
-   BREAKPOINTS: Alist mapping viewport width thresholds to grid configurations.
-   GAP: Grid gap.
-   CLASS: Additional CSS classes.
-   CHILDREN: Child elements.
+      ((cons (eql :remove-child) t)
+       (let ((child-id-to-remove (ensure-keyword (cdr message))))
+         (when (member child-id-to-remove (getf grid-props :children-ids))
+           (push (make-state-patch (append component-state-path '(:children-ids))
+                                   (remove child-id-to-remove (getf grid-props :children-ids)))
+                 patches)
+           (push `(:command-destroy-component ,child-id-to-remove) commands)
+           (log-info \"Grid-container ~A: Patched to remove child ID ~A, queued command for its destruction.\" component-id child-id-to-remove))
+         (unless (member child-id-to-remove (getf grid-props :children-ids))
+           (log-warn \"Grid-container ~A: Attempted to remove non-existent child ID ~A.\" component-id child-id-to-remove))))
 
-   Returns a styled-node representing the responsive grid."
-  (let* ((base-template-rows (getf base-config :template-rows '("auto")))
-         (base-template-columns (getf base-config :template-columns '("1fr")))
-         (base-template-areas (getf base-config :template-areas nil))
-         (base-auto-flow (getf base-config :auto-flow "row"))
-         (effective-gap (or gap 0))
-         (base-class "responsive-grid")
-         (all-classes (remove nil (list base-class class)))
+      ;; Propagate messages to children
+      ((cons (eql :message-to) t)
+       (let ((target-child-id (second msg))
+             (actual-message (cddr msg)))
+         (if (member target-child-id (getf grid-props :children-ids))
+             (let* ((child-component-id-path (list :components target-child-id))
+                    (child-state (get-path state child-component-id-path))
+                    (child-type (getf child-state :type)))
+               (if child-type
+                   (let ((child-instance (make-instance child-type)))
+                     (let ((child-update-result (update child-instance state actual-message :id-path child-component-id-path)))
+                       (setf patches (append (getf child-update-result :patches) patches))
+                       (setf commands (append (getf child-update-result :commands) commands))))
+                   (log-warn \"Grid-container ~A: Child ~A type not found in state for message propagation.\" component-id target-child-id)))
+             (log-warn \"Grid-container ~A: Message ~S targeted non-child ~A.\" component-id message target-child-id)))))
 
-         ;; Generate media query properties based on breakpoints
-         (media-queries
-           (when breakpoints
-             (loop for (width . config) in breakpoints
-                   for template-rows = (getf config :template-rows)
-                   for template-columns = (getf config :template-columns)
-                   for template-areas = (getf config :template-areas)
-                   collect (list :min-width width
-                                 :grid-template-rows (or template-rows base-template-rows)
-                                 :grid-template-columns (or template-columns base-template-columns)
-                                 :grid-template-areas (or template-areas base-template-areas))))))
+    (make-update-result :patches (nreverse patches) :commands (nreverse commands))))
 
-    (make-styled-node
-     :type :div
-     :props (list* :id id
-                   :display :grid
-                   :grid-template-rows base-template-rows
-                   :grid-template-columns base-template-columns
-                   :grid-auto-flow base-auto-flow
-                   :gap effective-gap
-                   :class (format nil "~{~A~^ ~}" all-classes)
-                   :media-queries media-queries ; Media queries for responsive behavior
-                   (when base-template-areas
-                     (list :grid-template-areas base-template-areas)))
-     :children children)))
+;;;---------------------------------------------------------------\\\n;;; View Method\\\n;;;---------------------------------------------------------------\\\n(defmethod view ((component grid-container) state &key id-path)
+  (let* ((component-id (id-from-path id-path))
+         (component-state-path `(:components ,component-id))
+         (grid-props (getf state component-state-path)))
+
+    (unless grid-props
+      (warn \"Grid-container ~A state not found at ~S. Generating error view.\" component-id component-state-path)
+      (return-from view `(:error \"Grid-container component state not found for ID: ~a\" ,component-id)))
+
+    (let ((children-ids (getf grid-props :children-ids))
+          (style-properties 
+            `(:display :grid
+              :grid-template-rows    ,(getf grid-props :template-rows '(\"auto\"))
+              :grid-template-columns ,(getf grid-props :template-columns '(\"1fr\"))
+              :grid-auto-flow        ,(getf grid-props :auto-flow \"row\")
+              :gap                   ,(getf grid-props :gap 0)
+              :row-gap               ,(getf grid-props :row-gap (getf grid-props :gap 0)) ; Fallback to gap
+              :column-gap            ,(getf grid-props :column-gap (getf grid-props :gap 0)) ; Fallback to gap
+              :justify-content       ,(getf grid-props :justify-content \"start\")
+              :align-content         ,(getf grid-props :align-content \"start\")
+              :justify-items         ,(getf grid-props :justify-items \"stretch\")
+              :align-items           ,(getf grid-props :align-items \"stretch\"))))
+
+      (when (getf grid-props :template-areas)
+        (setf style-properties (list* :grid-template-areas (getf grid-props :template-areas) style-properties)))
+        
+      ;; Add other common style properties from component state
+      (dolist (prop '(:width :height :min-width :min-height :max-width :max-height :padding :margin :background-color :color :border :border-radius :overflow))
+        (let ((value (getf grid-props prop)))
+          (when value
+            (setf style-properties (list* prop value style-properties)))))
+
+      `(:ui-element
+        :id ,component-id
+        :style ,style-properties
+        :children ,(mapcar (lambda (child-id-key)
+                             (let* ((child-component-id-path (list :components child-id-key))
+                                    (child-state (get-path state child-component-id-path))
+                                    (child-type (getf child-state :type)))
+                               (if child-type
+                                   (let ((child-instance (make-instance child-type)))
+                                     (view child-instance state :id-path child-component-id-path))
+                                   `(:error \"Child component type not found for ID: ~a in grid-container ~a\" ,child-id-key ,component-id))))
+                           children-ids)))))
+
+;;;---------------------------------------------------------------\\\n;;; Standalone Grid Item Creator (Helper for DSL)\\\
+;;; This doesn\'t define a component, but a way to style a child for grid layout.\\
+;;; The actual child is some other component (e.g. button, label).\\\n;;; This function would be used in the :view part of a parent component, or by the DSL processor.\\
+;;; For ElmTUI, grid item properties are typically part of the child\'s own view style or passed via layout hints.\
+;;; This might be more relevant if we had a specific :grid-item view node type.\
+;;; For now, these properties are usually set on the child\'s :style directly.\
+;;; Example: `(:button :my-button ... :style (:grid-area \"header\" :align-self \"center\"))`\\\n;;;---------------------------------------------------------------\\\n;; (defun grid-item (&key id area row row-span col col-span align-self justify-self class children)
+;;   \"Helper to construct a view node that represents a grid item with styling.\
+;;    This is NOT a component, but a way to wrap children with grid positioning style.\"
+;;   `(:ui-element
+;;     ,@(when id `(:id ,id))
+;;     :style (list* :grid-area area
+;;                   ,@(when row `(:grid-row-start ,row))
+;;                   ,@(when row-span `(:grid-row-end ,(if (numberp row) `(span ,row-span) row-span))) ; e.g. span 2
+;;                   ,@(when col `(:grid-column-start ,col))
+;;                   ,@(when col-span `(:grid-column-end ,(if (numberp col) `(span ,col-span) col-span)))
+;;                   ,@(when align-self `(:align-self ,align-self))
+;;                   ,@(when justify-self `(:justify-self ,justify-self))
+;;                   (when class `(:class ,class)))
+;;     :children ,children))

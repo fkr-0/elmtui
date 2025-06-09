@@ -1,6 +1,6 @@
 ;;; ───────────────────────── 3. Style DSL  ────────────────────────────────
 (uiop:define-package :elmtui.style-lib.styles
-  (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types)
+  (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types :log4cl)
   (:import-from :elmtui.style-lib.api
    :style :property :value :style-group
    :style-set :make-style :style-value :valid-style-value-p :stylegroup-p)
@@ -46,17 +46,24 @@ Example usage:
          (:documentation ,docstring))
        (defclass ,vk (value) ())
        (defmethod valid-value-p ((p ,pk) v)
-         (cond ((listp spec) `(member v ',spec))
-               ((symbolp spec) `(typep v ',spec))
-               ((and (consp spec) (eq (first spec) 'function)) spec)
-               (t `(error "Invalid value spec ~a" ',spec))))
+         (log:debug "STYLES: Validating property ~S (class ~S) with value ~S against spec ~S" ,kwsym p v ',spec)
+         (let ((result
+                 (cond ((listp ',spec) (if (member v ',spec :test #'equal) t nil))
+                       ((symbolp ',spec) (if (typep v ',spec) t nil))
+                       ((and (consp ',spec) (eq (first ',spec) 'function))
+                        (funcall (second ',spec) v)) ; Call the validation function
+                       (t (error "Invalid value spec ~a for property ~a" ',spec ,pk)))))
+           (log:debug "STYLES: Validation for ~S with value ~S result: ~S" ,kwsym v result)
+           result))
        (defun ,(intern (format nil "MAKE-STYLE/~a" keyword) :elmtui.style-lib.styles) (val)
+         (log:debug "STYLES: MAKE-STYLE/~a called with value: ~S" keyword val)
          (unless (valid-value-p (make-instance ',pk) val)
            (error "Invalid value ~a for ~a" val ',keyword))
          (make-instance 'style
                         :property (make-instance ',pk)
                         :value    (make-instance ',vk :value val :type ',spec)))
        (defmethod make-style ((sym (eql ',kwsym)) val)
+         (log:debug "STYLES: make-style specialized for ~S called with value: ~S" sym val)
          (,(intern (format nil "MAKE-STYLE/~a" keyword) :elmtui.style-lib.styles) val))
        ,@(when (not (eq default :unset))
            `((defmethod default-styles ()
@@ -117,6 +124,9 @@ Example usage:
 
 ;;; fallback make-style ----------------------------------------------------
 (defmethod make-style (k v)
+  (log:debug "STYLES: Fallback make-style for key ~S, value ~S" k v)
   (make-instance 'style
                  :property (make-instance 'property :name (string k))
                  :value    (make-instance 'value :value v :type (type-of v))))
+
+;;; Default Style Definitions using defstyle
