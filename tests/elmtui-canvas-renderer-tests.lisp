@@ -98,12 +98,12 @@
           (cellB (buffer-cell-at buf 1 3)))
       (is (char= (buffer-cell-char cellA) #\A))
       (is (char= (buffer-cell-char cellB) #\B))
-      (is (typep (buffer-cell-style cellA) 'elmtui.backend.common.ansi-styling:terminal-style))
-      (is (typep (buffer-cell-style cellB) 'elmtui.backend.common.ansi-styling:terminal-style))
-      (is (equal (elmtui.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cellA))
-                 (elmtui.backend.common.ansi-styling:make-termcolor :simple :green)))
-      (is (equal (elmtui.backend.common.ansi-styling:terminal-style-bg-color (buffer-cell-style cellA))
-                 (elmtui.backend.common.ansi-styling:make-termcolor :simple :black)))))
+      (is (typep (buffer-cell-style cellA) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+      (is (typep (buffer-cell-style cellB) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+      (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cellA))
+                 (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :green)))
+      (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color (buffer-cell-style cellA))
+                 (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :black)))))
 
 (test draw-rectangle-on-canvas-direct
   (let* ((buf (make-virtual-buffer 5 5)))
@@ -113,9 +113,9 @@
           (loop for col from 1 below 4 do
             (let ((cell (buffer-cell-at buf row col)))
               (is (char= (buffer-cell-char cell) #\Space))
-              (is (typep (buffer-cell-style cell) 'elmtui.backend.common.ansi-styling:terminal-style))
-              (is (equal (elmtui.backend.common.ansi-styling:terminal-style-bg-color (buffer-cell-style cell))
-                         (elmtui.backend.common.ansi-styling:make-termcolor :simple :blue)))))))
+              (is (typep (buffer-cell-style cell) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+              (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color (buffer-cell-style cell))
+                         (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :blue)))))))
 
 (test draw-border-on-canvas-direct
   (let* ((buf (make-virtual-buffer 6 4)))
@@ -124,26 +124,26 @@
     (loop for col from 1 below 5 do
       (let ((cell (buffer-cell-at buf 1 col)))
         (is (char= (buffer-cell-char cell) #\-))
-        (is (typep (buffer-cell-style cell) 'elmtui.backend.common.ansi-styling:terminal-style))
-        (is (equal (elmtui.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
-                   (elmtui.backend.common.ansi-styling:make-termcolor :simple :red)))))
+        (is (typep (buffer-cell-style cell) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+        (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
+                   (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :red)))))
     ;; Check bottom border
     (loop for col from 1 below 5 do
       (let ((cell (buffer-cell-at buf 3 col)))
         (is (char= (buffer-cell-char cell) #\-))
-        (is (typep (buffer-cell-style cell) 'elmtui.backend.common.ansi-styling:terminal-style))
-        (is (equal (elmtui.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
-                   (elmtui.backend.common.ansi-styling:make-termcolor :simple :red)))))
+        (is (typep (buffer-cell-style cell) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+        (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
+                   (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :red)))))
     ;; Check left border
     (loop for row from 1 below 4 do
       (let ((cell (buffer-cell-at buf row 1)))
         (is (char= (buffer-cell-char cell) #\|))
-        (is (typep (buffer-cell-style cell) 'elmtui.backend.common.ansi-styling:terminal-style))
-        (is (equal (elmtui.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
-                   (elmtui.backend.common.ansi-styling:make-termcolor :simple :red)))))
+        (is (typep (buffer-cell-style cell) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+        (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
+                   (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :red)))))
     ;; Check corner
     (let ((cell (buffer-cell-at buf 1 1)))
       (is (char= (buffer-cell-char cell) #\+))
-      (is (typep (buffer-cell-style cell) 'elmtui.backend.common.ansi-styling:terminal-style))
-      (is (equal (elmtui.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
-                 (elmtui.backend.common.ansi-styling:make-termcolor :simple :red))))))
+      (is (typep (buffer-cell-style cell) 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+      (is (equal (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color (buffer-cell-style cell))
+                 (elmtui.platform.backend.common.ansi-styling:make-termcolor :simple :red))))))

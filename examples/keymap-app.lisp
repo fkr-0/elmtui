@@ -4,106 +4,125 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.examples.keymap-app
   (:use :cl :alexandria)
-  (:import-from :elmtui.runtime #:def-elm-app #:run-app)
-  (:import-from :elmtui.view.core #:ui-node #:make-ui-node)
-  (:import-from :elmtui.state #:state-ref #:make-application-state)
-  (:import-from :elmtui.state.update #:defupdate)
-  (:import-from :elmtui.ui.widgets.counter
-    #:init :update :view #:counter-widget-id)
+  (:import-from :log4cl #:log-info #:log-debug #:log-warn)
+  (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.app.api #:find-component-by-id) 
+  (:import-from :elmtui.view.dsl #:view #:element) ; Removed unused #:children #:props
+  (:import-from :elmtui.state #:state-ref #:make-update-result #:get-path)
+  (:import-from :elmtui.ui.api #:component-id #:update)
+  (:import-from :elmtui.ui.widgets.label #:label)
+  (:import-from :elmtui.ui.widgets.layout #:box-layout)
+  (:import-from :elmtui.ui.widgets.counter #:counter)
+  (:import-from :elmtui.core.keymap #:key-event->normalized-key #:normalized-key= #:parse-key-string #:make-keymap)
   (:export #:main))
 
 (in-package :elmtui.examples.keymap-app)
 
 (defparameter *counter-a-id* :counter-a)
+(defparameter *info-label-id* :info-label)
 
 ;;;--------------------------------------------------------------
 ;;; Application Definition
 ;;;--------------------------------------------------------------
 
+(defapplication keymap-example-app
+  :root-viewport-id :my-root-viewport ; Changed from :rid for clarity
+  :root-component-dsl
+  '(box-layout ; Root component DSL should be a quoted list
+    :orientation :vertical
+    :spacing 1
+    :children (list ; Explicit list for children
+               '(label :id *info-label-id*
+                 :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit.")
+               '(counter :id *counter-a-id* :value 10)))
+  :initial-state-plist (app-init)
+  :update-fn #'app-update
+  :view-fn #'app-view
+  :command-processor-fn #'(lambda (command mq state cfg) (declare (ignore command mq state cfg)) nil))
+
 (defun app-init ()
   "Initializes the application model."
-  (let ((counter-a-model (elmtui.ui.widgets.counter:init :initial-value 10 :id *counter-a-id*)))
-    ;; Initial model plist for the whole app
-    (values
-      (list
-        :widgets (list (cons *counter-a-id* counter-a-model)) ; Store widget models here
-        :current-focus-id *counter-a-id* ; Focus the counter initially
-        :focusable-elements (list *counter-a-id*)
-        :should-quit nil)
-      nil))) ; No initial commands
+  `(:components ((,*info-label-id* (:type label
+                                    :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit."
+                                    :id ,*info-label-id*))
+                 (,*counter-a-id* (:type counter
+                                   :id ,*counter-a-id*
+                                   :value 10
+                                   ;; Counter's own keymap is usually part of its own state,
+                                   ;; but app-component-keymaps is how this app provides it.
+                                   )))
+    :focus-manager (:current-focus-id ,*counter-a-id*
+                    :focusable-elements (,*counter-a-id*))
+    :should-quit nil
+    :global-keymap ,(app-global-keymap)
+    ;; This is where component-specific keymaps are stored for this app.
+    ;; The focus system should look these up.
+    :component-keymaps ,(app-component-keymaps)))
 
-(defupdate app-update (app-state message)
-  "Main application update function.
-   Returns (values state-patch-plist commands-list)."
-  (let ((current-widgets (state-ref app-state :widgets))
-         (patch-list nil)
-         (commands-list nil))
+(defun app-global-keymap ()
+  "Defines global keybindings for the application."
+  (make-keymap :name "app-global-keymap" ; Added name for introspection
+               :bindings 
+               `(((,(parse-key-string "C-q") . (:app-quit-requested :source :global-C-q))))))
+;; (define-keymap *editor-keymap*
+;;   ("C-a" :type :message :target '(:select-all) :description "Select All")
+;;   ("C-c" :type :message :target '(:copy) :description "Copy")
+;;   ("C-v" :type :message :target '(:paste) :description "Paste")
+;;   ("C-x" :type :message :target '(:cut) :description "Cut")
+;;   ("C-z" :type :message :target '(:undo) :description "Undo")
+;;   ("C-y" :type :message :target '(:redo) :description "Redo"))
+(defun app-component-keymaps ()
+  "Defines keymaps specific to components, returned as an alist."
+  ;; The type warning HASH-TABLE vs CONS is because this returns an alist,
+  ;; not a single hash table. This is fine for lookup.
+  `((,*counter-a-id* . ,(make-keymap :name "counter-a-keymap" ; Added name
+                                     :bindings
+                                     `(((,(parse-key-string "+") . (:dispatch-to-component ,*counter-a-id* :increment)))
+                                       ((,(parse-key-string "=") . (:dispatch-to-component ,*counter-a-id* :increment)))
+                                       ((,(parse-key-string "-") . (:dispatch-to-component ,*counter-a-id* :decrement)))
+                                       ((,(parse-key-string "Enter") . (:dispatch-to-component ,*counter-a-id* :reset))))))))
 
-    (case (if (listp message) (first message) nil)
-      (:dispatch-to-widget
-        (let* ((target-widget-id (second message))
-                (widget-message (third message))
-                ;; (original-binding (fourth message)) ; Available if needed
-                (widget-model (assoc-value current-widgets target-widget-id)))
 
-          (if widget-model
-            (multiple-value-bind (widget-model-patch widget-commands)
-              (elmtui.ui.widgets.counter:update widget-model widget-message) ; Assuming all widgets have compatible update signature for now
-
-              ;; Create an updated widget model by merging the patch
-              (let ((updated-widget-model (copy-list widget-model))) ; Start with a copy
-                (loop for (key value) on widget-model-patch by #'cddr
-                  do (setf (getf updated-widget-model key) value))
-
-                ;; Update the list of widgets
-                (let ((new-widgets (mapcar (lambda (pair)
-                                             (if (eq (car pair) target-widget-id)
-                                               (cons target-widget-id updated-widget-model)
-                                               pair))
-                                     current-widgets)))
-                  (push :widgets patch-list)
-                  (push new-widgets patch-list)))
-              (setf commands-list (append widget-commands commands-list)))
-            (log:warn "KEYMAP-APP: No model found for widget ~S to dispatch message ~S" target-widget-id widget-message))))
-
+(defun app-update (message app-state) ; Flipped order to convention: message, app-state
+  "Main application update function."
+  (declare (ignorable message)) 
+  (let ((patches nil)
+        (commands nil)
+        (msg-type (if (listp message) (first message) message))) 
+    (case msg-type
+      (:dispatch-to-component
+       (let* ((target-component-id (second message))
+              (component-action (cddr message)) 
+              (component-instance (find-component-by-id app-state target-component-id))
+              (component-state-path (list :components target-component-id))
+              (component-state (get-path app-state component-state-path)))
+         (if (and component-instance component-state)
+             (multiple-value-bind (comp-patches comp-commands)
+                 ;; Pass the action directly, not as a list if it's already the action keyword
+                 (update component-instance component-state (if (consp component-action) (first component-action) component-action) :id-path component-state-path)
+               (when comp-patches
+                 (push `(,component-state-path ,comp-patches) patches))
+               (setf commands (append comp-commands commands)))
+             (log-warn "KEYMAP-APP: No component or state found for ID ~S to dispatch message ~S"
+                       target-component-id component-action))))
       (:app-quit-requested
-        (push :should-quit patch-list)
-        (push t patch-list)
-        (log:info "KEYMAP-APP: Quit requested."))
-
-      ;; Handle raw key events for global bindings (example)
-      (:key-event
-        (let ((norm-key (elmtui.core.keymap:key-event->normalized-key message)))
-          (cond
-            ((elmtui.core.keymap:normalized-key= norm-key (elmtui.core.keymap:parse-key-string "C-q"))
-              (log:info "KEYMAP-APP: Global C-q pressed.")
-              (push :should-quit patch-list)
-              (push t patch-list)
-              (setf commands-list (list '(:app-quit-requested (:source :global-C-q))))) ; Send quit message
-            (t (log:debug "KEYMAP-APP: Unhandled global key event: ~S" message)))))
-
+       (push '(:should-quit t) patches)
+       (log-info "KEYMAP-APP: Quit requested by message: ~S" message))
+      (:key-event ; This case should ideally not be hit if keymaps are comprehensive
+       (log-debug "KEYMAP-APP: Unhandled raw key event (should be caught by keymaps): ~S" message))
       (otherwise
-        (log:debug "KEYMAP-APP: Unhandled message: ~S" message)))
+       (log-debug "KEYMAP-APP: Unhandled message: ~S" message)))
+    (make-update-result :patches (nreverse patches) :commands commands)))
 
-    (values (nreverse patch-list) commands-list)))
-
-
-(defun app-view (app-state dispatch-fn)
-  "Main application view function."
-  (declare (ignore dispatch-fn))
-  (let* ((counter-a-model (assoc-value (state-ref app-state :widgets) *counter-a-id*))
-          (counter-a-view (when counter-a-model (elmtui.ui.widgets.counter:view counter-a-model))))
-    (make-ui-node :type :app-root
-      :props nil
-      :children (list
-                  (make-ui-node :type :text :props (list :value "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit."))
-                  (when counter-a-view counter-a-view)))))
-
-(def-elm-app keymap-example-app
-  :init #'app-init
-  :update #'app-update
-  :view #'app-view)
+(defun app-view (app-state)
+  "Main application view function. Uses the elmtui.view.dsl:view macro."
+  (view box-layout (:orientation :vertical :spacing 1)
+        (element label (:id *info-label-id* 
+                        :text (get-path app-state (list :components *info-label-id* :text))))
+        (let* ((counter-st (get-path app-state (list :components *counter-a-id*))))
+          (element counter (:id *counter-a-id*
+                            :value (getf counter-st :value))))))
 
 (defun main ()
   "Run the keymap example application."
-  (elmtui.runtime:run-app :app-name 'keymap-example-app))
+  (run-keymap-example-app)) ; Corrected to call the generated run function

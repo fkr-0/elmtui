@@ -478,8 +478,10 @@
       (return-from rect-diff (list r1))) ; No overlap, return r1
 
     (let ((rects '())
-          (ox (x overlap-rect)) (oy (y overlap-rect))
-          (ox2 (x2 overlap-rect)) (oy2 (y2 overlap-rect))
+          (ox (x overlap-rect))
+          (oy (y overlap-rect))
+          (ox2 (x2 overlap-rect))
+          (oy2 (y2 overlap-rect))
           (x (x r1)) (y (y r1))
           (x2 (x2 r1)) (y2 (y2 r1)))
 

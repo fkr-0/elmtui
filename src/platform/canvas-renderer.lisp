@@ -1,97 +1,14 @@
 (uiop:define-package :elmtui.platform.canvas-renderer
   (:use :cl :log4cl)
-  (:import-from :elmtui.platform.api
-                #:term-w
-                #:term-h
-                #:get-cursor-position
-                #:set-cursor-position
-                #:clear-area)
-  (:import-from :elmtui.core.loop :as-plist)
-  (:import-from :elmtui.view.geo
-                #:rectangle
-                #:make-rectangle
-                #:pos
-                #:make-pos
-                #:size
-                #:make-size
-                #:w
-                #:h
-                #:x
-                #:y)
-
   (:import-from :elmtui.platform.backend.common.virtual-buffer
-                #:set-buffer-cell-at
-                #:buffer-width
-                #:buffer-height)
-  ;; Import style resolution
-  (:import-from :elmtui.view.styled #:style-value)
-  ;; Import terminal style/color structs and helpers
-  (:import-from :elmtui.backend.common.ansi-styling
-                #:make-terminal-style
-                #:make-termcolor
-                #:terminal-style
-                #:terminal-color)
-  (:import-from :elmtui.platform.backend.common.virtual-buffer
-                #:virtual-terminal-buffer
-                #:make-virtual-terminal-buffer
-                #:with-virtual-buffer-lock
-                #:virtual-buffer
-                #:make-virtual-buffer
-                #:buffer-width
-                #:buffer-width #:buffer-height #:buffer-cell-at
-                #:buffer-cell-char #:buffer-cell-style
-                #:buffer-height
-                #:buffer-cell-at
-                #:set-buffer-cell-at)
-  (:export
-   ;; Canvas structure and accessors
-   #:canvas
-   #:make-canvas
-   #:canvas-buffer
-   #:canvas-backend
-   #:canvas-position-strategy
-   #:canvas-anchor-point
-   #:canvas-initial-cursor-position
-   #:canvas-current-cursor-position
-   #:canvas-view-rectangle
-   #:render-ui-tree-to-buffer
-   #:canvas-content-rectangle
-   #:canvas-max-size
-   #:canvas-visible-p
-   #:apply-canvas-to-buffer
-   #:get-canvas-viewport
-   #:content-w
-   #:content-h
-   #:view-w
-   #:view-h
-
-   ;; Canvas management
-   #:initialize-canvas
-   #:update-canvas-size
-   #:clear-canvas
-   #:prepare-canvas-for-rendering
-   #:finalize-canvas-after-rendering
-   #:restore-terminal-state
-
-   ;; Position strategies
-   #:+position-strategy-below-cursor+
-   #:+position-strategy-above-cursor+
-   #:+position-strategy-center-screen+
-   #:+position-strategy-fixed+
-
-   ;; Anchor points
-   #:+anchor-top+
-   #:+anchor-bottom+
-   #:+anchor-left+
-   #:+anchor-right+
-   #:+anchor-center+
-   #:+anchor-top-left+
-   #:+anchor-top-right+
-   #:+anchor-bottom-left+
-   #:+anchor-bottom-right+))
-
+                #:set-buffer-cell-at #:buffer-width #:buffer-height)
+  (:import-from :elmtui.platform.backend.common.ansi-styling
+                #:make-terminal-style #:make-termcolor)
+  (:export #:draw-text-on-canvas
+           #:draw-rectangle-on-canvas
+           #:draw-border-on-canvas
+           #:render-ui-tree-to-buffer))
 (in-package :elmtui.platform.canvas-renderer)
-;; Import virtual buffer APIs for setting cells and bounds checking
 
 (defun color->termcolor (col &optional (bg nil))
   "Convert a color spec (keyword, RGB list, or 256-int) into a terminal-color."  ; helper

@@ -15,6 +15,8 @@
                      (:import-from :elmtui.style-lib.util :*pad-fill-char*
                                    :*margin-fill-char*)
                      (:import-from :elmtui.style-lib.util :keyword-split)
+                     (:import-from :elmtui.utils :hex-str-to-rgb)
+                     (:import-from :elmtui.style-lib.selector :type> :cls> :id> :and> :cl-cls)
                      (:export :is-color :defstyle2 :or-concat-lambda :defstyle :defstylegroup
                       :padding-top :padding-left :padding-right :padding-bottom :padding-char
                               :margin-top :margin-left :margin-right :margin-bottom :margin-char
@@ -34,6 +36,22 @@
                               :*inheritable-style-properties* ; Export the new global
                               ))
 (in-package :elmtui.style-lib.properties)
+
+(defun valid-color-value-p (v)
+  "Checks if v is a valid color representation: keyword, 256-int, or list like (:simple :red) or (:rgb r g b)."
+  (or (keywordp v)
+      (integerp v) ; Assuming 256 color index
+      (and (consp v)
+           (keywordp (first v))
+           (case (first v)
+             (:simple (keywordp (second v)))
+             (:rgb (and (= (length (rest v)) 3) (every #'integerp (rest v))))
+             (:color-256 (integerp (second v)))
+             (t nil)))
+      (and (stringp v) ;; match #abcdef or abcdef
+           (or (and (char= (char v 0) #\#) (= (length v) 7)) ; Hex color))))
+               (and (= (length v) 6)))
+           (hex-str-to-rgb v)))) ; Named color or simple string
 
 (defparameter *inheritable-style-properties*
   '(:fg-color :attributes :font-family :font-size :text-align) ; Add more as they become relevant
@@ -792,3 +810,56 @@ against the property's type definition."
     (property-name) "Returns the default value for a given style property."
   (let ((defn (find-style-property-definition property-name)))
     (when defn (style-property-definition-default-value defn))))
+
+(defstyle :color #'(lambda (v) (valid-color-value-p v))
+  :docstring "Foreground color of text or other elements.")
+
+(defstyle :background-color #'(lambda (v) (valid-color-value-p v))
+  :docstring "Background color of an element.")
+
+(defstyle :border-color #'(lambda (v) (valid-color-value-p v))
+  :docstring "Color of an element's border.")
+
+(defstyle :border-style (list :solid :double :ascii :dashed :dotted :none) ; Added :dashed, :dotted, expanded from tests
+  :default :none
+  :docstring "Style of an element's border.")
+
+(defstyle :border-width 'integer
+  :default 0
+  :docstring "Width of an element's border (applies to all sides if not specified individually).")
+
+;; For individual border widths, if they are treated as separate style properties:
+(defstyle :border-top-width 'integer :default 0
+  :docstring "Width of the top border of an element.")
+(defstyle :border-right-width 'integer :default 0
+  :docstring "Width of the right border of an element.")
+(defstyle :border-bottom-width 'integer :default 0
+  :docstring "Width of the bottom border of an element.")
+(defstyle :border-left-width 'integer :default 0
+  :docstring "Width of the left border of an element.")
+
+
+(defstyle :padding 'integer ; Could be a list for (top right bottom left) or (vert horiz) or single value
+  :default 0
+  :docstring "Padding within an element.")
+;; For individual paddings:
+(defstyle :padding-top 'integer :default 0
+  :docstring "Padding on the top side of an element.")
+(defstyle :padding-right 'integer :default 0
+  :docstring "Padding on the right side of an element.")
+(defstyle :padding-bottom 'integer :default 0
+  :docstring "Padding on the bottom side of an element.")
+(defstyle :padding-left 'integer :default 0
+  :docstring "Padding on the left side of an element.")
+
+(defstyle :visibility (list :visible :hidden :collapse)
+  :default :visible
+  :docstring "Controls the visibility of an element.")
+
+(defstyle :display (list :block :inline :flex :grid :none) ; Added more common display types
+  :default :block
+  :docstring "Controls the display behavior of an element (layout model).")
+
+;; Add other common styles as needed, e.g., for flexbox, grid, text alignment, etc.
+;; (defstyle :width '(or integer keyword list) :default :auto) ; :fill, :auto, (percent 50)
+;; (defstyle :height '(or integer keyword list) :default :auto)

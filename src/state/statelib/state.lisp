@@ -1,8 +1,15 @@
 (uiop:define-package :elmtui.statelib.state (:use :cl :log4cl)
                      (:nicknames :ut.state.state)
                      (:import-from :elmtui.core.globals :*app-state*)
-                     (:export :make-application-state :state-ref :get-state
-                      :set-state :application-state #:set-state!
+                     (:import-from              :elmtui.state.api #:state-ref
+                                                #:make-application-state
+                                                #:application-state-data
+                                                #:application-state-transaction-log
+                                                #:get-state
+                                                #:state-data-data
+                                                #:application-state #:state-data)
+                     (:export :make-application-state  :get-state
+                              :set-state #:set-state!
                               :application-state-transaction-log :transaction-id
                               :application-state-observers :application-state-data
                               :application-state-lock
@@ -11,29 +18,13 @@
                               :set-state!
                       :set-state
                               :state-if-unset-else :log-state-data
-                              :application-state-transaction-history
-                      :application-state-undone-history ; Added export
-                              :transaction-log
-                      :transaction-history
-                              :undone-history)) ; Added export
+                              :application-state-undone-history ; Added export
+                      :transaction-log
+                              :transaction-history
+                      :undone-history)) ; Added export
 
 (in-package :ut.state.state)
 
-(defstruct state-data
-  "A struct to hold the application state data.
-  The data is stored in a hash-table."
-  (data (make-hash-table :test 'equal) :type hash-table))
-
-(defstruct application-state
-  "A struct to hold the application state.
-  The application state holds the state data, observers, a lock, a transaction log,
-  a transaction history (for undo), and an undone history (for redo)."
-  (data (make-state-data) :type state-data)
-  (observers (list) :type list)
-  (lock (sb-thread:make-mutex) :type sb-thread:mutex)
-  (transaction-log (list) :type list) ; Temporary log for current transaction
-  (transaction-history (list) :type list) ; Stack of committed transactions (undo stack)
-  (undone-history (list) :type list)) ; Stack of undone transactions (redo stack)
 
 ;; (defmethod print-object ((st application-state) stream)
 ;;   (print-unreadable-object (st stream :type t :identity t)
@@ -133,50 +124,19 @@
   (setf (gethash key (state-data-data (application-state-data app-state)))
         value))
 
-(defgeneric state-ref (app-state key &optional comp-id)
-  (:documentation "Get the value of `KEY' from application state `APP-STATE'.
-  Optionally provide COMP-ID to scope the key.
-
-  Args:
-    app-state: The application state to get the value from.
-    key: The key to get the value for.
-    comp-id: Optional component identifier to scope the key.
-
-  Returns:
-    The value of `KEY' in `APP-STATE', or nil if not found.")
-  (:method ((app-state application-state) key &optional comp-id)
-    (get-state app-state
-               (if comp-id
-                   (list comp-id key)
-                   key))))
-
-(defgeneric (setf state-ref) (value app-state key &optional comp-id)
-  (:documentation
-   "Set the value of `KEY' in application state `APP-STATE' to `VALUE'.
-    Optionally provide COMP-ID to scope the key.
-
-    NOTE: This method bypasses transaction logging and locking. It is generally
-    unsafe for direct use. Use the `set-state!` macro provided within `defupdate`
-    for safe, transactional updates. This method exists primarily for internal
-    use or specific scenarios where transactionality is handled externally.
-
-  Args:
-    value: The value to set.
-    app-state: The application state to set the value on.
-    key: The key to set.
-    comp-id: Optional component identifier to scope the key.
-
-  Returns:
-    The set value.")
-  ;; (:method (value (app-state application-state) key &optional comp-id)
-  ;;   ;; WARNING: This bypasses the lock and transaction logging.
-  ;;   ;; Prefer using set-state! within defupdate.
-  ;;   (set-state app-state
-  ;;              (if comp-id
-  ;;                  (list comp-id key)
-  ;;                  key)
-  ;;              value))
-  )
+;; (:method (value (app-state application-state) key &optional comp-id)
+;;   ;; WARNING: This bypasses the lock and transaction logging.
+;;   ;; Prefer using set-state! within defupdate.
+;;   (set-state app-state
+;;              (if comp-id
+;;                  (list comp-id key)
+;;                  key)
+;;              value))
+(defmethod state-ref ((app-state application-state) key &optional comp-id)
+  (get-state app-state
+             (if comp-id
+                 (list comp-id key)
+                 key)))
 
 ;;; ──────────────────────────────────────────────────────────────────────────
 ;;;  Minimal logging for state mutations

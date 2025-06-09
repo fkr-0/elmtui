@@ -199,6 +199,7 @@
 
 (defclass stylable ()
   ((sid :initarg :id
+        :initarg :sid
         :initform nil
         :accessor stylable-id
         :documentation "The ID of the stylable object.")
@@ -214,7 +215,8 @@
            :type style-set
            :initform (make-style-set) ; Initialize with an empty style-set
            :documentation "The styles associated with the stylable object.")
-   (dirty :initform t
+   (dirty :initarg :dirty
+          :initform t
           :accessor dirty
           :documentation "Indicates if the stylable needs to have styles reapplied."))
   (:documentation

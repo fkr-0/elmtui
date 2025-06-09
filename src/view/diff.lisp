@@ -1,13 +1,13 @@
 (defpackage :elmtui.view.diff
   (:use :cl)
   (:export :diff-trees
-           :apply-diff
+   :apply-diff
            :create-patch
-           :with-diff-options
+   :with-diff-options
            :component-key
-           :diff-node
+   :diff-node
            :optimize-diff-settings
-           :show-diff-stats))
+   :show-diff-stats))
 
 (in-package :elmtui.view.diff)
 
@@ -36,17 +36,17 @@
 
 ;; Environment for diff options
 (defmacro with-diff-options ((&key (key-based-diff t)
-                                   (use-heuristics t)
-                                   (batch-updates t)
-                                   (skip-unchanged t)
-                                   (track-moves t))
+                                (use-heuristics t)
+                                (batch-updates t)
+                                (skip-unchanged t)
+                                (track-moves t))
                              &body body)
   "Execute BODY with the specified diff options"
   `(let ((*diff-options* (make-diff-options :key-based-diff ,key-based-diff
-                                           :use-heuristics ,use-heuristics
-                                           :batch-updates ,batch-updates
-                                           :skip-unchanged ,skip-unchanged
-                                           :track-moves ,track-moves))
+                                            :use-heuristics ,use-heuristics
+                                            :batch-updates ,batch-updates
+                                            :skip-unchanged ,skip-unchanged
+                                            :track-moves ,track-moves))
          (*diff-stats* (make-diff-stats)))
      ,@body))
 
@@ -62,10 +62,10 @@
 (defun make-diff-node (type path old-value new-value &optional children)
   "Create a diff node"
   (%make-diff-node :type type
-                  :path path
-                  :old-value old-value
-                  :new-value new-value
-                  :children children))
+                   :path path
+                   :old-value old-value
+                   :new-value new-value
+                   :children children))
 
 ;; Get component key
 (defun component-key (node)
@@ -79,44 +79,44 @@
 (defun diff-props (old-props new-props path)
   "Compare two sets of props and return a list of changes"
   (let ((changes nil)
-        (all-keys (remove-duplicates 
+        (all-keys (remove-duplicates
                    (append (loop for (k v) on old-props by #'cddr collect k)
                            (loop for (k v) on new-props by #'cddr collect k))
                    :test #'eq)))
-    
+
     (dolist (key all-keys)
       (let ((old-value (getf old-props key))
             (new-value (getf new-props key)))
         (unless (equal old-value new-value)
-          (push (make-diff-node :prop-change 
-                               (append path (list :props key))
-                               old-value 
-                               new-value)
+          (push (make-diff-node :prop-change
+                                (append path (list :props key))
+                                old-value
+                                new-value)
                 changes)
           (incf (diff-stats-props-changed *diff-stats*)))))
-    
+
     (nreverse changes)))
 
 ;; Main diffing function for trees
 (defun diff-trees (old-tree new-tree &optional (path nil))
   "Compare two UI trees and return a list of changes"
   (incf (diff-stats-nodes-compared *diff-stats*))
-  
+
   (cond
     ;; Both nil - no changes
     ((and (null old-tree) (null new-tree))
      nil)
-    
+
     ;; Node added
     ((null old-tree)
      (incf (diff-stats-nodes-added *diff-stats*))
      (list (make-diff-node :add path nil new-tree)))
-    
+
     ;; Node removed
     ((null new-tree)
      (incf (diff-stats-nodes-removed *diff-stats*))
      (list (make-diff-node :remove path old-tree nil)))
-    
+
     ;; Both are not component nodes (e.g., strings or values)
     ((and (not (listp old-tree)) (not (listp new-tree)))
      (if (equal old-tree new-tree)
@@ -126,31 +126,31 @@
          (progn
            (incf (diff-stats-nodes-updated *diff-stats*))
            (list (make-diff-node :replace path old-tree new-tree)))))
-    
+
     ;; Different types of nodes
     ((or (listp old-tree) (listp new-tree))
      (if (and (listp old-tree) (listp new-tree)
               (eq (getf old-tree :type) (getf new-tree :type)))
          ;; Same component type - check props and children
-         (let ((props-diff (diff-props (getf old-tree :props) 
-                                       (getf new-tree :props) 
+         (let ((props-diff (diff-props (getf old-tree :props)
+                                       (getf new-tree :props)
                                        path))
                (children-diff nil))
-           
+
            ;; Apply key-based diffing to children if enabled
            (when (diff-options-key-based-diff *diff-options*)
-             (setf children-diff 
+             (setf children-diff
                    (diff-children-keyed (getf old-tree :children)
                                         (getf new-tree :children)
                                         (append path (list :children)))))
-           
+
            ;; Fall back to index-based diffing if no keys or disabled
            (unless children-diff
-             (setf children-diff 
+             (setf children-diff
                    (diff-children-indexed (getf old-tree :children)
                                           (getf new-tree :children)
                                           (append path (list :children)))))
-           
+
            ;; Combine props and children diffs
            (if (and (null props-diff) (null children-diff))
                (progn
@@ -159,12 +159,12 @@
                (progn
                  (incf (diff-stats-nodes-updated *diff-stats*))
                  (append props-diff children-diff))))
-         
+
          ;; Different component types - replace
          (progn
            (incf (diff-stats-nodes-updated *diff-stats*))
            (list (make-diff-node :replace path old-tree new-tree)))))
-    
+
     ;; Fallback for any other case
     (t
      (if (equal old-tree new-tree)
@@ -193,16 +193,16 @@
 (defun diff-children-keyed (old-children new-children base-path)
   "Compare children arrays using keys"
   (when (or (null old-children) (null new-children))
-    (return-from diff-children-keyed 
+    (return-from diff-children-keyed
       (diff-children-indexed old-children new-children base-path)))
-  
+
   ;; Build maps of key -> node and key -> index
   (let ((old-keys (make-hash-table :test #'equal))
         (new-keys (make-hash-table :test #'equal))
         (old-indices (make-hash-table :test #'equal))
         (new-indices (make-hash-table :test #'equal))
         (changes nil))
-    
+
     ;; Map old children
     (loop for child in old-children
           for i from 0
@@ -210,7 +210,7 @@
           do (progn
                (setf (gethash key old-keys) child)
                (setf (gethash key old-indices) i)))
-    
+
     ;; Map new children
     (loop for child in new-children
           for i from 0
@@ -218,7 +218,7 @@
           do (progn
                (setf (gethash key new-keys) child)
                (setf (gethash key new-indices) i)))
-    
+
     ;; Find moved, added, and updated nodes
     (loop for child in new-children
           for new-idx from 0
@@ -228,39 +228,39 @@
                    (child-path (append base-path (list new-idx))))
                (cond
                  ;; Node moved
-                 ((and old-idx 
+                 ((and old-idx
                        (diff-options-track-moves *diff-options*)
                        (/= old-idx new-idx))
                   (incf (diff-stats-nodes-moved *diff-stats*))
-                  (push (make-diff-node :move 
-                                       child-path
-                                       (cons old-idx new-idx)
-                                       child)
+                  (push (make-diff-node :move
+                                        child-path
+                                        (cons old-idx new-idx)
+                                        child)
                         changes)
-                  (setf changes (append changes 
+                  (setf changes (append changes
                                         (diff-trees old-node child child-path))))
-                 
+
                  ;; Node exists in both trees
                  (old-node
-                  (setf changes (append changes 
+                  (setf changes (append changes
                                         (diff-trees old-node child child-path))))
-                 
+
                  ;; Node added
                  (t
                   (incf (diff-stats-nodes-added *diff-stats*))
                   (push (make-diff-node :add child-path nil child)
                         changes)))))
-    
+
     ;; Find removed nodes
     (loop for child in old-children
           for old-idx from 0
           for key = (component-key child)
           when (not (gethash key new-keys))
-          do (let ((child-path (append base-path (list old-idx))))
-               (incf (diff-stats-nodes-removed *diff-stats*))
-               (push (make-diff-node :remove child-path child nil)
-                     changes)))
-    
+            do (let ((child-path (append base-path (list old-idx))))
+                 (incf (diff-stats-nodes-removed *diff-stats*))
+                 (push (make-diff-node :remove child-path child nil)
+                       changes)))
+
     (nreverse changes)))
 
 ;; Apply a diff to a tree
@@ -275,8 +275,8 @@
           (:remove (apply-remove result path))
           (:replace (apply-replace result path (diff-node-new-value change)))
           (:prop-change (apply-prop-change result path (diff-node-new-value change)))
-          (:move (apply-move result path (diff-node-old-value change) 
-                            (diff-node-new-value change))))))
+          (:move (apply-move result path (diff-node-old-value change)
+                             (diff-node-new-value change))))))
     result))
 
 ;; Apply operations to tree
@@ -378,10 +378,10 @@
       (setf (diff-options-batch-updates options) t)
       (when (> tree-size 5000)
         (setf (diff-options-use-heuristics options) t)))
-    
+
     ;; Adjust settings based on complexity
     (case complexity
-      (:low 
+      (:low
        (setf (diff-options-skip-unchanged options) t)
        (setf (diff-options-track-moves options) nil))
       (:medium
@@ -389,7 +389,7 @@
       (:high
        (setf (diff-options-use-heuristics options) t)
        (setf (diff-options-key-based-diff options) t)))
-    
+
     options))
 
 ;; Show diff stats
@@ -397,7 +397,7 @@
   "Display statistics about the last diff operation"
   (format t "~&Diff Statistics:~%")
   (format t "  Nodes compared:  ~8d~%" (diff-stats-nodes-compared stats))
-  (format t "  Nodes unchanged: ~8d (~3d%)~%" 
+  (format t "  Nodes unchanged: ~8d (~3d%)~%"
           (diff-stats-nodes-unchanged stats)
           (if (> (diff-stats-nodes-compared stats) 0)
               (round (* 100 (/ (diff-stats-nodes-unchanged stats)
@@ -412,17 +412,17 @@
 
 ;; Example usage:
 #|
-(let ((old-tree '(:type :div :props (:class "container") 
-                  :children ((:type :button :props (:label "OK") :children nil)
-                             (:type :span :props (:text "Hello") :children nil))))
-      (new-tree '(:type :div :props (:class "container") 
-                  :children ((:type :span :props (:text "Hello") :children nil)
-                             (:type :button :props (:label "Cancel") :children nil)))))
-  
-  (with-diff-options (:track-moves t)
-    (let ((diff (diff-trees old-tree new-tree)))
-      (show-diff-stats)
-      (format t "~%Diff: ~a~%" diff)
-      (let ((result (apply-diff old-tree diff)))
-        (format t "~%Result equals new-tree: ~a~%" (equal result new-tree))))))
+(let ((old-tree '(:type :div :props (:class "container")
+:children ((:type :button :props (:label "OK") :children nil)
+(:type :span :props (:text "Hello") :children nil))))
+(new-tree '(:type :div :props (:class "container")
+:children ((:type :span :props (:text "Hello") :children nil)
+(:type :button :props (:label "Cancel") :children nil)))))
+
+(with-diff-options (:track-moves t)
+(let ((diff (diff-trees old-tree new-tree)))
+(show-diff-stats)
+(format t "~%Diff: ~a~%" diff)
+(let ((result (apply-diff old-tree diff)))
+(format t "~%Result equals new-tree: ~a~%" (equal result new-tree))))))
 |#

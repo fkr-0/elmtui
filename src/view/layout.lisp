@@ -1,597 +1,419 @@
 ;;;===============================================================
 ;;; File: src/view/layout.lisp
-;;; Top-Level Layout Pass & Flexbox/Block Layout
+;;; Top-Level Layout Pass & Dispatcher
 ;;;===============================================================
 (uiop:define-package :elmtui.view.layout
-  (:use :cl :elmtui.view.core) ; Keep core for ui-node structure access
-  (:import-from :log4cl #:log-debug #:log-info #:log-warn)
-  ;; Import necessary symbols
+  (:use :cl :elmtui.view.core)
+  (:import-from :log4cl #:log-debug #:log-info #:log-warn #:log-error)
+  (:import-from :elmtui.style-lib.style-set #:set-style #:style-set) ; Function to add styles to a set
+  (:import-from :elmtui.style-lib.api #:styles)
   (:import-from :elmtui.view.geo
-                #:rectangle #:pos #:size #:h #:w #:x #:y
-                #:make-rectangle #:make-pos #:make-size
-                #:rectangle-pos #:rectangle-size #:copy-rectangle
-                #:clamp) ; Import clamp if not already available
-  (:import-from :elmtui.view.layout.flex
-                #:flex-item #:flex-container #:layout-flex-container
-                #:flex-item-children #:main-axis #:flex-wrap #:justify-content
-                #:align-items #:align-content #:order #:flex-grow #:flex-shrink
-                #:flex-basis #:align-self)
+                #:make-pos #:make-size
+                #:rectangle #:make-rectangle #:copy-rectangle
+                #:x #:y #:w #:h #:pos #:size)
   (:import-from :elmtui.view.styled
-                #:styled-ui-node #:style-value #:apply-stylesheet-to-tree
-                #:copy-styled-node #:styles)
-  ;; Grid layout function will be called via generic dispatch
-  ;; (:import-from :elmtui.view.layout.grid #:layout-grid-container)
-                                        ; Import grid layout
-  (:export :layout-tree ; New top-level function
-   :dispatch-layout ; Export the generic function
-   ;; Keep old exports for now, maybe deprecate later
-           :layout-vbox
-   :layout-hbox
-           :layout-grid-container-impl
-   :layout-grid))
+                #:styled-ui-node #:styles #:style-value #:copy-styled-node)
+  ;; Import specific layout engines
+  (:import-from :elmtui.view.layout.flex #:compute-flex-layout)
+
+  (:export :layout-tree :layout-node #:dispatch-layout #:layout-grid-container-impl))
+
 (in-package :elmtui.view.layout)
-
-;;;-----------------------------------------------------------------------------
-;;; Helper: Styled Node -> Flex Item Conversion
-;;;-----------------------------------------------------------------------------
 (defgeneric layout-grid-container-impl (grid-container-node available-rect))
-(defun styled-node->flex-item (styled-node)
-  "Convert a styled-ui-node into a flex-item instance.
-   Extracts layout properties EXCLUSIVELY from computed styles."
-  (let* ((raw-initial-w (style-value styled-node :width :auto))
-         (raw-initial-h (style-value styled-node :height :auto))
-         ;; Ensure initial-w and initial-h for make-size are numeric.
-         ;; Keywords like :auto, :fill will be handled by flex-basis or layout algorithm.
-         (numeric-initial-w (if (integerp raw-initial-w) raw-initial-w 0))
-         (numeric-initial-h (if (integerp raw-initial-h) raw-initial-h 0))
-         (initial-rect (make-rectangle :pos (make-pos :x 0 :y 0)
-                                       :size (make-size :w numeric-initial-w :h numeric-initial-h)))
-         ;; Extract flex properties from styles
-         (order (style-value styled-node :order 0))
-         (flex-grow (style-value styled-node :flex-grow 0))
-         (flex-shrink (style-value styled-node :flex-shrink 1))
-         (flex-basis (style-value styled-node :flex-basis nil)) ; nil means auto/use initial size
-         (align-self (style-value styled-node :align-self nil)) ; nil means inherit/auto
-         ;; Extract min/max constraints from styles
-         (min-w (style-value styled-node :min-width 0))
-         (max-w (style-value styled-node :max-width most-positive-fixnum))
-         (min-h (style-value styled-node :min-height 0))
-         (max-h (style-value styled-node :max-height most-positive-fixnum))
-         ;; Extract margins from styles
-         (margin-top (style-value styled-node :margin-top 0))
-         (margin-right (style-value styled-node :margin-right 0))
-         (margin-bottom (style-value styled-node :margin-bottom 0))
-         (margin-left (style-value styled-node :margin-left 0)))
-
-    (make-instance 'flex-item
-                   :rectangle initial-rect
-                   :order order
-                   :flex-grow flex-grow
-                   :flex-shrink flex-shrink
-                   :flex-basis flex-basis
-                   :align-self align-self
-                   :min-width min-w
-                   :max-width max-w
-                   :min-height min-h
-                   :max-height max-h
-                   :margin-top margin-top
-                   :margin-right margin-right
-                   :margin-bottom margin-bottom
-                   :margin-left margin-left
-                   ;; :child-container is NOT set here. Nested layout is handled by layout-tree recursion.
-                   )))
-
-;;;-----------------------------------------------------------------------------
-;;; Flexbox Layout for Children
-;;;-----------------------------------------------------------------------------
-
-(defun layout-flex-children (container-styled-node available-rect)
-  "Layout the children of CONTAINER-STYLED-NODE using flexbox within AVAILABLE-RECT.
-   Returns a list of *new* laid-out child nodes, and the collective
-   width and height occupied by these children within available-rect."
-  (unless (and available-rect (typep available-rect 'rectangle))
-    (error "layout-flex-children requires a valid available-rect."))
-
-  (let* ((children (ui-node-children container-styled-node))
-         (styled-children (if (every #'(lambda (n) (typep n 'styled-ui-node)) children)
-                              children
-                              (progn (warn "Non-styled node found in flex container children.")
-                                     children))) ; Should not happen in correct pipeline
-         (main-axis (style-value container-styled-node :flex-direction :row))
-         (justify-content (style-value container-styled-node :justify-content :flex-start))
-         (align-items (style-value container-styled-node :align-items :stretch))
-         (align-content (style-value container-styled-node :align-content :stretch))
-         (flex-wrap (style-value container-styled-node :flex-wrap :nowrap))
-
-         ;; Extract padding and border to calculate content rect properly
-         (padding (or (style-value container-styled-node :padding)
-                      (list :top (style-value container-styled-node :padding-top 0)
-                            :right (style-value container-styled-node :padding-right 0)
-                            :bottom (style-value container-styled-node :padding-bottom 0)
-                            :left (style-value container-styled-node :padding-left 0))))
-         (border-style (style-value container-styled-node :border-style :none))
-         (border-width (if (eq border-style :none)
-                           0
-                           (or (style-value container-styled-node :border-width 1) ; Default to 1 if style but no width
-                               (list :top (style-value container-styled-node :border-top-width 1)
-                                     :right (style-value container-styled-node :border-right-width 1)
-                                     :bottom (style-value container-styled-node :border-bottom-width 1)
-                                     :left (style-value container-styled-node :border-left-width 1)))))
-
-         ;; Calculate content rect to position children correctly
-         (content-rect (calculate-content-rect available-rect padding border-width)) ; This is the flex container's bounds
-         (flex-items (mapcar #'styled-node->flex-item children)))
-    (declare (type rectangle content-rect) (ignorable styled-children))
-    (log:debug "LAYOUT: layout-flex-children - Container ID: ~S, Content Rect: ~S"
-               (getf (ui-node-props container-styled-node) :id) content-rect)
-
-    (let ((container (make-instance 'flex-container
-                                    :rectangle (copy-rectangle content-rect)
-                                    :children flex-items
-                                    :main-axis main-axis
-                                    :justify-content justify-content
-                                    :align-items align-items
-                                    :align-content align-content
-                                    :flex-wrap flex-wrap)))
-      (layout-flex-container container) ; This updates flex-item rectangles relative to content-rect
-
-      (let ((laid-out-children-list nil)
-            (min-item-x most-positive-fixnum) (min-item-y most-positive-fixnum)
-            (max-item-x most-negative-fixnum) (max-item-y most-negative-fixnum)
-            (has-items nil))
-
-        (loop for flex-item in flex-items
-              for original-child in children ; Assuming children are already styled-ui-nodes
-              do
-                 (setf has-items t)
-                 (let* ((item-relative-rect (rectangle flex-item))
-                        ;; Make item-rect absolute for the child node
-                        (abs-pos-x (+ (x content-rect) (x item-relative-rect)))
-                        (abs-pos-y (+ (y content-rect) (y item-relative-rect)))
-                        (item-abs-rect (make-rectangle
-                                        :pos (make-pos :x abs-pos-x :y abs-pos-y)
-                                        :size (size item-relative-rect)))
-                        (new-child (copy-styled-node original-child)))
-
-                   ;; Store final absolute layout rect in props
-                   (setf (getf (ui-node-props new-child) :layout-rect) item-abs-rect)
-                   (setf (getf (ui-node-props new-child) :x) (x item-abs-rect))
-                   (setf (getf (ui-node-props new-child) :y) (y item-abs-rect))
-                   (setf (getf (ui-node-props new-child) :width) (w item-abs-rect))
-                   (setf (getf (ui-node-props new-child) :height) (h item-abs-rect))
-
-                   ;; RECURSE: layout the child node's subtree using its determined absolute rect
-                   (let ((recursed-child (layout-node new-child item-abs-rect)))
-                     (push recursed-child laid-out-children-list)
-
-                     ;; Update bounds based on the item's relative rect for content size calculation
-                     (setf min-item-x (min min-item-x (x item-relative-rect)))
-                     (setf min-item-y (min min-item-y (y item-relative-rect)))
-                     (setf max-item-x (max max-item-x (+ (x item-relative-rect) (w item-relative-rect))))
-                     (setf max-item-y (max max-item-y (+ (y item-relative-rect) (h item-relative-rect)))))))
-
-        (let ((children-content-w (if has-items (max 0 (- max-item-x min-item-x)) 0))
-              (children-content-h (if has-items (max 0 (- max-item-y min-item-y)) 0)))
-          (log:debug "LAYOUT: layout-flex-children for ~S - Children Content WxH: ~Ax~A"
-                     (getf (ui-node-props container-styled-node) :id)
-                     children-content-w children-content-h)
-          (values (nreverse laid-out-children-list)
-                  children-content-w
-                  children-content-h))))))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Helper: Calculate Content Rect (Inner area after padding/border)
 ;;;-----------------------------------------------------------------------------
+(defun calculate-content-rect (node-layout-rect styled-node)
+  "Calculate the content rectangle within NODE-LAYOUT-RECT for STYLED-NODE,
+   accounting for padding and border widths.
+   Returns a new RECTANGLE for the content area."
+  (let* ((padding-top (style-value styled-node :padding-top 0))
+         (padding-right (style-value styled-node :padding-right 0))
+         (padding-bottom (style-value styled-node :padding-bottom 0))
+         (padding-left (style-value styled-node :padding-left 0))
+         ;; Assuming border widths are 0 if border-style is :none, or 1 if not specified but style is not :none.
+         ;; This logic should ideally be part of style computation or a helper.
+         (border-style (style-value styled-node :border-style :none))
+         (default-border-width (if (eq border-style :none) 0 1))
+         (border-top-width (style-value styled-node :border-top-width default-border-width))
+         (border-right-width (style-value styled-node :border-right-width default-border-width))
+         (border-bottom-width (style-value styled-node :border-bottom-width default-border-width))
+         (border-left-width (style-value styled-node :border-left-width default-border-width)))
 
-(defun calculate-content-rect (box-rect padding border-width)
-  "Calculate the content rectangle given the box rectangle, padding, and border width.
-   BOX-RECT: The border-box rectangle (outermost box including borders)
-   PADDING: Padding value (integer or plist with :top, :right, :bottom, :left)
-   BORDER-WIDTH: Border width (integer or plist with :top, :right, :bottom, :left)
-   Returns a rectangle representing the content box."
-  (let ((pad-top    (if (integerp padding) padding (getf padding :top 0)))
-        (pad-right  (if (integerp padding) padding (getf padding :right 0)))
-        (pad-bottom (if (integerp padding) padding (getf padding :bottom 0)))
-        (pad-left   (if (integerp padding) padding (getf padding :left 0)))
-        (bw-top     (if (integerp border-width) border-width (getf border-width :top 0)))
-        (bw-right   (if (integerp border-width) border-width (getf border-width :right 0)))
-        (bw-bottom  (if (integerp border-width) border-width (getf border-width :bottom 0)))
-        (bw-left    (if (integerp border-width) border-width (getf border-width :left 0))))
+    ;; Ensure border widths are 0 if border-style is :none, regardless of explicit width values
+    (when (eq border-style :none)
+      (setf border-top-width 0 border-right-width 0 border-bottom-width 0 border-left-width 0))
 
-    (make-rectangle
-     :pos (make-pos :x (+ (x box-rect) pad-left bw-left)
-                    :y (+ (y box-rect) pad-top bw-top))
-     :size (make-size :w (- (w box-rect) pad-left pad-right bw-left bw-right)
-                      :h (- (h box-rect) pad-top pad-bottom bw-top bw-bottom)))))
+    (let* ((content-x (+ (x node-layout-rect) padding-left border-left-width))
+           (content-y (+ (y node-layout-rect) padding-top border-top-width))
+           (content-w (max 0 (- (w node-layout-rect)
+                                padding-left padding-right
+                                border-left-width border-right-width)))
+           (content-h (max 0 (- (h node-layout-rect)
+                                padding-top padding-bottom
+                                border-top-width border-bottom-width))))
+      (make-rectangle :pos (make-pos :x content-x :y content-y) :size (make-size :w content-w :h content-h)))))
 
-(defun position-child-in-parent (parent-content-rect child style)
-  "Position a child node within its parent's content rectangle.
-   PARENT-CONTENT-RECT: The parent's content rectangle
-   CHILD: The child node to position
-   STYLE: The child's style
-   Returns the child's border-box rectangle."
-  (let* ((margin (getf style :margin 0))
-         ;; Handle margin extraction properly depending on whether it's an integer or plist
-         (margin-top    (if (integerp margin) margin (getf margin :top 0)))
-         (margin-right  (if (integerp margin) margin (getf margin :right 0)))
-         (margin-bottom (if (integerp margin) margin (getf margin :bottom 0)))
-         (margin-left   (if (integerp margin) margin (getf margin :left 0)))
+(defun measure-node-intrinsic-size (node parent-absolute-content-rect parent-style-set)
+  "Compute NODE’s border-box in absolute coordinates and store it under
+   :LAYOUT-RECT, then recurse into its children."
+  (declare (type styled-ui-node node)
+           (type rectangle parent-absolute-content-rect)
+           (ignore parent-style-set))           ; <— context not yet used
+  (let* (;; ------------------------------------------------------------
+         ;; Style & margin extraction
+         ;; ------------------------------------------------------------
+         (display        (style-value node :display :block))
+         (margin-top     (style-value node :margin-top    0))
+         (margin-right   (style-value node :margin-right  0))
+         (margin-bottom  (style-value node :margin-bottom 0))
+         (margin-left    (style-value node :margin-left   0))
 
-         ;; Get available space within parent
-         (available-width (max 0 (- (w parent-content-rect) margin-left margin-right)))
-         (available-height (max 0 (- (h parent-content-rect) margin-top margin-bottom)))
+         ;; ------------------------------------------------------------
+         ;; Available space inside the parent’s content rectangle
+         ;; ------------------------------------------------------------
+         (avail-x ( + (x parent-absolute-content-rect) margin-left))
+         (avail-y ( + (y parent-absolute-content-rect) margin-top))
+         (avail-w (max 0 (- (w parent-absolute-content-rect) margin-left margin-right)))
+         (avail-h (max 0 (- (h parent-absolute-content-rect) margin-top  margin-bottom)))
 
-         ;; Handle width/height from style, with fallbacks
-         (child-width-value (getf style :width))
-         (child-height-value (getf style :height))
+         ;; ------------------------------------------------------------
+         ;; Requested width / height from styles
+         ;; ------------------------------------------------------------
+         (req-w (style-value node :width  :auto))
+         (req-h (style-value node :height :auto))
 
-         ;; Calculate final width and height
-         (child-width (cond
-                        ((integerp child-width-value) child-width-value)
-                        ((eq child-width-value :fill) available-width)
-                        ((eq child-width-value :auto)
-                         (or (getf (ui-node-props child) :intrinsic-width) ; Use intrinsic if present
-                             available-width)) ; Fall back to available space
-                        (t available-width))) ; Default to available
+         ;; Resolve :auto / <n> / “42%”
+         (eff-w
+           (cond ((numberp req-w)           req-w)
+                 ((stringp req-w)
+                  (if (alexandria:ends-with-subseq "%" req-w)
+                      (* avail-w
+                         (/ (parse-integer req-w :end (1- (length req-w))) 100.0))
+                      avail-w))
+                 (t                           avail-w)))
+         (eff-h
+           (cond ((numberp req-h)           req-h)
+                 ((stringp req-h)
+                  (if (alexandria:ends-with-subseq "%" req-h)
+                      (* avail-h
+                         (/ (parse-integer req-h :end (1- (length req-h))) 100.0))
+                      avail-h))
+                 (t                           avail-h)))
 
-         (child-height (cond
-                         ((integerp child-height-value) child-height-value)
-                         ((eq child-height-value :fill) available-height)
-                         ((eq child-height-value :auto)
-                          (or (getf (ui-node-props child) :intrinsic-height) ; Use intrinsic if present
-                              available-height)) ; Fall back to available space
-                         (t available-height))) ; Default to available
 
-         ;; Apply min/max constraints
-         (min-width (getf style :min-width 0))
-         (max-width (getf style :max-width most-positive-fixnum))
-         (min-height (getf style :min-height 0))
-         (max-height (getf style :max-height most-positive-fixnum))
-         (final-width (clamp child-width min-width max-width))
-         (final-height (clamp child-height min-height max-height)))
+         ;; Border-box rectangle in absolute coords
+         (layout-rect (make-rectangle :pos (make-pos :x avail-x :y avail-y) :size (make-size :w eff-w :h eff-h))))
+    (declare (ignore display))
 
-    ;; Create and return the child's box rectangle positioned within the parent
-    (make-rectangle
-     :pos (make-pos :x (+ (x parent-content-rect) margin-left)
-                    :y (+ (y parent-content-rect) margin-top))
-     :size (make-size :w final-width
-                      :h final-height))))
+    ;; --------------------------------------------------------------
+    ;; 1) store the rectangle on the node
+    ;; --------------------------------------------------------------
+    (setf (getf (ui-node-props node) :layout-rect) layout-rect)
 
-(defun layout-flex-children-row (parent-content-rect children)
-  "Layout children in a row within the parent's content rectangle.
-   PARENT-CONTENT-RECT: The parent's content rectangle
-   CHILDREN: List of (child, style) pairs
-   Returns a list of (child, layout-rect) pairs."
-  (let ((current-x (x parent-content-rect))
-        (results nil))
+    ;; --------------------------------------------------------------
+    ;; 2) recurse into children — naive block-flow for now
+    ;; --------------------------------------------------------------
+    (let* ((children       (ui-node-children node))
+           (child-content  (make-rectangle
+                            :pos (make-pos
+                                  :x (+ avail-x margin-left)
+                                  :y (+ avail-y margin-top))
+                            :size (make-size :w (- eff-w margin-left margin-right)
+                                             :h (- eff-h margin-top  margin-bottom)))))
+      (loop for child in children
+            do (measure-node-intrinsic-size child child-content nil))
 
-    (dolist (child-data children)
-      (destructuring-bind (child style) child-data
-        (let* ((margin (getf style :margin 0))
-               ;; Fix margin extraction to use proper keys
-               (margin-left   (if (integerp margin) margin (getf margin :left 0)))
-               (margin-right  (if (integerp margin) margin (getf margin :right 0)))
-               (margin-top    (if (integerp margin) margin (getf margin :top 0)))
-               (child-width  (getf style :width 0))
-               (child-height (getf style :height 0))
-               (child-rect (make-rectangle
-                            :pos (make-pos :x (+ current-x margin-left)
-                                           :y (+ (y parent-content-rect) margin-top))
-                            :size (make-size :w child-width
-                                             :h child-height))))
+      ;; Return the rectangle for callers that might care
+      layout-rect)))
 
-          ;; Update for next child
-          (setf current-x (+ (x child-rect) child-width margin-right))
+;; (defun measure-node-intrinsic-size (node parent-absolute-content-rect parent-style-set)
+;;   "PARENT-ABSOLUTE-CONTENT-RECT: The absolute rectangle defining the bounding box
+;;                                    within which this node's border-box must fit.
+;;    PARENT-STYLE-SET: The style-set of the parent (for context, not heavily used yet
+;;    This function computes and sets the :LAYOUT-RECT property (absolute coordinates
+;;     on the NODE and all its descendants."
+;;   (declare (type styled-ui-node node)
+;;            (type rectangle parent-absolute-content-rect)
+;;            (type (or null style-set) parent-style-set))
+;;   (let* ((node-id (getf (ui-node-props node) :id (gensym "ANON-NODE-")))
+;;          (display (style-value node :display :block)) ; Default to block display
+;;          (node-styles (styles node))
 
-          ;; Add to results
-          (push (list child child-rect) results))))
+;;          ;; Margins for the current node
+;;          (margin-top (style-value node :margin-top 0))
+;;          (margin-right (style-value node :margin-right 0))
+;;          (margin-bottom (style-value node :margin-bottom 0))
+;;          (margin-left (style-value node :margin-left 0))
 
-    (nreverse results)))
+;;          ;; Available space for this node's border-box, considering its margins
+;;          (available-outer-x (+ (x parent-absolute-content-rect) margin-left))
+;;          (available-outer-y (+ (y parent-absolute-content-rect) margin-top))
+;;          (available-outer-w (max 0 (- (w parent-absolute-content-rect) margin-left margin-right)))
+;;          (available-outer-h (max 0 (- (h parent-absolute-content-rect) margin-top margin-bottom)))
 
-;;;-----------------------------------------------------------------------------
-;;; Block Layout for Children
-;;;-----------------------------------------------------------------------------
+;;          ;; Requested width/height from style
+;;          ;; Percentage resolution needs parent's content width/height.
+;;          (requested-w (style-value node :width :auto))
+;;          (requested-h (style-value node :height :auto))
 
-(defun layout-block-children (container-styled-node available-content-rect)
-  "Layout children vertically within the available content rectangle, accounting for margins.
-   Returns a list of new laid-out child nodes and the total height used by them (including their margins)."
-  (let ((laid-out-children '())
-        (current-y (y available-content-rect)) ; Start at the top of the parent's content area
-        (max-child-width 0)
-        (previous-child-margin-bottom 0))
-    (log:debug "LAYOUT: layout-block-children - Container ID: ~S, Available Content Rect: ~S"
-               (getf (ui-node-props container-styled-node) :id) available-content-rect)
+;;          ;; Effective width/height for this node's border-box.
+;;          ;; If :auto, it will be determined by content or flex/grid algorithm.
+;;          ;; If a number, it's used directly.
+;;          ;; Percentages need to be resolved against available_outer_w/h.
+;;          (eff-w (cond ((numberp requested-w) requested-w)
+;;                       ((stringp requested-w) ; Percentage string e.g. "50%"
+;;                        (if (and (alexandria:ends-with-subseq "%" requested-w) (> (length requested-w) 1))
+;;                            (* (/ available-outer-w 100.0)
+;;                               (parse-integer
+;;                                (subseq requested-w 0 (- (length requested-w) 1))))
+;;                            available-outer-w))
+;;                       ((eq requested-w :auto) available-outer-w)
+;;                       (t available-outer-w)))
+;;          (eff-h (cond ((numberp requested-h) requested-h)
+;;                       ((stringp requested-h) ; Percentage string e.g. "50%"
+;;                        (if (and (alexandria:ends-with-subseq "%" requested-h) (> (length requested-h) 1))
+;;                            (* (/ available-outer-h 100.0)
+;;                               (parse-integer
+;;                                (subseq requested-h 0 (- (length requested-h) 1)))))))))))
 
-    ;; Extract padding and border to ensure correct content rect positioning
-    (let* ((padding (or (style-value container-styled-node :padding)
-                        (list :top (style-value container-styled-node :padding-top 0)
-                              :right (style-value container-styled-node :padding-right 0)
-                              :bottom (style-value container-styled-node :padding-bottom 0)
-                              :left (style-value container-styled-node :padding-left 0))))
-           (border-style (style-value container-styled-node :border-style :none))
-           (border-width (if (eq border-style :none)
-                             0
-                             (or (style-value container-styled-node :border-width 1) ; Default to 1 if style but no width
-                                 (list :top (style-value container-styled-node :border-top-width 1)
-                                       :right (style-value container-styled-node :border-right-width 1)
-                                       :bottom (style-value container-styled-node :border-bottom-width 1)
-                                       :left (style-value container-styled-node :border-left-width 1))))))
-      (declare (ignore padding border-width))
-      (loop for child-node in (ui-node-children container-styled-node)
-            do
-               (log:debug "LAYOUT-BLOCK-CHILDREN: Processing child of ~S -> ID: ~S, Type: ~A"
-                          (getf (ui-node-props container-styled-node) :id)
-                          (if (typep child-node 'ui-node) (getf (ui-node-props child-node) :id) "N/A")
-                          (type-of child-node))
-
-               (unless (typep child-node 'styled-ui-node)
-                 (log:warn "LAYOUT-BLOCK-CHILDREN: Skipping non-styled-ui-node child: ~S" child-node)
-                 (continue))
-
-               (when (typep child-node 'styled-ui-node)
-                 (let* ((child-margin-top (style-value child-node :margin-top 0))
-                        (child-margin-bottom (style-value child-node :margin-bottom 0))
-                        (child-margin-left (style-value child-node :margin-left 0))
-                        (child-margin-right (style-value child-node :margin-right 0))
-
-                        ;; Effective Y start for this child's margin-box
-                        ;; For block layout, collapse vertical margins (max of prev-bottom and current-top)
-                        (effective-margin-spacing (max previous-child-margin-bottom child-margin-top))
-
-                        ;; Child's border-box starting position
-                        (child-start-y-corrected (if (null laid-out-children)
-                                                     (+ current-y child-margin-top) ; First child
-                                                     (+ current-y effective-margin-spacing))) ; Subsequent children with margin collapsing
-
-                        ;; Available space for this child's border-box
-                        (child-border-box-available-x (+ (x available-content-rect) child-margin-left))
-                        (child-border-box-available-y child-start-y-corrected)
-                        (child-border-box-available-width (max 0 (- (w available-content-rect) child-margin-left child-margin-right)))
-                        (child-border-box-available-height (max 0 (- (+ (y available-content-rect) (h available-content-rect))
-                                                                     child-border-box-available-y)))
-
-                        (child-available-rect-for-layout (make-rectangle
-                                                          :pos (make-pos :x child-border-box-available-x
-                                                                         :y child-border-box-available-y)
-                                                          :size (make-size :w child-border-box-available-width
-                                                                           :h child-border-box-available-height)))
-
-                        (laid-out-child (layout-node child-node child-available-rect-for-layout))
-                        (child-layout-rect (when laid-out-child (getf (ui-node-props laid-out-child) :layout-rect))))
-
-                   (when laid-out-child
-                     (unless child-layout-rect (error "Laid-out child missing :layout-rect"))
-
-                     (push laid-out-child laid-out-children)
-
-                     ;; Advance current-y by the height of the child's border-box plus its bottom margin
-                     (setf current-y (+ (y child-layout-rect) (h child-layout-rect) child-margin-bottom))
-                     (setf previous-child-margin-bottom child-margin-bottom)
-
-                     ;; Track the maximum width used by children (including their horizontal margins)
-                     (setf max-child-width (max max-child-width (+ child-margin-left (w child-layout-rect) child-margin-right)))))))
-
-      (values (nreverse laid-out-children)
-              (- current-y (y available-content-rect))
-              max-child-width)))) ; Max width including horizontal margins
 
 ;;;-----------------------------------------------------------------------------
-;;; Top-Level Recursive Layout Function & Dispatch
+;;; Main Recursive Layout Function & Dispatcher
 ;;;-----------------------------------------------------------------------------
 
-(defgeneric dispatch-layout (display node available-rect)
-  (:documentation "Dispatch layout calculation based on display type.
-                   Returns a list of laid-out children and their collective width/height."))
-
-(defun layout-node (node available-rect)
-  "Calculate layout for a single styled node within available-rect.
-   Handles layout of children by dispatching based on display type.
-   Returns a new node with layout information."
+(defun layout-node (node parent-absolute-content-rect parent-style-set)
+  "Recursively computes the layout for NODE and its children.
+   NODE: The styled-ui-node to lay out.
+   PARENT-ABSOLUTE-CONTENT-RECT: The absolute rectangle defining the bounding box
+                                   within which this node's border-box must fit.
+   PARENT-STYLE-SET: The style-set of the parent (for context, not heavily used yet).
+   This function computes and sets the :LAYOUT-RECT property (absolute coordinates)
+   on the NODE and all its descendants.
+   Returns the modified NODE."
   (unless (typep node 'styled-ui-node)
-    (log:warn "LAYOUT: layout-node called on non-styled-node: ~A. Skipping." node)
-    (return-from layout-node nil))
-  (unless (typep available-rect 'rectangle)
-    (error "LAYOUT: layout-node requires a valid available-rect. Got: ~S" available-rect))
+    (log-warn "LAYOUT: Attempting to lay out a non-styled-ui-node: ~A" node)
+    (return-from layout-node node))
 
-  (log:debug "LAYOUT: layout-node - Node Type: ~S, ID: ~S, Display: ~S, Available Rect: ~S"
-             (ui-node-type node) (getf (ui-node-props node) :id)
-             (style-value node :display :block) available-rect)
+  (let* ((node-id (getf (ui-node-props node) :id (gensym "ANON-NODE-")))
+         (display (style-value node :display :block)) ; Default to block display
+         (node-styles (styles node))
 
-  (let* ((display (style-value node :display :block))
-         ;; Calculate rect available *for this node* (initially same as available-rect)
-         ;; Position will be adjusted by parent's layout logic later.
-         (node-rect (copy-rectangle available-rect))
-         ;; Extract padding and border values from the node's style
-         (padding (or (style-value node :padding)
-                      (list :top (style-value node :padding-top 0)
-                            :right (style-value node :padding-right 0)
-                            :bottom (style-value node :padding-bottom 0)
-                            :left (style-value node :padding-left 0))))
-         (border-style (style-value node :border-style :none))
-         (border-width (if (eq border-style :none)
-                           0
-                           (or (style-value node :border-width)
-                               (list :top (style-value node :border-top-width 0)
-                                     :right (style-value node :border-right-width 0)
-                                     :bottom (style-value node :border-bottom-width 0)
-                                     :left (style-value node :border-left-width 0)))))
-         ;; Calculate inner content area based on *this node's* padding/border
-         (content-rect (calculate-content-rect node-rect padding border-width)))
-    (log:debug "LAYOUT: layout-node - Node ID: ~S, Computed Content-Rect: ~S"
-               (getf (ui-node-props node) :id) content-rect)
-    (let* ( (laid-out-children nil)
-            (children-height 0)
-            (children-width 0))
+         ;; Margins for the current node
+         (margin-top (style-value node :margin-top 0))
+         (margin-right (style-value node :margin-right 0))
+         (margin-bottom (style-value node :margin-bottom 0))
+         (margin-left (style-value node :margin-left 0))
 
-      ;; 1. Layout Children using generic dispatch
-      (multiple-value-bind (result-children height width)
-          (dispatch-layout display node content-rect)
-        (setf laid-out-children result-children)
-        (setf children-height height)
-        (setf children-width width))
+         ;; Available space for this node's border-box, considering its margins
+         (available-outer-x (+ (x parent-absolute-content-rect) margin-left))
+         (available-outer-y (+ (y parent-absolute-content-rect) margin-top))
+         (available-outer-w (max 0 (- (w parent-absolute-content-rect) margin-left margin-right)))
+         (available-outer-h (max 0 (- (h parent-absolute-content-rect) margin-top margin-bottom)))
 
-      ;; 2. Determine Self Size based on styles and children
-      (let* ((styled-w (style-value node :width :auto))
-             (styled-h (style-value node :height :auto))
+         ;; Requested width/height from style (could be :auto, number, percentage)
+         ;; Percentage resolution needs parent's content width/height.
+         (requested-w (style-value node :width :auto))
+         (requested-h (style-value node :height :auto))
 
-             (pad-left (style-value node :padding-left 0))
-             (pad-right (style-value node :padding-right 0))
-             (pad-top (style-value node :padding-top 0))
-             (pad-bottom (style-value node :padding-bottom 0))
-             ;; Simplified border width calculation for self-sizing.
-             ;; Assumes uniform border if :border-style is not :none.
-             (border-s (style-value node :border-style :none))
-             (bw (if (eq border-s :none) 0 (or (style-value node :border-width) 1))) ; Use :border-width or default to 1
-             
-             (horizontal-padding-and-border (+ pad-left pad-right (* 2 bw)))
-             (vertical-padding-and-border (+ pad-top pad-bottom (* 2 bw)))
+         ;; Effective width/height for this node's border-box.
+         ;; If :auto, it will be determined by content or flex/grid algorithm.
+         ;; If a number, it's used directly (clamped by available space for non-scrolling).
+         ;; Percentages need to be resolved against available_outer_w/h.
+         (eff-w (cond ((numberp requested-w) (min requested-w available-outer-w))
+                      ((stringp requested-w) ; Percentage string e.g. "50%"
+                       (if (and (alexandria:ends-with-subseq "%" requested-w) (> (length requested-w) 1))
+                           (let* ((percentage-val (parse-integer (subseq requested-w 0 (1- (length requested-w)))))
+                                  (parent-dim-for-percentage (w parent-absolute-content-rect)))
+                             (max 0 (min available-outer-w ; Clamp to available space
+                                         (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
+                           (progn (log-warn "LAYOUT: Invalid percentage width string: ~S for node ~A. Using available." requested-w node-id)
+                                  available-outer-w)))
+                      ((eq requested-w :auto) available-outer-w) ; Placeholder, flex/grid/block will determine
+                      (t available-outer-w)))
+         (eff-h (cond ((numberp requested-h) (min requested-h available-outer-h))
+                      ((stringp requested-h) ; Percentage string e.g. "50%"
+                       (if (and (alexandria:ends-with-subseq "%" requested-h) (> (length requested-h) 1))
+                           (let* ((percentage-val (parse-integer (subseq requested-h 0 (1- (length requested-h)))))
+                                  (parent-dim-for-percentage (h parent-absolute-content-rect)))
+                             (max 0 (min available-outer-h ; Clamp to available space
+                                         (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
+                           (progn (log-warn "LAYOUT: Invalid percentage height string: ~S for node ~A. Using available." requested-h node-id)
+                                  available-outer-h)))
+                      ((eq requested-h :auto) available-outer-h) ; Placeholder, flex/grid/block will determine
+                      (t available-outer-h)))
 
-             ;; Calculate final width
-             (final-w (cond ((integerp styled-w) styled-w)
-                            ((eq styled-w :auto)
-                             ;; children-width is the content width from dispatch-layout
-                             (+ children-width horizontal-padding-and-border))
-                            ;; Add :fill if you intend to support it explicitly
-                            ;; ((eq styled-w :fill) (w available-rect))
-                            (t (w available-rect)))) ; Default fallback (e.g. for block taking available width)
+         ;; This is the initial estimate for the node's own border-box rectangle.
+         ;; Flex/Grid might adjust eff-w and eff-h if they were :auto.
+         (node-layout-rect (make-rectangle :pos (make-pos :x available-outer-x :y available-outer-y) :size (make-size :w eff-w :h eff-h))))
 
-             ;; Calculate final height
-             (final-h (cond ((integerp styled-h) styled-h)
-                            ((eq styled-h :auto)
-                             ;; children-height is the content height from dispatch-layout
-                             (+ children-height vertical-padding-and-border))
-                            ;; ((eq styled-h :fill) (h available-rect))
-                            (t (h available-rect)))))
-        (when (eq (ui-node-type node) :list-item)
-          (log:debug "LAYOUT: :list-item styled-h=~S children-height=~S vertical-padding=~S props=~S styles=~S"
-                     styled-h children-height vertical-padding-and-border (ui-node-props node)
-                     (if (typep node 'styled-ui-node) (styles node) nil)))
-        ;; Apply min/max constraints
-        (setf final-w (clamp final-w (style-value node :min-width 0)
-                             (style-value node :max-width most-positive-fixnum)))
-        (setf final-h (clamp final-h (style-value node :min-height 0)
-                             (style-value node :max-height most-positive-fixnum)))
+    (setf (getf (ui-node-props node) :layout-rect) node-layout-rect)
+    (log-debug "LAYOUT: Initial frame for ~A (~A) display:~S. ParentAbsContentRect:~S. Assigned initial layout_rect:~S"
+               (ui-node-type node) node-id display parent-absolute-content-rect node-layout-rect)
 
-        ;; 3. Determine Self Position (Relative to parent's content-rect)
-        ;; The actual final position is set by the PARENT's layout logic.
-        ;; We store the size here, position is initially (0,0) relative to available-rect.
-        (let ((final-x (x available-rect))
-              (final-y (y available-rect)))
+    (if (eq display :none)
+        (progn
+          (log-info "LAYOUT: ~A (~A) display:none. Setting zero size." (ui-node-type node) node-id)
+          (setf (w (getf (ui-node-props node) :layout-rect)) 0)
+          (setf (h (getf (ui-node-props node) :layout-rect)) 0)
+          (setf (ui-node-children node) nil)) ; No children to lay out
+        ;; Else, proceed with layout for visible display types
+        (let* ((self-content-rect (calculate-content-rect node-layout-rect node))
+               (final-node-rect node-layout-rect) ; Will be updated by flex/grid if size is auto
+               (laid-out-children nil))
+          (log-debug "LAYOUT: ~A (~A) self_content_rect for children: ~S" (ui-node-type node) node-id self-content-rect)
 
-          ;; 4. Create/Update Node with Layout Info
-          (let ((new-node (copy-styled-node node)))
-            (setf (ui-node-children new-node) laid-out-children)
-            (let ((final-layout-rect (make-rectangle :pos (make-pos :x final-x :y final-y)
-                                                     :size (make-size :w final-w :h final-h))))
-              (setf (getf (ui-node-props new-node) :layout-rect) final-layout-rect)
-              ;; Update individual props for convenience? (Optional)
-              (setf (getf (ui-node-props new-node) :x) final-x)
-              (setf (getf (ui-node-props new-node) :y) final-y)
-              (setf (getf (ui-node-props new-node) :width) final-w)
-              (setf (getf (ui-node-props new-node) :height) final-h)
-              (log:debug "LAYOUT: layout-node result for ID ~S - Final Rect: ~S"
-                         (getf (ui-node-props new-node) :id)
-                         final-layout-rect)
-              (log:debug "LAYOUT: layout-node PRE-RETURN for ID ~S - Final Rect: ~S, Props: ~S"
-                         (getf (ui-node-props new-node) :id)
-                         final-layout-rect
-                         (ui-node-props new-node))
-              new-node)))))))
+          (case display
+            (:flex
+             (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S" (ui-node-type node) node-id self-content-rect)
+             ;; compute-flex-layout is expected to:
+             ;; 1. Calculate the layout for children within self-content-rect.
+             ;; 2. Set :layout-rect on each child.
+             ;; 3. Return the final rectangle for the flex container itself (node-layout-rect might be updated).
+             (setf final-node-rect (compute-flex-layout
+                                    node
+                                    self-content-rect
+                                    parent-style-set
+                                    ))
+             (setf (getf (ui-node-props node) :layout-rect) final-node-rect)
+             ;; Children of the flex container now have their :layout-rects set by compute-flex-layout.
+             ;; We must recurse into them to lay out *their* children.
+             (setf laid-out-children
+                   (loop for child in (ui-node-children node)
+                         collect (layout-node child
+                                              (getf (ui-node-props child) :layout-rect) ; Child's border-box is parent_abs_content_rect for its children
+                                              node-styles))))
+            (:grid
+             (log-info "LAYOUT: ~A (~A) dispatching to GRID layout in ~S" (ui-node-type node) node-id self-content-rect)
+             ;; layout-grid-container-impl is expected to:
+             ;; 1. Calculate layout for children within self-content-rect.
+             ;; 2. Set :layout-rect on each child.
+             ;; 3. Return the final rectangle for the grid container itself.
+             (setf final-node-rect (layout-grid-container-impl node self-content-rect))
+             (setf (getf (ui-node-props node) :layout-rect) final-node-rect)
+             ;; Recurse for children of the grid container
+             (setf laid-out-children
+                   (loop for child in (ui-node-children node)
+                         collect (layout-node child
+                                              (getf (ui-node-props child) :layout-rect)
+                                              node-styles))))
+            (:block
+                (log-info "LAYOUT: ~A (~A) dispatching to BLOCK layout in ~S" (ui-node-type node) node-id self-content-rect)
+              (let ((current-child-y-offset 0)
+                    (max-child-width 0)
+                    (previous-child-margin-bottom 0)) ; For margin collapsing (simplified)
+                (setf laid-out-children
+                      (loop for child-node in (ui-node-children node)
+                            collect (let* ((child-margin-top (style-value child-node :margin-top 0))
+                                           (child-margin-bottom (style-value child-node :margin-bottom 0))
+                                           ;; Simplified margin collapsing: take max of prev bottom and current top
+                                           (effective-margin-top (max previous-child-margin-bottom child-margin-top))
+                                           (child-available-parent-rect
+                                             (make-rectangle
+                                              :pos (make-pos :x (x self-content-rect) ; Child x is relative to parent content-box x
+                                                             :y (+ (y self-content-rect) current-child-y-offset effective-margin-top))
+                                              :size (make-size :w (w self-content-rect)
+                                                               :h (max 0 (- (h self-content-rect) current-child-y-offset effective-margin-top)))))
+                                           (laid-out-child (layout-node child-node child-available-parent-rect node-styles)))
+                                      ;; Y offset for next child is current offset + this child's margin-top + this child's height + this child's margin-bottom
+                                      ;; However, layout-node already placed the child considering its own margins relative to child-available-parent-rect.
+                                      ;; So, the height of its layout-rect IS its border-box height.
+                                      ;; The current-child-y-offset should advance by the space taken by the child, including its top margin (already handled by effective-margin-top)
+                                      ;; and its entire height (border-box).
+                                      (incf current-child-y-offset (+ effective-margin-top (h (getf (ui-node-props laid-out-child) :layout-rect))))
+                                      (setf max-child-width (max max-child-width (w (getf (ui-node-props laid-out-child) :layout-rect))))
+                                      (setf previous-child-margin-bottom child-margin-bottom) ; Store for next iteration
+                                      laid-out-child)))
+                ;; If container height is auto, adjust it based on children
+                (when (eq requested-h :auto)
+                  (let* ((total-padding-border-h (- (h node-layout-rect) (h self-content-rect)))
+                         ;; Add the last child's bottom margin if it wasn't collapsed with a subsequent non-existent child
+                         (final-content-height (+ current-child-y-offset previous-child-margin-bottom)))
+                    (setf (h final-node-rect) (+ final-content-height total-padding-border-h))))
+                ;; If container width is auto, adjust it based on children's max width + padding/border
+                (when (eq requested-w :auto)
+                  (let* ((total-padding-border-w (- (w node-layout-rect) (w self-content-rect))))
+                    ;; max-child-width is the border-box width of the widest child.
+                    ;; The container's content width needs to accommodate this.
+                    (setf (w final-node-rect) (+ max-child-width total-padding-border-w))))
+                (setf (getf (ui-node-props node) :layout-rect) final-node-rect)))
+            (:inline
+             (log-warn "LAYOUT: Inline layout not yet implemented for ~A (~S). Treating as block for children." (ui-node-type node) node-id)
+             ;; Fallback to block-like layout for children for now
+             (setf laid-out-children
+                   (loop for child-node in (ui-node-children node)
+                         collect (layout-node child-node self-content-rect node-styles))))
+            (t
+             (log-warn "LAYOUT: ~A (~A) unknown display type ~S, treating as :block for children" (ui-node-type node) node-id display)
+             (setf laid-out-children
+                   (loop for child-node in (ui-node-children node)
+                         collect (layout-node child-node self-content-rect node-styles)))))
 
+          (setf (ui-node-children node) laid-out-children)))
 
-;; --- Default layout method (handles unknown display types like block) ---
-(defmethod dispatch-layout (display node available-rect)
-  ;; (declare (ignore display))
-  (log:debug "LAYOUT: dispatch-layout (default/block) for ~S, Display: ~S, Available: ~S"
-             (getf (ui-node-props node) :id) display available-rect)
-                                        ; Treat unknown as block
-  (layout-block-children node available-rect))
-
-;; --- Flex layout method ---
-(defmethod dispatch-layout ((display (eql :flex)) node available-rect)
-  (log:debug "LAYOUT: dispatch-layout (:flex) for ~S, Available: ~S"
-             (getf (ui-node-props node) :id) available-rect)
-  (multiple-value-bind (laid-children content-w content-h)
-      (layout-flex-children node available-rect)
-    (values laid-children content-w content-h)))
-
-;; --- Block layout method ---
-(defmethod dispatch-layout ((display (eql :block)) node available-rect)
-  (log:debug "LAYOUT: dispatch-layout (:block) for ~S, Available: ~S"
-             (getf (ui-node-props node) :id) available-rect)
-  (layout-block-children node available-rect))
-
-;; --- ListBox layout method (Treat as block for now) ---
-;; Children (list items) are laid out like block elements vertically.
-(defmethod dispatch-layout ((display (eql :list-box)) node available-rect)
-  (log:debug "LAYOUT: dispatch-layout (:list-box treated as :block) for ~S, Available: ~S"
-             (getf (ui-node-props node) :id) available-rect)
-  (layout-block-children node available-rect))
-
-;; --- ListItem layout method (Treat as block for now) ---
-;; Children (usually just text) are laid out like block elements.
-(defmethod dispatch-layout ((display (eql :list-item)) node available-rect)
-  (log:debug "LAYOUT: dispatch-layout (:list-item treated as :block) for ~S, Available: ~S"
-             (getf (ui-node-props node) :id) available-rect)
-  (layout-block-children node available-rect))
-
-;; --- Inline layout method (stub) ---
-(defmethod dispatch-layout ((display (eql :inline)) node available-rect)
-  (declare (ignore node available-rect))
-  (warn ":inline layout not implemented")
-  (values nil 0 0))
-
-;; --- None layout method ---
-(defmethod dispatch-layout ((display (eql :none)) node available-rect)
-  (declare (ignore node available-rect))
-  (values nil 0 0))
-
-;; --- Grid layout method ---
-;; (defmethod dispatch-layout ((display (eql :grid)) node available-rect)
-;;   (log:debug "LAYOUT: dispatch-layout (:grid) for ~S, Available: ~S"
-;;              (getf (ui-node-props node) :id) available-rect)
-;;   ;; Calls the main grid layout function from the grid package
-;;   (layout-grid-container-impl node available-rect))
-
+    (log-debug "LAYOUT: Final computed rect for ~A (~A): ~S" (ui-node-type node) node-id (getf (ui-node-props node) :layout-rect))
+    node))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Top-Level Entry Point
 ;;;-----------------------------------------------------------------------------
 
 (defun layout-tree (styled-root-node screen-rect)
-  "Top-level entry point for layout. Takes the root of the styled node tree
-   and the total available screen rectangle."
-  (log:info "LAYOUT: Starting layout-tree for root node ID: ~S, Screen Rect: ~S"
-            (getf (ui-node-props styled-root-node) :id) screen-rect)
+  "Computes and sets the :LAYOUT-RECT property for STYLED-ROOT-NODE and all its descendants.
+   SCREEN-RECT: The initial RECTANGLE representing the available screen space.
+   Returns the modified STYLED-ROOT-NODE with layout information."
   (unless (typep styled-root-node 'styled-ui-node)
-    (error "layout-tree requires a styled-ui-node tree root."))
+    (log-error "LAYOUT-TREE: Root node is not a styled-ui-node: ~A" styled-root-node)
+    (return-from layout-tree styled-root-node))
   (unless (typep screen-rect 'rectangle)
-    (error "layout-tree requires a valid screen-rect."))
-  ;; Layout the root node within the screen rectangle
-  (let ((result (layout-node styled-root-node screen-rect)))
-    (log:info "LAYOUT: Finished layout-tree for root node ID: ~S. Resulting layout-rect: ~S"
-              (getf (ui-node-props styled-root-node) :id)
-              (getf (ui-node-props result) :layout-rect))
-    result))
+    (log-error "LAYOUT-TREE: screen-rect is not a rectangle: ~A" screen-rect)
+    (return-from layout-tree styled-root-node))
+
+  (log-info "LAYOUT-TREE: Starting layout for root ~S in screen rect ~S"
+            (getf (ui-node-props styled-root-node) :id "N/A") screen-rect)
+
+  (layout-node styled-root-node screen-rect nil)
+  styled-root-node)
 
 ;;;-----------------------------------------------------------------------------
+;;; Dispatch Methods (Placeholder for explicit grid dispatch if needed)
+;;; The main layout-node function uses a CASE statement for dispatch.
+;;; If we wanted to use generic functions for dispatch, it would look like this:
+;;;-----------------------------------------------------------------------------
+
+;; (defgeneric dispatch-layout (display node available-rect parent-style-set)
+;;   (:documentation "Dispatches to the appropriate layout algorithm based on display type."))
+
+;; (defmethod dispatch-layout ((display (eql :grid)) node available-rect parent-style-set)
+;;   (elmtui.view.layout.grid:layout-grid-container-impl node available-rect))
+
+;; (defmethod dispatch-layout ((display (eql :flex)) node available-rect parent-style-set)
+;;   (elmtui.view.layout.flex:compute-flex-layout node available-rect))
+
+;; ... other methods ...
+
+;; (defmethod dispatch-layout (display node available-rect parent-style-set)
+;;   ;; Default (e.g. block)
+;;   (log-warn "LAYOUT: No specific dispatch for display type ~S on node ~S. Using default block logic."
+;;             display (getf (ui-node-props node) :id "N/A"))
+;;   ;; ... block layout logic directly here or call a block-layout function ...
+
+;;;-------------------------------------------------------------------------------
 ;;; Deprecated Public Layout Functions (Adapt or Remove)
-;;;-----------------------------------------------------------------------------
+;;;-------------------------------------------------------------------------------
 
-(defun layout-vbox (nodes container-rect &rest container-props &key &allow-other-keys)
-  "DEPRECATED: Use stylesheets and :display :flex with :flex-direction :column."
-  (declare (ignore nodes container-rect container-props))
-  (warn "layout-vbox is deprecated. Use stylesheets and flex display properties.")
-  nil)
+;; (defun layout-vbox (nodes container-rect &rest container-props &key &allow-other-keys)
+;;   (declare (ignore nodes container-rect container-props))
+;;   (log-warn "layout-vbox is deprecated.")
+;;   nil)
 
-(defun layout-hbox (nodes container-rect &rest container-props &key &allow-other-keys)
-  "DEPRECATED: Use stylesheets and :display :flex with :flex-direction :row."
-  (declare (ignore nodes container-rect container-props))
-  (warn "layout-hbox is deprecated. Use stylesheets and flex display properties.")
-  nil)
+;; (defun layout-hbox (nodes container-rect &rest container-props &key &allow-other-keys)
+;;   (declare (ignore nodes container-rect container-props))
+;;   (log-warn "layout-hbox is deprecated.")
+;;   nil)
 
-(defun layout-grid (nodes rows cols container-rect &key gap)
-  "DEPRECATED: Use stylesheets and :display :grid."
-  (declare (ignore nodes rows cols container-rect gap))
-  (warn "layout-grid is deprecated. Use stylesheets and grid display properties.")
-  nil)
+;; (defun layout-grid (nodes rows cols container-rect &key gap)
+;;   (declare (ignore nodes rows cols container-rect gap))
+;;   (log-warn "layout-grid is deprecated. Use display:grid style.")
+;;   nil)
