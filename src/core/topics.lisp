@@ -31,7 +31,8 @@
    #:topic-subscription
    #:make-topic-subscription
    #:topic-subscription-pattern
-   #:topic-subscription-handler))
+   #:topic-subscription-handler
+   #:publish-to-topic))
 
 (in-package :elmtui.core.topics)
 

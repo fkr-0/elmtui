@@ -131,6 +131,7 @@
    :valid-value-p ; Validation generic
    :dirty :dirty-p ; Export dirty accessor and predicate
    :sid
+   :styles-list
    ;; Value related functions
    :style-property-definition-default-value
    :parse-property-value
@@ -424,3 +425,6 @@ it carries an optional NAME:string and RULES:list."))
 (defmethod style-property-value-raw-value (value)
   "For non-style-value objects, return the value directly."
   value)
+
+(defgeneric styles-list (stylable)
+  (:documentation "Return a list of styles applied to the stylable object."))

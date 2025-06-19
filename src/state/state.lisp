@@ -1,19 +1,20 @@
 ;;;===============================================================
 ;;; File: src/state/state.lisp
 ;;; Comprehensive Elm State Management (Transactional, Observable, Thread-safe)
+;; Public package for state management
 (uiop:define-package :elmtui.state
-  (:use :cl)
+  (:use :cl )
   (:import-from :elmtui.state.api ; Import from the central API
    :application-state :make-application-state :state-ref :get-state :set-state
-   #:application-state-data
+   #:application-state-data #:state-data #:state-data-data
    :with-transaction :undo-last-transaction
    :update-result :make-update-result :ur-patches :ur-commands
-   :merge-patch :merge-patches
-   :get-path :set-path :remove-path
-                :get-component-by-path :store-component-at-path :remove-component-at-path
-   :ur-has-command-p :ur-add-command)
+   :ur-has-command-p)
   (:import-from :elmtui.core.globals
    :*app-state*)
+  ;; Import the conditions package directly to avoid qualified references
+  (:import-from :elmtui.core.conditions
+   :async-task-error :log-condition)
   ;; Import lower-level statelib components if they are not exposed via elmtui.state.api
   ;; but are needed for the implementation details within elmtui.state.
   (:import-from :elmtui.statelib.state
@@ -33,23 +34,22 @@
   ;; For now, assuming elmtui.state.api handles all public exports.
   ;; If elmtui.state defines functions that are part of the API, they should be exported there.
   (:export
-   ;; If any symbols defined *directly* in this file (elmtui.state) are meant to be part of the API,
-   ;; they should be exported from elmtui.state.api.
-   ;; For example, if merge-patch, get-path etc. are defined here, they are exported via elmtui.state.api.
-   ;; The `update-result` struct and its methods are defined here and exported via the API.
-   :update-result :make-update-result :ur-patches :ur-commands
-   :ur-has-command-p :ur-add-command
+   :with-async-restarts ; This is a utility for async task handling, not part of the API
+   ;; Functions defined here that are exported to the public API
    :merge-patch :merge-patches
    :get-path :set-path :remove-path
    :get-component-by-path :store-component-at-path :remove-component-at-path
-   :rollback-state ; Defined here, should be in API exports if public
-   ;; Also, re-export core types if this is their canonical definition point for the API
+   :rollback-state 
+   ;; Re-exports from other packages that are part of this package's interface
+   :update-result :make-update-result :ur-patches :ur-commands
+   :ur-has-command-p
    :application-state :make-application-state :state-ref :get-state :set-state
    :with-transaction
    ))
 
 (in-package :elmtui.state)
 
+(declaim (ftype (function () t) rollback-state))
 ;;;--------------------------------------------------------------
 ;;; Update Result Structure (defined here, exported via API)
 ;;;--------------------------------------------------------------
@@ -65,8 +65,13 @@
 ;;; Path Utilities for Plists (Functional: return new plists on change)
 ;;; (defined here, exported via API)
 ;;;--------------------------------------------------------------
+(declaim (ftype (function (list list &optional t) t) get-path))
 (defun get-path (data path &optional default)
   "Retrieves a value from a nested plist using a list of keys (path)."
+  (declare (type list data path)
+           (type t default))
+  (check-type data list)
+  (check-type path list)
   (loop with current-data = data
         for key in path
         do (if (and (listp current-data) (evenp (length current-data)))
@@ -76,10 +81,15 @@
                (return default)) ; Path broken (non-plist encountered)
         finally (return current-data)))
 
+(declaim (ftype (function (list list t) list) set-path))
 (defun set-path (data path new-value)
   "Sets a value in a nested plist using a list of keys (path).
    Creates intermediate plists if they don't exist.
    Returns a new plist with the modification."
+  (declare (type list data path)
+           (type t new-value))
+  (check-type data list)
+  (check-type path list)
   (if (null path) (error "Path cannot be empty for set-path"))
   (let ((key (car path))
         (rest-path (cdr path)))
@@ -93,18 +103,22 @@
             (setf (getf new-data key) (set-path current-child rest-path new-value))))
       new-data)))
 
+(declaim (ftype (function (list list) list) remove-path))
 (defun remove-path (data path)
   "Removes a key-value pair from a nested plist.
    Returns a new plist with the modification, or original if path not found or data is nil."
+  (declare (type list data path))
+  (check-type data list)
+  (check-type path list)
   (if (or (null path) (null data)) (return-from remove-path data))
   (let ((key (car path))
         (rest-path (cdr path)))
     (if (null rest-path) ; Key to remove is at this level
-        (if (nth-value 1 (getf data key)) ; Check if key exists before copying and remf-ing
-            nil
-            ;; (let ((new-data (copy-list data))) ;; MODIFIED: was nil, now proper remf
-            ;;   (remf new-data key)
-            ;;   new-data)
+        ;; Check if key exists before copying and remf-ing
+        (if (getf data key nil) ; Use getf with default nil to check existence
+            (let ((new-data (copy-list data)))
+              (remf new-data key)
+              new-data)
             data) ; Key not found, return original data
         (let ((child (getf data key)))
           (if (and (listp child) (evenp (length child))) ; If child is a plist, recurse
@@ -120,47 +134,157 @@
 ;;; State Patching and Component Path Management
 ;;; (defined here, exported via API)
 ;;;--------------------------------------------------------------
-(defun merge-patch (state-plist patch)
-  "Merges a single patch into the state plist. Returns new state-plist.
-A patch is a list: (path-list new-value).
-If new-value is :elmtui-delete-path, the path is removed."
+;; Use the same FTYPE signature as defined in the API
+;; Ensure FTYPE matches the API expectation
+(declaim (ftype (function ((or list hash-table) list) (or list hash-table)) merge-patch))
+(defun merge-patch (state-data patch)
+  "Merges a single patch into the state data. Returns updated data.
+Patch is a list: (path-list new-value). If new-value is :elmtui-delete-path, removes the path.
+Supports both hash-table and plist based state-data."
+  ;; Handle both hash-tables and lists directly, not state-data structs
+  (declare (type (or hash-table list) state-data)
+           (type list patch))
+  (check-type state-data (or hash-table list))
+  (check-type patch list)
+  (unless (and (= (length patch) 2) (listp (first patch)))
+    (error "Invalid patch format. Expected (path-list new-value), got ~S" patch))
+  
   (let ((path (first patch))
         (value (second patch)))
-    (if (eq value :elmtui-delete-path)
-        (remove-path state-plist path)
-        (set-path state-plist path value))))
+    (cond
+      ;; Hash-table backing: only simple top-level keys supported
+      ((hash-table-p state-data)
+       (if (and (listp path) (= (length path) 1))
+           (let ((key (first path)))
+             (if (eq value :elmtui-delete-path)
+                 (remhash key state-data)
+                 (setf (gethash key state-data) value))
+             state-data)
+           (error "Unsupported nested path on hash-table state: ~S" path)))
+      ;; Plist backing: delegate to existing utilities
+      ((listp state-data)
+       (if (eq value :elmtui-delete-path)
+           (remove-path state-data path)
+           (set-path state-data path value)))
+      (t (error "Unsupported state type ~S for merging patch" state-data)))))
 
-(defun merge-patches (state-plist patches)
-  "Merges a list of patches into the state plist. Returns new state-plist."
-  (reduce #'(lambda (current-state p) (merge-patch current-state p))
-          patches
-          :initial-value state-plist))
+;; Declare the function type that matches the API expectation
+(declaim (ftype (function ((or hash-table list) list) (or hash-table list)) merge-patches))
+(defun merge-patches (state-data patches)
+  "Merges a list of patches or a property list into the state data. Handles hash-tables and plists.
+Returns the updated state-data (hash-table or plist)."
+  ;; Handle both hash-tables and lists directly, not state-data structs
+  (declare (type (or hash-table list) state-data)
+           (type list patches)) ; Patches can be a plist or list of patch-forms
+  (check-type state-data (or hash-table list))
+  (check-type patches list)
+  
+  ;; Normalize property list form '(:k1 v1 :k2 v2 ...)' into list of patch pairs ((k1) v1) ...
+  (let* ((patch-list
+           (cond
+             ((and (listp patches)
+                   (every #'atom patches)
+                   (evenp (length patches)))
+              (loop for (k v) on patches by #'cddr
+                    collect (list (list k) v)))
+             ((listp patches) patches)
+             (t (error "Invalid patches format: ~S" patches)))))
+    (cond
+      ((hash-table-p state-data)
+       ;; Destructively apply each patch to the hash-table
+       (dolist (p patch-list state-data)
+         (merge-patch state-data p)))
+      ((listp state-data)
+       ;; Merge into new plist
+       (reduce (lambda (current-state p)
+                 (merge-patch current-state p))
+               patch-list
+               :initial-value state-data))
+      (t (error "Unsupported state type ~S for merging patches" state-data)))))
 
+(declaim (ftype (function (application-state list) t) get-component-by-path))
 (defun get-component-by-path (app-state component-id-path)
   "Retrieves a component instance from the application state using its ID path.
    The component itself is stored under '(:components <id1> <id2> ... :component-instance)."
-  (get-path (application-state-data app-state) ; Operate on the internal data plist
-            (append '(:components) component-id-path '(:component-instance))))
+  (declare (type application-state app-state)
+           (type list component-id-path))
+  (check-type app-state application-state)
+  (check-type component-id-path list)
+  
+  ;; Get the raw application state data
+  (let* ((app-data (application-state-data app-state))
+         (components-path (append '(:components) component-id-path '(:component-instance))))
+    ;; If app-data is a state-data struct, get its hash-table data
+    (if (typep app-data 'state-data)
+        ;; Since state-data.data is always a hash-table, handle it specially
+        (let ((hash-table-data (state-data-data app-data)))
+          ;; Use get-path which will handle hash-table data
+          (if (and (listp components-path) (= (length components-path) 1))
+              (gethash (first components-path) hash-table-data)
+              ;; For nested paths in a hash-table (not well supported)
+              (error "Nested paths in hash-table not supported: ~S" components-path)))
+        ;; If app-data is a direct plist, use get-path normally
+        (get-path app-data components-path))))
 
+(declaim (ftype (function (application-state list t) (or list hash-table)) store-component-at-path))
 (defun store-component-at-path (app-state component-id-path component-instance)
-  "Stores a component instance in the application state at the given ID path. Returns new app-state data plist."
-  (let ((full-path (append '(:components) component-id-path '(:component-instance))))
-    ;; This should operate on the internal data of app-state and return the new data plist
-    ;; The caller (e.g. defupdate) would then update the app-state struct.
-    ;; OR, if this is meant to be a direct mutation, it needs to use the transaction mechanism.
-    ;; For now, assuming it returns a new plist for functional purity within merge-patches.
-    (set-path (application-state-data app-state) full-path component-instance)))
+  "Stores a component instance in the application state at the given ID path. Returns new app-state data (plist or hash-table)."
+  (declare (type application-state app-state)
+           (type list component-id-path)
+           (type t component-instance))
+  (check-type app-state application-state)
+  (check-type component-id-path list)
+  
+  ;; Get the raw application state data and modify it
+  (let* ((app-data (application-state-data app-state))
+         (full-path (append '(:components) component-id-path '(:component-instance))))
+    ;; If app-data is a state-data struct, get its hash-table data
+    (if (typep app-data 'state-data)
+        ;; Since state-data.data is always a hash-table, handle it specially
+        (let ((hash-table-data (state-data-data app-data)))
+          ;; Handle storing in hash-table (direct key only for simplicity)
+          (if (and (listp full-path) (= (length full-path) 1))
+              (progn 
+                (setf (gethash (first full-path) hash-table-data) component-instance)
+                hash-table-data)
+              ;; For now, error on nested paths in hash-tables 
+              (error "Nested paths in hash-table not supported: ~S" full-path)))
+        ;; If app-data is a direct plist, use set-path normally
+        (set-path app-data full-path component-instance))))
 
+(declaim (ftype (function (application-state list) list) remove-component-at-path))
 (defun remove-component-at-path (app-state component-id-path)
   "Removes a component instance and its state from the application state at the given ID path.
    This removes the specific :component-instance and the entire state subtree for that component ID path.
    Returns new app-state data plist."
-  (let* ((instance-path (append '(:components) component-id-path '(:component-instance)))
-         (state-subtree-path (append '(:components) component-id-path))
-         (current-data (application-state-data app-state))
-         (temp-data (remove-path current-data instance-path))
-         (final-data (remove-path temp-data state-subtree-path)))
-    final-data))
+  (declare (type application-state app-state)
+           (type list component-id-path))
+  (check-type app-state application-state)
+  (check-type component-id-path list)
+  
+  ;; Get the raw application state data
+  (let* ((app-data (application-state-data app-state))
+         (instance-path (append '(:components) component-id-path '(:component-instance)))
+         (state-subtree-path (append '(:components) component-id-path)))
+    
+    ;; If app-data is a state-data struct, get its hash-table data
+    (if (typep app-data 'state-data)
+        ;; Since state-data.data is always a hash-table, handle it specially
+        (let ((hash-table-data (state-data-data app-data)))
+          ;; Handle removing from hash-table (direct key only for simplicity)
+          (if (and (listp instance-path) (= (length instance-path) 1))
+              (progn
+                (remhash (first instance-path) hash-table-data)
+                ;; Also remove the subtree key if present
+                (when (and (listp state-subtree-path) (= (length state-subtree-path) 1))
+                  (remhash (first state-subtree-path) hash-table-data))
+                '()) ; Return empty list to represent success
+              ;; For now, error on nested paths in hash-tables
+              (error "Nested paths in hash-table not supported: ~S" instance-path)))
+        ;; If app-data is a direct plist, use remove-path normally
+        (let ((temp-data (remove-path app-data instance-path))
+              (final-data (remove-path app-data state-subtree-path)))
+          final-data))))
 
 ;; Ensure application-state-data is accessible if used directly
 ;; This might need to be an exported accessor from elmtui.statelib.state if not already.
@@ -176,3 +300,32 @@ If new-value is :elmtui-delete-path, the path is removed."
 ;;   extracting its data, applying `merge-patches` to this data, and then
 ;;   setting the new data back into the `application-state` object, all within a transaction.
 
+
+(defmacro with-async-restarts ((condition-var) &body forms) ; Renamed body to forms
+  "Handle async task failures with DRY restarts: ignore, rollback, replace, provide result."
+  `(block with-async-restarts
+     (handler-bind
+         ((async-task-error
+            (lambda (,condition-var)
+              (log-condition ,condition-var)
+              (restart-case
+                  (signal ,condition-var)
+                (ignore-task ()
+                  :report "Ignore/discard this async task."
+                  (return-from with-async-restarts nil))
+                (rollback-state ()
+                  :report "Rollback state to previous checkpoint."
+                  ;; Use fully qualified name as state is loaded first now
+                  (when (fboundp 'elmtui.state:rollback-state) (funcall #'rollback-state))
+                  (return-from with-async-restarts nil))
+                (replace-task (new-task)
+                  :report "Replace the async task interactively or programmatically."
+                  ;; Return the new task value, don't funcall body
+                  (return-from with-async-restarts new-task))
+                (provide-result (result)
+                  :report "Provide a custom result for this task."
+                  (return-from with-async-restarts result))
+                (retry ()
+                  :report "Retry the async task."
+                  (return-from with-async-restarts (progn ,@forms))))))) ; Use forms
+       ,@forms))) ; Use forms

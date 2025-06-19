@@ -1,17 +1,18 @@
 (in-package :asdf-user)
 
 (asdf:defsystem "elmtui-tests"
-  :description "Test suite for the uncharming-tui system"
-  :author "CL User <cl.user@mail.com>"
+  :description "Test suite for the elmtui system"
+  :author "User <user@archlinux>"
   :version "0.0.1"
   :depends-on (#:elmtui #:fiveam)
-  :license "BSD"
+  :license "GPL"
   :serial t
   :components ((:module "tests"
                 :serial t
-                :components (
-                             (:file "elmtui-tests")
-                             (:file "tree-renderer-tests"))))
+                :components ((:file "elmtui-tests")
+                             (:file "application-init-tests")
+                             (:file "component-init-tests"))))
+  :perform (test-op (op c) (symbol-call :elmtui.tests :run-all-tests)))
   ;; (:file "elmtui-loop-async-tests")
   ;; (:file "elmtui-state-tests")
   ;; (:file "elmtui-core-keymap-tests") ; Added keymap tests

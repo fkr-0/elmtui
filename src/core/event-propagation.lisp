@@ -5,7 +5,7 @@
 (uiop:define-package :elmtui.core.event-propagation
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn)
-  (:import-from :elmtui.view.styled #:stylable-id #:styled-ui-node)
+  (:import-from :elmtui.view.api #:stylable-id #:styled-ui-node)
   (:import-from :elmtui.core.event-types
                 #:mouse-event
                 #:ui-event
@@ -16,7 +16,7 @@
                 #:key-event-p
                 #:mouse-event-p
                 #:stop-propagation)
-  (:import-from :elmtui.view.core
+  (:import-from :elmtui.view.api
                 #:ui-node
                 #:ui-node-parent
                 #:ui-node-children)
@@ -45,7 +45,7 @@
       (return-from traverse-ui-tree-down t))
     (loop for child in (ui-node-children root-node)
           when (traverse-ui-tree-down child visitor-fn)
-          return t)))
+            return t)))
 
 (defun find-ui-node-by-id (root-node id)
   "Finds a UI node with the given ID in the UI tree.

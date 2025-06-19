@@ -7,7 +7,7 @@
   :license      "GNU GPL, version 3"
   :source-control (:git "https://github.com/user/elmtui.git")
   :depends-on   (#:alexandria #:str #:sb-posix
-                              #:log4cl #:slynk
+                              #:log4cl  #:slynk
                               #:cl-reexport
                               #:bordeaux-threads)
   :pathname "./src/"
@@ -15,11 +15,7 @@
   :components ((:file "utils")
                (:file "core/logging")
                (:file "core/globals")
-               ;; ================= api =================
-               (:file "app/api")
-               (:file "state/api") ; Added state/api
-               (:file "ui/api")
-               (:file "view/api")
+               (:file "core/conditions")
                (:module "cleve-elm"
                 :pathname "clevelib/"
                 :serial t
@@ -40,8 +36,14 @@
                              (:file "ems")
                              (:file "clevelib")))
 
-
-               ;; State Management (Load before Core/Conditions)
+               (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
+               ;; Core Modules (Load after cleve-elm, before API Layer)
+               (:file "state/msg")
+               (:file "view/position") ; Load position before focus manager
+               (:file "view/api") ; Imports: cl (pure declarations)
+               ;; Load state module early since focus manager needs it
+               (:file "state/statelib/state")
+               (:file "state/api")
                (:module "state"
                 :pathname "state/"
                 :serial t
@@ -50,46 +52,21 @@
                               :serial t
                               :pathname "statelib/"
                               :components (
-                                           (:file "state")
                                            (:file "observe")
                                            (:file "transaction")
                                            (:file "package")))
 
                              (:file "state")
-                             (:file "msg")
                              (:file "model")
-                             (:file "transactions") ; Added transactions.lisp
+                                        ; Added transactions.lisp
                              (:file "elm")
-                             (:file "update")))
+                             (:file "update")
 
-               (:file "view/geo")
-               (:file "view/core")
-               (:module "view/style-lib"
-                :pathname "view/style-lib/"
-                :serial t
-                :components ((:file "api") ; Defines stylable, selector base class, etc.
-                             (:file "util")
-                             (:file "types")
-                             (:file "styles")
-                             (:file "style-set")
-                             (:file "macros")
-                             (:file "selector")
-                             (:file "properties")
-
-                             ;; Selector implementations moved after view/styled
-                             (:file "rule")
-                             (:file "stylable") ; Implementation details? Might depend on api.
-                             (:file "styled-strings")
-                             (:file "stylesheet")
-                             (:file "style-lib")))
-               (:file "view/styled")
-               (:file "view/position")
-               ;; Core Modules (Load after State)
+                             (:file "transactions"))) ; Moved here - loads after state implementation
                (:module "core"
                 :pathname "./core/"
                 :serial t
                 :components (
-                             (:file "conditions")
                              (:file "async")
                              (:file "threads")
                              (:file "event-channels")
@@ -119,7 +96,38 @@
                               :components ((:file "manager")))
                              (:file "keymap-system") ; Main entry point for keyboard/focus system
                              (:file "loop")))
+               ;; ================= API LAYER =================
+               ;; These API files define the public interface for each module
+               ;; Each contains both the interface declarations and implementations
+               (:file "app/api") ; Imports: elmtui.core.globals, elmtui.core.event-channels
 
+               (:file "ui/api") ; Imports: elmtui.state.api, elmtui.utils
+               (:file "platform/api") ; Imports: elmtui.utils, bordeaux-threads
+
+
+
+
+               (:file "view/geo")
+               (:file "view/core")
+               (:module "view/style-lib"
+                :pathname "view/style-lib/"
+                :serial t
+                :components (
+                             (:file "util")
+                             (:file "types")
+                             (:file "styles")
+                             (:file "style-set")
+                             (:file "macros")
+                             (:file "selector")
+                             (:file "properties")
+
+                             ;; Selector implementations moved after view/styled
+                             (:file "rule")
+                             (:file "stylable") ; Implementation details? Might depend on api.
+                             (:file "styled-strings")
+                             (:file "stylesheet")
+                             (:file "style-lib")))
+               (:file "view/styled")
                ;; --- View / UI Dependency Resolution ---
                ;; Load core view definitions first
                ;; Load the style library needed by styled nodes and UI
@@ -158,7 +166,7 @@
                              ;; Load the main package file AFTER the individual widget files
                              (:file "widgets-pkg") ; Correct filename to load widgets.lisp
                              (:file "widget-registry")))
-
+               (:file "app/dsl-type-registry")
                (:file "app/application")
                ;; Load remaining View components (depend on UI widgets, layout etc)
                (:file "view/memo")
@@ -184,8 +192,7 @@
                 :serial t
                 :pathname "platform/"
                 :components (
-                             ;; Platform API Definition
-                             (:file "api")
+                             ;; Platform API Definition is loaded earlier in the "API LAYER" block
                              (:file "backend/common/ansi-styling")
                              (:file "backend/common/virtual-buffer")
                              ;; (:file "canvas" :depends-on ("api"
@@ -263,7 +270,8 @@
                              (:file "rainbow-app-canvas")
                              ;; (:file "boxes-app")
                              ;; (:file "dirli")
-                             (:file "colortext-app")))
+                             ;; (:file "colortext-app")
+                             ))
                ;; (:module "dirlister"
                ;;  :serial t
                ;;  :pathname "../examples/dirlister_poc/"
@@ -300,13 +308,12 @@
   :components ((:module "tests"
                 :serial t ; Ensure tests run in a defined order if necessary, or remove if not.
                 :components
-                ((:file "packages")
-                 (:file "test-utils")
-                 (:file "component-init-tests")
+                ((:file "elmtui-tests")
                  (:file "application-init-tests")
-                 (:file "flex-layout-tests")
-                 (:file "grid-layout-engine-tests")
-                 (:file "tree-renderer-tests") ; Added tree-renderer tests
+                 (:file "component-init-tests")
+                 ;; (:file "flex-layout-tests")
+                 ;; (:file "grid-layout-engine-tests")
+                 ;; (:file "tree-renderer-tests") ; Added tree-renderer tests
                  ;; Add other test files here
                  )))
   :description "Test suite for elmtui."

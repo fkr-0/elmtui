@@ -1,19 +1,14 @@
 (uiop:define-package :elmtui.statelib.state (:use :cl :log4cl)
                      (:nicknames :ut.state.state)
                      (:import-from :elmtui.core.globals :*app-state*)
-                     (:import-from              :elmtui.state.api #:state-ref
-                                                #:make-application-state
-                                                #:application-state-data
-                                                #:application-state-transaction-log
-                                                #:get-state
-                                                #:state-data-data
-                                                #:application-state #:state-data)
                      (:export :make-application-state  :get-state
-                              :set-state #:set-state!
+                              :set-state #:set-state! :state-ref
                               :application-state-transaction-log :transaction-id
                               :application-state-observers :application-state-data
                               :application-state-lock
-                      :state-data :state-data-data
+                      :state-data :state-data-data :make-state-data
+                      :application-state :make-application-state
+                      :application-state-transaction-history :application-state-undone-history
                       :merge-state :with-state :with-comp-state
                               :set-state!
                       :set-state
@@ -24,6 +19,46 @@
                       :undone-history)) ; Added export
 
 (in-package :ut.state.state)
+
+;;;--------------------------------------------------------------
+;;; State Data Structures
+;;;--------------------------------------------------------------
+
+(defstruct state-data
+  "A struct to hold the application state data.
+  The data is stored in a hash-table."
+  (data (make-hash-table :test 'equal) :type hash-table))
+
+;; Correct FTYPE declarations for struct constructors and accessors
+;; The constructor doesn't need parameters (optional ones are auto-generated)
+(declaim (ftype (function (&key (:data hash-table)) state-data) make-state-data))
+;; Accessor is correct
+(declaim (ftype (function (state-data) hash-table) state-data-data)) 
+;; Correct writer signature - the value comes first, then the instance
+(declaim (ftype (function (hash-table state-data) hash-table) (setf state-data-data)))
+
+(defstruct application-state
+  "A struct to hold the application state.
+  The application state holds the state data, observers, a lock, a transaction log,
+  a transaction history (for undo), and an undone history (for redo)."
+  (data (make-state-data) :type state-data)
+  (observers (list) :type list)
+  (lock (sb-thread:make-mutex) :type sb-thread:mutex)
+  (transaction-log (list) :type list) ; Temporary log for current transaction
+  (transaction-history (list) :type list) ; Stack of committed transactions (undo stack)
+  (undone-history (list) :type list)) ; Stack of undone transactions (redo stack)
+
+;; Correct FTYPE declarations for application-state constructor with proper keyword parameters
+(declaim (ftype (function 
+                 (&key 
+                  (:data state-data)
+                  (:observers list)
+                  (:lock sb-thread:mutex)
+                  (:transaction-log list)
+                  (:transaction-history list)
+                  (:undone-history list))
+                 application-state) 
+                make-application-state))
 
 
 ;; (defmethod print-object ((st application-state) stream)

@@ -9,9 +9,7 @@
   (:import-from :elmtui.core.globals
                 #:*event-loop* #:*app-state* #:*app-message-processor* #:*app-sender*)
   (:import-from :elmtui.style-lib.api
-                #:style-set)
-  (:import-from :elmtui.style-lib.style-set
-                #:styles-list )
+                #:style-set #:styles-list)
   (:import-from :elmtui.core.conditions
                 #:event-loop-dispatch-error #:async-task-error)
   (:import-from :cleve-elm.event-loop

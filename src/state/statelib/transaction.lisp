@@ -1,17 +1,20 @@
 (uiop:define-package :elmtui.statelib.transaction
   (:use :cl :log4cl )
   (:import-from :elmtui.statelib.observe #:notify-observers) ; Import the real notify-observers
+  (:import-from :elmtui.statelib.state
+                #:application-state-transaction-history
+                #:app-state
+                #:application-state) ; Import the real notify-observers
   (:import-from :elmtui.state.api #:undo-last-transaction
                 #:application-state-undone-history
                 #:application-state-transaction-log
+                #:with-transaction
                 #:application-state-observers
                 #:application-state-lock
                 #:state-data-data
                 #:set-state
-                #:application-state-data
-                #:application-state-transaction-history
-                #:app-state
-                #:application-state)
+                #:with-transaction
+                #:application-state-data)
   (:nicknames :ut.state.transaction)
   (:export :transaction :transaction-id :transaction-changes
    :transaction-timestamp :transaction-name :transaction-description
@@ -88,11 +91,11 @@
   (notify-observers app-state (transaction-changes transaction)))
 
 ;;;  Replace the existing WITH-TRANSACTION macro with the one below
-(defmacro with-transaction ((app-state &key 
-                                         (label "Unnamed Transaction")
-                                         name
-                                         description)
-                            &body body)
+(defmacro elmtui.state.api:with-transaction ((app-state &key
+                                                          (label "Unnamed Transaction")
+                                                          name
+                                                          description)
+                                             &body body)
   "Execute BODY, then bundle all state changes into *one* transaction.
 If BODY unwinds with an error, the changes are discarded (no commit).
 Actual data rollback is still done later by `undo-last-transaction`.

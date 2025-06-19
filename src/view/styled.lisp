@@ -5,6 +5,7 @@
 (uiop:define-package :elmtui.view.styled
   (:use :cl)
   (:import-from :log4cl #:log-debug #:log-warn) ; Added log-warn
+  (:import-from :elmtui.view.api :styled-ui-node :styled-ui-node-style-map)
   (:import-from :elmtui.view.core
    :ui-node :make-ui-node :copy-ui-node
                 :ui-node-type :ui-node-props :ui-node-children :node-type)
@@ -12,6 +13,7 @@
   (:import-from :elmtui.style-lib.api
                 #:stylable #:stylable-id #:classes #:parents-of #:styles #:dirty #:dirty-p
                 #:make-style-set ; Ensure make-style-set is available
+
                 #:stylesheet-rules ; For checking if stylesheet is empty, if needed
                 #:style-set #:stylesheet-name)
   ;; Import default style set, value-of, and copy-set from style-set package
@@ -36,35 +38,22 @@
 ;;; Styled UI Node Class
 ;;;-----------------------------------------------------------------------------
 
-(defclass styled-ui-node (ui-node stylable)
-  ;; stylable mixin provides: sid, classes, parents-of, styles, dirty
-  ()
-  (:documentation
-   "A UI node that can be styled via elmtui.style-lib.
-    It inherits from ui-node for basic structure and stylable for style-related slots and behavior."))
-
-;; Methods implementing the stylable interface for styled-ui-node
-;; These typically rely on slot-accessors provided by the 'stylable' class
-;; If 'stylable' defines accessors like (stylable-id (node stylable)), etc.,
-;; then explicit method definitions here might only be needed for customization.
-
 (defmethod stylable-id ((node styled-ui-node))
-  "Returns the ID of the styled node. Relies on the 'sid' slot from 'stylable'."
-  (if (slot-boundp node 'elmtui.style-lib.api::sid)
-      (slot-value node 'elmtui.style-lib.api::sid)
-      (progn
-        (log-warn "STYLED: styled-ui-node accessed for ID, but 'sid' slot unbound. Props: ~S" (ui-node-props node))
-        nil))) ; Or fallback to (getf (ui-node-props node) :id) if that's desired policy
+  "Returns the ID of the styled node from its props."
+  (getf (ui-node-props node) :id))
 
 (defmethod classes ((node styled-ui-node))
-  "Returns the classes of the styled node. Relies on the 'classes' slot from 'stylable'."
-  (if (slot-boundp node 'elmtui.style-lib.api::classes)
-      (slot-value node 'elmtui.style-lib.api::classes)
-      (progn
-        (log-warn "STYLED: styled-ui-node accessed for classes, but 'classes' slot unbound. Props: ~S" (ui-node-props node))
-        nil)))
+  "Returns the classes of the styled node from its props."
+  (let ((classes-prop (getf (ui-node-props node) :classes)))
+    (cond ((null classes-prop) nil)
+          ((listp classes-prop) classes-prop)
+          ((keywordp classes-prop) (list classes-prop))
+          ((stringp classes-prop) (list (intern (string-upcase classes-prop) :keyword)))
+          (t (log-warn "STYLED: Invalid :classes ~S in props for node ID ~S. Ignored." 
+                       classes-prop (getf (ui-node-props node) :id))
+             nil))))
 
-;; parents-of, styles, dirty/dirty-p are assumed to be accessors provided by elmtui.style-lib:stylable.
+;; parents-of, styles, dirty/dirty-p would be handled by stylesheet system if needed
 
 ;;;-----------------------------------------------------------------------------
 ;;; Node Creation / Copying
@@ -74,38 +63,24 @@
   "Create a new styled UI node.
    Props should include :id and :classes for styling selectors.
    PARENT is the direct parent styled-ui-node (used for :parents initarg of stylable)."
-  (log:debug "STYLED: make-styled-node - Type: ~S, Props: ~S, Children count: ~A, Parent provided: ~S"
+  (log-debug "STYLED: make-styled-node - Type: ~S, Props: ~S, Children count: ~A, Parent provided: ~S"
              type props (length children) (if parent t nil))
   (let* ((provided-id (getf props :id))
          (final-id (or provided-id (gensym "NODE-")))
-         (classes-prop (getf props :classes))
-         (processed-classes (cond ((null classes-prop) nil)
-                                  ((listp classes-prop) classes-prop)
-                                  ((keywordp classes-prop) (list classes-prop))
-                                  ((stringp classes-prop) (list (intern (string-upcase classes-prop) :keyword)))
-                                  (t (log-warn "STYLED: Invalid :classes ~S in props for node ID ~S. Ignored." classes-prop final-id)
-                                     nil)))
          ;; Props for the base ui-node part, ensure :id is the final-id
          (effective-props (let ((p (copy-list props))) (setf (getf p :id) final-id) p))
          (node (make-instance 'styled-ui-node
-                              ;; Initargs for stylable mixin
-                              :sid final-id
-                              :classes processed-classes
-                              :parents (when parent (list parent))
-                              ;; :styles will be initialized below
-                              :dirty t)))
+                              ;; Only use the initargs that styled-ui-node actually accepts
+                              :style-map nil))) ; Initialize with empty style-map for now
     ;; Set basic ui-node slots
     (setf (ui-node-type node) type)
     (setf (ui-node-props node) effective-props)
     (setf (ui-node-children node) children)
 
-    ;; Initialize styles slot: defaults + inline styles from :style prop
-    (let ((initial-styles (copy-set *default-style-set*)))
-      (let ((inline-style-data (getf props :style)))
-        (when (and inline-style-data (listp inline-style-data))
-          (loop for (key val) on inline-style-data by #'cddr
-                do (set-style initial-styles key val))))
-      (setf (styles node) initial-styles))
+    ;; Initialize style-map: convert inline styles from :style prop to a plist
+    (let ((inline-style-data (getf props :style)))
+      (when (and inline-style-data (listp inline-style-data))
+        (setf (styled-ui-node-style-map node) inline-style-data)))
     node))
 
 (defun copy-styled-node (node &key type props children parent)
@@ -114,7 +89,7 @@
    and then populated by query-stylesheet in apply-stylesheet-to-tree.
    Children from the original node are taken as a list to be processed by the caller."
   (log:debug "STYLED: copy-styled-node - Original ID: ~S, New Parent: ~S"
-             (stylable-id node) (if parent (stylable-id parent) "NIL"))
+             (getf (ui-node-props node) :id) (if parent (getf (ui-node-props parent) :id) "NIL"))
   (make-styled-node
    :type (or type (ui-node-type node))
    :props (or props (copy-list (ui-node-props node)))
@@ -136,26 +111,21 @@
 (defmethod apply-stylesheet-to-tree ((node styled-ui-node) stylesheet &optional parent)
   "Apply styles to an already styled-ui-node tree. Returns a new styled node."
   (log:debug "STYLED: apply-stylesheet-to-tree for styled-ui-node - ID: ~S, Type: ~S, Stylesheet: ~A, Parent ID: ~S"
-             (stylable-id node) (ui-node-type node)
+             (getf (ui-node-props node) :id) (ui-node-type node)
              (if stylesheet (stylesheet-name stylesheet) "NIL_STYLESHEET")
-             (if parent (stylable-id parent) "NIL_PARENT"))
+             (if parent (getf (ui-node-props parent) :id) "NIL_PARENT"))
 
   ;; 1. Create a new node instance, copying from the original.
   ;;    'copy-styled-node' (via 'make-styled-node') sets its parent link and
-  ;;    initializes its 'styles' slot (defaults + inline styles from its own props).
+  ;;    initializes its 'style-map' slot with inline styles from its own props.
   (let ((new-node (copy-styled-node node :parent parent)))
 
     ;; 2. Apply the stylesheet.
-    ;;    'query-stylesheet' uses (styles new-node) as its base, applies rules from
-    ;;    'stylesheet', and handles inheritance using 'new-node's parent context.
-    ;;    It returns a new style-set which becomes the computed styles for 'new-node'.
-    (setf (styles new-node) (query-stylesheet stylesheet new-node))
-    (log:debug "STYLED: Styles computed for ID ~S: ~S" (stylable-id new-node) (styles new-node))
+    ;;    For now, we just keep the inline styles since the stylesheet system is simplified
+    ;;    In the future, this would query the stylesheet and compute final styles
+    (log:debug "STYLED: Style-map for ID ~S: ~S" (getf (ui-node-props new-node) :id) (styled-ui-node-style-map new-node))
 
-    ;; 3. Mark the new-node as no longer dirty (styles are now current).
-    (setf (dirty new-node) nil)
-
-    ;; 4. Recursively process children from the original node's children list.
+    ;; 3. Recursively process children from the original node's children list.
     ;;    Each child will be processed, and 'new-node' (the current styled node)
     ;;    will be passed as its parent.
     (setf (ui-node-children new-node)

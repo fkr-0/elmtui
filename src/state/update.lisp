@@ -27,9 +27,7 @@
 ;; Assuming it's related to command handling and might be more complex.
 ;; For now, if it's just a concept, elmtui.state.api exports it.
 ;; If it needs an implementation here:
-(defgeneric publish-to-topic (topic-name message)
-  (:documentation "Generic function to publish a message to a named topic.
-Specific implementations will handle the dispatch logic, potentially using elmtui.core.topics."))
+
 
 ;; Default method for publish-to-topic (can be specialized by users or other systems)
 (defmethod publish-to-topic (topic-name message)
@@ -123,7 +121,7 @@ Specific implementations will handle the dispatch logic, potentially using elmtu
    (defupdate my-updater (current-app-state message)
      (if (eq message :increment)
          (values (list :counter (1+ (getf (elmtui.state.api:get-state current-app-state :counter) 0))) ; Patches
-                 (list '(:log "Counter incremented"))) ; Commands
+                 (list '(:log \"Counter incremented\"))) ; Commands
          (values nil nil))) ; No change, no commands
   "
   `(defun ,name (,state-var ,msg-var)

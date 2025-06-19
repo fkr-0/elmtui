@@ -1,7 +1,6 @@
 (uiop:define-package :elmtui.examples.root-viewport-test-app
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.app #:defapplication #:run-application #:quit)
-  (:import-from :elmtui.view.styled #:make-styled-node)
   (:import-from :elmtui.style-lib.styles #:rgb)
   (:import-from :elmtui.state.update #:defupdate)
   (:import-from :elmtui.core.event-types #:key-event #:key-code #:key-name)
@@ -78,14 +77,15 @@ Arrow keys move the root viewport's effective offsets. 'q' quits."
       (t nil))))
 
 (defun app-view (app-state)
-  "Defines the UI DSL for the root viewport's child content (the movable rectangle)."
+  "Defines the UI DSL for the root viewport's child content (the movable rectangle).
+   Returns pure hiccup-like data structure, not objects."
   (declare (ignore app-state)) ; app-state is not directly used to construct this static child
-  (make-styled-node
-   :type :container ; This will be the rectangle
-   :props (list :id :moving-rect
-                :style (list :width +rect-width+
-                             :height +rect-height+
-                             :bg-color *rect-color*))))
+  ;; Return PURE DATA (hiccup-like DSL), not objects
+  `(:container 
+    :id :moving-rect
+    :style (:width ,+rect-width+
+            :height ,+rect-height+
+            :bg-color ,*rect-color*)))
 
 (defapplication root-viewport-test-app
   :root-viewport-id :movable-root-vp ; Matches the ID used in app-init for state
