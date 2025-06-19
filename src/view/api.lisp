@@ -24,6 +24,7 @@
    ;; Diff-pipeline generics
    #:diff-buffer
    #:apply-diff
+   #:stylable-id
    ;; Abstract node classes
    #:ui-node
    #:styled-ui-node
@@ -31,6 +32,11 @@
    #:laid-out-ui-node))
 
 (in-package #:elmtui.view.api)
+;;; ===================================================================
+;;; INTERFACE SECTION - Public API declarations
+;;; ===================================================================
+
+;; Removed FTYPE declarations to avoid clobbering warnings - generic functions provide the interface
 
 ;;; -----------------------------------------------------------------------
 ;;; PROTOCOL NOTES
@@ -96,6 +102,11 @@
 ;;; =======================================================================
 
 (defgeneric render-view (app-state)
+;;; ===================================================================
+;;; IMPLEMENTATION SECTION
+;;; ===================================================================
+  (:method ((app-state t))
+    (error "RENDER-VIEW not implemented for ~S" (type-of app-state)))
   (:documentation
    "High-level entry point of the View-pipeline.
 
@@ -104,6 +115,8 @@ RESULT     – Tree of UI-NODE instances in their *rich* form (labels, list-boxe
 The result *must* be a pure value; no side-effects allowed."))
 
 (defgeneric apply-style (rich-tree)
+  (:method ((rich-tree list))
+    (error "APPLY-STYLE not implemented for ~S" (type-of rich-tree)))
   (:documentation
    "Normalise and merge style information.
 
@@ -112,6 +125,8 @@ RESULT     – Tree of STYLED-UI-NODE objects whose STYLE-MAP slot is *complete*
 Must not change tree topology."))
 
 (defgeneric resolve-view (styled-tree)
+  (:method ((styled-tree list))
+    (error "RESOLVE-VIEW not implemented for ~S" (type-of styled-tree)))
   (:documentation
    "Lower complex widgets to a minimal atomic vocabulary.
 
@@ -119,6 +134,8 @@ STYLED-TREE – Output of APPLY-STYLE.
 RESULT       – Tree of ATOMIC-UI-NODE objects (:drawable-content, :layout, …)."))
 
 (defgeneric layout-view (atomic-tree available-rect)
+  (:method ((atomic-tree list) (available-rect list))
+    (error "LAYOUT-VIEW not implemented for ~S and ~S" (type-of atomic-tree) (type-of available-rect)))
   (:documentation
    "Compute absolute geometry for every node.
 
@@ -127,6 +144,8 @@ AVAILABLE-RECT  – Rect structure (x y w h) representing constraints.
 RESULT          – Tree of LAID-OUT-UI-NODE objects with LAYOUT-RECT populated."))
 
 (defgeneric render-to-buffer (laid-out-tree backbuffer)
+  (:method ((laid-out-tree list) (backbuffer t))
+    (error "RENDER-TO-BUFFER not implemented for ~S and ~S" (type-of laid-out-tree) (type-of backbuffer)))
   (:documentation
    "Emit drawing commands into BACKBUFFER.
 
@@ -140,12 +159,16 @@ Return value  – Implementation-defined (usually BACKBUFFER or NIL)."))
 ;;; -----------------------------------------------------------------------
 
 (defgeneric diff-buffer (prev-buffer curr-buffer)
+  (:method ((prev-buffer t) (curr-buffer t))
+    (error "DIFF-BUFFER not implemented for ~S and ~S" (type-of prev-buffer) (type-of curr-buffer)))
   (:documentation
    "Compute *minimal* diff operations to transform PREV-BUFFER into CURR-BUFFER.
 
 Return value – A list/stream of diff operations understood by APPLY-DIFF."))
 
 (defgeneric apply-diff (backend diff-ops terminal-origin)
+  (:method ((backend t) (diff-ops list) (terminal-origin list))
+    (error "APPLY-DIFF not implemented for ~S, ~S and ~S" (type-of backend) (type-of diff-ops) (type-of terminal-origin)))
   (:documentation
    "Apply DIFF-OPS to the physical terminal via BACKEND.
 
@@ -161,13 +184,13 @@ Return value     – Implementation-defined (often NIL)."))
 (defclass ui-node ()
   ((type
     :initarg :type
-    :reader ui-node-type
+    :accessor ui-node-type
     :type symbol
     :documentation "Semantic node type keyword, e.g. :label or :listbox.")
    (props
     :initarg :props
-    :reader ui-node-props
-    :type plist
+    :accessor ui-node-props
+    :type list ; Actually a plist
     :documentation "Raw property plist passed by the component’s view function.")
    (children
     :initarg :children
@@ -178,14 +201,36 @@ Return value     – Implementation-defined (often NIL)."))
    "Rich UI node produced directly by a component’s view.
 These nodes may still be declarative/high-level."))
 
+(defmethod initialize-instance :after ((node ui-node) &key)
+  (check-type (ui-node-type node) symbol)
+  (check-type (ui-node-props node) list) ; Plists are lists
+  (check-type (ui-node-children node) list))
+
 (defclass styled-ui-node (ui-node)
   ((style-map
     :initarg :style-map
-    :reader styled-ui-node-style-map
-    :type plist
+    :accessor styled-ui-node-style-map
+    :type list ; Actually a plist
     :documentation "Fully-resolved style plist after APPLY-STYLE."))
   (:documentation
    "UI node after stylesheet cascade expansion and normalisation."))
+;; (defclass styled-ui-node (ui-node stylable)
+;;   ;; stylable mixin provides: sid, classes, parents-of, styles, dirty
+;;   ()
+;;   (:documentation
+;;    "A UI node that can be styled via elmtui.style-lib.
+;;     It inherits from ui-node for basic structure and stylable for style-related slots and behavior."))
+
+;; Methods implementing the stylable interface for styled-ui-node
+;; These typically rely on slot-accessors provided by the 'stylable' class
+;; If 'stylable' defines accessors like (stylable-id (node stylable)), etc.,
+;; then explicit method definitions here might only be needed for customization.
+(defgeneric stylable-id (node)
+  (:documentation "Return the ID of the styled node."))
+                                        ; Or fallback to (getf (ui-node-props node) :id) if that's desired policy
+
+(defmethod initialize-instance :after ((node styled-ui-node) &key)
+  (check-type (styled-ui-node-style-map node) list)) ; Plists are lists
 
 (defclass atomic-ui-node (styled-ui-node)
   ()
@@ -196,11 +241,14 @@ Allowed TYPEs: :drawable-content, :layout, :viewport, …"))
 (defclass laid-out-ui-node (atomic-ui-node)
   ((layout-rect
     :initarg :layout-rect
-    :reader laid-out-ui-node-layout-rect
+    :accessor laid-out-ui-node-layout-rect
     :type list        ;; (x y w h) or RECT struct
     :documentation "Absolute rectangle in terminal cells."))
   (:documentation
    "Atomic UI node after absolute geometry has been assigned."))
+
+(defmethod initialize-instance :after ((node laid-out-ui-node) &key)
+  (check-type (laid-out-ui-node-layout-rect node) list)) ; Assuming (x y w h) list for now
 
 ;;; -----------------------------------------------------------------------
 ;;; END OF FILE

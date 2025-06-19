@@ -11,7 +11,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.core.focus
   (:use :cl :log4cl)
-  (:import-from :elmtui.view.styled
+  (:import-from :elmtui.view.api
                 #:stylable-id) ; Only import what's actually there
   (:import-from :elmtui.core.keymap.event-integration
                 #:handle-key-event

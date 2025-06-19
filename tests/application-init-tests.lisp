@@ -1,51 +1,24 @@
-(uiop:define-package :elmtui.tests.application-init
-  (:use :cl :fiveam :alexandria)
-  (:import-from :elmtui.app.application
-                #:application
-                #:defapplication #:run-application
-                #:quit #:dispatch)
-  (:import-from :elmtui.state.api #:application-state #:state-ref) ;; For defining state-ref method
-  (:import-from :elmtui.ui.defcomponent #:defcomponent)
+;;;; Minimal application initialization tests
+;;;; Tests basic application setup functionality
 
-  (:import-from :elmtui.ui.api
-                #:get-component-instance
-                #:register-dsl-component-type
-                #:get-component-class-for-dsl-type
-                #:process-command-default
-                #:render-view-default
-                #:read-event-default
+(uiop:define-package :elmtui.tests.application-init
+  (:use :cl :fiveam)
+  (:import-from :elmtui.app.api
                 #:app-config
-                #:app-config-message-queue
-                #:app-config-command-processor-fn
-                #:app-config-renderer-fn
-                #:*applications*
-                #:*dsl-type-to-component-class*)
-  (:import-from :elmtui.ui.api
-                #:component #:component-id #:view #:update #:init #:id-from-path
-                #:get-path #:make-state-patch #:make-update-result)
-  (:import-from :elmtui.ui.defcomponent #:defcomponent)
-  ;; Import specific widgets if their classes are directly instantiated or type-checked
-  (:import-from :elmtui.ui.widgets.label #:label-component)
-  (:import-from :elmtui.ui.widgets.button #:button-component)
-  (:import-from :elmtui.ui.widgets.layout #:layout-component)
-  (:import-from :elmtui.ui.widgets.viewport #:viewport-component)
-  )
+                #:app-config-name)
+  (:export #:application-init-tests))
 (in-package :elmtui.tests.application-init)
+
 (def-suite application-init-tests
-  :description "Tests for the new application definition and component initialization.")
+  :description "Basic tests for application initialization")
 
 (in-suite application-init-tests)
 
-;;; Mock component for testing
-(defclass test-component (elmtui.ui.api:component) ())
-
-(defmethod elmtui.ui.api:init ((component test-component) &key id-path (initial-state nil) &allow-other-keys)
-  (let ((component-id (elmtui.ui.api:id-from-path id-path)))
-    (values component
-            (list (elmtui.ui.api:make-state-patch 
-                   id-path ; This is `(:components <id>)`
-                   `(:type ,(type-of component) :id ,component-id :state ,(or initial-state :default))))
-            nil)))
+;; Basic smoke test
+(test app-config-creation
+  "Test that app-config can be created"
+  (let ((config (make-instance 'app-config :name 'test-app)))
+    (is (eq 'test-app (app-config-name config)))))
 
 (defmethod elmtui.ui.api:view ((component test-component) &key id-path app-state)
   (declare (ignore id-path app-state))

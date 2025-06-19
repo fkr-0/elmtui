@@ -41,6 +41,15 @@ in the external application state as *patches* rather than CLOS slots."))
 
 (defun compute-anchor-offset (anchor viewport-width viewport-height term-cols term-rows cursor-row cursor-col)
   "Compute (offset-y, offset-x) for the root-viewport based on anchor, terminal size, viewport size, and cursor position."
+  (declare (type anchor-type anchor)
+           (type (integer 0 *) viewport-width viewport-height term-cols term-rows cursor-row cursor-col))
+  (check-type anchor anchor-type)
+  (check-type viewport-width (integer 0 *))
+  (check-type viewport-height (integer 0 *))
+  (check-type term-cols (integer 0 *))
+  (check-type term-rows (integer 0 *))
+  (check-type cursor-row (integer 0 *))
+  (check-type cursor-col (integer 0 *))
   (ecase anchor
     (:top-left      (values 0 0))
     (:top           (values 0 (floor (- term-cols viewport-width) 2)))
@@ -62,6 +71,12 @@ in the external application state as *patches* rather than CLOS slots."))
 
 (defun compute-view-size (anchor term-cols term-rows cursor-row)
   "Return three values: width height offset-y."
+  (declare (type anchor-type anchor)
+           (type (integer 0 *) term-cols term-rows cursor-row))
+  (check-type anchor anchor-type)
+  (check-type term-cols (integer 0 *))
+  (check-type term-rows (integer 0 *))
+  (check-type cursor-row (integer 0 *))
   (ecase anchor
     (:below-cursor (values term-cols (- term-rows cursor-row 1) 0))
     (:above-cursor (values term-cols cursor-row                 0))
@@ -106,36 +121,56 @@ in the external application state as *patches* rather than CLOS slots."))
 
 (defmethod elmtui.ui.api:init ((component root-viewport)
                                &key id-path
-                                 initial-child-spec
-                                 (anchor :below-cursor)
-                                 (initial-terminal-dimensions '(80 . 24))
-                                 (initial-cursor-pos '(0 . 0)))
-  "Return a *patch list* describing the component’s initial state."
-  (multiple-value-bind (w h oy)
-      (compute-view-size anchor
-                         (car initial-terminal-dimensions)
-                         (cdr initial-terminal-dimensions)
-                         (car initial-cursor-pos))
-    (declare (ignore oy)) ; oy from compute-view-size is not directly used for offset here
-    (multiple-value-bind (offset-y offset-x)
-        (compute-anchor-offset anchor w h
-                               (car initial-terminal-dimensions)
-                               (cdr initial-terminal-dimensions)
-                               (car initial-cursor-pos)
-                               (cdr initial-cursor-pos))
-      `((,(append id-path '(:type))          ,(type-of component))
-        (,(append id-path '(:id))            ,(id-from-path id-path))
-        (,(append id-path '(:state))
-         (:width ,w
-          :height ,h
-          :offset-x ,offset-x
-          :offset-y ,offset-y
-          :anchor ,anchor
-          :initial-cursor-row ,(car initial-cursor-pos)
-          :initial-cursor-col ,(cdr initial-cursor-pos)))
-        ;; Add the child spec if provided.
-        ,@(when initial-child-spec
-            `((,(append id-path '(:child)) ,initial-child-spec)))))))
+                                 initial-terminal-dimensions
+                                 initial-cursor-pos
+                                 initial-child-spec ; This is the DSL for the child content
+                                 dsl) ; The dsl for the root-viewport itself
+  "Return a *patch list* describing the component’s initial state.
+Initial child spec is stored in state for the view method to use."
+  (declare (type list id-path initial-terminal-dimensions initial-cursor-pos)
+           (type (or null list) initial-child-spec dsl) ; child-spec and dsl can be complex forms
+           ) ; dsl for root-viewport itself might not be needed if all info comes from direct args
+  (check-type id-path list)
+  (check-type initial-terminal-dimensions (cons (integer 0 *) (cons (integer 0 *) null)))
+  (check-type initial-cursor-pos (cons (integer 0 *) (cons (integer 0 *) null)))
+  ;; initial-child-spec can be any valid DSL, so not strictly checking its structure here beyond list/null
+  ;; dsl for root-viewport itself also not strictly checked beyond list/null
+  (let* ((anchor (or (getf (getf dsl :props) :anchor) ; Get anchor from the root-viewport's own DSL if provided
+                     :below-cursor))
+         (term-rows (second initial-terminal-dimensions))
+         (term-cols (first initial-terminal-dimensions))
+         (cursor-r (second initial-cursor-pos))
+         (cursor-c (first initial-cursor-pos))
+         (patches nil)
+         (commands nil))
+
+    ;; Calculate viewport size and offset based on anchor and terminal dimensions
+    (multiple-value-bind (computed-width computed-height computed-offset-y computed-offset-x)
+        (if (member anchor '(:above-cursor :below-cursor))
+            (multiple-value-bind (w h oy) (compute-view-size anchor term-cols term-rows cursor-r)
+              (values w h oy cursor-c)) ; x-offset for these is cursor-c or derived
+            (multiple-value-bind (offset-y offset-x)
+                (compute-anchor-offset anchor term-cols term-rows term-cols term-rows cursor-r cursor-c) ; placeholder vp-w/h
+              (values term-cols term-rows offset-y offset-x))) ; For non-cursor anchors, assume full size for now
+
+      (setf patches
+            (list
+             (list (append id-path '(:state :width)) computed-width)
+             (list (append id-path '(:state :height)) computed-height)
+             (list (append id-path '(:state :offset-x)) computed-offset-x)
+             (list (append id-path '(:state :offset-y)) computed-offset-y)
+             (list (append id-path '(:state :anchor)) anchor)
+             (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
+             ;; Store the initial-child-spec (which is a DSL tree) in the state.
+             ;; The `view` method of root-viewport will use this.
+             (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
+             ;; Store the original DSL of the root-viewport itself for completeness
+             (list (append id-path '(:state :dsl)) dsl))))
+
+    ;; No direct child component instantiation or init here.
+    ;; The `view` method will use the :child-dsl-spec.
+
+    (values patches commands)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; API – UPDATE
@@ -145,6 +180,8 @@ in the external application state as *patches* rather than CLOS slots."))
                                  state message
                                  &key id-path)
   "Handle :terminal-resized plus delegate all other messages downward."
+  (declare (type list id-path) (type t state message)) ; state and message can be complex
+  (check-type id-path list)
   (flet ((patch (subkey value)
            `(,(append id-path subkey) ,value)))
     (case (ensure-list message)
@@ -183,103 +220,33 @@ in the external application state as *patches* rather than CLOS slots."))
 
 (defmethod elmtui.ui.api:view ((component root-viewport) state
                                &key id-path)
+  (declare (type list id-path) (type t state)) ; state can be complex
+  (check-type id-path list)
   (let* ((vp-state (get-path state (append id-path '(:state))))
-         (child    (child-instance state id-path)))
-    `(:root-viewport
-      :id        ,(id-from-path id-path)
-      :width     ,(getf vp-state :width)
-      :height    ,(getf vp-state :height)
-      :offset-x  ,(getf vp-state :offset-x)
-      :offset-y  ,(getf vp-state :offset-y)
-      :anchor    ,(getf vp-state :anchor)
-      :child     ,(when child
-                    (elmtui.ui.api:view child state
-                                        :id-path (append id-path
-                                                         (list (slot-value child 'id))))))))
+         (child-dsl-spec (getf vp-state :child-dsl-spec)) ; Get the child's DSL
+         (width (getf vp-state :width))
+         (height (getf vp-state :height))
+         (offset-x (getf vp-state :offset-x 0))
+         (offset-y (getf vp-state :offset-y 0))
+         (scroll-x (getf vp-state :scroll-x 0))
+         (scroll-y (getf vp-state :scroll-y 0))
+         (effective-id (getf vp-state :id (first id-path)))) ; Fallback for id
 
-;;; ---------------------------------------------------------------------------
-;;; Cleanup helpers
-;;; ---------------------------------------------------------------------------
+    (unless child-dsl-spec
+      (log4cl:log-warn "Root-viewport ~A has no child-dsl-spec in its state." effective-id)
+      ;; Return a minimal viewport DSL if no child is specified
+      (return-from elmtui.ui.api:view
+        `(:viewport :id ,effective-id
+                    :width ,width :height ,height
+                    :offset-x ,offset-x :offset-y ,offset-y
+                    :children nil)))
 
-(defmethod get-cleanup-info ((component root-viewport)
-                             root-viewport-id-path
-                             app-state)
-  "Return a property list the platform driver may need on shutdown.
-
-Args:
-  component: The root-viewport component instance (often nil if called generically).
-  root-viewport-id-path: The ID path to the root-viewport in the app-state.
-  app-state: The current application state (model).
-
-Returns:
-  A property list with :initial-cursor-row and :anchor if the root-viewport's
-  state is found, otherwise nil.
-  Example: '(:initial-cursor-row 5 :anchor :below-cursor)"
-  (let ((state (get-path app-state
-                         (append root-viewport-id-path '(:state)))))
-    (if state ; Check if state was found
-        `(:initial-cursor-row ,(getf state :initial-cursor-row 0) ; Default to 0 if not present
-          :anchor             ,(getf state :anchor :top-left))   ; Default to :top-left if not present
-        (progn
-          (log4cl:log-warn "get-cleanup-info: Root viewport state not found at ~S"
-                           (append root-viewport-id-path '(:state)))
-          nil)))) ; Return nil if state is not found
-
-;;; ---------------------------------------------------------------------------
-;;; EOF
-;;; ---------------------------------------------------------------------------
-
-;;; ---------------------------------------------------------------------------
-;;; EOF
-;;; ---------------------------------------------------------------------------
-;; (defun canvas-terminal-origin (cv backend-instance)
-;;   "Calculates and returns the absolute top-left (row, col) of the canvas
-;;    on the terminal based on its strategy, arguments, and current terminal state.
-;;    Returns (values absolute-row absolute-col)."
-;;   (declare (ignorable backend-instance)) ; backend-instance needed for term-w/h, cursor-pos
-;;   (let ((canvas-w (canvas-width cv))
-;;         (canvas-h (canvas-height cv))
-;;         (term-w (term-w backend-instance))
-;;         (term-h (term-h backend-instance)))
-;;     (multiple-value-bind (base-x base-y)
-;;         (case (canvas-position-strategy cv)
-;;           (#.+position-strategy-fixed+
-;;            (values (getf (canvas-position-args cv) :x 0)
-;;                    (getf (canvas-position-args cv) :y 0)))
-;;           (#.+position-strategy-below-cursor+
-;;            (multiple-value-bind (cursor-c cursor-r)
-;;                (get-cursor-position backend-instance)
-;;              (values cursor-c (1+ cursor-r))))
-;;           (#.+position-strategy-above-cursor+
-;;            (multiple-value-bind (cursor-c cursor-r)
-;;                (get-cursor-position backend-instance)
-;;              (values cursor-c (- cursor-r canvas-h)))) ;; Anchor point will adjust this further
-;;           (#.+position-strategy-center-screen+
-;;            (values (floor (- term-w canvas-w) 2)
-;;                    (floor (- term-h canvas-h) 2)))
-;;           (t (log-warn "CANVAS: Unknown position strategy: ~S. Defaulting to (0,0)."
-;;                        (canvas-position-strategy cv))
-;;            (values 0 0)))
-;;       ;; Adjust base-x, base-y based on anchor-point
-;;       ;; The base-x, base-y is the terminal coordinate where the anchor point of the canvas will be.
-;;       (case (canvas-anchor-point cv)
-;;         (#.+anchor-top-left+ (values base-y base-x)) ; y is row, x is col
-;;         (#.+anchor-top+
-;;          (values base-y (floor (- base-x (/ canvas-w 2)))))
-;;         (#.+anchor-top-right+
-;;          (values base-y (- base-x canvas-w -1)))
-;;         (#.+anchor-left+
-;;          (values (floor (- base-y (/ canvas-h 2))) base-x))
-;;         (#.+anchor-center+
-;;          (values (floor (- base-y (/ canvas-h 2))) (floor (- base-x (/ canvas-w 2)))))
-;;         (#.+anchor-right+
-;;          (values (floor (- base-y (/ canvas-h 2))) (- base-x canvas-w -1)))
-;;         (#.+anchor-bottom-left+
-;;          (values (- base-y canvas-h -1) base-x))
-;;         (#.+anchor-bottom+
-;;          (values (- base-y canvas-h -1) (floor (- base-x (/ canvas-w 2)))))
-;;         (#.+anchor-bottom-right+
-;;          (values (- base-y canvas-h -1) (- base-x canvas-w -1)))
-;;         (t (log-warn "CANVAS: Unknown anchor point: ~S. Defaulting to top-left behavior."
-;;                      (canvas-anchor-point cv))
-;;          (values base-y base-x))))))
+    ;; Construct the viewport DSL, embedding the child-dsl-spec as its content.
+    ;; The actual rendering of child-dsl-spec happens when this whole view tree is processed.
+    `(:viewport :id ,effective-id
+                :width ,width :height ,height
+                :offset-x ,offset-x :offset-y ,offset-y
+                :scroll-x ,scroll-x :scroll-y ,scroll-y
+                ;; The child-dsl-spec is typically a single DSL form.
+                ;; The :children of a :viewport expects a list of DSL forms.
+                :children (list child-dsl-spec))))

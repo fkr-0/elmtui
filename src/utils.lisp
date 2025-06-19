@@ -13,6 +13,7 @@
 (defun ensure-list (x)
   "Ensures that X is a list. If X is nil, returns an empty list.
    If X is already a list, returns it unchanged."
+  (declare (type t x))
   (if (null x)
       nil
       (if (listp x)
@@ -21,11 +22,11 @@
 (defun ensure-keyword (val)
   "Converts the value to a keyword. Strings are upcased.
 Useful for ensuring path segments are keywords."
+  (declare (type (or keyword string symbol) val))
   (etypecase val
     (keyword val)
     (string (intern (string-upcase val) :keyword))
-    (symbol (intern (string-upcase (symbol-name val)) :keyword))
-    (t (error "Cannot convert value ~A to keyword." val))))
+    (symbol (intern (string-upcase (symbol-name val)) :keyword))))
 
 (defun hex-str-to-rgb (hex-str)
   "Convert a hex color string (e.g., #RRGGBB) to a list of RGB integers."

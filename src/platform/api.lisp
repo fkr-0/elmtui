@@ -1,15 +1,16 @@
-;;;===============================================================
-;;; File: src/platform/api.lisp
-;;; Platform Abstraction API
-;;;
-;;; This file defines the generic functions that any platform backend
-;;; must implement to integrate with elmtui. These functions model
-;;; the abstract behavior required for rendering, input, and display
-;;; management, independent of any specific terminal library.
-;;;===============================================================
+;;;===============================================================\\
+;;; File: src/platform/api.lisp\\
+;;; Platform Abstraction API\\
+;;;\\
+;;; This file defines the generic functions that any platform backend\\
+;;; must implement to integrate with elmtui. These functions model\\
+;;; the abstract behavior required for rendering, input, and display\\
+;;; management, independent of any specific terminal library.\\
+;;;===============================================================\\
 
 (uiop:define-package :elmtui.platform.api
   (:use :cl)
+  (:import-from #:elmtui.utils #:plistp)
   (:export
    :lockable
    :lock-of
@@ -79,289 +80,109 @@
    :get-native-handle))
 
 (in-package :elmtui.platform.api)
+;;; ===================================================================
+;;; INTERFACE SECTION - Public API declarations
+;;; ===================================================================
+
+;;TODO can we add (symbol &key (:publish-fn (or null function))) to initialize-backend?
+;;(declaim (ftype (function (t &key (:publish-fn (or null function)) t) t) initialize-backend))
+(defgeneric initialize-backend (backend-type &key &allow-other-keys)
+  (:documentation "Initialize the backend for the specified platform. If PUBLISH-FN is provided, it will be used to publish events."))
+(declaim (ftype (function (t) null) shutdown-backend))
+(declaim (ftype (function (t) string) backend-name backend-version))
+(declaim (ftype (function (t) (values integer integer)) get-screen-dimensions))
+(declaim (ftype (function (t) null) clear-screen flush-output))
+(declaim (ftype (function (t boolean) null) set-cursor-visibility))
+(declaim (ftype (function (t integer integer) null) set-cursor-position))
+(declaim (ftype (function (t) (values integer integer)) get-cursor-position))
+(declaim (ftype (function (t) null) hide-cursor show-cursor))
+(declaim (ftype (function (t integer integer) null) handle-backend-resize))
+(declaim (ftype (function (t t integer integer string &key (:style t)) null) draw-text-at))
+(declaim (ftype (function (t t integer integer character &key (:style t)) null) draw-char-at))
+(declaim (ftype (function (t t integer integer integer integer &key (:char character) (:style t)) null) fill-rectangle))
+(declaim (ftype (function (t t integer integer integer integer &key (:style t) (:corners list) (:sides list)) null) draw-box-outline))
+(declaim (ftype (function (t t integer integer integer integer &key (:border-style t) (:border-color t) (:box-char-set t) (:style t)) null) draw-styled-box))
+(declaim (ftype (function (t t integer integer &key (:style t)) null) set-cell-style))
+(declaim (ftype (function (t t integer integer integer integer &key (:style t)) null) clear-area))
+(declaim (ftype (function (t t) t) render-and-present))
+(declaim (ftype (function (t &key (:red (or null real)) (:green (or null real)) (:blue (or null real)) (:name symbol)) t) make-color))
+(declaim (ftype (function (t &key (:foreground-color t) (:background-color t) (:attributes list)) t) make-style))
+(declaim (ftype (function (t t t) null) apply-style))
+(declaim (ftype (function (t) t) default-foreground-color default-background-color))
+(declaim (ftype (function (t) boolean) supports-truecolor-p))
+(declaim (ftype (function (t) (or null integer)) max-colors))
+(declaim (ftype (function (t) integer) term-w term-h))
+(declaim (ftype (function (integer t) integer) (setf term-w) (setf term-h)))
+(declaim (ftype (function (t) stream) term-stream))
+(declaim (ftype (function (t) t) term-style))
+(declaim (ftype (function (t &key (:timeout (or null real))) t) poll-input-event peek-input-event))
+(declaim (ftype (function (t &key (:motion-events-p boolean)) boolean) enable-mouse-support))
+(declaim (ftype (function (t) null) disable-mouse-support))
+(declaim (ftype (function (t symbol) boolean) set-input-mode))
+(declaim (ftype (function (t keyword) boolean) query-feature))
+(declaim (ftype (function (t) boolean) supports-unicode-p supports-mouse-p))
+(declaim (ftype (function (t) t) get-native-handle))
 
 (defclass lockable ()
   ((lock :initarg :lock
          :initform (bt:make-recursive-lock)
-         :accessor lock-of)
+         :accessor lock-of ; Changed from accessor to reader to prevent direct (setf lock-of)
+         :type bt:recursive-lock)
    (lock-owner :initarg :lock-owner
                :initform nil
-               :accessor lock-owner)
+               :accessor lock-owner
+               :type t) ; Can be any thread object or T for generic owner
    (lock-owner-count :initarg :lock-owner-count
                      :initform 0
-                     :accessor lock-owner-count)))
+                     :accessor lock-owner-count
+                     :type unsigned-byte)))
+
+;;; ===================================================================
+;;; IMPLEMENTATION SECTION
+;;; ===================================================================
+(defmethod initialize-instance :after ((l lockable) &key)
+  (check-type (lock-of l) bt:recursive-lock)
+  (check-type (lock-owner-count l) unsigned-byte))
 
 (defmethod acquire-lock ((l lockable))
   "Acquire the terminal lock. If the lock is already held by the current thread,
 increment the lock count. Otherwise, acquire the lock and set the lock owner to
 the current thread."
-  (with-slots (lock lock-owner lock-owner-count)
-      l
-    (bt:with-recursive-lock-held (lock)
-      (if (eq lock-owner t)
-          (incf lock-owner-count)
-          (setf lock-owner t
-                lock-owner-count 1)))))
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
+  (let ((current-thread (bt:current-thread)))
+    (with-slots (lock lock-owner lock-owner-count)
+        l
+      (bt:acquire-lock lock t) ; Ensure the lock is acquired before checking owner
+      (if (eq lock-owner current-thread)
+          (incf (the unsigned-byte lock-owner-count))
+          (progn
+            (setf lock-owner current-thread)
+            (setf lock-owner-count 1)))))
+  l) ; Return the lockable object
 
 (defmethod release-lock ((l lockable))
   "Release the terminal lock. If the lock count is greater than 1, decrement the
 lock count. Otherwise, release the lock and set the lock owner to nil."
-  (with-slots (lock lock-owner lock-owner-count)
-      l
-    (bt:with-recursive-lock-held (lock)
-      (when (eq lock-owner t)
-        (if (> lock-owner-count 1)
-            (decf lock-owner-count)
-            (setf lock-owner nil
-                  lock-owner-count 0))))))
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
+  (let ((current-thread (bt:current-thread)))
+    (with-slots (lock lock-owner lock-owner-count)
+        l
+      (when (eq lock-owner current-thread)
+        (if (> (the unsigned-byte lock-owner-count) 1)
+            (decf (the unsigned-byte lock-owner-count))
+            (progn
+              (setf lock-owner nil)
+              (setf lock-owner-count 0)
+              (bt:release-lock lock)))))))
 
-(defmacro with-lock ((lockable) &body body)
-  "Execute BODY with LOCKABLE locked."
+(defmacro with-lock ((l) &body body)
+  "Execute BODY with the lock of LOCKABLE L acquired.
+This macro ensures that the lock is acquired before executing BODY,
+and released afterwards, even if an error occurs during execution.
+It uses `acquire-lock` and `release-lock` methods to manage the lock.
+This is useful for ensuring thread safety when accessing shared resources."
   `(progn
-     (acquire-lock ,lockable)
-     (unwind-protect (progn ,@body) (release-lock ,lockable))))
-
-;;;---------------------------------------------------------------
-;;; Backend Lifecycle
-;;;---------------------------------------------------------------
-
-(defgeneric initialize-backend (backend-type &key publish-fn &allow-other-keys) ; Added publish-fn
-  (:documentation "Initializes and configures the specified platform backend.
-This function should perform any necessary setup, such as opening a connection
-to the terminal, setting up initial modes, or allocating resources.
-It should return an opaque backend instance handle that will be passed to
-other platform API functions.
-BACKEND-TYPE: A symbol or keyword identifying the backend to initialize (e.g., :ncurses, :cl-charms).
-PUBLISH-FN: An optional function the backend can use to publish events (e.g., for signals).
-ALLOW-OTHER-KEYS: Backend-specific initialization options can be passed.
-Returns the backend instance or signals an error on failure."))
-
-(defgeneric shutdown-backend (backend-instance)
-  (:documentation "Shuts down the platform backend and releases all associated resources.
-This function should perform cleanup tasks like closing terminal connections,
-restoring terminal modes, and freeing memory.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric backend-name (backend-instance)
-  (:documentation "Returns a string identifying the name of the backend (e.g., \"NCurses\").
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric backend-version (backend-instance)
-  (:documentation "Returns a string identifying the version of the backend library.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-;;;---------------------------------------------------------------
-;;; Display & Screen Management
-;;;---------------------------------------------------------------
-
-(defgeneric get-screen-dimensions (backend-instance)
-  (:documentation "Returns the current dimensions of the terminal screen.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-Returns (VALUES WIDTH HEIGHT) in character cells."))
-
-(defgeneric clear-screen (backend-instance)
-  (:documentation "Clears the entire terminal screen.
-The cursor position may be affected (typically moved to 0,0).
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric flush-output (backend-instance)
-  (:documentation "Forces any buffered output to be displayed on the terminal.
-Some backends buffer drawing commands for efficiency; this ensures they are
-rendered immediately.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric set-cursor-visibility (backend-instance visible-p)
-  (:documentation "Sets the visibility of the terminal cursor.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-VISIBLE-P: A boolean; T to show the cursor, NIL to hide it."))
-
-(defgeneric set-cursor-position (backend-instance row col)
-  (:documentation "Moves the terminal cursor to the specified row and column.
-Coordinates are 0-indexed (top-left is 0,0).
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The target row.
-COL: The target column."))
-
-(defgeneric get-cursor-position (backend-instance)
-  (:documentation "Gets the current position of the terminal cursor.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-Returns (VALUES ROW COL)."))
-
-(defgeneric hide-cursor (backend-instance)
-  (:documentation "Convenience function to hide the terminal cursor. Equivalent to (set-cursor-visibility backend-instance nil).
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric show-cursor (backend-instance)
-  (:documentation "Convenience function to show the terminal cursor. Equivalent to (set-cursor-visibility backend-instance t).
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric handle-backend-resize (backend-instance width height)
-  (:documentation "Notifies the backend that its display area has changed.
-The backend should update its internal state, dimensions, buffers,
-and potentially clear/reset its display to prepare for a full redraw.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-WIDTH: The new width.
-HEIGHT: The new height."))
-
-;;;---------------------------------------------------------------
-;;; Drawing Primitives
-;;;---------------------------------------------------------------
-
-(defgeneric draw-text-at (backend-instance target-buffer row col text &key style)
-  (:documentation "Draws a string of text at the specified row and column.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The starting row for the text.
-COL: The starting column for the text.
-TEXT: The string to draw.
-STYLE: An optional backend-specific style object (e.g., color, attributes) created by MAKE-STYLE.
-If NIL, backend default style is used."))
-
-(defgeneric draw-char-at (backend-instance target-buffer row col char &key style)
-  (:documentation "Draws a single character at the specified row and column.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The row for the character.
-COL: The column for the character.
-CHAR: The character to draw.
-STYLE: An optional backend-specific style object. If NIL, backend default style is used."))
-
-(defgeneric fill-rectangle (backend-instance target-buffer row col height width &key char style)
-  (:documentation "Fills a rectangular area of the screen with a specified character and style.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The top row of the rectangle.
-COL: The left column of the rectangle.
-HEIGHT: The height of the rectangle in character cells.
-WIDTH: The width of the rectangle in character cells.
-CHAR: The character to fill with. Defaults to a space if not provided by the backend.
-STYLE: An optional backend-specific style object. If NIL, backend default style is used."))
-
-(defgeneric draw-box-outline (backend-instance target-buffer row col height width &key style corners sides)
-  (:documentation "Draws the outline of a box using line-drawing characters.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The top row of the box.
-COL: The left column of the box.
-HEIGHT: The height of the box.
-WIDTH: The width of the box.
-STYLE: An optional backend-specific style object for the lines.
-CORNERS: A list of four characters for top-left, top-right, bottom-left, bottom-right corners.
-         Defaults to backend-specific line drawing characters.
-SIDES: A list of two characters for horizontal and vertical lines.
-       Defaults to backend-specific line drawing characters."))
-
-(defgeneric draw-styled-box (backend-instance target-buffer row col height width &key border-style border-color box-char-set style)
-  (:documentation "Draws a box with potentially different styles for each side/corner.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The top row of the box.
-COL: The left column of the box.
-HEIGHT: The height of the box.
-WIDTH: The width of the box.
-BORDER-STYLE: A keyword or list describing the line style (e.g., :single, :double, or a list for individual sides).
-BORDER-COLOR: A color spec or list of color specs for the border lines.
-BOX-CHAR-SET: (Optional) A specific set of characters to use for corners and lines,
-              allowing for styles like :ascii or custom characters. If nil, backend chooses based on BORDER-STYLE.
-STYLE: An optional backend-specific style object (primarily for foreground color of the border).
-       If BORDER-COLOR is provided, it should take precedence for the border lines themselves."))
-
-(defgeneric set-cell-style (backend-instance target-buffer row col &key style)
-  (:documentation "Applies a style to the character cell at the given coordinates without changing the character itself.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The row of the cell.
-COL: The column of the cell.
-STYLE: The backend-specific style object to apply."))
-
-(defgeneric clear-area (backend-instance target-buffer row col height width &key style)
-  (:documentation "Clears a rectangular area of the screen, typically filling it with spaces using a given style.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-ROW: The top row of the area.
-COL: The left column of the area.
-HEIGHT: The height of the area.
-WIDTH: The width of the area.
-STYLE: An optional backend-specific style object (often just background color). If NIL, uses default background."))
-
-;;;---------------------------------------------------------------
-
-;;;---------------------------------------------------------------
-;;; Input Handling
-;;;---------------------------------------------------------------
-
-(defgeneric poll-input-event (backend-instance &key timeout)
-  (:documentation "Polls for the next input event from the terminal.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-TIMEOUT: An optional non-negative real number in seconds.
-         If 0, returns immediately (non-blocking).
-         If NIL or not provided, blocks indefinitely until an event occurs.
-         If > 0, waits for up to TIMEOUT seconds.
-Returns an event object (structure/plist) representing the input, or NIL if no event
-is available within the timeout. Event objects should be standardized as much as
-possible (e.g., (:type :key :key :f1 :modifiers (:control)), (:type :mouse ...))."))
-
-(defgeneric peek-input-event (backend-instance)
-  (:documentation "Checks if an input event is available without consuming it.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-Returns the event object if available, or NIL otherwise. Subsequent calls to
-POLL-INPUT-EVENT or PEEK-INPUT-EVENT will return the same event if it was not consumed."))
-
-(defgeneric enable-mouse-support (backend-instance &key motion-events-p)
-  (:documentation "Enables mouse event reporting for the terminal, if supported.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-MOTION-EVENTS-P: If T, attempts to enable mouse motion events as well.
-Returns T if mouse support was successfully enabled, NIL otherwise."))
-
-(defgeneric disable-mouse-support (backend-instance)
-  (:documentation "Disables mouse event reporting for the terminal.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric set-input-mode (backend-instance mode)
-  (:documentation "Sets the terminal input mode (e.g., raw, cooked, cbreak).
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-MODE: A keyword representing the desired mode (e.g., :RAW, :COOKED, :CBREAK).
-      Supported modes are backend-dependent.
-Returns T if the mode was set successfully, NIL otherwise."))
-
-;;;---------------------------------------------------------------
-;;; Capability Querying
-;;;---------------------------------------------------------------
-
-(defgeneric query-feature (backend-instance feature-keyword)
-  (:documentation "Queries the backend for support of a specific feature.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-FEATURE-KEYWORD: A keyword identifying the feature (e.g., :UNICODE, :TRUECOLOR, :MOUSE-MOTION, :BLINK-TEXT).
-Returns T if the feature is supported, NIL otherwise. This is more general than
-specific functions like SUPPORTS-TRUECOLOR-P."))
-
-(defgeneric supports-unicode-p (backend-instance)
-  (:documentation "Returns T if the backend and terminal are configured to support Unicode characters correctly.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-(defgeneric supports-mouse-p (backend-instance)
-  (:documentation "Returns T if the backend can provide mouse input events.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND."))
-
-;;;---------------------------------------------------------------
-;;; Raw Access (Escape Hatch)
-;;;---------------------------------------------------------------
-
-(defgeneric get-native-handle (backend-instance)
-  (:documentation "Returns the underlying native handle or object used by the backend (e.g., ncurses WINDOW*).
-This provides an escape hatch for backend-specific operations not covered by the API.
-Use with caution, as it breaks platform independence.
-BACKEND-INSTANCE: The opaque handle returned by INITIALIZE-BACKEND.
-Returns a native handle, or NIL if not applicable or not exposed."))
-
-;;;-----------------------------------------------------------------------------
-;;; Terminal Output Access
-;;;-----------------------------------------------------------------------------
-
-(defmacro with-terminal-output ((backend stream-var) &body body)
-  "Execute BODY with STREAM-VAR bound to the terminal output stream from BACKEND.
-   Provides safe access to the terminal output stream for direct writing.
-
-   Example:
-     (with-terminal-output (backend out)
-       (format out \"~c[0m\" #\\Escape))"
-  `(let ((,stream-var (term-stream ,backend)))
-     ,@body))
-
-(defmethod make-style ((instance t) &key foreground-color background-color attributes)
-  (list :fg (or foreground-color (default-foreground-color instance))
-        :bg (or background-color (default-background-color instance))
-        :attrs (copy-list attributes)))
+     (acquire-lock ,l)
+     (unwind-protect
+          (progn ,@body)
+       (release-lock ,l))))

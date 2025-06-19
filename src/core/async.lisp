@@ -9,14 +9,17 @@
    :async-task-error :promise-cancelled-p :promise-cancelled-condition
                 :promise :resolve-promise :reject-promise :await)
   (:import-from :elmtui.core.globals #:*app-sender*) ; Import *app-sender* from globals
+  (:import-from :elmtui.state #:rollback-state) ; Import rollback-state from state module
+                                        ; Import *app-sender* from globals
   (:export :cmd-async
-   :spawn-worker
-           :cmd-batch
-   :interpret-cmd
-           :*async-tasks*
-   :*async-errors*
-           :await-cmd
-   :cancel-cmd))
+   :with-async-restarts
+           :spawn-worker
+   :cmd-batch
+           :interpret-cmd
+   :*async-tasks*
+           :*async-errors*
+   :await-cmd
+           :cancel-cmd))
                                         ; Removed export of *app-sender*
 (in-package :elmtui.core.async)
 
@@ -149,7 +152,34 @@
 
       ;; Start the first attempt
       (do-attempt attempts))))
-
+(defmacro with-async-restarts ((condition-var) &body forms) ; Renamed body to forms
+  "Handle async task failures with DRY restarts: ignore, rollback, replace, provide result."
+  `(block with-async-restarts
+     (handler-bind
+         ((elmtui.core.conditions:async-task-error
+            (lambda (,condition-var)
+              (elmtui.core.conditions:log-condition ,condition-var)
+              (restart-case
+                  (signal ,condition-var)
+                (ignore-task ()
+                  :report "Ignore/discard this async task."
+                  (return-from with-async-restarts nil))
+                (rollback-state ()
+                  :report "Rollback state to previous checkpoint."
+                  ;; Call the imported rollback-state function
+                  (rollback-state)
+                  (return-from with-async-restarts nil))
+                (replace-task (new-task)
+                  :report "Replace the async task interactively or programmatically."
+                  ;; Return the new task value, don't funcall body
+                  (return-from with-async-restarts new-task))
+                (provide-result (result)
+                  :report "Provide a custom result for this task."
+                  (return-from with-async-restarts result))
+                (retry ()
+                  :report "Retry the async task."
+                  (return-from with-async-restarts (progn ,@forms))))))) ; Use forms
+       ,@forms)))
 (defun cmd-recurring (interval-seconds function &key args on-message stop-condition max-iterations)
   "Create a recurring command that runs periodically.
    Parameters:
@@ -196,7 +226,7 @@
 (defun interpret-cmd (cmd)
   "Execute CMD: spawn async-task(s) or sequence. Handles errors with restarts and async-task-error."
   ;; Use with-async-restarts for standard async error handling
-  (elmtui.core.conditions:with-async-restarts (c)
+  (with-async-restarts (c)
     (handler-case
         (let ((cmd-type (car cmd)))
           (case cmd-type
@@ -273,7 +303,7 @@
 
 (defun await-cmd (cmd)
   "Wait for CMD (async-task) to finish and return result. Handles async-task-error."
-  (elmtui.core.conditions:with-async-restarts (c)
+  (with-async-restarts (c)
     (let ((cmd-type (car cmd)))
       (case cmd-type
         (:async
@@ -287,7 +317,7 @@
 
 (defun cancel-cmd (cmd)
   "Cancel CMD (async-task). Handles async-task-error."
-  (elmtui.core.conditions:with-async-restarts (c)
+  (with-async-restarts (c)
     (let ((cmd-type (car cmd)))
       (case cmd-type
         (:async
@@ -335,7 +365,7 @@
 
 (defun spawn-worker (task &key name )
   "Spawn a worker thread to execute TASK asynchronously."
-  (elmtui.core.conditions:with-async-restarts (c)
+  (with-async-restarts (c)
     (handler-case
         (let ((task-id (gensym (format nil "WORKER-~A" name)))
               (worker-task (new-task task)))
@@ -351,7 +381,7 @@
 (defun cmd-batch (commands)
   "Create a CMD that executes a batch of COMMANDS sequentially.
    Returns a list of results from each command in the batch."
-  (elmtui.core.conditions:with-async-restarts (c)
+  (with-async-restarts (c)
     (let ((results (mapcar #'interpret-cmd commands)))
       ;; Return the results of the batch execution
       results))
@@ -360,7 +390,7 @@
 (defun cmd-batch-await (commands)
   "Create a CMD that executes a batch of COMMANDS and waits for all to finish.
    Returns a list of results from each command in the batch."
-  (elmtui.core.conditions:with-async-restarts (c)
+  (with-async-restarts (c)
     (let ((results (mapcar #'await-cmd commands)))
       ;; Return the results of the batch execution
       results))

@@ -1,63 +1,33 @@
-;; TODO find out if all those schema validating is actually sound or even useful
-;; ;;;===============================================================
-;; ;;; File: tests/elmtui-tests.lisp
-;; ;;; FiveAM Unit Tests for Step 1: Advanced Event & Message Layer
+;;;; ELMTUI Test Suite
+;;;; This file sets up the main test package and defines basic test infrastructure
 
-;; (uiop:define-package :elmtui-tests
-;;   (:use :cl :fiveam :log4cl
-;;    :elmtui.core.events
-;;         :elmtui.state.msg ; For defmsg tests
-;;    :elmtui.core.conditions)
-;;   (:import-from :elmtui.core.events
-;;    #:register-message-contract
-;;    #:validate-message
-;;    #:make-message
-;;    #:message-data
-;;    #:remove-before-send-message-hook
-;;    #:message-type
-;;    #:add-before-send-message-hook
-;;    #:add-after-send-message-hook
-;;    :*message-priorities*
-;;                 :*message-contracts*
-;;                 #:remove-after-send-message-hook
-;;                 )
-;;   (:import-from :elmtui.state.msg
-;;                 #:message-variant-p
-;;                 #:defmsg)
-;;   (:import-from :elmtui.core.loop
-;;                 #:publish
-;;                 #:subscribe
-;;                 #:unsubscribe)
-;;   (:import-from :elmtui.core.conditions
-;;                 #:message-validation-error)
-;;   (:import-from :cl :type-error)
-;;   (:export :run-all-elmtui-tests))
+(uiop:define-package :elmtui.tests
+  (:use :cl :fiveam)
+  (:export #:run-tests #:elmtui-test-suite #:run-all-tests))
 
+(in-package :elmtui.tests)
 
-;; (in-package :elmtui-tests)
+;; Define the main test suite
+(def-suite elmtui-test-suite
+  :description "Main test suite for elmtui TUI framework")
 
-;; (def-suite step1-event-message)
-;; (in-suite step1-event-message)
+;; Set this as the default test suite
+(in-suite elmtui-test-suite)
 
-;; ;;; 1. Message contract registration and enforcement
-;; (test message-contract-validation
-;;   (let ((msg-valid (make-message :foo :ok))
-;;         (msg-invalid (make-message :foo :fail)))
-;;     (register-message-contract :foo (lambda (msg) (equal (message-data msg) :ok)))
-;;     (is (validate-message msg-valid))
-;;     (signals elmtui.core.conditions:message-validation-error
-;;       (validate-message msg-invalid))))
+;; Basic smoke test to ensure the package loads
+(test package-loads
+  "Test that the elmtui package loads without errors"
+  (is (find-package :elmtui)))
 
-;; ;;; 1.5 Schema-based message validation (using defmsg schemas)
-;; (defmsg schema-validation-msg (:docstring "Message type for schema validation tests")
-;;         NoArgsVariant
-;;         (TypedArgVariant :count integer :label string)
-;;         (OptionalArgVariant ;; &key
-;;          :id t :activep boolean ;; :initform t
-;;          )) ; Assuming defmsg handles &key and initforms for schema
+;; Convenience function to run all tests
+(defun run-tests ()
+  "Run all elmtui tests"
+  (run! 'elmtui-test-suite))
 
-;; (test schema-based-validation-correct
-;;   ;; Test with a message that conforms to the defmsg schema
+;; Also provide this function for ASDF integration
+(defun run-all-tests ()
+  "Run all elmtui tests (alias for run-tests)"
+  (run-tests))
 ;;   (let ((msg-no-args (make-message 'schema-validation-msg '(:noargsvariant)))
 ;;         (msg-typed-args (make-message 'schema-validation-msg '(:typedargvariant :count 123 :label "hello")))
 ;;         (msg-optional-args (make-message 'schema-validation-msg '(:optionalargvariant :id "test-id" :activep nil)))

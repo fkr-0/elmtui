@@ -1,188 +1,271 @@
 (uiop:define-package :elmtui.ui.widgets.layout
-  (:use :cl :alexandria)
+  (:use :cl :alexandria :elmtui.ui.defcomponent)
   (:import-from #:log4cl :log-info :log-debug :log-warn)
   (:import-from #:elmtui.utils :ensure-keyword)
-  (:import-from :elmtui.ui.api :get-path :id-from-path
-   :make-state-patch :get-component-instance)
-  (:import-from :elmtui.ui.defcomponent :defcomponent)
-  (:import-from :elmtui.state :make-update-result) ; Ensure this is imported
+  (:import-from :elmtui.ui.api
+                #:component-id
+                #:id-from-path
+                #:init
+                #:update
+                #:view
+                #:destroy
+                #:make-state-patch
+                #:get-path)
+  (:import-from :elmtui.state.api
+                #:ur-patches
+                #:ur-commands
+                #:make-update-result
+                #:update-result-patches
+                #:update-result-commands)
+  (:export #:layout))
 
-  (:export
-   #:layout
-   #:make-layout
-   ))
 (in-package :elmtui.ui.widgets.layout)
 
-;;;---------------------------------------------------------------
-;;; Layout Component
-;;;---------------------------------------------------------------
-(defclass layout (component)
+(defcomponent layout ()
   ()
-  (:documentation "A component that arranges child components.
-Its behavioral state (layout-type, spacing) is in app-state.
-It stores IDs of its child components in app-state under :children."))
+  (:state
+   (display :flex
+            :type keyword
+            :documentation
+            "Display mode: :flex, :grid, :block, :none. Default :flex." :initarg :display)
+   (flex-direction :column
+                   :type keyword
+                   :documentation
+                   "Flex direction: :row, :column, etc." :initarg :flex-direction)
+   (grid-template-columns '("1fr")
+                          :type list
+                          :documentation
+                          "Grid columns."
+                          :initarg :grid-template-columns)
+   (grid-template-rows '("auto")
+                       :type list :documentation "Grid rows."
+                       :initarg :grid-template-rows)
+   (grid-template-areas nil :type (or null list)
+                            :documentation "Grid areas." :initarg :grid-template-areas)
+   (grid-auto-flow "row" :type string :documentation "Grid auto-flow."
+                         :initarg :grid-auto-flow)
+   (gap 0 :type (or integer string)
+          :documentation "Gap between items." :initarg :gap)
+   (row-gap nil :type (or null integer string)
+                :documentation "Row gap." :initarg :row-gap)
+   (column-gap nil :type (or null integer string)
+                   :documentation "Column gap." :initarg :column-gap)
+   (justify-content "start" :type string
+                            :documentation "Justify content." :initarg :justify-content)
+   (align-items "stretch" :type string :documentation "Align items." :initarg :align-items)
+   (align-content "start" :type string :documentation "Align content." :initarg :align-content)
+   (justify-items "stretch"
+                  :type string :documentation "Justify items." :initarg :justify-items)
+   (children-ids nil :type list :documentation "Child component IDs.")
+   (width nil :type (or null integer string) :documentation "Width." :initarg :width)
+   (height nil :type (or null integer string) :documentation "Height." :initarg :height)
+   (min-width nil :type (or null integer string) :documentation "Min width." :initarg :min-width)
+   (min-height nil :type (or null integer string) :documentation "Min height." :initarg :min-height)
+   (max-width nil :type (or null integer string) :documentation "Max width." :initarg :max-width)
+   (max-height nil :type (or null integer string) :documentation "Max height." :initarg :max-height)
+   (padding nil :type (or null integer string list) :documentation "Padding." :initarg :padding)
+   (margin nil :type (or null integer string list) :documentation "Margin." :initarg :margin)
+   (background-color nil
+                     :type (or null string keyword)
+                     :documentation "Background color." :initarg :background-color)
+   (color nil :type (or null string keyword)
+              :documentation "Foreground color."
+              :initarg :color)
+   (border nil :type (or null string)
+               :documentation "Border style."
+               :initarg :border)
+   (border-radius nil :type (or null string integer)
+                      :documentation "Border radius."
+                      :initarg :border-radius)
+   (overflow nil :type (or null keyword)
+                 :documentation "Overflow."
+                 :initarg :overflow)
+   (other-style-props nil
+                      :type list
+                      :documentation "Other style props."))
 
-(defun make-layout (&key id)
-  "Creates a new layout component instance. ID is for potential direct use, but in DSL, it's derived."
-  (make-instance 'layout :id id))
+  (:documentation "Unified layout component for Elmtui. Arranges children using flexbox or grid, depending
+on :display. Supports all major layout and style props.")
 
-;;;---------------------------------------------------------------
-;;; Component API Implementation (New TEA-aligned)
-;;;---------------------------------------------------------------
-(defmethod init ((component layout) &rest other-args &key id-path initial-layout-type initial-spacing initial-child-specs &allow-other-keys )
-  (let ((component-id (id-from-path id-path))
-        (child-patches nil)
-        (child-commands nil)
-        ;; (child-refs nil) ; child-refs was not used, can be removed
-        (child-ids nil)
-        (actual-layout-type (case initial-layout-type
-                              ((:column :row) :flex)
-                              (t (or initial-layout-type :flex))))
-        (actual-flex-direction (case initial-layout-type
-                                 (:column :column)
-                                 (:row :row)
-                                 (t (getf other-args :flex-direction :column)))))
-    (dolist (child-spec initial-child-specs)
-      (let* ((child-type (first child-spec))
-             (raw-child-id (second child-spec))
-             (child-id (if (keywordp raw-child-id) raw-child-id (intern (string raw-child-id) :keyword)))
-             (child-initargs (cddr child-spec))
-             (child-instance (make-instance child-type))
-             (child-id-path-for-child-init (list :components child-id)))
-        (multiple-value-bind (initialized-child-instance patches-from-child commands-from-child)
-            (apply #'init child-instance :id-path child-id-path-for-child-init child-initargs)
-          (declare (ignore initialized-child-instance))
-          ;; (push child-instance child-refs) ; Not needed
-          (push child-id child-ids)
-          (setf child-patches (append patches-from-child child-patches))
-          (setf child-commands (append commands-from-child child-commands)))))
-    (values component
-            (append
-             (list (make-state-patch (list :components component-id)
-                                     (let ((base-state-list
-                                             `(:type ,(type-of component)
-                                               :id ,component-id
-                                               :layout-type ,actual-layout-type
-                                               ,@(when (eq actual-layout-type :flex)
-                                                   `(:flex-direction ,actual-flex-direction))
-                                               :spacing ,(or initial-spacing 0)
-                                               :children-ids ,(nreverse child-ids)
-                                               ,@(loop for prop in '(:width :height :min-width :min-height :max-width :max-height :padding :margin :align-items :justify-content :background-color :color :border :border-radius :overflow)
-                                                       for value = (getf other-args prop)
-                                                       when value
-                                                         append `(,prop ,value)))))\n                                       (if (eq actual-layout-type :grid)
-                                           (append base-state-list
-                                                   `(:grid-template-columns ,(getf other-args :grid-template-columns "1fr")
-                                                     :grid-template-rows    ,(getf other-args :grid-template-rows "auto")))
-                                           base-state-list))))
-             child-patches)
-            child-commands)))
+  (:on-unhandled-message :log)
 
-(defmethod update ((component layout) state message &key id-path )
-  "Handles messages for the layout or propagates to children.
-`state` is the full application state.
-Returns an update-result list: (:patches patches :commands commands)."
-  (let* ((component-id (id-from-path id-path))
-         (component-state-path (list :components component-id))
-         (layout-props (get-path state component-state-path))
-         (patches nil)
-         (commands nil)) ; Initialize commands
+  (:init (props self-id-path)
+         (let ((collected-child-effects nil)
+               (collected-child-id-segments nil)
+               (layout-state-settings nil)
+               (known-props '(:children :display :layout-type
+                              :flex-direction :grid-template-columns :grid-template-rows
+                              :grid-template-areas :grid-auto-flow
+                              :gap :spacing
+                              :row-gap :column-gap
+                              :justify-content :align-items :align-content :justify-items
+                              :width :height :min-width :min-height :max-width :max-height
+                              :padding :margin :background-color :color :border :border-radius :overflow)))
+           ;; Children
+           (loop for child-spec in (getf props :children)
+                 for child-type = (first child-spec)
+                 for raw-child-id = (second child-spec)
+                 for child-id-segment = (ensure-keyword raw-child-id)
+                 for child-initargs = (cddr child-spec)
+                 for child-full-id-path = (append self-id-path (list child-id-segment))
+                 do
+                    (push child-id-segment collected-child-id-segments)
+                    (let ((child-instance (make-instance child-type)))
+                      (multiple-value-bind (_child-instance child-patches child-commands)
+                          (apply #'elmtui.ui.api:init child-instance :id-path child-full-id-path child-initargs)
+                        (declare (ignore _child-instance))
+                        (setf collected-child-effects (append child-patches child-commands collected-child-effects)))))
+           (setf (getf layout-state-settings :children-ids) (nreverse collected-child-id-segments))
+           ;; Display mode/backward compat
+           (let* ((explicit-display (getf props :display))
+                  (old-layout-type (getf props :layout-type))
+                  (final-display (or explicit-display
+                                     (case old-layout-type
+                                       ((:column :row) :flex)
+                                       (:grid :grid)
+                                       (otherwise (or old-layout-type :flex))))))
+             (setf (getf layout-state-settings :display) final-display)
+             (when (eq final-display :flex)
+               (setf (getf layout-state-settings :flex-direction)
+                     (or (getf props :flex-direction)
+                         (case old-layout-type
+                           (:column :column)
+                           (:row :row)
+                           (otherwise :column))))))
+           ;; Gap/spacing
+           (let* ((explicit-gap (getf props :gap))
+                  (old-spacing (getf props :spacing))
+                  (base-gap-value (or explicit-gap old-spacing 0)))
+             (setf (getf layout-state-settings :gap) base-gap-value)
+             (setf (getf layout-state-settings :row-gap) (or (getf props :row-gap) base-gap-value))
+             (setf (getf layout-state-settings :column-gap) (or (getf props :column-gap) base-gap-value)))
+           ;; Other direct props
+           (dolist (prop-key '(:grid-template-columns :grid-template-rows :grid-template-areas :grid-auto-flow
+                               :justify-content :align-items :align-content :justify-items
+                               :width :height :min-width :min-height :max-width :max-height
+                               :padding :margin :background-color :color :border :border-radius :overflow))
+             (let ((val (getf props prop-key)))
+               (when val (setf (getf layout-state-settings prop-key) val))))
+           ;; Other style props
+           (let ((other-props nil))
+             (loop for (key val) on props by #'cddr
+                   unless (member key known-props)
+                     do (setf other-props (list* key val other-props)))
+             (setf (getf layout-state-settings :other-style-props) (nreverse other-props)))
+           (values layout-state-settings (nreverse collected-child-effects))))
+  (:update
+   (message local-state app-state self-id-path)
+   (:add-child (child-id-segment child-type child-initargs)
+               (let* ((child-id-key (ensure-keyword child-id-segment))
+                      (child-full-id-path (append self-id-path (list child-id-key)))
+                      (child-instance (make-instance child-type))
+                      (new-children-ids (cons child-id-key (getf local-state :children-ids))))
+                 (multiple-value-bind (_instance child-patches child-commands)
+                     (apply #'elmtui.ui.api:init
+                            child-instance
+                            :id-path child-full-id-path
+                            child-initargs)
+                   (declare (ignore _instance))
+                   `(values
+                     (:children-ids ,(remove-duplicates new-children-ids :test #'equal))
+                     ,(append child-patches child-commands)))))
+   (:remove-child (child-id-segment)
+                  (let* ((child-id-key (ensure-keyword child-id-segment))
+                         (child-full-id-path (append self-id-path (list child-id-key)))
+                         (new-children-ids (remove child-id-key (getf local-state :children-ids) :test #'equal)))
+                    (values `(:children-ids ,new-children-ids)
+                            (list :destroy-component-recursive child-full-id-path))))
+   (:set-property (prop-keyword new-value)
+                  (let ((state-changes-plist nil)
+                        (known-direct-props '(:display :flex-direction
+                                              :grid-template-columns :grid-template-rows
+                                              :grid-template-areas :grid-auto-flow
+                                              :row-gap :column-gap
+                                              :justify-content :align-items
+                                              :align-content :justify-items
+                                              :width :height
+                                              :min-width :min-height
+                                              :max-width :max-height
+                                              :padding :margin
+                                              :background-color :color
+                                              :border :border-radius :overflow
+                                              :children-ids)))
+                    (cond
+                      ((eq prop-keyword :gap)
+                       (progn
+                         (setf (getf state-changes-plist :gap) new-value)
+                         (when (or (null (getf local-state :row-gap))
+                                   (equal (getf local-state :row-gap) (getf local-state :gap)))
+                           (setf (getf state-changes-plist :row-gap) new-value))
+                         (when (or (null (getf local-state :column-gap))
+                                   (equal (getf local-state :column-gap) (getf local-state :gap)))
+                           (setf (getf state-changes-plist :column-gap) new-value))))
+                      ((member prop-keyword known-direct-props)
+                       (progn
+                         (setf (getf state-changes-plist prop-keyword) new-value)
+                         ;; Update other-style-props to include this direct prop
+                         (let ((osp (copy-list (getf local-state :other-style-props))))
+                           (setf (getf osp prop-keyword) new-value)
+                           (setf (getf state-changes-plist :other-style-props) osp))))
+                      (t
+                       (setf (getf state-changes-plist :other-style-props)
+                             (append (list prop-keyword new-value) (getf local-state :other-style-props)))))
+                    (values state-changes-plist nil)))
+   (:message-to (target-child-id-segment child-message)
+                (let* ((target-child-id (ensure-keyword target-child-id-segment))
+                       (child-full-id-path (append self-id-path (list target-child-id)))
+                       (child-type (get-path app-state child-full-id-path :type)))
+                  (if (and child-type (find target-child-id (getf local-state :children-ids) :test #'equal))
+                      (let* ((child-instance (make-instance child-type))
+                             (child-update-result (apply #'elmtui.ui.api:update child-instance app-state child-message :id-path child-full-id-path)))
+                        (values nil
+                                (append (ur-patches child-update-result)
+                                        (ur-commands child-update-result))))
+                      (values nil nil)))))
 
-    (unless layout-props
-      (log-warn "Layout component ~A state not found at ~S. No update performed." component-id component-state-path)
-      (return-from update (make-update-result :patches nil :commands nil)))
-
-    (typecase message
-      ((cons (eql :add-child))
-       ;; Message format: (:add-child child-type child-id . child-initargs)
-       ;; e.g., (:add-child :button :new-button :label "Click Me")
-       ;; The child-id within child-spec should be unique.
-       (let ((child-spec (cdr message))) ; child-spec is (child-type child-id . child-initargs)
-         ;; Command for the application loop to handle child instantiation, init,
-         ;; and updating this layout's :children-ids state.
-         (push `(:command-add-child-to-layout ,component-id ,child-spec) commands)
-         (log-info "Layout ~A: Queued command to add child with spec: ~S" component-id child-spec)))
-
-      ((cons (eql :remove-child))
-       (let ((child-id-to-remove (ensure-keyword (cdr message))))
-         (when (member child-id-to-remove (getf layout-props :children-ids))
-           ;; Patch to update the layout's own children list
-           (push (make-state-patch (append component-state-path '(:children-ids))
-                                   (remove child-id-to-remove (getf layout-props :children-ids)))
-                 patches)
-           ;; Command to destroy the child component's state and run its cleanup (if any)
-           (push `(:command-destroy-component ,child-id-to-remove) commands)
-           (log-info "Layout ~A: Patched to remove child ID ~A, queued command for its destruction." component-id child-id-to-remove))
-         (unless (member child-id-to-remove (getf layout-props :children-ids))
-           (log-warn "Layout ~A: Attempted to remove non-existent child ID ~A." component-id child-id-to-remove))))
-
-      ((cons (eql :set-layout-prop))
-       (let ((prop-name (second message))
-             (prop-value (third message)))
-         (push (make-state-patch (append component-state-path (list prop-name)) prop-value) patches)
-         (log-info "Layout ~A: Patched property ~A to ~S." component-id prop-name prop-value)))
-
-      (t
-       ;; Propagate to children if message is targeted
-       ;; Assuming messages are targeted like (:message-to :child-id actual-message)
-       (when (and (consp message) (keywordp (car message)) (eq (car message) :message-to))
-         (let ((target-child-id (second message))
-               (actual-message (cddr message)))
-           (if (member target-child-id (getf layout-props :children-ids))
-               (let* ((child-component-id-path (list :components target-child-id))
-                      (child-state (get-path state child-component-id-path))
-                      (child-type (getf child-state :type)))
-                 (if child-type
-                     (let ((child-instance (make-instance child-type))) ; Stateless instance for dispatch
-                       (let ((child-update-result (update child-instance state actual-message :id-path child-component-id-path)))
-                         (setf patches (append (getf child-update-result :patches) patches))
-                         (setf commands (append (getf child-update-result :commands) commands))))
-                     (log-warn "Layout ~A: Child ~A type not found in state for message propagation." component-id target-child-id)))
-               (log-warn "Layout ~A: Message ~S targeted non-child ~A." component-id message target-child-id))))))
-    (make-update-result :patches patches :commands commands)))
-
-(defmethod view ((component layout) state &key id-path )
-  "Generates a view model for the layout component based on the current app-state."
-  (let* ((component-id (id-from-path id-path))
-         (component-state-path (list :components component-id))
-         (layout-props (get-path state component-state-path)))
-
-    (unless layout-props
-      (log-warn "Layout component ~A state not found at ~S. Generating error view." component-id component-state-path)
-      (return-from view `(:error "Layout component state not found for ID: ~a" ,component-id)))
-
-    (let ((layout-type (getf layout-props :layout-type :flex))
-          (flex-direction (getf layout-props :flex-direction :column)) ; Used if layout-type is :flex
-          (spacing (getf layout-props :spacing 0))
-          (children-ids (getf layout-props :children-ids))
-          (style-properties (list)))
-
-      (setf style-properties
-            (case layout-type
-              (:flex
-               `(:display :flex :flex-direction ,flex-direction :gap ,spacing))
-              (:grid
-               `(:display :grid
-                 :grid-template-columns ,(getf layout-props :grid-template-columns "1fr")
-                 :grid-template-rows    ,(getf layout-props :grid-template-rows "auto")
-                 :gap ,spacing))
-              (:block  `(:display :block))
-              (:none   `(:display :none))
-              (t       `(:display :flex :flex-direction :column :gap ,spacing))))
-
-      (dolist (prop '(:width :height :min-width :min-height :max-width :max-height :padding :margin :align-items :justify-content :background-color :color :border :border-radius :overflow))
-        (let ((value (getf layout-props prop)))
-          (when value
-            (setf style-properties (list* prop value style-properties)))))
-
-      `(:ui-element
-        :id ,component-id
-        :style ,style-properties
-        :children ,(mapcar (lambda (child-id-key)
-                             (let* ((child-component-id-path (list :components child-id-key))
-                                    (child-state (get-path state child-component-id-path))
-                                    (child-type (getf child-state :type)))\n                               (if child-type
-                                   (let ((child-instance (make-instance child-type)))
-                                     (view child-instance state :id-path child-component-id-path))
-                                   `(:error "Child component type not found for ID: ~a in layout ~a" ,child-id-key ,component-id))))
-                           children-ids)))))
+  (:view (local-state app-state self-id-path)
+         (let* ((component-id (id-from-path self-id-path))
+                (children-ids (getf local-state :children-ids))
+                (display-mode (getf local-state :display :flex))
+                (style-properties nil))
+           (setf (getf style-properties :display) display-mode)
+           (case display-mode
+             (:flex
+              (setf (getf style-properties :flex-direction) (getf local-state :flex-direction :column))
+              (setf (getf style-properties :gap) (or (getf local-state :column-gap) (getf local-state :row-gap) (getf local-state :gap 0)))
+              (setf (getf style-properties :justify-content) (getf local-state :justify-content "start"))
+              (setf (getf style-properties :align-items) (getf local-state :align-items "stretch"))
+              (setf (getf style-properties :align-content) (getf local-state :align-content "start")))
+             (:grid
+              (setf (getf style-properties :grid-template-columns) (getf local-state :grid-template-columns '("1fr")))
+              (setf (getf style-properties :grid-template-rows) (getf local-state :grid-template-rows '("auto")))
+              (when (getf local-state :grid-template-areas)
+                (setf (getf style-properties :grid-template-areas) (getf local-state :grid-template-areas)))
+              (setf (getf style-properties :grid-auto-flow) (getf local-state :grid-auto-flow "row"))
+              (setf (getf style-properties :gap) (getf local-state :gap 0))
+              (setf (getf style-properties :row-gap) (or (getf local-state :row-gap) (getf local-state :gap 0)))
+              (setf (getf style-properties :column-gap) (or (getf local-state :column-gap) (getf local-state :gap 0)))
+              (setf (getf style-properties :justify-content) (getf local-state :justify-content "start"))
+              (setf (getf style-properties :align-content) (getf local-state :align-content "start"))
+              (setf (getf style-properties :justify-items) (getf local-state :justify-items "stretch"))
+              (setf (getf style-properties :align-items) (getf local-state :align-items "stretch"))))
+           (dolist (prop '(:width :height :min-width :min-height :max-width :max-height
+                           :padding :margin :background-color :color :border :border-radius :overflow))
+             (let ((value (getf local-state prop)))
+               (when value (setf (getf style-properties prop) value))))
+           (loop for (key val) on (getf local-state :other-style-props) by #'cddr
+                 do (setf (getf style-properties key) val))
+           (list :ui-element
+                 :id component-id
+                 :type :layout
+                 :style style-properties
+                 :children (mapcar
+                            (lambda (child-id-segment)
+                              (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
+                                     (child-type (get-path app-state child-full-id-path :type)))
+                                (if child-type
+                                    (let ((child-instance (make-instance child-type)))
+                                      (elmtui.ui.api:view child-instance app-state :id-path child-full-id-path))
+                                    (list :error "Child component type not found for ID: ~a in layout ~a"
+                                          child-id-segment component-id))))
+                            children-ids)))))

@@ -28,7 +28,7 @@ It stores the ID of its child component in app-state under :child."))
 ;;;---------------------------------------------------------------
 ;;; Component API Implementation (New TEA-aligned)
 ;;;---------------------------------------------------------------
-(defmethod init ((component viewport) &key id-path initial-width initial-height initial-offset-x initial-offset-y initial-child-spec &allow-other-keys)
+(defmethod init ((component viewport) &key id-path initial-width initial-height initial-offset-x initial-offset-y initial-child-spec dsl &allow-other-keys)
   (let ((component-id (id-from-path id-path))
         (child-patches nil)
         (child-commands nil)
@@ -39,9 +39,8 @@ It stores the ID of its child component in app-state under :child."))
              (c-id (if (and id-key (eq id-key :id))
                        (third initial-child-spec)
                        (error "Viewport init: child-spec ~S missing :id keyword or value." initial-child-spec)))
-             (child-initargs (if (and id-key (eq id-key :id))
-                                 (cdddr initial-child-spec)
-                                 (cddr initial-child-spec))) ; seems to be unreaachable (and id-key (eq id-key :id)) always t?
+             (child-initargs (cdddr initial-child-spec))
+
              (child-instance (make-instance child-type :id c-id))
              ;; Child's canonical id-path for its own init is (:components <child-id>)
              (child-id-path-for-child-init (list :components c-id)))
@@ -54,7 +53,7 @@ It stores the ID of its child component in app-state under :child."))
           (setf child-id c-id)          ; Store ID for state
           (setf child-patches current-child-patches)
           (setf child-commands current-child-commands))))
-
+    
     (values component
             (append
              (list (make-state-patch id-path ; Path to the viewport's own component registration
@@ -64,7 +63,8 @@ It stores the ID of its child component in app-state under :child."))
                                        :state (:width ,initial-width
                                                :height ,initial-height
                                                :offset-x ,(or initial-offset-x 0)
-                                               :offset-y ,(or initial-offset-y 0))
+                                               :offset-y ,(or initial-offset-y 0)
+                                               :dsl ,dsl)
                                        ;; Store child ID directly under the viewport's component state
                                        :child-id ,child-id
                                        )))

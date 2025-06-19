@@ -12,7 +12,7 @@
    :elmtui.ui.widgets.listbox
    :elmtui.ui.widgets.scrollable-container
    :elmtui.ui.widgets.grid-container
-   :elmtui.ui.widgets.form
+   ;; :elmtui.ui.widgets.form
    ;; TODO: Add more specialized widgets as needed
    )
   (:documentation "Provides standardized Elm-style UI widgets.
