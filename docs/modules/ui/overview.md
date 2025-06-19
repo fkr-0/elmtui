@@ -15,7 +15,7 @@ The `ui` module is responsible for defining and managing UI components (also ref
 ## Main Features
 
 - **Component Definition:** Provides a macro or system (e.g., `defcomponent` from `src/ui/defcomponent.lisp`) for defining new UI components.
-- **Component Lifecycle:** (If applicable) Manages aspects of a component's lifecycle (e.g., initialization, mounting, unmounting).
+- **Component Lifecycle:** Manages aspects of a component's lifecycle (e.g., initialization, mounting, unmounting). **All components initialized from DSL will have their DSL form stored in their state under the `:dsl` key by default.**
 - **Local State Management:** Allows components to have their own internal state, managed according to Elmtui's state principles (likely TEA-inspired via the `state` module).
 - **Event Handling:** Defines how components receive and process events (e.g., key presses, mouse events, custom messages) and update their local state or emit messages.
 - **Props/Attributes:** Allows components to receive input data (properties) from their parent components.

@@ -17,10 +17,14 @@
 
 You can override this when calling `SETUP-UI-LOGGERS` by passing the
 :SUBSYSTEMS keyword with your own list.")
+(declaim (type list *default-subsystems*))
 
 ;;; ------------------------------------------------------------------
 (defun %make-file-appender (pathname &key (layout :simple))
   "Internal helper – returns a fresh FILE-APPENDER that *appends* to PATHNAME."
+  (declare (type (or pathname string) pathname) (type keyword layout))
+  (check-type pathname (or pathname string))
+  (check-type layout keyword)
   ;; LOG4CL will expand the path when we write the first entry.
   (make-instance 'file-appender
                  :file pathname
@@ -49,6 +53,13 @@ An alist of (SUBSYSTEM . LOGGER) pairs for convenient programmatic use.
 
 Calling this function repeatedly REPLACES all appenders of already-existing
 loggers, so you can reconfigure at runtime (e.g. switch on DEBUG)."
+  (declare (type (or pathname string) directory)
+           (type list subsystems)
+           (type keyword level layout))
+  (check-type directory (or pathname string))
+  (check-type subsystems list)
+  (check-type level keyword)
+  (check-type layout keyword)
   (let ((results '()))
     (dolist (sub subsystems)
       (let* ((logger-name (format nil "ELMTUI.~A" sub))
@@ -72,6 +83,8 @@ loggers, so you can reconfigure at runtime (e.g. switch on DEBUG)."
 If the logger does not exist yet, it is *created on demand* **without**
 any appenders.  Call `SETUP-UI-LOGGERS` first if you want automatic
 file appenders."
+  (declare (type (or keyword string) subsystem))
+  (check-type subsystem (or keyword string))
   (make-logger (format nil "ELMTUI.~A" subsystem)))
 
 ;;; ------------------------------------------------------------------
@@ -84,6 +97,8 @@ Example
 (with-subsystem-logger :rendering
   (log:debug \"Drawing the main canvas\"))
 ```"
+  (declare (type (or keyword string) subsystem))
+  ;; No runtime check-type for macro argument here, it's compile-time.
   `(let ((*logger* (subsystem-logger ,subsystem)))
      ,@body))
 

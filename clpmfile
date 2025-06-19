@@ -12,9 +12,13 @@
 (:asd "elmtui-tests.asd")
 
 (:github "sly" :path "joaotavora/sly" :branch "master")
+;; (:github "slynk" :path "joaotavora/sly" :commit "63131ef965d8ff3a6b79cc7aff8e8f5fc1a82aec")
 (:github "fiveam"
  :path "lispci/fiveam"
  :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379")
+(:github "asdf-viz"
+ :path "guicho271828/asdf-viz"
+ :branch "master")
 
 (:github "cl-fzy"
  :path "fkr-0/cl-fzy"

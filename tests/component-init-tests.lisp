@@ -1,33 +1,23 @@
-(uiop:define-package :elmtui.tests.component-init
-  (:use :cl :fiveam :alexandria)
-  (:import-from :elmtui.app.application
-                #:application
-                #:defapplication #:run-application
-                #:quit #:dispatch)
-  (:import-from :elmtui.state.api #:application-state #:state-ref) ;; For defining state-ref method
-  (:import-from :elmtui.ui.defcomponent #:defcomponent)
+;;;; Minimal component initialization tests
+;;;; Tests basic component setup functionality
 
+(uiop:define-package :elmtui.tests.component-init
+  (:use :cl :fiveam)
   (:import-from :elmtui.ui.api
-                #:get-component-instance
-                #:register-dsl-component-type
-                #:get-component-class-for-dsl-type
-                #:process-command-default
-                #:render-view-default
-                #:read-event-default
-                #:app-config
-                #:app-config-message-queue
-                #:app-config-command-processor-fn
-                #:app-config-renderer-fn
-                #:*applications*
-                #:*dsl-type-to-component-class*)
-  (:import-from :elmtui.ui.api
-                #:component #:component-id #:view #:update #:init #:id-from-path
-                #:get-path #:make-state-patch #:make-update-result)
-  (:import-from :elmtui.ui.defcomponent #:defcomponent)
-  ;; Import specific widgets if their classes are directly instantiated or type-checked
-  (:import-from :elmtui.ui.widgets.label #:label-component)
-  (:import-from :elmtui.ui.widgets.button #:button-component)
-  (:import-from :elmtui.ui.widgets.layout #:layout-component)
+                #:component)
+  (:export #:component-init-tests))
+
+(in-package :elmtui.tests.component-init)
+
+(def-suite component-init-tests
+  :description "Basic tests for component initialization")
+
+(in-suite component-init-tests)
+
+;; Basic smoke test
+(test component-class-exists
+  "Test that component class exists"
+  (is (find-class 'component nil)))
   (:import-from :elmtui.ui.widgets.viewport #:viewport-component)
   )
 

@@ -1,167 +1,190 @@
 (uiop:define-package :elmtui.ui.widgets.panel
-  (:use :cl :alexandria)
-  (:import-from :elmtui.ui.api #:component #:make-state-patch #:id-from-path #:get-path)
-  (:import-from :elmtui.state #:make-update-result)
-  (:import-from :elmtui.view.styled #:make-styled-node)
-  (:export #:panel #:make-panel ; Class name and constructor
-           ;; Messages (if any specific to panel itself)
-           #:msg-set-panel-property
-           ))
+  (:use :cl :alexandria :elmtui.ui.defcomponent)
+  (:import-from :elmtui.ui.api
+                #:component #:id-from-path #:app-state #:get-component-property
+                #:init #:update #:view #:destroy #:make-state-patch) ; Added make-state-patch
+  (:import-from :elmtui.state.api #:make-update-result #:get-path #:state-ref
+                                   #:update-result-patches #:update-result-commands)
+  (:export #:panel))
 
 (in-package :elmtui.ui.widgets.panel)
 
-;;;---------------------------------------------------------------\\\n;;; Panel Component\\\n;;;---------------------------------------------------------------\\\n(defclass panel (component) ()
-  (:documentation "A panel component that visually groups its children, often with a border and title.\\n   Its properties (title, border style, etc.) and children are managed in the application state."))
+(defcomponent panel ()
+    () ;; No direct CLOS slots
+    (:state
+     (title nil :type (or null string) :documentation "Optional title for the panel."
+                  :initarg :title :accessor panel-title)
+     (border-style :single :type keyword :documentation "Style of the border (e.g., :none, :single, :double, :rounded)."
+                           :initarg :border-style :accessor panel-border-style)
+     (padding 0 :type (or null integer string list) :documentation "Internal padding. Integer for all sides, list (t r b l), or CSS string."
+                  :initarg :padding :accessor panel-padding)
+     (children-ids nil :type list :documentation "List of keyword IDs for child components managed by this panel.")
+     ;; Common style properties that have initargs
+     (width nil :type (or null integer string) :documentation "Width of the panel."
+                  :initarg :width :accessor panel-width)
+     (height nil :type (or null integer string) :documentation "Height of the panel."
+                   :initarg :height :accessor panel-height)
+     (margin nil :type (or null integer string list) :documentation "Margin around the panel."
+                   :initarg :margin :accessor panel-margin)
+     (background-color nil :type (or null string keyword) :documentation "Background color of the panel."
+                                 :initarg :background-color :accessor panel-background-color)
+     (color nil :type (or null string keyword) :documentation "Foreground color (text color) of the panel."
+                  :initarg :color :accessor panel-color)
+     (border nil :type (or null string) :documentation "Explicit border string (e.g., \"1px solid green\"). Overrides border-style if set."
+                   :initarg :border :accessor panel-border)
+     (border-radius nil :type (or null string integer) :documentation "Border radius for rounded corners."
+                          :initarg :border-radius :accessor panel-border-radius)
+     (overflow nil :type (or null keyword) :documentation "Overflow behavior (e.g., :hidden, :scroll, :auto)."
+                     :initarg :overflow :accessor panel-overflow)
+     ;; For any other properties passed to make-instance not covered by above initargs
+     (other-style-props nil :type list :documentation "Plist of other style properties passed during init."))
+  (:documentation "A panel component that visually groups its children, often with a border and title.")
+  (:on-unhandled-message :log)
 
-(defun make-panel (&key id)
-  "Creates a new panel component instance."
-  (make-instance 'panel :id id))
+  (:init (props self-id-path)
+   (let ((collected-child-effects nil)
+         (collected-child-id-segments nil)
+         (other-props-for-state nil)
+         ;; List of initargs that defcomponent will handle for the panel's own state
+         (panel-handled-initargs '(:title :border-style :padding :width :height :margin
+                                   :background-color :color :border :border-radius :overflow)))
 
-;;;---------------------------------------------------------------\\\n;;; Messages (Keywords)\\\
-;;;---------------------------------------------------------------\\\n;; Example: (:set-panel-property :title \"New Title\")
-(defparameter msg-set-panel-property :set-panel-property)
+     ;; Initialize children from the :children prop
+     (loop for child-spec in (getf props :children)
+           for child-type = (first child-spec)
+           for child-id-segment = (second child-spec) ; e.g., :button1
+           for child-initargs = (cddr child-spec)
+           for child-full-id-path = (append self-id-path (list child-id-segment))
+           do
+              (push child-id-segment collected-child-id-segments)
+              (let ((child-instance (make-instance child-type)))
+                (multiple-value-bind (_child-instance child-patches child-commands)
+                    (apply #'elmtui.ui.api:init child-instance :id-path child-full-id-path child-initargs)
+                  (declare (ignore _child-instance))
+                  (setf collected-child-effects
+                        (append child-patches child-commands collected-child-effects)))))
+     
+     ;; Collect any props passed to make-instance that are not :children and not one of the panel's direct initargs
+     (loop for (key val) on props by #'cddr
+           unless (or (eq key :children) (member key panel-handled-initargs))
+             do (setf other-props-for-state (list* key val other-props-for-state)))
+     
+     ;; Return values for state fields that defcomponent doesn't automatically handle from initargs,
+     ;; or that need special calculation.
+     ;; :title, :border-style, etc., will be set by defcomponent from props using their :initargs.
+     (values `(:children-ids ,(nreverse collected-child-id-segments)
+               :other-style-props ,(nreverse other-props-for-state))
+             (nreverse collected-child-effects))))
 
-;;;---------------------------------------------------------------\\\n;;; Init Method\\\n;;;---------------------------------------------------------------\\\n(defmethod init ((component panel) &key id-path
-                                     initial-title
-                                     (initial-border-style :single) ; :none, :single, :double, :rounded
-                                     (initial-padding 0)
-                                     initial-child-specs ; Children managed by layout system
-                                     &allow-other-keys)
-  (let ((component-id (id-from-path id-path))
-        (child-patches nil)
-        (child-commands nil)
-        (child-ids nil)) ; IDs of direct children if this panel also lays them out
+  (:update (message local-state app-state self-id-path)
+   (:set-property (prop-keyword new-value)
+    (if (member prop-keyword '(:title :border-style :padding :width :height :margin :background-color :color :border :border-radius :overflow))
+        (values (list prop-keyword new-value) nil)
+        (let ((current-other-styles (getf local-state :other-style-props)))
+          (if (getf current-other-styles prop-keyword) ;; Check if it's an existing "other" style
+              (values `(:other-style-props ,(let ((osp (copy-list current-other-styles)))
+                                              (setf (getf osp prop-keyword) new-value)
+                                              osp))
+                      nil)
+              (progn
+                (warn "Panel ~A: Attempt to set unknown property ~S via :set-property." (id-from-path self-id-path) prop-keyword)
+                (values nil nil))))))
+   
+   (:add-child (child-id-segment child-type &rest child-initargs)
+    (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
+           (child-instance (make-instance child-type))
+           (new-children-ids (cons child-id-segment (getf local-state :children-ids))))
+      (multiple-value-bind (_instance child-patches child-commands)
+          (apply #'elmtui.ui.api:init child-instance :id-path child-full-id-path child-initargs)
+        (declare (ignore _instance))
+        (values `(:children-ids ,(remove-duplicates new-children-ids :test #'equal))
+                (append child-patches child-commands)))))
 
-    ;; Initialize children if this component is responsible for them
-    (dolist (child-spec initial-child-specs)
-      (let* ((child-type (first child-spec))
-             (child-id (second child-spec))
-             (child-initargs (cddr child-spec))
-             (child-instance (make-instance child-type))
-             (child-id-path-for-child-init (list :components child-id)))
-        (multiple-value-bind (initialized-child-instance patches-from-child commands-from-child)
-            (apply #'init child-instance :id-path child-id-path-for-child-init child-initargs)
-          (declare (ignore initialized-child-instance))
-          (push child-id child-ids)
-          (setf child-patches (append patches-from-child child-patches))
-          (setf child-commands (append commands-from-child child-commands)))))
+   (:remove-child (child-id-segment)
+    (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
+           (new-children-ids (remove child-id-segment (getf local-state :children-ids) :test #'equal))
+           ;; Command to trigger destruction of the child component's state and view
+           (destroy-command `(:destroy-component-recursive ,child-full-id-path)))
+      (values `(:children-ids ,new-children-ids) (list destroy-command))))
 
-    (values component
-            (append
-             (list (make-state-patch `(:components ,component-id)
-                                     `(:type ,(type-of component)
-                                       :id ,component-id
-                                       :title ,initial-title
-                                       :border-style ,initial-border-style
-                                       :padding ,initial-padding
-                                       :children-ids ,(nreverse child-ids) ; Store child IDs
-                                       ;; Pass through common style props if provided in other-args
-                                       ,@(loop for prop in '(:width :height :min-width :min-height :max-width :max-height :margin :background-color :color :border :border-radius :overflow)
-                                               for value = (getf other-args prop)
-                                               when value
-                                                 append `(,prop ,value)))))
-             child-patches)
-            child-commands)))
+   (:message-to (target-child-id-segment &rest child-message)
+    (let* ((child-full-id-path (append self-id-path (list target-child-id-segment)))
+           (child-type (elmtui.state.api:get-path app-state child-full-id-path :type)))
+      (if (and child-type (find target-child-id-segment (getf local-state :children-ids) :test #'equal))
+          (let* ((child-instance (make-instance child-type))
+                 (child-update-result (elmtui.ui.api:update child-instance app-state child-message :id-path child-full-id-path)))
+            (values nil ; No local state change for the panel itself
+                    (append (update-result-patches child-update-result)
+                            (update-result-commands child-update-result))))
+          (progn
+            (warn "Panel ~A: Message ~S targeted non-child or unknown-type child ~A."
+                  (id-from-path self-id-path) child-message target-child-id-segment)
+            (values nil nil))))))
 
-;;;---------------------------------------------------------------\\\n;;; Update Method\\\n;;;---------------------------------------------------------------\\\n(defmethod update ((component panel) state msg &key id-path)
-  (let* ((component-id (id-from-path id-path))
-         (component-state-path `(:components ,component-id))
-         (panel-props (getf state component-state-path))
-         (patches nil)
-         (commands nil))\n
-    (unless panel-props
-      (warn \"Panel ~A state not found at ~S\" component-id component-state-path)\n      (return-from update (make-update-result :patches nil :commands nil)))
+  (:view (local-state app-state self-id-path)
+   (let* ((component-id (id-from-path self-id-path))
+          (title (getf local-state :title))
+          (border-style (getf local-state :border-style :single))
+          (padding-val (getf local-state :padding 0))
+          (children-ids (getf local-state :children-ids))
+          (style-properties nil))
 
-    (typecase msg
-      ((cons (eql msg-set-panel-property) t)
-       (let ((prop-name (second msg))
-             (prop-value (third msg)))
-         (if (member prop-name '(:title :border-style :padding :width :height :min-width :min-height :max-width :max-height :margin :background-color :color :border :border-radius :overflow))
-             (push (make-state-patch (append component-state-path (list prop-name)) prop-value) patches)
-             (warn \"Panel ~A: Unknown property for set-panel-property: ~S\" component-id prop-name))))
+     ;; Populate style-properties from local-state's direct style fields
+     (loop for style-key in '(:width :height :margin :background-color :color :border :border-radius :overflow)
+           for value = (getf local-state style-key)
+           when value
+             do (setf (getf style-properties style-key) value))
+     (setf (getf style-properties :padding) padding-val)
 
-      ;; Handle dynamic child addition/removal if panel manages children directly
-      ((cons (eql :add-child) t)
-       (let ((child-spec (cdr message)))
-         (push `(:command-add-child-to-layout ,component-id ,child-spec) commands)
-         (log-info \"Panel ~A: Queued command to add child with spec: ~S\" component-id child-spec)))
+     ;; Merge properties from :other-style-props
+     (loop for (key val) on (getf local-state :other-style-props) by #'cddr
+           do (setf (getf style-properties key) val))
+           
+     (setf (getf style-properties :display) :block)
 
-      ((cons (eql :remove-child) t)
-       (let ((child-id-to-remove (ensure-keyword (cdr message))))
-         (when (member child-id-to-remove (getf panel-props :children-ids))
-           (push (make-state-patch (append component-state-path '(:children-ids))
-                                   (remove child-id-to-remove (getf panel-props :children-ids)))
-                 patches)
-           (push `(:command-destroy-component ,child-id-to-remove) commands)
-           (log-info \"Panel ~A: Patched to remove child ID ~A, queued command for its destruction.\" component-id child-id-to-remove))
-         (unless (member child-id-to-remove (getf panel-props :children-ids))
-           (log-warn \"Panel ~A: Attempted to remove non-existent child ID ~A.\" component-id child-id-to-remove))))
+     (unless (getf style-properties :border)
+       (case border-style
+         (:single (setf (getf style-properties :border) "1px solid"))
+         (:double (setf (getf style-properties :border) "3px double"))
+         (:rounded (setf (getf style-properties :border) "1px solid")
+                   (unless (getf style-properties :border-radius)
+                     (setf (getf style-properties :border-radius) "5px")))))
+     
+     `(:ui-element
+       :id ,component-id
+       :type :panel
+       :style ,style-properties
+       :properties `(,@(when title `(:title ,title))
+                     :border-style ,border-style)
+       :children ,(mapcar (lambda (child-id-segment)
+                            (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
+                                   (child-type (elmtui.state.api:get-path app-state child-full-id-path :type)))
+                              (if child-type
+                                  (let ((child-instance (make-instance child-type)))
+                                    (elmtui.ui.api:view child-instance app-state :id-path child-full-id-path))
+                                  `(:error "Child component type not found for ID: ~a in panel ~a"
+                                          ,child-id-segment ,component-id))))
+                          children-ids)))))
 
-      ;; Propagate messages to children
-      ((cons (eql :message-to) t)
-       (let ((target-child-id (second msg))
-             (actual-message (cddr msg)))
-         (if (member target-child-id (getf panel-props :children-ids))
-             (let* ((child-component-id-path (list :components target-child-id))
-                    (child-state (get-path state child-component-id-path))
-                    (child-type (getf child-state :type)))
-               (if child-type
-                   (let ((child-instance (make-instance child-type)))
-                     (let ((child-update-result (update child-instance state actual-message :id-path child-component-id-path)))
-                       (setf patches (append (getf child-update-result :patches) patches))
-                       (setf commands (append (getf child-update-result :commands) commands))))
-                   (log-warn \"Panel ~A: Child ~A type not found in state for message propagation.\" component-id target-child-id)))
-             (log-warn \"Panel ~A: Message ~S targeted non-child ~A.\" component-id message target-child-id)))))
+;; Method to handle destruction of the panel and its children
+(defmethod elmtui.ui.api:destroy ((self panel) app-state &key id-path)
+  (let ((panel-local-state (elmtui.state.api:get-path app-state id-path))
+        (all-patches nil)
+        (all-commands nil))
 
-    (make-update-result :patches (nreverse patches) :commands (nreverse commands))))
+    (loop for child-id-segment in (getf panel-local-state :children-ids)
+          for child-full-id-path = (append id-path (list child-id-segment))
+          for child-type = (elmtui.state.api:get-path app-state child-full-id-path :type)
+          when child-type
+            do (let ((child-instance (make-instance child-type)))
+                 (multiple-value-bind (child-patches child-commands-from-destroy)
+                     (elmtui.ui.api:destroy child-instance app-state :id-path child-full-id-path)
+                   (setf all-patches (append child-patches all-patches))
+                   (setf all-commands (append child-commands-from-destroy all-commands))))
+          else
+            do (warn "Panel destroy: Child ~A type not found for path ~A during panel ~A destruction."
+                     child-id-segment child-full-id-path (id-from-path id-path)))
 
-;;;---------------------------------------------------------------\\\n;;; View Method\\\n;;;---------------------------------------------------------------\\\n(defmethod view ((component panel) state &key id-path)
-  (let* ((component-id (id-from-path id-path))
-         (component-state-path `(:components ,component-id))
-         (panel-props (getf state component-state-path)))
+    (push (elmtui.ui.api:make-state-patch id-path :elmtui-delete-path) all-patches)
 
-    (unless panel-props
-      (warn \"Panel ~A state not found at ~S. Generating error view.\" component-id component-state-path)
-      (return-from view `(:error \"Panel component state not found for ID: ~a\" ,component-id)))
-
-    (let ((children-ids (getf panel-props :children-ids))
-          (title (getf panel-props :title))
-          (border-style (getf panel-props :border-style :single))
-          (padding (getf panel-props :padding 0))
-          (style-properties 
-            `(:display :block ; Panels are typically block-level containers
-              :padding ,padding
-              ;; Border properties are often handled by specific renderer logic for panels
-              ;; or could be translated to standard CSS border properties here.
-              ;; For now, we pass border-style and title as direct props for the renderer.
-              ))
-          )
-
-      ;; Add other common style properties from component state
-      (dolist (prop '(:width :height :min-width :min-height :max-width :max-height :margin :background-color :color :border :border-radius :overflow))
-        (let ((value (getf panel-props prop)))
-          (when value
-            (setf style-properties (list* prop value style-properties)))))
-      
-      ;; If :border was explicitly set in panel-props, use it. Otherwise, derive from :border-style.
-      (unless (getf panel-props :border)
-        (case border-style
-          (:single (setf style-properties (list* :border \"1px solid\" style-properties)))
-          (:double (setf style-properties (list* :border \"3px double\" style-properties)))
-          (:rounded (setf style-properties (list* :border \"1px solid\" :border-radius \"5px\" style-properties)))))
-
-      `(:ui-element
-        :id ,component-id
-        :type :panel ; Specific type for renderer
-        :style ,style-properties
-        :properties `(,@(when title `(:title ,title)) ; Pass title for renderer to handle
-                      :border-style ,border-style) ; Pass original border-style for renderer
-        :children ,(mapcar (lambda (child-id-key)
-                             (let* ((child-component-id-path (list :components child-id-key))
-                                    (child-state (get-path state child-component-id-path))
-                                    (child-type (getf child-state :type)))
-                               (if child-type
-                                   (let ((child-instance (make-instance child-type)))
-                                     (view child-instance state :id-path child-component-id-path))
-                                   `(:error \"Child component type not found for ID: ~a in panel ~a\" ,child-id-key ,component-id))))
-                           children-ids)))))
+    (values (nreverse all-patches) (nreverse all-commands))))

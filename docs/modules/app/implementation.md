@@ -55,19 +55,40 @@ The `app` module's implementation focuses on orchestrating the Elmtui runtime en
 
 ### Key Public APIs
 (List and briefly describe the main functions/macros exported by the `app` module for developers to use.)
-*   `run-application (root-component &key initial-state)`: Starts an Elmtui application.
-*   `define-application (...)`: (If a declarative way to define apps exists).
+*   `run-application (app-spec &key backend-type platform-options)`: Starts an Elmtui application using a specification plist. This is the primary entry point for applications defined via `defapplication`.
+*   `defapplication`: Macro for declaratively defining an Elmtui application, generating a runner function that internally calls `run-application`.
 *   `quit-application (app-instance)`: Programmatically stops an application.
 
 ```lisp
-;; Example: Starting an application
-(defun my-main ()
-  (elmtui-app:run-application (make-instance 'my-root-widget)
-                              :initial-state '(:title "My App")))
+;; Example: Starting an application using a specification plist
+(elmtui.app.api:run-application
+  (list :name 'my-app
+        :init-fn #'my-init
+        :update-fn #'my-update
+        :view-fn #'my-view
+        :subscriptions-fn #'my-subs
+        :message-queue my-queue
+        :root-viewport-id :main-root-vp)
+  :backend-type :terminal
+  :platform-options '(:tty-path "/dev/tty"))
 ```
+
+;; If using defapplication (recommended for most apps):
+(defapplication my-app
+  :root-viewport-id :main-root-vp
+  :initial-state-plist (my-init)
+  :root-component-dsl (list (my-view nil))
+  :update-fn 'my-update
+  :view-fn 'my-view
+  :subscriptions-fn (lambda (model) ...)
+  ;; ...other options...
+  )
+
+;; This generates a function RUN-MY-APP which can be called directly.
 
 ### Important Notes
 *   The `run-application` function is typically blocking until the application exits.
+*   The method for `(app-spec list)` is implemented in [`src/platform/driver.lisp`](src/platform/driver.lisp), bridging the generic application specification to the platform-specific driver.
 *   Ensure proper resource cleanup if manually managing application instances.
 
 ### Extension Points

@@ -7,15 +7,13 @@
 (uiop:define-package :elmtui.examples.rainbow-app
   (:use :cl :alexandria :log4cl)
   (:import-from :log4cl #:log-info #:log-debug)
-  (:import-from :elmtui.view.styled #:make-styled-node)
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.style-lib.rule #:defrule)
   (:import-from :elmtui.style-lib.sheet #:defstylesheet)
-  (:import-from :elmtui.state.update #:defupdate)
   (:import-from :elmtui.core.event-types #:key-event)
-  (:import-from :elmtui.state #:make-update-result)
+  (:import-from :elmtui.state.api #:make-update-result)
   (:export
-   :main))
+   :run-rainbow-example-app))
 
 (in-package :elmtui.examples.rainbow-app)
 
@@ -45,61 +43,57 @@
   (defstylesheet (generate-stripe-rules-forms)))
 
 ;;;--------------------------------------------------------------
-;;; Application Definition
+;;; Application Update Function
 ;;;--------------------------------------------------------------
+;; (defun app-update (message state)
+;;   "Handles application messages by returning an update-result struct.
+;; Any key press or quit request sets :should-quit to t."
+;;   (declare (ignore state))
+;;   (log-info "RAINBOW-APP: app-update called with message: ~S (Type: ~A)"
+;;             message (type-of message))
+;;   (make-update-result
+;;    :patches (when (or (typep message 'elmtui.core.event-types:key-event)
+;;                       (and (listp message) (eq (first message) :app-quit-requested)))
+;;               (list (list :should-quit) t))
+;;    :commands nil))
 
-(defun app-init ()
-  "Initializes the application model."
-  (values
-   ;; Initial application state (plist)
-   (list :current-stylesheet rainbow-stylesheet
-         :should-quit nil)
-   ;; No initial commands
-   nil))
-
-(defupdate app-update (app-state message)
+(defun app-update (app-state message)
   "Handles updates to the application state based on messages.
-   Any key press will quit the application."
-  (declare (ignore app-state)) ; app-state not used directly, patches are absolute
-  (log-info "RAINBOW-APP: app-update called with message: ~S (Type: ~A)" message (type-of message))
-  (let ((patch nil))
-    (cond
-      ((typep message 'elmtui.core.event-types:key-event)
-       (log-info "RAINBOW-APP: Key event condition met for ~A, setting :should-quit to t." message)
-       (setf patch (list :should-quit t))) ; Patch to set should-quit to t
-
-      ((and (listp message) (eq (first message) :app-quit-requested))
-       (log-info "RAINBOW-APP: :APP-QUIT-REQUESTED condition met for ~A, setting :should-quit to t." message)
-       (setf patch (list :should-quit t))) ; Patch to set should-quit to t
-      (t (setf patch nil)))
-    (values patch nil))) ; Explicitly return (values patches commands)
+   Any key event or :app-quit-requested sets :should-quit to t."
+  (declare (ignore app-state)) ; app-state not used for this logic
+  (cond
+    ((or (typep message 'elmtui.core.event-types:key-event)
+         (and (listp message) (eq (first message) :app-quit-requested)))
+     (make-update-result :patches (list (list :should-quit t))))
+    (t
+     (make-update-result))))
 
 (defun rainbow-content-view (app-state)
   "Defines the UI DSL for the rainbow app's content."
   (declare (ignore app-state)) ; app-state not used in this simple static view
-  ;; This is the DSL for the content that will be the child of the root-viewport
-  (make-styled-node
-   :type :container
-   :props (list :id :rainbow-main-container
-                :direction :row ; Stripes are laid out horizontally
-                :height :fill
-                :width :fill
-                :style (list :bg-color (elmtui.style-lib.styles:rgb '(10 10 10)))); Dark background for main container
-   :children (loop for (color-name class-name rgb-val) in *rainbow-colors-with-names*
-                   collect (make-styled-node
-                            :type :container ; Each stripe is a container
-                            :props (list :id (intern (format nil "STRIPE-~A" (string color-name)) :keyword)
-                                         :classes (string-downcase (symbol-name class-name)) ; Ensure class name is a string
-                                         ;; width and height come from the stylesheet class
-                                         )
-                            :children nil))))
+  ;; This is PURE DSL DATA for the content that will be the child of the root-viewport
+  `(:container
+    :id :rainbow-main-container
+    :direction :row ; Stripes are laid out horizontally
+    :height :fill
+    :width :fill
+    :style (:bg-color ,(elmtui.style-lib.styles:rgb '(10 10 10))) ; Dark background for main container
+    :children ,(loop for (color-name class-name rgb-val) in *rainbow-colors-with-names*
+                     collect `(:container ; Each stripe is a container
+                               :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
+                               :classes ,(string-downcase (if (symbolp class-name) (symbol-name class-name)
+                                                               class-name)) ; Ensure class name is a string
+                               ;; width and height come from the stylesheet class
+                               :children nil))))
 
 (defapplication rainbow-example-app
   :root-viewport-id :rainbow-root-vp
-  :initial-state-plist (app-init) ; Get initial state from app-init (which returns a plist)
-  :root-component-dsl (rainbow-content-view nil) ; Initial DSL for the content
+  :initial-state-plist (list :current-stylesheet rainbow-stylesheet
+                             :should-quit nil)
+  :root-component-dsl (rainbow-content-view nil) ; Directly use the DSL form
   :update-fn 'app-update
   :view-fn 'rainbow-content-view  ; Function that generates the content DSL
   :subscriptions-fn (lambda (model)
                       (declare (ignore model))
-                      (log-debug "RAINBOW-APP: Subscriptions function called.")))
+                      (log-debug "RAINBOW-APP: Subscriptions function called.")
+                      nil))

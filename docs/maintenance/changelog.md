@@ -18,7 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 *   Created `ai_documentation_plan.md` in project root.
 
 ### Changed
-*   (For future changes)
+*   Updated `docs/modules/app/implementation.md` to document the correct `run-application` API signature and usage.
+*   Improved documentation consistency for application startup and example usage.
+
+### Fixed
+*   Added missing method for `elmtui.app.api:run-application` specializing on `(app-spec list)`, resolving "no applicable method" error for example apps using `defapplication`.
+*   Rainbow example now runs as intended.
+
+### Added
+*   Created `docs/examples/rainbow-app.md` with metadata, usage, and implementation notes for the Rainbow example application.
+*   All components now store their originating DSL form in their state under the `:dsl` key by default, handled by the base `component` class's `init` method.
 
 ### Deprecated
 *   (For future changes)

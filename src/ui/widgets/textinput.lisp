@@ -3,7 +3,7 @@
 ;;; Standardized Elm-style Text Input Widget
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.textinput
-  (:use :cl :alexandria) ; Added alexandria
+  (:use :cl) ; Added alexandria
   (:import-from :elmtui.ui.defcomponent
                 #:defcomponent #:id-from-path) ; Removed unused imports
   (:import-from :elmtui.ui.api ; Added for component base class
@@ -51,7 +51,7 @@
                                          initial-on-change
                                          initial-on-submit
                                          (initial-disabled nil)
-                                         &allow-other-keys)
+                 &allow-other-keys)
   (let ((component-id (id-from-path id-path)))
     (values component
             (list (make-state-patch `(:components ,component-id)
@@ -80,6 +80,7 @@
          (patches nil)
          (commands nil)
          (value-changed nil))
+    (declare (ignore current-on-change)) ; state is not used directly in this method
 
     (unless props
       (warn "Textinput ~A state not found at ~S" component-id component-state-path)
@@ -94,38 +95,38 @@
                 (key-sym (getf key-data :key-sym)))
            (cond
              (char ; Printable character
-              (push (make-state-patch (append component-state-path \'(:value))
-                                      (concatenate \'string
+              (push (make-state-patch (append component-state-path '(:value))
+                                      (concatenate 'string
                                                    (subseq current-value 0 current-cursor-pos)
                                                    (string char)
                                                    (subseq current-value current-cursor-pos))) patches)
-              (push (make-state-patch (append component-state-path \'(:cursor-pos)) (1+ current-cursor-pos)) patches)
+              (push (make-state-patch (append component-state-path '(:cursor-pos)) (1+ current-cursor-pos)) patches)
               (setf value-changed t))
              ((eq key-sym :backspace)
               (when (> current-cursor-pos 0)
-                (push (make-state-patch (append component-state-path \'(:value))
-                                        (concatenate \'string
+                (push (make-state-patch (append component-state-path '(:value))
+                                        (concatenate 'string
                                                      (subseq current-value 0 (1- current-cursor-pos))
                                                      (subseq current-value current-cursor-pos))) patches)
-                (push (make-state-patch (append component-state-path \'(:cursor-pos)) (1- current-cursor-pos)) patches)
+                (push (make-state-patch (append component-state-path '(:cursor-pos)) (1- current-cursor-pos)) patches)
                 (setf value-changed t)))
              ((eq key-sym :delete)
               (when (< current-cursor-pos (length current-value))
-                (push (make-state-patch (append component-state-path \'(:value))
-                                        (concatenate \'string
+                (push (make-state-patch (append component-state-path '(:value))
+                                        (concatenate 'string
                                                      (subseq current-value 0 current-cursor-pos)
                                                      (subseq current-value (1+ current-cursor-pos)))) patches)
                 (setf value-changed t)))
              ((eq key-sym :left)
               (when (> current-cursor-pos 0)
-                (push (make-state-patch (append component-state-path \'(:cursor-pos)) (1- current-cursor-pos)) patches)))
+                (push (make-state-patch (append component-state-path '(:cursor-pos)) (1- current-cursor-pos)) patches)))
              ((eq key-sym :right)
               (when (< current-cursor-pos (length current-value))
-                (push (make-state-patch (append component-state-path \'(:cursor-pos)) (1+ current-cursor-pos)) patches)))
+                (push (make-state-patch (append component-state-path '(:cursor-pos)) (1+ current-cursor-pos)) patches)))
              ((eq key-sym :home)
-              (push (make-state-patch (append component-state-path \'(:cursor-pos)) 0) patches))
+              (push (make-state-patch (append component-state-path '(:cursor-pos)) 0) patches))
              ((eq key-sym :end)
-              (push (make-state-patch (append component-state-path \'(:cursor-pos)) (length current-value)) patches))
+              (push (make-state-patch (append component-state-path '(:cursor-pos)) (length current-value)) patches))
              ((eq key-sym :enter)
               (when current-on-submit
                 (push current-on-submit commands)))))))
@@ -135,8 +136,8 @@
        (unless current-disabled
          (let ((new-val (getf (rest msg) :new-value)))
            (unless (string= current-value new-val)
-             (push (make-state-patch (append component-state-path \'(:value)) new-val) patches)
-             (push (make-state-patch (append component-state-path \'(:cursor-pos)) (length new-val)) patches) ; Move cursor to end
+             (push (make-state-patch (append component-state-path '(:value)) new-val) patches)
+             (push (make-state-patch (append component-state-path '(:cursor-pos)) (length new-val)) patches) ; Move cursor to end
              (setf value-changed t)))))
 
       ;; 3. Bare keyword :textinput-submit
@@ -148,22 +149,22 @@
       ;; 4. Direct property mutation for external control (e.g., from a form)
       ;;    (:set-property :property-name <value>)
       ((cons (eql :set-property) t)
-        (let ((prop-key (second msg))
-              (prop-val (third msg)))
-          (case prop-key
-            (:value
-             (unless (string= current-value prop-val)
-               (push (make-state-patch (append component-state-path \'(:value)) prop-val) patches)
-               (push (make-state-patch (append component-state-path \'(:cursor-pos)) (length prop-val)) patches)
-               (setf value-changed t)))
-            (:placeholder
-             (push (make-state-patch (append component-state-path \'(:placeholder)) prop-val) patches))
-            (:cursor-pos
-             (push (make-state-patch (append component-state-path \'(:cursor-pos)) prop-val) patches))
-            (:on-change
-             (push (make-state-patch (append component-state-path \'(:on-change)) prop-val) patches))
-            (:on-submit
-             (push (make-state-patch (append component-state-path \'(:on-submit)) prop-val) patches))
-            (:disabled
-             (push (make-state-patch (append component-state-path \'(:disabled)) prop-val) patches))
-            (t (warn "Unknown property for textinput set-property: ~S" prop-key))))))
+       (let ((prop-key (second msg))
+             (prop-val (third msg)))
+         (case prop-key
+           (:value
+            (unless (string= current-value prop-val)
+              (push (make-state-patch (append component-state-path '(:value)) prop-val) patches)
+              (push (make-state-patch (append component-state-path '(:cursor-pos)) (length prop-val)) patches)
+              (setf value-changed t)))
+           (:placeholder
+            (push (make-state-patch (append component-state-path '(:placeholder)) prop-val) patches))
+           (:cursor-pos
+            (push (make-state-patch (append component-state-path '(:cursor-pos)) prop-val) patches))
+           (:on-change
+            (push (make-state-patch (append component-state-path '(:on-change)) prop-val) patches))
+           (:on-submit
+            (push (make-state-patch (append component-state-path '(:on-submit)) prop-val) patches))
+           (:disabled
+            (push (make-state-patch (append component-state-path '(:disabled)) prop-val) patches))
+           (t (warn "Unknown property for textinput set-property: ~S" prop-key))))))))

@@ -5,8 +5,6 @@
 (uiop:define-package :elmtui.core.topic-registry
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn)
-  (:import-from :elmtui.state.update
-                #:publish-to-topic)
   (:import-from :elmtui.core.topics
                 #:topic
                 #:topic-name
@@ -49,7 +47,9 @@
 ;;;-----------------------------------------------------------------------------
 ;;; Topic Subscription Registry
 ;;;-----------------------------------------------------------------------------
-
+(defgeneric publish-to-topic (topic-name message)
+  (:documentation "Generic function to publish a message to a named topic.
+Specific implementations will handle the dispatch logic, potentially using elmtui.core.topics."))
 (defvar *topic-subscriptions* (make-hash-table :test 'equal)
   "Registry of subscriptions indexed by pattern")
 

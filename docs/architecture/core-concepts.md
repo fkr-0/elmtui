@@ -34,7 +34,7 @@ This document explains the fundamental concepts and principles that underpin the
 
 *   **Components/Widgets:** Reusable, self-contained UI building blocks, defined and managed by the [UI module](../modules/ui/overview.md).
 *   **Composition:** How components are combined to build complex UIs, typically within the `view` functions of parent components.
-*   **Lifecycle:** (If applicable, describe component lifecycle methods like init, update, destroy, managed by the `defcomponent` system in the [UI module](../modules/ui/overview.md)).
+*   **Lifecycle:** Component lifecycle methods like `init`, `update`, and `destroy` are managed by the `defcomponent` system in the [UI module](../modules/ui/overview.md). **All components initialized from DSL will have their DSL form stored in their state under the `:dsl` key by default.**
 
 ## 4. State Management
 

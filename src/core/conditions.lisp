@@ -9,9 +9,9 @@
    :render-error
    :event-loop-dispatch-error
    :async-task-error
+   :async-task-error
    :with-message-restarts
    :signal-subscriber-error
-   :with-async-restarts
    :with-render-restarts
    :state-update-error
    :subscriber-handler-error
@@ -141,34 +141,6 @@
                   (return-from with-message-restarts (progn ,@forms))))))) ; Use forms
        ,@forms))) ; Use forms
 
-(defmacro with-async-restarts ((condition-var) &body forms) ; Renamed body to forms
-  "Handle async task failures with DRY restarts: ignore, rollback, replace, provide result."
-  `(block with-async-restarts
-     (handler-bind
-         ((elmtui.core.conditions:async-task-error
-            (lambda (,condition-var)
-              (log-condition ,condition-var)
-              (restart-case
-                  (signal ,condition-var)
-                (ignore-task ()
-                  :report "Ignore/discard this async task."
-                  (return-from with-async-restarts nil))
-                (rollback-state ()
-                  :report "Rollback state to previous checkpoint."
-                  ;; Use fully qualified name as state is loaded first now
-                  (when (fboundp 'elmtui.state:rollback-state) (funcall 'elmtui.state:rollback-state))
-                  (return-from with-async-restarts nil))
-                (replace-task (new-task)
-                  :report "Replace the async task interactively or programmatically."
-                  ;; Return the new task value, don't funcall body
-                  (return-from with-async-restarts new-task))
-                (provide-result (result)
-                  :report "Provide a custom result for this task."
-                  (return-from with-async-restarts result))
-                (retry ()
-                  :report "Retry the async task."
-                  (return-from with-async-restarts (progn ,@forms))))))) ; Use forms
-       ,@forms))) ; Use forms
 
 (defmacro with-render-restarts ((condition-var) &body forms) ; Renamed body to forms
   "Handle render/view failures with DRY restarts: skip, fallback, retry."

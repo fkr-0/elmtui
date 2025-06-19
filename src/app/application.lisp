@@ -7,6 +7,8 @@
   (:use #:cl)
   (:import-from #:elmtui.core.globals          :*applications*)
   (:import-from #:elmtui.utils                 :ensure-keyword)
+  (:import-from #:cleve-elm.channel #:make-channel )
+  (:import-from #:cleve-elm.core.event-channels #:make-message-channel )
   (:import-from #:elmtui.app.api
                 #:app-config
                 #:make-app-config
@@ -84,29 +86,33 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
 
 (defmacro defapplication (name &rest args)
   "Define an ElmTUI application called NAME."
-  (let ((known '(:root-component-dsl :initial-state-plist
+  (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
                  :update-fn :view-fn :command-processor-fn
                  :subscriptions-fn :root-viewport-id)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
-             (root-dsl   (%required kw-plist :root-component-dsl name))
+             (root-dsl   (%required kw-plist :root-component-dsl name)) ; Should be the DSL form itself
              (root-vp-id (%kw (%required kw-plist :root-viewport-id name)))
              ;; Optional
-             (initial-state  (getf kw-plist :initial-state-plist '()))
+             (initial-state-plist (getf kw-plist :initial-state-plist '()))
+             (initial-state-fn (getf kw-plist :initial-state-fn nil))
              ;; Normalise FN designators to symbols
+             (state (if initial-state-fn
+                        `(funcall ,initial-state-fn)
+                        initial-state-plist))
              (update-fn* (%->symbol (getf kw-plist :update-fn)
                                     ":update-fn" name))
              (view-fn*   (%->symbol (getf kw-plist :view-fn)
                                     ":view-fn" name))
              (cmd-proc-fn (%->symbol (getf kw-plist :command-processor-fn)
                                      ":command-processor-fn" name))
-             ;; Subscriptions: keep symbol | lambda | NIL
+             ;; Subscriptions: keep symbol | lambda | NIL, but handle lambda evaluation properly
              (subs-fn-form
                (let ((v (getf kw-plist :subscriptions-fn)))
-                 (cond ((or (symbolp v)
-                            (and (consp v) (eq (car v) 'lambda))) v)
+                 (cond ((symbolp v) `',v) ; Quote symbol for later evaluation
+                       ((and (consp v) (eq (car v) 'lambda)) `',v) ; Quote lambda form to store as cons
                        ((null v)
-                        '(lambda (model) (declare (ignore model)) nil))
+                        ''(lambda (model) (declare (ignore model)) nil))
                        (t (error "DEFAPPLICATION ~S: :subscriptions-fn must be symbol or lambda – got: ~S"
                                  name v)))))
              ;; Auto-generated helper names
@@ -127,47 +133,68 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
                  (make-app-config
                   :name ',name
                   :root-component-dsl ,root-dsl
-                  :initial-state-plist ,initial-state
+                  :initial-state-plist ,state
                   :update-fn-sym ',update-fn*
                   :view-fn-sym   ',view-fn*
                   :command-processor-fn ,cmd-proc-fn
-                  :subscriptions-fn-form ,subs-fn-form))
+                  :subscriptions-fn-form ,subs-fn-form
+                  :message-queue (make-message-channel :capacity 20) ; Create proper event-channel
+                  ))
 
            ;; --------------------------------------------------------------
-           ;; INITIALISE-APP-STATE
+           ;; ❷ Generated APP STATE INITIALIZER
+           ;; Name: INITIALIZE-APP-STATE-<app-name>
+           ;; Args: &key initial-terminal-dimensions initial-cursor-position &allow-other-keys
            ;; --------------------------------------------------------------
-           (defun ,init-fn-sym (&key initial-terminal-dimensions
-                                  initial-cursor-position)
-             (let* ((state   (copy-tree ,initial-state))
-                    (patches nil)
-                    (cmds    nil)
-                    (rv-id   ,root-vp-id) ; root-vp-id is from the outer let*
-                    (rv-path (list :components rv-id))
-                    (current-root-dsl ,root-dsl) ; root-dsl is from the outer let*
-                    (rv-dsl-spec
-                      `(root-viewport ; This is a literal symbol
-                        :id ,rv-id    ; Splice in the value of lexical variable rv-id
-                        :initial-terminal-dimensions
-                        ,initial-terminal-dimensions ; Splice in the value of the function argument
-                        :initial-cursor-pos ,initial-cursor-position ; Splice in the value of the function argument
-                        :initial-child-spec  ,current-root-dsl)) ; Splice in the value of lexical variable current-root-dsl
-                    (rv-inst (instantiate-component-from-dsl rv-dsl-spec rv-path)))
-               (when rv-inst
-                 (push (list (append rv-path '(:component-instance)) rv-inst)
-                       patches)
-                 (multiple-value-bind (_ init-patches init-commands)
-                     (init rv-inst
-                           :id-path rv-path
-                           :initial-terminal-dimensions initial-terminal-dimensions
-                           :initial-cursor-pos initial-cursor-position
-                           :initial-child-spec ,root-dsl)
-                   (declare (ignore _))
-                   (setf patches (nconc patches init-patches))
-                   (setf cmds    (nconc cmds    init-commands))))
-               (values (merge-patches state patches) cmds)))
+           (defun ,init-fn-sym (&key (initial-terminal-dimensions '(80 24))
+                                  (initial-cursor-position '(0 0))
+                                &allow-other-keys) ; Allow other platform-options
+             (declare (ignorable initial-terminal-dimensions initial-cursor-position)) ; May not be used if root-dsl is complex
+             (let ((state ,state) ; Initialize state from macro parameter
+                   (patches nil)
+                   (commands nil)
+                   (rv-id ,root-vp-id) ; Use the required root-viewport-id
+                   (rv-path (list :components ,root-vp-id)))
+
+               ;; Instantiate the root-viewport component
+               ;; The DSL for the root-viewport itself, including its initial child.
+               (let* ((current-root-dsl ,root-dsl) ; root-dsl is from the outer let*
+                      (rv-dsl-spec
+                        `(root-viewport ; This is a literal symbol
+                          :id ,rv-id
+                          ;; Pass explicit initargs that root-viewport's init method expects
+                          ;; :initial-terminal-dimensions ,initial-terminal-dimensions
+                          ;; :initial-cursor-pos ,initial-cursor-position
+                          ;; :initial-child-spec ,current-root-dsl
+                          ;; Other props for root-viewport itself can be in its dsl if needed
+                          :props (:anchor :below-cursor) ; Example: default anchor if not in platform-options
+                          )))
+                 (when rv-id
+                   (let ((rv-inst (instantiate-component-from-dsl rv-dsl-spec rv-path)))
+                     (when rv-inst
+                       (log4cl:log-info "Initialized root viewport instance: ~A for app ~A" rv-inst ',name)
+                       (multiple-value-bind (init-patches init-commands)
+                           (elmtui.ui.api:init rv-inst
+                                               :id-path rv-path
+                                               :dsl rv-dsl-spec ; Pass the dsl for the root-viewport
+                                               ;; Pass options needed by root-viewport's init
+                                               :initial-terminal-dimensions initial-terminal-dimensions
+                                               :initial-cursor-pos initial-cursor-position
+                                               :initial-child-spec current-root-dsl)
+                         (setf patches (nconc patches init-patches))
+                         (setf commands (nconc commands init-commands))))
+                     ;; Store the root viewport instance itself if needed (e.g., for direct access, though usually via get-component-instance)
+                     ;; (setf state (merge-patches state (list (list rv-path rv-inst)))) ; Storing instance might be redundant if state is pure data
+                     ))
+
+                 ;; Merge initial state with patches from root viewport init
+                 (setf state (merge-patches state patches))
+                 (values state commands))))
+
 
            ;; --------------------------------------------------------------
-           ;; PROCESS-MESSAGE
+           ;; ❸ Generated MESSAGE PROCESSOR
+           ;; Name: PROCESS-MESSAGE-<app-name>
            ;; --------------------------------------------------------------
            (defun ,proc-fn-sym (state msg)
              (let* ((update-result
@@ -184,8 +211,8 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
            (defun ,run-fn-sym (&key (platform :terminal) platform-options
                                &allow-other-keys)
              (let* ((cfg           (gethash ',name *applications*))
-                    (state-cell    (list nil))
-                    (msg-queue     (app-config-message-queue cfg))
+                    (state-cell    (list nil)) ; Holds the current state
+                    (msg-queue     (app-config-message-queue cfg)) ; Get the mailbox from app-config
                     (init-fn       #',init-fn-sym)
                     (proc-fn       #',proc-fn-sym)
                     (app-view-fn   (symbol-function
@@ -194,39 +221,30 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
                     (app-subs-form (app-config-subscriptions-fn-form cfg)))
                (labels
                    ((pinit ()
+                      ;; Validate platform-options before initialization
+                      (elmtui.app.api:validate-platform-options platform platform-options)
                       (multiple-value-bind (st init-cmds)
-                          (apply init-fn
-                                 (append (list :initial-terminal-dimensions
-                                               (getf platform-options
-                                                     :initial-terminal-dimensions))
-                                         (list :initial-cursor-position
-                                               (getf platform-options
-                                                     :initial-cursor-position))))
+                          ;; Apply platform-options plist as keyword args to init-fn
+                          (apply init-fn platform-options)
                         (setf (car state-cell) st)
                         (when cmd-proc-fn
                           (dolist (c init-cmds)
                             (funcall cmd-proc-fn c msg-queue st cfg)))
-                        st))
-                    (pupdate (model pmsg)
-                      (multiple-value-bind (nst new-cmds)
-                          (funcall proc-fn model pmsg)
-                        (setf (car state-cell) nst)
-                        (when cmd-proc-fn
-                          (dolist (c new-cmds)
-                            (funcall cmd-proc-fn c msg-queue nst cfg)))
-                        nst))
-                    (pview  (model) (funcall app-view-fn model))
-                    (psubs  (model) (funcall (compile nil app-subs-form) model)))
-                 (elmtui.app.api:run-application
-                  (list :name ',name
-                        :init-fn #'pinit
-                        :update-fn #'pupdate
-                        :view-fn   #'pview
-                        :subscriptions-fn #'psubs
-                        :message-queue msg-queue
-                        :root-viewport-id ,root-vp-id)
-                  :backend-type platform
-                  :platform-options platform-options))))
+                        st)))
+                 (pinit)
+                 (let ((app-spec-for-driver
+                         (list :name ',name
+                               :init-fn #',init-fn-sym ; Pass the actual function
+                               :update-fn #',proc-fn-sym ; Pass the actual function
+                               :view-fn app-view-fn ; Pass the actual function
+                               :subscriptions-fn app-subs-form ; Pass the form/lambda/symbol
+                               :command-processor-fn cmd-proc-fn ; Pass the function/symbol
+                               :message-queue msg-queue
+                               :root-viewport-id ,root-vp-id)))
+                   (elmtui.app.api:run-application
+                    app-spec-for-driver ; 1st arg: the app configuration plist
+                    :backend-type platform ; keyword arg
+                    :platform-options platform-options))))) ; keyword arg
            ',name)))))
 ;;; ---------------------------------------------------------------------------
 ;;; Quick manual demo & FiveAM tests unchanged … (omitted for brevity)

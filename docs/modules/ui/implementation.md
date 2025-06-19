@@ -46,6 +46,7 @@ The `ui` module's implementation revolves around the `defcomponent` macro (found
 - Each instance of a component in the UI tree is an object of the class defined by `defcomponent`.
 - It holds its current local state and a copy of its props.
 - It might also have a unique ID, references to parent/children, etc.
+- **If the component was created from a DSL form, the original DSL form is always stored in the component's state under the `:dsl` key. This is handled by the base `component` class's `init` method.**
 
 ### Props Handling
 - Props are passed down from parent components during view rendering.
