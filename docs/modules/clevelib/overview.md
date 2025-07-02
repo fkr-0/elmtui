@@ -1,8 +1,15 @@
 ---
 # AI Metadata Tags
-ai_keywords: [Clevelib, CFFI, FFI, Low-level, Native Integration, System Calls, Terminal Control Low Level, Termios]
+ai_keywords: [Clevelib, CFFI, Thread Primitives, Channel, Message Passing, Terminal Helpers, Mutex, Condition Variable, Native Bindings]
 ai_contexts: [architecture, implementation, development]
-ai_relations: ["./implementation.md", "../platform/overview.md", "../core/overview.md", "../../architecture/system-overview.md", "../../architecture/module-dependencies.md"]
+ai_relations: [
+  "./implementation.md",
+  "../platform/overview.md",
+  "../core/overview.md",
+  "../../architecture/system-overview.md",
+  "../../architecture/tech-stack.md",
+  "../../architecture/module-dependencies.md"
+]
 ---
 
 # Clevelib Module Overview
@@ -10,45 +17,71 @@ ai_relations: ["./implementation.md", "../platform/overview.md", "../core/overvi
 <!-- AI-IMPORTANCE:level=normal -->
 ## Core Functionality
 
-The `clevelib` module (short for "C-Level Library" or similar, actual meaning to be confirmed) is presumed to handle low-level interactions, potentially with C libraries via CFFI (C Foreign Function Interface), direct system calls, or other native integrations necessary for Elmtui's operation. This could include fine-grained terminal control (e.g., using `termios` on Unix-like systems), signal handling, or performance-critical routines.
+The `clevelib` module provides a focused set of low-level primitives for Elmtui, implemented via CFFI bindings to native system libraries. Its main responsibilities are thread creation and management, inter-thread communication (channels, message queues), and select terminal control helpers. It does **not** provide a general-purpose event system, async I/O, or memory management abstraction.
 
-*(Actual core functionality needs to be determined by inspecting the `src/clevelib/` directory and its contents, such as `src/clevelib/termios.lisp`.)*
+## Main Features
 
-## Main Features (Hypothetical/Observed)
-
-- **CFFI Bindings:** Wrappers around C libraries for terminal manipulation (e.g., `termios.h` functions).
-- **Direct System Call Interface:** Access to specific OS-level functions related to terminal I/O.
-- **Low-Level Terminal I/O Control:** Functions to get and set terminal attributes, like enabling raw mode.
-- **Signal Handling Setup:** (Potentially) Interfacing with POSIX signals.
-- **Performance-Critical Utilities:** (Potentially) Functions implemented at a lower level for speed.
+- **Thread Primitives:** Creation, joining, and synchronization of native threads
+- **Channels:** Simple, thread-safe message passing between threads
+- **Mutexes & Condition Variables:** Synchronization primitives for safe concurrent code
+- **Terminal Helpers:** Minimal wrappers for raw mode and terminal state (used by platform module)
+- **CFFI Bindings:** Safe, minimal interfaces to required C/system functions
 
 <!-- AI-CONTEXT-START:type=architecture -->
-## Architectural Design
+## Architectural Role
 
-The `clevelib` module serves as a foundational layer, providing an abstraction over platform-specific or C-level details that other higher-level modules (like `platform` or `core`) can consume. It helps isolate native code dependencies.
+`clevelib` is the lowest-level utility layer in Elmtui. It exposes only the minimal set of primitives needed by higher-level modules:
+- The [`platform`](../platform/overview.md) module uses clevelib for terminal state and raw mode helpers.
+- The [`core`](../core/overview.md) and [`app`](../app/overview.md) modules use clevelib for thread and channel primitives to implement event loops and background workers.
 
-### Component Structure
+All higher-level event processing, async logic, and resource management are handled outside clevelib.
 
-This module likely consists of:
-- CFFI definitions (`defcfun`, `defcstruct`, etc.), for example, in `src/clevelib/termios.lisp`.
-- Lisp wrapper functions around these CFFI calls.
-- Utility functions for managing low-level resources.
+### Key Components
+- **API Layer ([src/clevelib/api.lisp](src/clevelib/api.lisp:1)):** Public interface for thread, channel, and terminal helpers
+- **Threading ([src/clevelib/thread.lisp](src/clevelib/thread.lisp:1)):** Native thread and synchronization primitives
+- **Channel System ([src/clevelib/channel.lisp](src/clevelib/channel.lisp:1)):** Simple message channels for inter-thread communication
+- **Terminal Control ([src/clevelib/target.lisp](src/clevelib/target.lisp:1)):** Minimal helpers for terminal state
+
 <!-- AI-CONTEXT-END -->
 
-<!-- AI-CONTEXT-START:type=usage -->
-## How to Use
+<!-- AI-CONTEXT-START:type=development -->
+## Usage Examples
 
-The `clevelib` module is generally not intended for direct use by end-users of the Elmtui library. Instead, its functionalities are exposed through higher-level APIs in modules like `platform` or `core`.
+### Threading
 
-Developers working on the Elmtui library itself might interact with `clevelib` when:
-- Adding support for new terminal features that require C library calls.
-- Optimizing performance-critical sections of code by dropping to a lower level.
-- Debugging issues related to native library interactions.
+```lisp
+;; Create and start a thread
+(let ((worker (clevelib:make-thread (lambda () (do-work)))))
+  (clevelib:join-thread worker))
+```
 
-### Common Scenarios (for Elmtui internal development)
+### Channels
 
-- Calling a C function to get terminal dimensions (if not handled by a higher-level library).
-- Setting terminal modes (e.g., raw mode, cooked mode) using `termios` wrappers.
+```lisp
+;; Create a channel and send/receive a message
+(let ((ch (clevelib:make-channel)))
+  (clevelib:send-message ch :ping)
+  (let ((msg (clevelib:receive-message ch)))
+    (process-message msg)))
+```
+
+### Mutexes
+
+```lisp
+(let ((mutex (clevelib:make-mutex)))
+  (clevelib:with-mutex (mutex)
+    ;; critical section
+    (update-shared-state)))
+```
+
+### Terminal Helpers
+
+```lisp
+(clevelib:with-raw-terminal ()
+  ;; Terminal is in raw mode here
+  (read-raw-input))
+```
+
 <!-- AI-CONTEXT-END -->
 
 ## Related Resources
@@ -56,6 +89,7 @@ Developers working on the Elmtui library itself might interact with `clevelib` w
 - [Implementation Details](./implementation.md)
 - [Platform Module Overview](../platform/overview.md)
 - [Core Module Overview](../core/overview.md)
-- [System Overview](../../architecture/system-overview.md)
+- [System Architecture Overview](../../architecture/system-overview.md)
+- [Technology Stack](../../architecture/tech-stack.md)
 - [Module Dependencies](../../architecture/module-dependencies.md)
-- [CFFI User Manual](https://cffi.common-lisp.dev/manual/) (if CFFI is used)
+- [CFFI Documentation](https://cffi.common-lisp.dev/)

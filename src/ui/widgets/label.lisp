@@ -13,7 +13,6 @@
 
 ;; Define component with its state properties
 (defcomponent label ()
-  () ;; No direct CLOS slots
   (:state
    (text "Label" :type string :documentation "The text content of the label."
                  :initarg :text :accessor label-text)
@@ -23,7 +22,7 @@
   (:on-unhandled-message :log) ; Or :no-op if strictly static
 
   (:init (props self-id-path)
-         (declare (ignore self-id-path))
+         ;; (declare (ignore self-id-path))
          ;; The :initargs :text and :for (if provided to make-instance) will be handled by defcomponent's
          ;; default initarg processing. This inline :init can still override or supplement.
          ;; Here, we allow :initial-text and :initial-for as aliases from props.

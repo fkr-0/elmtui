@@ -10,25 +10,21 @@ defining models and messages, and creating update functions, following Elm Archi
   (:import-from :elmtui.core.globals
    :*app-state*)
 
-  ;; From elmtui.statelib.state (struct definitions)
-  (:import-from :elmtui.statelib.state
-   :state-data :make-state-data :state-data-data
-                :application-state :make-application-state :application-state-data
-   :application-state-observers :application-state-lock
-   :application-state-transaction-log :application-state-transaction-history
-   :application-state-undone-history
-                :get-state :set-state :state-ref)
 
   ;; From elmtui.state (which wraps/uses elmtui.statelib)
   ;; (:import-from :elmtui.state
+  ;;  ;; Core state object
+  ;;  :application-state :make-application-state
   ;;  ;; Transactional wrapper
   ;;  ;; Update result structure (returned by update functions)
-  ;;               :update-result :make-update-result :ur-patches :ur-commands
-  ;;               ;; Path-based state manipulation (for patches)
-  ;;               :merge-patch :merge-patches
-  ;;               :get-path :set-path :remove-path
-  ;;               ;; Component instance state management
-  ;;  :get-component-by-path :store-component-at-path :remove-component-at-path)
+  ;;  :update-result :make-update-result :ur-patches :ur-commands
+  ;;  ;; Path-based state manipulation (for patches)
+  ;;  :merge-patch :merge-patches
+  ;;  :get-path :set-path :remove-path
+  ;;  ;; Component instance state management
+  ;;               :get-component-by-path :store-component-at-path :remove-component-at-path
+  ;;               ;; General state access (use with caution, prefer model/component accessors)
+  ;;  :get-state)
 
   ;; From elmtui.state.model (Elm-style model definition)
   ;; (:import-from :elmtui.state.model
@@ -75,74 +71,77 @@ defining models and messages, and creating update functions, following Elm Archi
   ;; Define the public interface by exporting the imported symbols.
   (:export
    ;; Global application state instance
-   :*app-state*
 
-   ;; Core State & Transactions
-   :application-state :make-application-state
-   :get-state ; General state accessor
-   #:with-transaction
-   #:update-result
-   #:ur-patches
-   #:ur-commands
-   #:ur-add-command
-   #:ur-has-command-p
-   #:make-update-result
-   #:start-transaction
-   :state-ref
-   :set-state
-   :get-state
 
-   ;; Path & Component State Management (primarily for use within update logic/patches)
-   :merge-patch :merge-patches
-   :get-path :set-path :remove-path
-   :get-component-by-path :store-component-at-path :remove-component-at-path
-   :handle-async-command
-   ;; Elm-style Abstractions
-   :undo-last-transaction
-   ;; Models
-   :application-state-transaction-history
-   :defmodel
-   :initialize-model-state
-   :get-slot
-   :with-model-access
-   ;; Messages
-   :defmsg
-   :message-variant-p
-   ;; Update Logic
-   :defupdate
-   :update-result :make-update-result :ur-patches :ur-commands
 
-   ;; Predefined AppMsg Message Constructors (exported from elmtui.state.msg)
-   :make-increment-counter-appmsg
-   :make-decrement-counter-appmsg
-   :make-set-counter-label-appmsg
-   :make-activate-user-appmsg
-   :make-deactivate-user-appmsg
-   :make-request-focus-appmsg
-   :make-focus-next-appmsg
-   :make-focus-previous-appmsg
-   :make-set-theme-appmsg
-   :make-state-changed-appmsg
-   :make-async-progress-update-appmsg
-   :make-key-event-appmsg
-   :make-mouse-event-appmsg
-   :make-window-resize-appmsg
-   :make-update-focusable-ids-appmsg
-   :state-data
-   :application-state
+   #:*app-state*
+   #:application-state
+   #:application-state
+   #:make-application-state
+   #:application-state
+   #:state-data
    #:application-state-data
+   #:application-state-lock
+   #:application-state-observers
+   #:application-state-transaction-history
+   #:application-state-transaction-log
+   #:application-state-undone-history
+   #:defmodel
+   #:defmsg
+   #:defupdate
+   #:dispatch-to-topic
+   #:get-component-by-path #:store-component-at-path #:remove-component-at-path
+   #:get-path #:set-path #:remove-path
+   #:get-slot
+   #:get-state
+   #:get-state ; General state accessor
+   #:handle-async-command
+   #:handle-async-command
+   #:initialize-model-state
+   #:make-activate-user-appmsg
+   #:make-async-progress-update-appmsg
+   #:make-deactivate-user-appmsg
+   #:make-decrement-counter-appmsg
+   #:make-focus-next-appmsg
+   #:make-focus-previous-appmsg
+   #:make-increment-counter-appmsg
+   #:make-key-event-appmsg
+   #:make-mouse-event-appmsg
+   #:make-request-focus-appmsg
+   #:make-set-counter-label-appmsg
+   #:make-set-theme-appmsg
+   #:make-state-changed-appmsg
+   #:make-update-focusable-ids-appmsg
+   #:make-update-result
+   #:make-window-resize-appmsg
+   #:merge-patch #:merge-patches
+   #:message-variant-p
+   #:publish-to-topic
+   #:set-state
+   #:start-transaction
+   #:state-data
    #:state-data-data
-   #:application-state #:state-data
-   :application-state-undone-history
-   :application-state-transaction-log
-   :application-state-observers
-   :application-state-lock
-   ;; Application Loop and Command Handling
+   #:state-ref
+   #:undo-last-transaction
+   #:update-result
+   #:update-result #:make-update-result #:ur-patches #:ur-commands
+   #:ur-add-command
+   #:ur-commands
+   #:ur-has-command-p
+   #:ur-patches
+   #:with-model-access
+   #:with-transaction
+   #:with-transaction
    ;; Advanced Update/Command Handling
-   :publish-to-topic
-   :dispatch-to-topic
-   :handle-async-command
-   :malformed-update-result-error))
+   ;; Application Loop and Command Handling
+   ;; Core State & Transactions
+   ;; Elm-style Abstractions
+   ;; Messages
+   ;; Models
+   ;; Path & Component State Management (primarily for use within update logic/patches)
+   ;; Predefined AppMsg Message Constructors (exported from elmtui.state.msg)
+   ;; Update Logic
+   #:malformed-update-result-error))
 
 (in-package :elmtui.state.api)
 ;;; ===================================================================
@@ -158,9 +157,22 @@ defining models and messages, and creating update functions, following Elm Archi
 ;; would be the way to apply these patches.
 ;; (defgeneric make-application-state ()
 ;;   (:documentation "Create a new application state instance."))
-(defmacro with-transaction (&body body)
-  (declare (ignore body))
-  (error "with-transaction macro not yet implemented."))
+;; Delegate to the real implementation in elmtui.statelib.transaction
+;; (defmacro with-transaction (args &body body)
+;;   "API macro: delegates to elmtui.state.statelib.transaction:with-transaction."
+;;   `(elmtui.state.statelib.transaction:with-transaction ,args ,@body))
+
+
+;; (defgeneric APPLICATION-STATE-LOCK (app-state))
+;; (defgeneric APPLICATION-STATE-OBSERVERS (app-state))
+(defgeneric GET-PATH (app-state path &optional comp-id)
+  (:documentation "Get the value at `PATH` in the application state `APP-STATE`.
+  Optionally provide `COMP-ID` to scope the key."))
+(defgeneric MERGE-PATCHES (app-state patches)
+  (:documentation "Merge `PATCHES` into the application state `APP-STATE`.
+  This applies a list of patches to the current state, updating it accordingly."))
+
+
 (defstruct (update-result (:conc-name ur-))
   "Represents the result of an update operation, containing patches to apply to the state
 and commands to be executed."
@@ -193,8 +205,42 @@ and commands to be executed."
   (setf (ur-commands result) (cons command (ur-commands result)))
   result)
 
-;; Note: The state-data and application-state structs are now defined in
-;; elmtui.statelib.state and imported from there.
+;;;--------------------------------------------------------------
+(defstruct state-data
+  "A struct to hold the application state data.
+  The data is stored in a hash-table."
+  (data (make-hash-table :test 'equal) :type hash-table))
+
+;; Correct FTYPE declarations for struct constructors and accessors
+;; The constructor doesn't need parameters (optional ones are auto-generated)
+(declaim (ftype (function (&key (:data hash-table)) state-data) make-state-data))
+;; Accessor is correct
+(declaim (ftype (function (state-data) hash-table) state-data-data)) 
+;; Correct writer signature - the value comes first, then the instance
+(declaim (ftype (function (hash-table state-data) hash-table) (setf state-data-data)))
+
+(defstruct application-state
+  "A struct to hold the application state.
+  The application state holds the state data, observers, a lock, a transaction log,
+  a transaction history (for undo), and an undone history (for redo)."
+  (data (make-state-data) :type state-data)
+  (observers (list) :type list)
+  (lock (sb-thread:make-mutex) :type sb-thread:mutex)
+  (transaction-log (list) :type list) ; Temporary log for current transaction
+  (transaction-history (list) :type list) ; Stack of committed transactions (undo stack)
+  (undone-history (list) :type list)) ; Stack of undone transactions (redo stack)
+
+;; Correct FTYPE declarations for application-state constructor with proper keyword parameters
+(declaim (ftype (function 
+                 (&key 
+                  (:data state-data)
+                  (:observers list)
+                  (:lock sb-thread:mutex)
+                  (:transaction-log list)
+                  (:transaction-history list)
+                  (:undone-history list))
+                 application-state) 
+                make-application-state))
 ;; (declaim (ftype (function (application-state) state-data) application-state-data))
 ;; (declaim (ftype (function (state-data application-state) state-data) (setf application-state-data)))
 ;; (declaim (ftype (function (application-state) list) application-state-observers))

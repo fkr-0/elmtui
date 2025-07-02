@@ -6,6 +6,16 @@ ai_relations: ["./implementation.md", "../core/overview.md", "../clevelib/overvi
 ---
 
 # Platform Module Overview
+## Recent Fixes
+
+- The render pipeline now normalizes the styled tree to always be a list before layout and rendering. This prevents type errors when the view root is a single node.
+- The render pipeline now distinguishes between an empty UI tree (treated as a valid "no-op" and logged as such, with frame rendering skipped) and all other cases where the rendered canvas is NIL (treated as errors, logged, and the application is halted). This aligns with Elm/TEA and Elmtui philosophy: empty UI is not an error, but unexpected NIL from rendering is a bug and must be surfaced.
+
+## Event Consumer Error
+
+- If you see `Error in event consumer loop: Channel is closed.`, this means the event channel was closed (e.g., due to shutdown or error). This is not a bug in the render pipeline, but a runtime condition. Ensure event channels are not used after closure and all consumers/producers are properly synchronized.
+
+
 
 <!-- AI-IMPORTANCE:level=critical -->
 ## Core Functionality

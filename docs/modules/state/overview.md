@@ -1,8 +1,17 @@
 ---
 # AI Metadata Tags
-ai_keywords: [State Management, Elm Architecture, Model, Update, Msg, Immutability, State Store, Application State, defcomponent]
-ai_contexts: [architecture, usage, development, implementation]
-ai_relations: ["./implementation.md", "../core/overview.md", "../app/overview.md", "../ui/overview.md", "../../architecture/core-concepts.md", "../../architecture/system-overview.md", "../../architecture/module-dependencies.md"]
+ai_keywords: [State Module, Elm Architecture, TEA, Model, Update, Message Handling, State Management, Immutable State, State Transactions, Component State]
+ai_contexts: [architecture, development, implementation]
+ai_relations: [
+  "./implementation.md",
+  "../app/overview.md",
+  "../core/overview.md",
+  "../ui/overview.md",
+  "../view/overview.md",
+  "../../architecture/system-overview.md",
+  "../../architecture/core-concepts.md",
+  "../../architecture/module-dependencies.md"
+]
 ---
 
 # State Module Overview
@@ -10,71 +19,174 @@ ai_relations: ["./implementation.md", "../core/overview.md", "../app/overview.md
 <!-- AI-IMPORTANCE:level=critical -->
 ## Core Functionality
 
-The `state` module implements Elmtui's state management paradigm, heavily inspired by The Elm Architecture (TEA). It provides mechanisms for defining, updating, and accessing the application's state in a predictable and often immutable or controlled-mutability manner. This is closely tied to how components are defined via `defcomponent` and their lifecycle methods like `init`, `update`, and `view` (often found in `src/state/elm.lisp`).
+The `state` module implements The Elm Architecture (TEA) pattern for Elmtui, providing predictable state management through the Model-Update-View cycle. It handles both global application state and local component state, ensuring all state changes are managed in a controlled and predictable manner. The module includes support for state transactions, immutable updates, and reactive state propagation.
 
 ## Main Features
 
-- **State Representation:** Defines how application and component state (the "Model" in TEA terms) is structured.
-- **Update Logic:** Provides a way to define "update" functions or methods that transform the state based on incoming messages ("Msg" in TEA).
-- **Message System Integration:** Works closely with the `core` module's event/message system.
-- **Immutability/Controlled Mutability:** (To be confirmed based on actual implementation) May enforce or encourage immutable state updates, or provide transactional updates.
-- **State Access:** Provides ways for UI components to access and react to state changes.
-- **Initial State:** Handles the setup of the application's and components' initial state via `init` functions/methods.
+- **TEA Implementation:** Complete implementation of The Elm Architecture (Model-Update-View) pattern
+- **State Management:** Both global application state and local component state handling
+- **Message Processing:** Type-safe message handling and routing system
+- **Update Functions:** Pure functions for state transformations based on messages
+- **State Transactions:** Atomic state updates with rollback capabilities
+- **Immutable Updates:** Controlled state mutation with immutability helpers
+- **State Observation:** Reactive state change notifications and subscriptions
+- **Command Effects:** Side effect management through command dispatching
 
 <!-- AI-CONTEXT-START:type=architecture -->
 ## Architectural Design
 
-The `state` module is central to Elmtui's data flow. UI components (`ui` module) typically trigger messages, which are processed by update logic defined within or using the `state` module. This results in a new state, which then causes the UI to re-render.
+The `state` module implements a functional reactive architecture based on The Elm Architecture, ensuring predictable and maintainable state management.
 
-### Key Concepts (TEA Influence)
-- **Model:** The (often single, global) data structure representing the application's state. Components also have local state managed similarly.
-- **Update (Reducer/Msg Handler):** Functions that take the current state and a message, and return a new state (and potentially commands/effects).
-- **Messages (Msg):** Data structures representing events or user intentions that can lead to state changes.
+### Key Components
+- **State Store ([`src/state/state.lisp`](src/state/state.lisp:1)):** Central state container and management
+- **Message System ([`src/state/msg.lisp`](src/state/msg.lisp:1)):** Type definitions and routing for messages
+- **Update Engine ([`src/state/update.lisp`](src/state/update.lisp:1)):** State transformation logic
+- **Model Definitions ([`src/state/model.lisp`](src/state/model.lisp:1)):** State structure and validation
+- **Elm Integration ([`src/state/elm.lisp`](src/state/elm.lisp:1)):** TEA pattern implementation
+- **State Library ([`src/state/statelib/`](src/state/statelib/:1)):** Low-level state management utilities
+- **Transaction System ([`src/state/transactions.lisp`](src/state/transactions.lisp:1)):** Atomic state updates
 
-### Data Flow
-1.  User interaction or system event generates a Message.
-2.  Message is dispatched (via `core`) to an Update function.
-3.  Update function processes the Message and current Model, producing a new Model.
-4.  The UI (`view` module) re-renders based on the new Model.
+### TEA Pattern Implementation
+1. **Model:** Application and component state represented as immutable data structures
+2. **Update:** Pure functions that transform state in response to messages: `(model, message) -> (new-model, command)`
+3. **View:** Functions that derive UI structure from current state (handled by [`view`](../view/overview.md) module)
+4. **Messages:** Data structures representing events or user actions
+5. **Commands:** Side effects to be executed by the runtime (HTTP requests, timers, etc.)
 <!-- AI-CONTEXT-END -->
 
-<!-- AI-CONTEXT-START:type=usage -->
+<!-- AI-CONTEXT-START:type=development -->
 ## How to Use
 
-Application developers will interact extensively with the `state` module:
+### Defining State Models
 
-- **Defining the Model:** Structuring the application's data.
-  ```lisp
-  ;; (defstruct my-app-model
-  ;;   (counter 0)
-  ;;   (user-name ""))
-  ```
-- **Defining Messages:**
-  ```lisp
-  ;; (defun increment-message () '(:type :increment))
-  ;; (defun set-user-name-message (name) `(:type :set-user :name ,name))
-  ```
-- **Defining Update Logic:**
-  ```lisp
-  ;; (defun my-app-update (msg model)
-  ;;   (case (getf msg :type)
-  ;;     (:increment (update-model model :counter (1+ (model-counter model))))
-  ;;     (:set-user (update-model model :user-name (getf msg :name)))
-  ;;     (otherwise model)))
-  ;; ; `update-model` would be a hypothetical helper for immutable updates
-  ```
-- **Accessing State in Components:** Components read from the current state to render their view.
-- **Dispatching Messages from Components:** Component event handlers create and send messages.
+```lisp
+;; Define application state structure
+(defmodel app-model
+  :counter 0
+  :user-name ""
+  :todos (list)
+  :current-view :home)
 
-*(The exact API for defining models, messages, and update functions will depend on Elmtui's specific implementation, e.g., `src/state/elm.lisp` and `src/ui/defcomponent.lisp`.)*
+;; Define component-specific state
+(defmodel counter-component-state
+  :value 0
+  :increment-step 1
+  :max-value 100)
+```
+
+### Message Definitions
+
+```lisp
+;; Define message types
+(defmsg app-msg
+  (:increment)
+  (:decrement)
+  (:set-user-name string)
+  (:add-todo string)
+  (:toggle-todo integer)
+  (:change-view keyword))
+```
+
+### Update Functions
+
+```lisp
+;; Global update function
+(defun app-update (model msg)
+  (match msg
+    (:increment 
+     (values (update-model model :counter (1+ (model-counter model)))
+             nil))
+    (:decrement
+     (values (update-model model :counter (1- (model-counter model)))
+             nil))
+    ((:set-user-name name)
+     (values (update-model model :user-name name)
+             nil))
+    ((:add-todo text)
+     (values (update-model model :todos 
+                          (append (model-todos model) (list text)))
+             ;; Command to save todos to storage
+             (cmd:save-todos (model-todos model))))))
+
+;; Component update function (using defcomponent)
+(defcomponent counter (props state)
+  (:init (initial-props)
+    (make-counter-component-state :value 0))
+  
+  (:update (msg local-state)
+    (match msg
+      (:increment
+       (values (update-model local-state 
+                           :value (1+ (counter-component-state-value local-state)))
+               nil))
+      (:reset
+       (values (make-counter-component-state :value 0)
+               nil)))))
+```
+
+### State Transactions
+
+```lisp
+;; Atomic state updates
+(state:with-transaction ()
+  (state:update-global-state :counter 42)
+  (state:update-component-state my-component :value 10)
+  ;; If any operation fails, all changes are rolled back
+  )
+
+;; Manual transaction control
+(let ((transaction (state:begin-transaction)))
+  (state:update-in-transaction transaction :user-name "Alice")
+  (state:update-in-transaction transaction :todos (list "New task"))
+  (if (validate-state-changes transaction)
+      (state:commit-transaction transaction)
+      (state:rollback-transaction transaction)))
+```
+
+### State Observation
+
+```lisp
+;; Subscribe to state changes
+(state:observe-state :counter
+  (lambda (old-value new-value)
+    (log:info "Counter changed from ~A to ~A" old-value new-value)))
+
+;; Subscribe to component state changes
+(state:observe-component-state my-component :value
+  (lambda (old-value new-value)
+    (when (> new-value 100)
+      (send-message my-component :reset))))
+```
+<!-- AI-CONTEXT-END -->
+
+<!-- AI-CONTEXT-START:type=implementation -->
+## Implementation Notes
+
+### State Storage
+- **Global State:** Single atom/ref containing the entire application state
+- **Component State:** Local state stored within component instances
+- **State Structure:** Typically implemented as nested maps/plists with fast access patterns
+- **Persistence:** Optional state persistence through serialization
+
+### Update Processing
+- **Pure Functions:** All update functions are side-effect free
+- **Batching:** Multiple state updates can be batched for performance
+- **Validation:** State changes can be validated before application
+- **Rollback:** Failed updates can be rolled back to previous state
+
+### Memory Management
+- **Structural Sharing:** Immutable updates use structural sharing to minimize memory allocation
+- **Garbage Collection:** Old state versions are eligible for garbage collection
+- **State History:** Optional state history tracking for debugging and undo functionality
 <!-- AI-CONTEXT-END -->
 
 ## Related Resources
 
 - [Implementation Details](./implementation.md)
-- [Core Concepts: The Elm Architecture](../../architecture/core-concepts.md#2-the-elm-architecture-tea-influence)
+- [App Module Overview](../app/overview.md)
 - [Core Module Overview](../core/overview.md)
 - [UI Module Overview](../ui/overview.md)
-- [App Module Overview](../app/overview.md)
-- [System Overview](../../architecture/system-overview.md)
+- [View Module Overview](../view/overview.md)
+- [TEA Architecture Concepts](../../architecture/core-concepts.md#2-the-elm-architecture-tea-influence)
+- [System Architecture Overview](../../architecture/system-overview.md)
 - [Module Dependencies](../../architecture/module-dependencies.md)

@@ -5,6 +5,7 @@ ai_contexts: [architecture]
 ai_relations: [
   "./system-overview.md",
   "./core-concepts.md",
+  "./dependency-analysis.md",
   "../modules/app/overview.md",
   "../modules/clevelib/overview.md",
   "../modules/core/overview.md",
@@ -106,8 +107,21 @@ graph TD
 ### 7. General Utilities ([`utils`](../modules/utils/overview.md) as a provider)
 *   Many modules may depend on the [`utils`](../modules/utils/overview.md) module for common helper functions, macros, and basic data structures.
 
+<!-- AI-IMPORTANCE:level=critical -->
+## Comprehensive Dependency Analysis Available
+
+For a thorough analysis of current module dependencies, identified issues, and a complete refactoring plan to establish clean API boundaries, see the **[Comprehensive Dependency Analysis and API Refactoring Plan](./dependency-analysis.md)**.
+
+This analysis includes:
+- Detailed examination of actual code dependencies
+- Identification of circular dependencies and tight coupling issues
+- 5-phase refactoring plan to establish API-driven architecture
+- Concrete examples of proposed API interfaces
+- Risk mitigation strategies and success metrics
+
 ## Related Resources
 
+- **[Comprehensive Dependency Analysis](./dependency-analysis.md)** - Detailed analysis and refactoring plan
 - [System Architecture Overview](./system-overview.md)
 - [Core Architectural Concepts](./core-concepts.md)
 - [App Module Overview](../modules/app/overview.md)
@@ -122,4 +136,4 @@ graph TD
 - [AI Documentation Index](../ai-index/overview.md)
 
 ---
-*This document will be refined with more accurate dependency information and more detailed interaction descriptions as the Elmtui codebase is further analyzed.*
+*This document provides a high-level overview of module interactions. For detailed dependency analysis and architectural refactoring guidance, refer to the [Dependency Analysis](./dependency-analysis.md) document.*

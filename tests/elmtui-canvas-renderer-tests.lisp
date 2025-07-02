@@ -39,7 +39,7 @@
 
 (def-suite elmtui-canvas-renderer-tests
   :description "Tests for the canvas rendering system."
-  ;; :in elmtui-tests ; This was commented out, ensure your test runner picks it up or uncomment if needed.
+  ;; :in elmtui.tests:elmtui.tests ; This was commented out, ensure your test runner picks it up or uncomment if needed.
   )
 
 (in-suite elmtui-canvas-renderer-tests)

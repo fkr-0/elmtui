@@ -5,10 +5,13 @@
   (:use :cl)
   ;; (:import-from :elmtui.view.layout
   ;;               :layout-vbox :layout-hbox)
+  (:import-from :elmtui.view.api
+   #:ui-node-p
+                :ui-node-type :ui-node-props :ui-node-children)
   (:export
    ;; Core Types
    :ui-node :ui-node-p :make-ui-node :copy-ui-node
-   :ui-node-type :ui-node-props :ui-node-children
+
    ;; View Definition
    :defview :with-view-context
    ;; Node Creation DSL
@@ -36,9 +39,7 @@
     Contract: type (:text|:container|:vbox|:hbox|:widget), props plist, children list."))
 
 ;; Define the predicate function
-(defun ui-node-p (object)
-  "Returns T if OBJECT is a ui-node, NIL otherwise."
-  (typep object 'ui-node))
+
 
 (defun make-ui-node (&key type props children)
   "Create a new ui-node with validation."

@@ -10,7 +10,7 @@
   (:import-from :elmtui.app #:defapplication #:run-application)
   (:import-from :elmtui.state.update #:defupdate)
   (:import-from :elmtui.core.event-types #:key-event)
-  (:import-from :elmtui.statelib.transaction #:make-update-result #:with-transaction)
+  (:import-from :elmtui.state.transactions #:make-update-result #:with-transaction)
   (:import-from :elmtui.view.geo #:w)
   (:import-from :elmtui.ui.widgets.root-viewport #:make-root-viewport)
   (:import-from :elmtui.platform.api #:get-terminal-dimensions)
@@ -94,8 +94,7 @@
   :subscriptions-fn (lambda (model)
                       (declare (ignore model))
                       (log-debug "RAINBOW-APP-CANVAS: Subscriptions function called."))
-  :quit-on-esc t
-  :initial-terminal-dimensions '(80 . 24)) ; Default, app-init gets actual
+  :platform-options (list :quit-on-esc t :initial-terminal-dimensions '(80 . 24))) ; Default, app-init gets actual
 
 ;;;--------------------------------------------------------------
 ;;; Main Entry Point

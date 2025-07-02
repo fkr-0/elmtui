@@ -183,10 +183,12 @@
                           ((and (consp def) (eq (car def) :minmax)) :minmax)
                           ((member def '(:auto :min-content :max-content) :test #'eq) :content)
                           (t :auto)))) ; Default to :auto for unknown/invalid definitions
-          (make-grid-track :index i :type type :definition def
+          (make-grid-track :index i :type type
+                           :definition def
                            :base-size (if (eq type :fixed) (max 0.0 (float def)) 0.0) ; Fixed size must be non-negative
                            :fr-units (if (eq type :fr) (cadr def) 0.0)
-                           :growth-limit (if (and (eq type :minmax) (caddr def) (numberp (caddr def)))
+                           :growth-limit (if (and (eq type :minmax) (caddr def)
+                                                  (numberp (caddr def)))
                                              (caddr def)
                                              most-positive-double-float)
                            :is-flexible (not (eq type :fixed))))))
@@ -209,9 +211,15 @@
     (when (eq (grid-track-type track) :content)
       (let ((min-c 0.0) (max-c 0.0))
         (dolist (item (grid-track-items track)) ; Assumes grid-track-items is populated
-          (let* ((item-span (if (eq dimension :width) (grid-item-col-span item) (grid-item-row-span item)))
-                 (item-min (if (eq dimension :width) (grid-item-min-content-width item) (grid-item-min-content-height item)))
-                 (item-max (if (eq dimension :width) (grid-item-max-content-width item) (grid-item-max-content-height item))))
+          (let* ((item-span (if (eq dimension :width)
+                                (grid-item-col-span item)
+                                (grid-item-row-span item)))
+                 (item-min (if (eq dimension :width)
+                               (grid-item-min-content-width item)
+                               (grid-item-min-content-height item)))
+                 (item-max (if (eq dimension :width)
+                               (grid-item-max-content-width item)
+                               (grid-item-max-content-height item))))
             (when (and item-span (> item-span 0)) ; Ensure span is valid
               (let ((contrib-min (/ item-min item-span))
                     (contrib-max (/ item-max item-span)))

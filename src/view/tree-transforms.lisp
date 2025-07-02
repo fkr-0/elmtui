@@ -4,8 +4,9 @@
 
 (uiop:define-package :elmtui.view.tree-transforms
   (:use :cl :alexandria :log4cl)
+  (:import-from :elmtui.contracts #:define-stage #:pipeline-contract-violation)
   (:import-from :elmtui.view.api
-    render-view apply-style resolve-view layout-view render-to-buffer diff-buffer apply-diff)
+   :resolve-view :layout-view)
   (:import-from :elmtui.view.core #:ui-node #:ui-node-type #:ui-node-props #:ui-node-children #:ui-node-p #:make-ui-node)
   (:import-from :elmtui.view.styled
                 #:styled-ui-node #:styles #:make-styled-node #:copy-styled-node
@@ -15,53 +16,24 @@
   (:import-from :elmtui.view.layout #:layout-tree #:layout-node #:box-model #:padding-box #:content-box #:border-box)
   (:import-from :elmtui.style-lib.api #:stylesheet #:style-set)
   (:import-from :elmtui.ui.api #:component #:view #:id)
-  (:import-from :split-sequence #:split-sequence))
+  ;; (:import-from :str :split)
+  )
+
 (in-package :elmtui.view.tree-transforms)
 
 ;;; ----------------------------------------------------------------------
 ;;; Tree Transformation Pipeline Implementations
 ;;; ----------------------------------------------------------------------
 
-(defmethod render-view ((app-state list) (root-component component))
-  "High-level entry point of the view-pipeline (Stage 1).
-  Calls the view method of the ROOT-COMPONENT with APP-STATE.
-  Returns a raw UI-Node tree."
-  (log:debug "TREE-TRANSFORMS: render-view - Root component ID: ~S" (id root-component))
-  ;; Assuming the root component's view method returns a single ui-node or a list
-  ;; which should be wrapped in a root list for the pipeline.
-  (let ((raw-view (view root-component app-state :id-path `(:components ,(id root-component)))))
-    (if (listp raw-view)
-        raw-view ; If view already returns a list (e.g. multiple top-level for a fragment)
-        (list raw-view)))) ; Wrap single node in a list
-
-(defmethod apply-style ((raw-tree list) (stylesheet stylesheet))
-  "Apply styles to the RAW-TREE using the STYLESHEET (Stage 2).
-  Wraps elmtui.view.styled:apply-stylesheet-to-tree.
-  Returns a new tree of styled-ui-nodes."
-  (log:debug "TREE-TRANSFORMS: apply-style - Processing ~D raw top-level node(s)."
-             (length raw-tree))
-  (if (null raw-tree)
-      nil
-      ;; apply-stylesheet-to-tree expects a single root node or a list of nodes.
-      ;; If raw-tree is a list of multiple top-level nodes, process each.
-      ;; However, typically a component view should return a single root ui-node.
-      ;; For now, assume apply-stylesheet-to-tree can handle a list of roots if necessary,
-      ;; or that raw-tree will usually contain one root.
-      (elmtui.view.styled:apply-stylesheet-to-tree (first raw-tree) stylesheet nil)
-      ;; If apply-stylesheet-to-tree is designed for a single root, and raw-tree might have multiple:
-      ;; (mapcar (lambda (node) (elmtui.view.styled:apply-stylesheet-to-tree node stylesheet nil))
-      ;; raw-tree)
-      ;; For now, assuming the pipeline expects a single root from render-view, wrapped in a list.
-      ;; And apply-stylesheet-to-tree returns that single root, also styled.
-      ;; So, the output should be a list containing one styled root node.
-      ;; Let's adjust to return a list, consistent with other stages
-      (list (elmtui.view.styled:apply-stylesheet-to-tree (first raw-tree) stylesheet nil))))
-
-(defmethod resolve-view ((styled-tree list) (app-state list))
+(define-stage resolve-view
+    ((or null (cons styled-ui-node null)) ; Input: list with 0 or 1 styled-ui-node
+     (or null (cons styled-ui-node null))) ; Output: list with 0 or 1 styled-ui-node
+    (styled-tree &optional app-state)
   "Resolve non-atomic nodes and apply style-driven transformations (Stage 3).
   STYLED-TREE is a list containing one styled root node.
   APP-STATE is the global application state, potentially needed by component view methods.
   Returns an atomic UI-Node tree (list containing one root atomic node)."
+  ;; (declare (ignore app-state))
   (log:debug "TREE-TRANSFORMS: resolve-view - Processing ~D styled top-level node(s)."
              (length styled-tree))
   (labels ((resolve-node (item parent-id-path)
@@ -138,7 +110,7 @@
                     ;; Add other type-specific resolutions here if needed.
                     )
 
-                  ;; 3. Recursively resolve children of the (potentially transformed) node
+                  ;; 3. Recursively resolve children of the (potentially transformed) a
                   (let ((resolved-children (loop for child in children
                                                  for resolved-child = (resolve-node child (cons (getf props :id) parent-id-path))
                                                  when resolved-child collect resolved-child)))
@@ -165,100 +137,25 @@
           (if resolved-root (list resolved-root) nil)))))
 
 
-(defmethod layout-view ((atomic-tree list) (available-rect rectangle) (stylesheet stylesheet))
+(define-stage layout-view
+    ((or null (cons styled-ui-node null)) ; Input: list with 0 or 1 styled-ui-node
+     (or null (cons styled-ui-node null))) ; Output: list with 0 or 1 styled-ui-node
+    (atomic-tree &key available-rect stylesheet)
   "Compute absolute geometry for every node in ATOMIC-TREE (Stage 4).
   ATOMIC-TREE is assumed to be a list containing a single root UI-Node.
   AVAILABLE-RECT is the rectangle (border-box) for the root node.
   STYLESHEET is needed if layout decisions depend on re-querying styles (should be rare here).
   Returns a laid-out atomic UI-Node tree (list containing one root node).
   Each node in the returned tree will have a :layout-rect (its border-box) and a :box-model property."
+  ;; (declare (ignore stylesheet))
   (log:debug "TREE-TRANSFORMS: layout-view - Processing ~D atomic top-level node(s). Available-rect: ~S"
              (length atomic-tree) available-rect)
-  (declare (ignore stylesheet)) ; Stylesheet should have been fully applied by now.
 
-  (labels (;; Helper to calculate box model for a node given its available space (border-box)
-           (calculate-box-model (node parent-content-rect)
-             (let* ((styled-node (if (typep node 'styled-ui-node) node
-                                     (error "Layout-view expects styled-ui-nodes. Got: ~S" node)))
-                    ;; Get padding values from the styled node
-                    (pt (or (style-value styled-node :padding-top 0) 0))
-                    (pr (or (style-value styled-node :padding-right 0) 0))
-                    (pb (or (style-value styled-node :padding-bottom 0) 0))
-                    (pl (or (style-value styled-node :padding-left 0) 0))
-                    ;; Get border widths
-                    (bt (if (eq (style-value styled-node :border-style :none) :none) 0 (or (style-value styled-node :border-top-width 0) 0)))
-                    (br (if (eq (style-value styled-node :border-style :none) :none) 0 (or (style-value styled-node :border-right-width 0) 0)))
-                    (bb (if (eq (style-value styled-node :border-style :none) :none) 0 (or (style-value styled-node :border-bottom-width 0) 0)))
-                    (bl (if (eq (style-value styled-node :border-style :none) :none) 0 (or (style-value styled-node :border-left-width 0) 0)))
-
-                    ;; Determine node's own border-box size based on its style and parent-content-rect
-                    ;; This is where :width, :height, :min-width, :max-width, etc. styles are used
-                    ;; For now, let's assume it takes up parent-content-rect space unless specified
-                    ;; This part will be handled by the specific layout engines (flex, grid, block)
-                    ;; Here, we are given the node's border-box (node-border-box argument to layout-node-internal)
-                    ;; So, we use that to derive padding and content boxes.
-
-                    (node-border-box parent-content-rect) ; This is the given available space for this node
-
-                    (padding-rect (make-rectangle
-                                   :x (+ (x node-border-box) bl)
-                                   :y (+ (y node-border-box) bt)
-                                   :w (max 0 (- (w node-border-box) bl br))
-                                   :h (max 0 (- (h node-border-box) bt bb))))
-                    (content-rect (make-rectangle
-                                   :x (+ (x padding-rect) pl)
-                                   :y (+ (y padding-rect) pt)
-                                   :w (max 0 (- (w padding-rect) pl pr))
-                                   :h (max 0 (- (h padding-rect) pt pb)))))
-               (make-instance 'box-model
-                              :border-box node-border-box
-                              :padding-box padding-rect
-                              :content-box content-rect)))
-
-           (layout-node-internal (node current-available-rect parent-abs-pos)
-             (if (typep node 'styled-ui-node)
-                 (let* (;; Calculate the node's own border-box based on its styles and current-available-rect.
-                        ;; This is the core of the specific layout engine (flex, grid, block).
-                        ;; For now, we'll have a placeholder for block, and flex/grid will be called.
-                        (display-type (style-value node :display :block))
-                        (node-box-model nil) ; Will be set by specific layout logic
-                        (laid-out-node-children nil))
-
-                   ;; The actual layout calculation happens here, determining node-border-box-final
-                   ;; For block layout (placeholder):
-                   (let ((node-border-box-final current-available-rect)) ; Simplistic: takes all available space
-                     (setf node-box-model (calculate-box-model node node-border-box-final))
-
-                     ;; Recursively lay out children within this node's content-box
-                     (let ((children-available-rect (content-box node-box-model)))
-                       (setf laid-out-node-children
-                             (loop for child in (ui-node-children node)
-                                   collect (layout-node-internal child
-                                                                 children-available-rect ; Each child gets the same content box for now (block)
-                                                                 (make-rectangle :x (x children-available-rect)
-                                                                                 :y (y children-available-rect)
-                                                                                 :w 0 :h 0) ; Parent abs pos for children
-                                                                 ))))
-
-                     ;; Create a new node with layout information
-                     (let ((new-props (copy-list (ui-node-props node))))
-                       (setf (getf new-props :layout-rect) (border-box node-box-model)) ; Store the absolute border-box
-                       (setf (getf new-props :box-model) node-box-model)
-                       (make-styled-node :type (ui-node-type node)
-                                         :props new-props
-                                         :children laid-out-node-children
-                                         ;; Need to ensure other styled-node slots are preserved
-                                         :style-set (styles node) ; Preserve original style-set
-                                         ;; sid, classes, parents-of, dirty should be copied by copy-styled-node if used
-                                         ))))
-                 node))) ; Non-styled-nodes pass through (should not happen here)
-
-    (if (and atomic-tree (= 1 (length atomic-tree)) (typep (first atomic-tree) 'styled-ui-node))
-        (let ((root-node (first atomic-tree)))
-          ;; elmtui.view.layout:layout-tree is the main entry point for layout
-          ;; It should handle the box model calculations internally and recursively.
-          ;; The `layout-tree` function itself will call calculate-box-model or similar logic.
-          (list (layout-tree root-node available-rect)))
-        (progn
-          (warn "LAYOUT-VIEW: Expected atomic-tree to be a list with a single styled root UI-Node. Got: ~A" atomic-tree)
-          atomic-tree))))
+  (if (and atomic-tree (= 1 (length atomic-tree)) (typep (first atomic-tree) 'styled-ui-node))
+      (let ((root-node (first atomic-tree)))
+        ;; elmtui.view.layout:layout-tree is the main entry point for layout
+        ;; It should handle the box model calculations internally and recursively.
+        (list (layout-tree root-node available-rect)))
+      (progn
+        (warn "LAYOUT-VIEW: Expected atomic-tree to be a list with a single styled root UI-Node. Got: ~A" atomic-tree)
+        atomic-tree)))

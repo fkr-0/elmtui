@@ -17,41 +17,35 @@ The `ui` module's implementation revolves around the `defcomponent` macro (found
 
 ### `defcomponent` Macro
 - **Expansion:**
-    - Likely defines a CLOS class for the component. This class might inherit from a base `<component>` class.
-    - Slots in the class would store props and the component's local state.
-    - Generates methods for `init`, `update`, `view`, and potentially `handle-event`, `on-focus`, `on-blur`, etc., specialized on the new component class.
+  - `defcomponent` generates a standard CLOS class that inherits from `elmtui.ui.api:component`.
+  - It automatically defines methods for `init`, `update`, and `view` based on the clauses provided in the macro body.
+- **State Management:**
+  - The `:state` clause defines the local state schema for the component.
+  - State is stored in the global application state, not in the component instance itself, to facilitate a centralized state management model.
 - **Syntax:**
   ```lisp
-  ;; (elmtui:defcomponent component-name (props-arg state-arg &optional global-state-arg)
-  ;;   (:init (initial-props)
-  ;;     ;; Returns initial local state
-  ;;     ...)
-  ;;   (:update (message local-state &optional global-state)
-  ;;     ;; Returns (values new-local-state new-global-state command)
-  ;;     ;; or (values new-local-state command) if no global state arg
-  ;;     ...)
-  ;;   (:view (props local-state &optional global-state)
-  ;;     ;; Returns a view structure (using elmtui-view DSL)
-  ;;     ...)
-  ;;   ;; Optional clauses:
-  ;;   ;; (:handle-event (event local-state &optional global-state) ...) ; Lower-level event handling
-  ;;   ;; (:props-changed (new-props old-props local-state &optional global-state) ...)
-  ;;   ;; (:on-mount (local-state &optional global-state) ...)
-  ;;   ;; (:on-unmount (local-state &optional global-state) ...)
-  ;; )
+  (defcomponent component-name (superclass1)
+    (:state
+     (slot1-name initial-value1 :type type :accessor accessor-name1)
+     (slot2-name initial-value2 :type type :accessor accessor-name2))
+    (:init (props self-id-path)
+      ;; ... returns (values initial-local-state-plist initial-commands)
+    )
+    (:update (msg local-state-map app-state self-id-path)
+      ;; ... returns (values local-changes-plist commands)
+    )
+    (:view (local-state-map app-state self-id-path)
+      ;; ... returns view DSL
+    ))
   ```
-  *(This is a hypothetical but plausible structure for `defcomponent` based on common patterns and TEA principles.)*
 
 ### Component Instance
 - Each instance of a component in the UI tree is an object of the class defined by `defcomponent`.
-- It holds its current local state and a copy of its props.
-- It might also have a unique ID, references to parent/children, etc.
-- **If the component was created from a DSL form, the original DSL form is always stored in the component's state under the `:dsl` key. This is handled by the base `component` class's `init` method.**
+- It holds an `id` which is used to access its state from the global application state.
 
 ### Props Handling
-- Props are passed down from parent components during view rendering.
-- The `defcomponent` system likely handles how these props are received and made available to the `init`, `update`, and `view` functions/methods.
-- There might be a mechanism to detect prop changes (`:props-changed` clause).
+- Props are passed as keyword arguments to the `init` method.
+- The `defcomponent` system makes these props available to the `:init` clause.
 
 ### Local State Management
 - The `:init` clause defines the initial local state.

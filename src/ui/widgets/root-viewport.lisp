@@ -144,6 +144,8 @@ Initial child spec is stored in state for the view method to use."
          (patches nil)
          (commands nil))
 
+    (log4cl:log-debug "Initializing root-viewport with ID ~A, anchor ~A, cursor position ~A"
+                      (first id-path) anchor initial-cursor-pos)
     ;; Calculate viewport size and offset based on anchor and terminal dimensions
     (multiple-value-bind (computed-width computed-height computed-offset-y computed-offset-x)
         (if (member anchor '(:above-cursor :below-cursor))
@@ -153,19 +155,35 @@ Initial child spec is stored in state for the view method to use."
                 (compute-anchor-offset anchor term-cols term-rows term-cols term-rows cursor-r cursor-c) ; placeholder vp-w/h
               (values term-cols term-rows offset-y offset-x))) ; For non-cursor anchors, assume full size for now
 
-      (setf patches
-            (list
-             (list (append id-path '(:state :width)) computed-width)
-             (list (append id-path '(:state :height)) computed-height)
-             (list (append id-path '(:state :offset-x)) computed-offset-x)
-             (list (append id-path '(:state :offset-y)) computed-offset-y)
-             (list (append id-path '(:state :anchor)) anchor)
-             (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
-             ;; Store the initial-child-spec (which is a DSL tree) in the state.
-             ;; The `view` method of root-viewport will use this.
-             (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
-             ;; Store the original DSL of the root-viewport itself for completeness
-             (list (append id-path '(:state :dsl)) dsl))))
+      (progn
+        (log4cl:log-debug "Computed viewport size: width ~A, height ~A, offset-x ~A, offset-y ~A"
+                          computed-width computed-height computed-offset-x computed-offset-y)
+        ;; (log4cl:log-debug "Setting patches: ~A%"
+        ;;                   (list
+        ;;                    (list (append id-path '(:state :width)) computed-width)
+        ;;                    (list (append id-path '(:state :height)) computed-height)
+        ;;                    (list (append id-path '(:state :offset-x)) computed-offset-x)
+        ;;                    (list (append id-path '(:state :offset-y)) computed-offset-y)
+        ;;                    (list (append id-path '(:state :anchor)) anchor)
+        ;;                    (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
+        ;;                    ;; Store the initial-child-spec (which is a DSL tree) in the state.
+        ;;                    ;; The `view` method of root-viewport will use this.
+        ;;                    (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
+        ;;                    ;; Store the original DSL of the root-viewport itself for completeness
+        ;;                    (list (append id-path '(:state :dsl)) dsl)))
+        (setf patches
+              (list
+               (list (append id-path '(:state :width)) computed-width)
+               (list (append id-path '(:state :height)) computed-height)
+               (list (append id-path '(:state :offset-x)) computed-offset-x)
+               (list (append id-path '(:state :offset-y)) computed-offset-y)
+               (list (append id-path '(:state :anchor)) anchor)
+               (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
+               ;; Store the initial-child-spec (which is a DSL tree) in the state.
+               ;; The `view` method of root-viewport will use this.
+               (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
+               ;; Store the original DSL of the root-viewport itself for completeness
+               (list (append id-path '(:state :dsl)) dsl)))))
 
     ;; No direct child component instantiation or init here.
     ;; The `view` method will use the :child-dsl-spec.

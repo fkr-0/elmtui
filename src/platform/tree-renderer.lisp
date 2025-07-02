@@ -4,9 +4,9 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.platform.tree-renderer
   (:use :cl :alexandria :log4cl)
+  (:import-from :elmtui.contracts #:define-stage)
   (:import-from :elmtui.view.core #:ui-node #:ui-node-p #:ui-node-type #:ui-node-props #:ui-node-children)
   (:import-from :elmtui.view.geo #:rectangle #:pos #:size #:x #:y #:w #:h)
-  (:import-from :elmtui.platform.backend.common.ansi-styling #:terminal-color)
   (:import-from :elmtui.view.styled #:styled-ui-node #:style-value)
   (:import-from :elmtui.style-lib.api #:styles #:style-set)
 
@@ -25,10 +25,9 @@
   (:import-from :elmtui.platform.backend.common.ansi-styling
                 #:make-terminal-style
                 #:copy-terminal-style
-                #:terminal-color
                 #:make-termcolor
                 #:terminal-style-bg-color
-                #:terminal-color-bg
+                #:termcolor-bg
                 #:fuzz-color ; Utility to convert colors to termcolor
                 #:terminal-style ; Struct name, for type checks if needed
                 #:terminal-color ; Struct name for type checks
@@ -36,45 +35,7 @@
                 #:terminal-style-italic #:terminal-style-underline #:terminal-style-inverse
                 #:terminal-style-faint #:terminal-style-blink #:terminal-style-strike #:terminal-style-invisible
                 #:style-to-terminal-style) ; Utility if still relevant, or re-implement conversion
-  (:export #:render-laid-out-tree-to-canvas))
-
-(in-package :elmtui.platform.tree-renderer)
-;;;===============================================================
-;;; File: src/platform/tree-renderer.lisp
-;;; Renders a laid-out UI tree to a canvas's virtual buffer.
-;;;===============================================================
-(uiop:define-package :elmtui.platform.tree-renderer
-  (:use :cl :alexandria :log4cl)
-  (:import-from :elmtui.view.core #:ui-node #:ui-node-p #:ui-node-type #:ui-node-props #:ui-node-children)
-  (:import-from :elmtui.view.geo #:rectangle #:pos #:size #:x #:y #:w #:h)
-  (:import-from :elmtui.view.styled #:styled-ui-node #:style-value)
-  (:import-from :elmtui.style-lib.api #:styles #:style-set)
-
-
-  (:import-from :elmtui.platform.backend.common.virtual-buffer
-                #:virtual-terminal-buffer ; Structure name (though usually manipulated via canvas)
-                #:set-buffer-cell-at
-                #:buffer-cell-at ; Added for reading existing cell style
-                #:buffer-cell-style ; Added for reading existing cell style
-                #:buffer-width
-                #:buffer-height
-                #:clear-buffer ; To prepare canvas before rendering
-                #:default-buffer-cell) ; For clearing/filling
-
-  (:import-from :elmtui.platform.backend.common.ansi-styling
-                #:make-terminal-style
-                #:copy-terminal-style
-                #:make-termcolor
-                #:terminal-style-bg-color
-                #:terminal-color-bg
-                #:fuzz-color ; Utility to convert colors to termcolor
-                #:terminal-style ; Struct name, for type checks if needed
-                #:termcolor ; Struct name for type checks
-                #:terminal-style-fg-color #:terminal-style-bg-color #:terminal-style-bold
-                #:terminal-style-italic #:terminal-style-underline #:terminal-style-inverse
-                #:terminal-style-faint #:terminal-style-blink #:terminal-style-strike #:terminal-style-invisible
-                #:style-to-terminal-style) ; Utility if still relevant, or re-implement conversion
-  (:export #:render-laid-out-tree-to-canvas))
+  (:export #:render-laid-out-tree-to-buffer))
 
 (in-package :elmtui.platform.tree-renderer)
 
@@ -360,13 +321,17 @@
         (dolist (child (ui-node-children node))
           (%render-node child canvas-buffer abs-x abs-y))))))
 
-(defun render-laid-out-tree-to-canvas (laid-out-tree buffer)
-  "Renders the laid-out UI tree to the canvas's virtual buffer."
-  (log-info "TREE-RENDERER: Starting render to canvas.")
+(define-stage render-laid-out-tree-to-buffer
+    ((or null (cons styled-ui-node null)) ; Input: list with 0 or 1 laid-out styled-ui-node
+     virtual-terminal-buffer)             ; Output: the buffer that was rendered to
+    (laid-out-tree &key buffer)
+  "Renders the laid-out UI tree to the virtual buffer (Stage 5)."
+  (check-type buffer virtual-terminal-buffer)
+  (log-info "TREE-RENDERER: Starting render to buffer.")
   (clear-buffer buffer) ; Prepare canvas by clearing or resetting to default
-  (%render-node laid-out-tree buffer 0 0)
-  (log-info "TREE-RENDERER: Finished render to canvas."))
-                                        ; Return the canvas, now with the rendered tree in its buffer
+  (%render-node (first laid-out-tree) buffer 0 0)
+  (log-info "TREE-RENDERER: Finished render to buffer.")
+  buffer)
 
 ;; Ensure all functions are properly closed and the file ends correctly.
 

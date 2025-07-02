@@ -7,12 +7,10 @@
         :elmtui.platform.input) ; For start-reader
   (:import-from :log4cl
                 #:log-debug #:log-info #:log-warn #:log-error)
-  (:import-from :elmtui.view.styled
-                #:apply-stylesheet-to-tree)
-  (:import-from :elmtui.view.layout
-                #:layout-tree)
+  (:import-from :elmtui.pipeline
+                #:full-view-pipeline)
   (:import-from :elmtui.core.event-types
-                #:key-event #:resize-event #:resize-event-width #:resize-event-height) ; Fixed event type
+                #:key-event #:resize-event #:resize-event-width #:resize-event-height)
   (:import-from :elmtui.core.globals
                 #:*app-sender*)
   (:import-from :elmtui.core.focus
@@ -21,30 +19,28 @@
   (:import-from :elmtui.core.keymap
                 #:key-event->normalized-key
                 #:lookup-keymap)
-  (:import-from :elmtui.state #:get-path #:state-ref) ;; Import get-path and state-ref
+  (:import-from :elmtui.state #:get-path #:state-ref)
   (:import-from :elmtui.view.geo
+                #:make-instance
                 #:make-rectangle #:make-pos #:make-size)
   (:import-from :elmtui.platform.api
                 #:initialize-backend #:shutdown-backend
                 #:term-w #:term-h #:handle-backend-resize
                 #:flush-output #:get-cursor-position #:set-cursor-position #:clear-lines #:scroll-up #:scroll-down)
-  (:import-from :elmtui.platform.tree-renderer
-                #:render-laid-out-tree-to-canvas)
   (:import-from :elmtui.platform.backend.terminal.diff-renderer
-                #:compute-buffer-diff #:apply-diff-to-backend
                 #:*compute-buffer-diff-first-call*)
   (:import-from :elmtui.platform.backend.common.virtual-buffer
-                #:virtual-buffer #:copy-virtual-buffer #:make-virtual-buffer ; Added virtual-buffer type
+                #:virtual-buffer #:copy-virtual-buffer #:make-virtual-buffer
                 #:buffer-width #:buffer-height)
-  (:import-from :elmtui.app.api #:run-application #:get-component-instance #:app-config-message-queue) ; Added app-config-message-queue
+  (:import-from :elmtui.app.api #:run-application #:get-component-instance #:app-config-message-queue)
   (:import-from :elmtui.core.loop
-                #:publish #:start-loop #:elm-stop-loop #:event-loop) ; Added event-loop
+                #:publish #:start-loop #:elm-stop-loop #:event-loop)
   (:import-from :elmtui.core.async
                 #:interpret-cmd)
   (:import-from :elmtui.ui.widgets.root-viewport
-                #:root-viewport) ; Removed get-cleanup-info since it doesn't exist
-  (:import-from :elmtui.style-lib.sheet #:stylesheet) ; Added stylesheet type
-  (:import-from :bordeaux-threads #:mailbox) ; For type declaration
+                #:root-viewport)
+  (:import-from :elmtui.style-lib.api #:stylesheet)
+  (:import-from :bordeaux-threads #:mailbox)
   (:export #:run-app-platform)) ; Ensure this is exported if called directly elsewhere
 
 (in-package #:elmtui.platform.driver)
@@ -195,40 +191,31 @@ Args:
          (root-viewport-state (elmtui.state:get-path current-model (append *root-viewport-id-path* '(:state))))
          (viewport-width (getf root-viewport-state :width))
          (viewport-height (getf root-viewport-state :height))
-         (viewport-offset-x (getf root-viewport-state :offset-x 0)) ; Provide default if missing
-         (viewport-offset-y (getf root-viewport-state :offset-y 0))) ; Provide default if missing
+         (viewport-offset-x (getf root-viewport-state :offset-x 0))
+         (viewport-offset-y (getf root-viewport-state :offset-y 0))
+         (stylesheet (elmtui.state:get-path current-model '(:current-stylesheet))))
 
     (unless (and (typep view-fn 'function)
                  (numberp viewport-width) (plusp viewport-width)
-                 (numberp viewport-height) (plusp viewport-height)
-                 (numberp viewport-offset-x)
-                 (numberp viewport-offset-y))
-      (log:error "DRIVER: Invalid parameters for render-frame. View-fn: ~S, VP-Width: ~S, VP-Height: ~S, VP-OffsetX: ~S, VP-OffsetY: ~S"
-                 view-fn viewport-width viewport-height viewport-offset-x viewport-offset-y)
+                 (numberp viewport-height) (plusp viewport-height))
+      (log:error "DRIVER: Invalid parameters for render-frame.")
       (return-from render-frame))
 
-    (let* ((current-view-dsl (funcall view-fn current-model))
-           (stylesheet (elmtui.state:get-path current-model '(:current-stylesheet))) ; Assuming stylesheet is at this path
-           (styled-tree (if stylesheet
-                            (apply-stylesheet-to-tree current-view-dsl stylesheet current-model)
-                            current-view-dsl))
-           (laid-out-tree (layout-tree styled-tree (make-instance 'elmtui.view.geo:rectangle :x 0 :y 0 :w viewport-width :h viewport-height)))
-           (target-canvas (make-virtual-buffer viewport-width viewport-height))
-           (rendered-canvas (render-laid-out-tree-to-canvas laid-out-tree target-canvas))
-           (diff (compute-buffer-diff *previous-frame-buffer* rendered-canvas))
-           (paint-start-col viewport-offset-x)
-           (paint-start-row viewport-offset-y))
+    (let ((initial-context
+            (list :app-model current-model
+                  :view-fn view-fn
+                  :stylesheet (or stylesheet (make-instance 'elmtui.style-lib.api:stylesheet))
+                  :viewport-rect (make-instance 'elmtui.view.geo:rectangle :x 0 :y 0 :w viewport-width :h viewport-height)
+                  :front-buffer *previous-frame-buffer*
+                  :backend backend-instance
+                  :origin-x viewport-offset-x
+                  :origin-y viewport-offset-y)))
 
-      (declare (type list current-view-dsl styled-tree laid-out-tree)
-               (type (or null elmtui.style-lib.api:stylesheet) stylesheet)
-               (type elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer target-canvas rendered-canvas)
-               (type list diff) ; Type of diff structure
-               (type number paint-start-col paint-start-row))
+      (let ((final-context (elmtui.contracts:full-view-pipeline initial-context)))
+        (setf *previous-frame-buffer* (getf final-context :front-buffer))
+        (flush-output backend-instance)))
 
-      (apply-diff-to-backend backend-instance diff paint-start-col paint-start-row)
-      (setf *previous-frame-buffer* (copy-virtual-buffer rendered-canvas))
-      (flush-output backend-instance)))
-  (log:debug "DRIVER: --- Finished Render Frame ---"))
+    (log:debug "DRIVER: --- Finished Render Frame ---")))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Main Application Loop & Lifecycle
@@ -239,11 +226,16 @@ Args:
   (let* ((publish-fn (lambda (event) (publish event))) ; publish is from elmtui.core.loop
          (message-queue (getf app-spec :message-queue))
          (update-fn (getf app-spec :update-fn))
-         (subscriptions-fn (getf app-spec :subscriptions-fn))
+         (raw-subs-fn (getf app-spec :subscriptions-fn))
+         (subscriptions-fn
+           (cond
+             ((functionp raw-subs-fn) raw-subs-fn)
+             ((and (consp raw-subs-fn) (eq (car raw-subs-fn) 'lambda)) (eval raw-subs-fn))
+             ((symbolp raw-subs-fn) (symbol-function raw-subs-fn))
+             (t (error "Invalid :subscriptions-fn"))))
          (cmd-proc-fn (getf app-spec :command-processor-fn))
          (app-name (getf app-spec :name))
          (app-cfg-for-cmd (gethash app-name elmtui.core.globals:*applications*)))
-
     (declare (type function publish-fn update-fn subscriptions-fn)
              (type (or null function) cmd-proc-fn)
              (type symbol app-name)
@@ -253,10 +245,11 @@ Args:
     (setf *driver-initiated-shutdown-p* nil)
     (log:info "DRIVER: Starting application loop for ~A." app-name)
     (loop
-      (when (or *driver-initiated-shutdown-p*
-                (elmtui.state:get-path *current-app-model* '(:should-quit)))
-        (log:info "DRIVER: Shutdown condition met. Exiting app loop for ~A." app-name)
-        (return))
+      (let ((should-quit (elmtui.state:get-path *current-app-model* '(:should-quit))))
+        (log:debug "DRIVER: Loop check: *driver-initiated-shutdown-p* = ~A, :should-quit = ~A" *driver-initiated-shutdown-p* should-quit)
+        (when (or *driver-initiated-shutdown-p* should-quit)
+          (log:info "DRIVER: Shutdown condition met. Exiting app loop for ~A. (*driver-initiated-shutdown-p* = ~A, :should-quit = ~A)" app-name *driver-initiated-shutdown-p* should-quit)
+          (return)))
 
       (let ((msg (elmtui.core.event-channels:receive-event message-queue))) ; Blocking receive
         (log:debug "DRIVER (~A): Dequeued message: ~S (Type: ~A)" app-name msg (type-of msg))
@@ -269,11 +262,12 @@ Args:
            (render-frame app-spec *current-app-model* backend-instance))
           ((and (listp msg) (eq (first msg) :app-quit-requested)) ; Generic quit message
            (setf *driver-initiated-shutdown-p* t)
-           (log:info "DRIVER: :app-quit-requested received for ~A." app-name))
+           (log:info "DRIVER: :app-quit-requested received for ~A. Setting *driver-initiated-shutdown-p* to T." app-name))
           (t ; Process regular app message
            (multiple-value-bind (next-model commands)
                (funcall update-fn *current-app-model* msg)
              (declare (type list next-model commands))
+             (log:debug "DRIVER: After update-fn, next-model :should-quit = ~A" (elmtui.state:get-path next-model '(:should-quit)))
              (setf *current-app-model* next-model)
              (when cmd-proc-fn
                (dolist (c commands)
@@ -282,6 +276,8 @@ Args:
              ;; (let ((subs (funcall subscriptions-fn next-model))) ...)
              (render-frame app-spec next-model backend-instance))))))
     (log:info "DRIVER: Application loop for ~A finished." app-name)))
+
+
 
 
 (defun shutdown-platform ()
@@ -355,3 +351,52 @@ Args:
       (shutdown-platform)
       (elm-stop-loop) ; Fixed function call
       (log:info "DRIVER: Application ~A has shut down." (getf app-spec :name)))))
+;; (defun run-app-platform (app-spec ; This is the app-spec-for-driver plist
+;;                          &key (backend-type :terminal)
+;;                            (tty-path #+os-unix "/dev/tty" #-os-unix nil)
+;;                            ;; Add other platform options run-app-platform directly uses here
+;;                          &allow-other-keys) ; Allows platform-options like :initial-terminal-dimensions
+;;   (declare (type list app-spec)
+;;            (type (or keyword t) backend-type) ; allow t for type check
+;;            (type (or string null) tty-path))
+;;   (when (and (not (keywordp backend-type))
+;;              (not (null backend-type)))
+;;     (log4cl:log-error "run-app-platform: backend-type is not a keyword! Type: ~A, Value: ~S" (type-of backend-type) backend-type)
+;;     (when (typep backend-type 'elmtui.view.core:ui-node)
+;;       (log4cl:log-error "run-app-platform: backend-type is a UI-NODE! This is a bug. Node: ~S" backend-type))
+;;     (error "run-app-platform: backend-type must be a keyword, got: ~S (type: ~A)" backend-type (type-of backend-type)))
+;;   (setf *backend* nil *input-thread* nil *stop-input-fn* nil
+;;         *driver-initiated-shutdown-p* nil *previous-frame-buffer* nil
+;;         *current-app-model* nil *root-viewport-id-path* nil
+;;         elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t)
+
+;;   (let ((event-loop (start-loop)) ; Start the main event loop
+;;         (initial-model nil)
+;;         (initial-commands nil))
+;;     (declare (type list initial-model initial-commands))
+;;     (unwind-protect
+;;          (progn
+;;            (setf *backend* (initialize-backend-with-publish-fn
+;;                             backend-type
+;;                             tty-path ; Use tty-path from keyword args (potentially from platform-options)
+;;                             (lambda (ev) (publish ev))))
+;;            (unless *backend*
+;;              (error "Failed to initialize backend ~A" backend-type))
+
+;;            (multiple-value-bind (thread stop-fn)
+;;                (start-input-reader-thread *backend* (lambda (ev) (publish ev)))
+;;              (setf *input-thread* thread)
+;;              (setf *stop-input-fn* stop-fn))
+
+;;            (multiple-value-setq (initial-model initial-commands) (initialize-app-model app-spec))
+;;            (process-initial-commands initial-commands (lambda (ev) (publish ev)) app-spec)
+;;            (setup-initial-previous-buffer initial-model)
+
+;;            ;; Initial render
+;;            (render-frame app-spec initial-model *backend*)
+;;            ;; Start the application message processing loop
+;;            (app-loop app-spec *backend*))
+;;       ;; Cleanup
+;;       (shutdown-platform)
+;;       (elm-stop-loop) ; Fixed function call
+;;       (log:info "DRIVER: Application ~A has shut down." (getf app-spec :name)))))

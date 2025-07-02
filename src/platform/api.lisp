@@ -88,6 +88,12 @@
 ;;(declaim (ftype (function (t &key (:publish-fn (or null function)) t) t) initialize-backend))
 (defgeneric initialize-backend (backend-type &key &allow-other-keys)
   (:documentation "Initialize the backend for the specified platform. If PUBLISH-FN is provided, it will be used to publish events."))
+
+;; Defensive check for initialize-backend
+(defmethod initialize-backend :before ((backend-type t) &key &allow-other-keys)
+  (unless (keywordp backend-type)
+    (log4cl:log-error "initialize-backend: backend-type is not a keyword! Type: ~A, Value: ~S" (type-of backend-type) backend-type)
+    (error "initialize-backend: backend-type must be a keyword, got: ~S (type: ~A)" backend-type (type-of backend-type))))
 (declaim (ftype (function (t) null) shutdown-backend))
 (declaim (ftype (function (t) string) backend-name backend-version))
 (declaim (ftype (function (t) (values integer integer)) get-screen-dimensions))

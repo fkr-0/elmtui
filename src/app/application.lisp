@@ -6,7 +6,8 @@
     #:elmtui.app
   (:use #:cl)
   (:import-from #:elmtui.core.globals          :*applications*)
-  (:import-from #:elmtui.utils                 :ensure-keyword)
+  (:import-from #:elmtui.utils                 #:ensure-keyword
+                #:coerce-fn)
   (:import-from #:cleve-elm.channel #:make-channel )
   (:import-from #:cleve-elm.core.event-channels #:make-message-channel )
   (:import-from #:elmtui.app.api
@@ -27,7 +28,7 @@
                 #:ur-commands)
   (:import-from #:elmtui.ui.api                #:init #:view)
   (:import-from #:elmtui.ui.widgets.root-viewport #:root-viewport)
-  (:export #:defapplication))
+  (:export #:defapplication #:make-app-config #:get-component-instance))
 
 (in-package #:elmtui.app)
 
@@ -59,26 +60,86 @@
             (progn (push k rplist) (push v rplist))))
       (values (nreverse kplist) (nreverse rplist))))
 
-  ;; Normalise “maybe-quoted” symbol designators.
-  (defun %->symbol (val what app)
-    "Return a *symbol* extracted from VAL or signal error.
-WHAT is a human label (:update-fn etc.) for diagnostics."
+  ;; Normalize function designators for macro keyword args.
+  (defun %normalize-fn (val what app)
+    "Accepts a symbol, quoted symbol, (function sym), lambda, or function object.
+  Returns a function object or lambda as-is. For a symbol/quoted symbol, returns the symbol for later resolution."
     (cond
-      ((symbolp val) val)
-      ((and (consp val)                           ; (quote sym)
-            (eq (car val) 'quote)
-            (symbolp (cadr val)))
-       (cadr val))
-      ((and (consp val)                           ; (function sym)
-            (eq (car val) 'function)
-            (symbolp (cadr val)))
-       (cadr val))
-      ((and (consp val)                           ; inline lambda
-            (eq (car val) 'lambda))
-       ;; leave lambda form as-is – caller will compile it.
+      ((and (consp val) (eq (car val) 'lambda))
        val)
-      (t (error "DEFAPPLICATION ~S: ~A must be a symbol, quoted symbol, FUNCTION form, or lambda – got: ~S"
+      ((functionp val)
+       val)
+      ((symbolp val)
+       val)
+      ((and (consp val) (eq (car val) 'quote) (symbolp (cadr val)))
+       (cadr val))
+      ((and (consp val) (eq (car val) 'function) (symbolp (cadr val)))
+       (cadr val))
+      (t (error "DEFAPPLICATION ~S: ~A must be a symbol, quoted symbol, FUNCTION form, lambda, or function object – got: ~S"
                 app what val)))))
+
+                                        ; Default lambda if NIL is allowed
+
+;;; ---------------------------------------------------------------------------
+;;; Helper functions
+;;; ---------------------------------------------------------------------------
+
+(defun generate-child-id (parent-id child-suffix)
+  "Generate a unique child ID based on parent ID and suffix."
+  (intern (format nil "~A-~A" parent-id child-suffix) :keyword))
+
+;;; ---------------------------------------------------------------------------
+;;; Helper function to initialize components from DSL
+;;; ---------------------------------------------------------------------------
+
+(defun initialize-components-from-dsl (dsl app-state)
+  "Recursively traverses a component DSL, instantiates components,
+   and returns the accumulated patches and commands."
+  (let ((patches nil)
+        (commands nil))
+    (labels ((process-node (node parent-path)
+               (when (and (consp node) (symbolp (car node)))
+                 (let* ((component-type (car node))
+                        (component-props (cdr node))
+                        (component-id (getf component-props :id))
+                        (component-id-path `(:components ,component-id)))
+                   (when component-id
+                     ;; Instantiate the component using the API function
+                     (let ((component-instance (elmtui.app.api:instantiate-component-from-dsl
+                                                 node component-id-path)))
+                       (when component-instance
+                         (multiple-value-bind (instance init-patches init-commands)
+                             (elmtui.ui.api:init component-instance
+                                                 :id-path component-id-path
+                                                 ;; Pass through any initial-* properties as initargs
+                                                 :initial-state (getf component-props :initial-state)
+                                                 :initial-text (getf component-props :initial-text)
+                                                 :initial-count (getf component-props :initial-count)
+                                                 :initial-title (getf component-props :initial-title)
+                                                 :initial-data (getf component-props :initial-data)
+                                                 :initial-child-specs (getf component-props :initial-child-specs)
+                                                 :child-initial-state (getf component-props :child-initial-state))
+                           (declare (ignore instance))
+                           (setf patches (nconc patches init-patches))
+                           (setf commands (nconc commands init-commands))))))
+                   
+                   ;; Process any nested components
+                   (dolist (child (remove-if-not #'consp component-props))
+                     (when (and (consp child) (consp (car child)))
+                       (process-node (car child) component-id-path))))))
+             
+             (process-dsl-list (dsl-list)
+               (when (consp dsl-list)
+                 (if (keywordp (car dsl-list))
+                     ;; Single component
+                     (process-node dsl-list nil)
+                     ;; List of components
+                     (dolist (node dsl-list)
+                       (when (consp node)
+                         (process-node node nil)))))))
+      
+      (process-dsl-list dsl)
+      (values patches commands))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; The macro itself
@@ -88,7 +149,7 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
   "Define an ElmTUI application called NAME."
   (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
                  :update-fn :view-fn :command-processor-fn
-                 :subscriptions-fn :root-viewport-id)))
+                 :subscriptions-fn :root-viewport-id :platform-options)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
              (root-dsl   (%required kw-plist :root-component-dsl name)) ; Should be the DSL form itself
@@ -100,19 +161,19 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
              (state (if initial-state-fn
                         `(funcall ,initial-state-fn)
                         initial-state-plist))
-             (update-fn* (%->symbol (getf kw-plist :update-fn)
-                                    ":update-fn" name))
-             (view-fn*   (%->symbol (getf kw-plist :view-fn)
-                                    ":view-fn" name))
-             (cmd-proc-fn (%->symbol (getf kw-plist :command-processor-fn)
-                                     ":command-processor-fn" name))
+             (update-fn* (%normalize-fn (getf kw-plist :update-fn)
+                                        ":update-fn" name))
+             (view-fn*   (%normalize-fn (getf kw-plist :view-fn)
+                                        ":view-fn" name))
+             (cmd-proc-fn (%normalize-fn (coerce-fn (getf kw-plist :command-processor-fn))
+                                         ":command-processor-fn" name))
              ;; Subscriptions: keep symbol | lambda | NIL, but handle lambda evaluation properly
              (subs-fn-form
                (let ((v (getf kw-plist :subscriptions-fn)))
                  (cond ((symbolp v) `',v) ; Quote symbol for later evaluation
                        ((and (consp v) (eq (car v) 'lambda)) `',v) ; Quote lambda form to store as cons
-                       ((null v)
-                        ''(lambda (model) (declare (ignore model)) nil))
+                       ;; ((null v)
+                       ;;  ''(lambda (model) (declare (ignore model)) nil))
                        (t (error "DEFAPPLICATION ~S: :subscriptions-fn must be symbol or lambda – got: ~S"
                                  name v)))))
              ;; Auto-generated helper names
@@ -173,22 +234,34 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
                    (let ((rv-inst (instantiate-component-from-dsl rv-dsl-spec rv-path)))
                      (when rv-inst
                        (log4cl:log-info "Initialized root viewport instance: ~A for app ~A" rv-inst ',name)
+                       (log4cl:log-info "With DSL spec: ~A" rv-dsl-spec)
                        (multiple-value-bind (init-patches init-commands)
                            (elmtui.ui.api:init rv-inst
                                                :id-path rv-path
-                                               :dsl rv-dsl-spec ; Pass the dsl for the root-viewport
+                                               :dsl ;; TODO use the actual dsl without root viewport, because
+                                               ;; that makes it no valid plist
+                                               (cdr rv-dsl-spec) ; Pass the dsl for the root-viewport
                                                ;; Pass options needed by root-viewport's init
                                                :initial-terminal-dimensions initial-terminal-dimensions
                                                :initial-cursor-pos initial-cursor-position
                                                :initial-child-spec current-root-dsl)
                          (setf patches (nconc patches init-patches))
-                         (setf commands (nconc commands init-commands))))
+                         (setf commands (nconc commands init-commands))
+                         (log4cl:log-info "Root viewport initialized with patches: ~A and commands: ~A"
+                                          patches commands)))
                      ;; Store the root viewport instance itself if needed (e.g., for direct access, though usually via get-component-instance)
                      ;; (setf state (merge-patches state (list (list rv-path rv-inst)))) ; Storing instance might be redundant if state is pure data
                      ))
 
-                 ;; Merge initial state with patches from root viewport init
+                 ;; Initialize components from the root DSL
+                 (multiple-value-bind (component-patches component-commands)
+                     (initialize-components-from-dsl current-root-dsl state)
+                   (setf patches (nconc patches component-patches))
+                   (setf commands (nconc commands component-commands)))
+
+                 ;; Merge initial state with patches from root viewport and component init
                  (setf state (merge-patches state patches))
+                 (log4cl:log-info "Initial state after root viewport and component init: ~A" state)
                  (values state commands))))
 
 
@@ -219,6 +292,7 @@ WHAT is a human label (:update-fn etc.) for diagnostics."
                                     (app-config-view-fn-sym cfg)))
                     (cmd-proc-fn   (app-config-command-processor-fn cfg))
                     (app-subs-form (app-config-subscriptions-fn-form cfg)))
+               (declare (ignorable proc-fn))
                (labels
                    ((pinit ()
                       ;; Validate platform-options before initialization

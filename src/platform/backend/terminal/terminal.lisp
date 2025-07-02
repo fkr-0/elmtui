@@ -814,8 +814,8 @@ This method should be implemented by subclasses of low-level-terminal."
 ;; This function will recursively traverse the tree and draw nodes.
 (defun render-ui-tree-to-buffer (backend target-buffer ui-node)
   (when ui-node
-    (let* ((props (elmtui.view.core:ui-node-props ui-node))
-           (node-type (elmtui.view.core:ui-node-type ui-node))
+    (let* ((props (elmtui.view.api:ui-node-props ui-node))
+           (node-type (elmtui.view.api:ui-node-type ui-node))
            (node-id (getf props :id))
            (layout-rect (getf props :layout-rect))
            (style-object (if (typep ui-node 'elmtui.view.styled:styled-ui-node)
@@ -864,5 +864,5 @@ This method should be implemented by subclasses of low-level-terminal."
                                    :char #\Space
                                    :style cell-style-plist))))))))
 
-      (dolist (child (elmtui.view.core:ui-node-children ui-node))
+      (dolist (child (elmtui.view.api:ui-node-children ui-node))
         (render-ui-tree-to-buffer backend target-buffer child)))))
