@@ -172,33 +172,33 @@
   "Test component with custom update method"
   (let* ((instance (make-instance 'test-with-update))
          (id-path '(:components :test))
-         ;; Create a simple mock app state with just the required component state
          (mock-app-state `(:components (:test (:counter 5 :messages () :type :test-with-update :id :test)))))
 
     ;; Test increment message
-    (let ((result (update instance mock-app-state '(:increment 3) :id-path id-path)))
+    (let* ((result (update instance mock-app-state '(:increment 3) :id-path id-path))
+           (patches (ur-patches result))
+           (counter-patch (find '(:components :test :counter) patches :key #'first :test #'equal))
+           (messages-patch (find '(:components :test :messages) patches :key #'first :test #'equal)))
       (is (typep result 'elmtui.state.api:update-result))
-      (let ((patches (ur-patches result)))
-        (is (= 2 (length patches))) ; counter and messages patches
-        (is (= 8 (second (find-if (lambda (patch)
-                                    (equal '(:components :test :counter) (first patch)))
-                                  patches))))))
+      (is (= 2 (length patches)))
+      (is (not (null counter-patch)))
+      (is (= 8 (second counter-patch)))
+      (is (not (null messages-patch))))
 
     ;; Test reset message
-    (let ((result (update instance mock-app-state '(:reset) :id-path id-path)))
+    (let* ((result (update instance mock-app-state '(:reset) :id-path id-path))
+           (patches (ur-patches result))
+           (counter-patch (find '(:components :test :counter) patches :key #'first :test #'equal)))
       (is (typep result 'elmtui.state.api:update-result))
-      (let ((patches (ur-patches result)))
-        (is (= 2 (length patches)))
-        (is (= 0 (second (find-if (lambda (patch)
-                                    (equal '(:components :test :counter) (first patch)))
-                                  patches))))))
+      (is (= 2 (length patches)))
+      (is (not (null counter-patch)))
+      (is (= 0 (second counter-patch))))
 
     ;; Test unhandled message (otherwise clause)
     (let ((result (update instance mock-app-state '(:unknown-message) :id-path id-path)))
       (is (typep result 'elmtui.state.api:update-result))
       (let ((patches (ur-patches result)))
-        (is (= 1 (length patches))) ; only messages patch
-        ))))
+        (is (= 1 (length patches)))))))
 
 (test defcomponent-default-view
   "Test default view method"
@@ -290,4 +290,17 @@
     (is (typep instance 'test-child))
     (is (typep instance 'test-simple))
     (is (typep instance 'component))
-    (is (eq :test-child (cclass-name instance)))))
+    (is (eq :test-child (cclass-name instance)))
+
+    (let* ((id-path '(:components :test-child1)))
+      (multiple-value-bind (returned-instance patches commands)
+          (init instance :id-path id-path)
+        (is (eq instance returned-instance))
+        (is (= 1 (length patches)))
+        (is (null commands))
+        (let* ((patch (first patches))
+               (state (second patch)))
+          (is (string= "test" (getf state :name)))
+          (is (= 42 (getf state :value)))
+          (is (eq t (getf state :enabled)))
+          (is (string= "child" (getf state :child-prop))))))))
