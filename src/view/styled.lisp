@@ -72,6 +72,8 @@
          (node (make-instance 'styled-ui-node
                               ;; Only use the initargs that styled-ui-node actually accepts
                               :style-map nil))) ; Initialize with empty style-map for now
+    (log:debug "STYLED: make-styled-node - Created node with ID: ~S, Type: ~S, Effective Props: ~S"
+               final-id type effective-props)
     ;; Set basic ui-node slots
     (setf (ui-node-type node) type)
     (setf (ui-node-props node) effective-props)
@@ -95,13 +97,40 @@
    :props (or props (copy-list (ui-node-props node)))
    ;; Children are taken from the original node's children list.
    ;; apply-stylesheet-to-tree will iterate over these and process them.
+
    :children (or children (ui-node-children node))
    :parent parent))
-
+(defmethod ui-node-props ((node list))
+  "Raises a backtracing error if ui-node-props is called on a raw DSL list/plist."
+  (error "ui-node-props called on a list/plist: ~S~%Backtrace:~%~A"
+         node
+         (with-output-to-string (s)
+           (let ((*print-length* 10) (*print-level* 4))
+             (sb-debug:backtrace 10 s)))))
 ;;;-----------------------------------------------------------------------------
 ;;; Style Application
 ;;;-----------------------------------------------------------------------------
 
+(defmethod stylable-id ((node list))
+  "Fallback for stylable-id on raw DSL lists. Returns :id if present, else NIL."
+  (getf node :id))
+
+;; Improved: Always convert DSL list directly to styled-ui-node, not ui-node, for robust style handling
+(defmethod apply-stylesheet-to-tree ((node list) stylesheet &optional parent)
+  "Handle DSL property list trees by converting directly to a styled-ui-node, then applying styles. Correctly threads parent."
+  (log:debug "STYLED: apply-stylesheet-to-tree for DSL list. Converting to styled-ui-node. Parent: ~S"
+             (if parent (ignore-errors (stylable-id parent)) "NIL_PARENT"))
+  (let* ((type (first node))
+         (props (loop for (k v) on (rest node) by #'cddr
+                      until (eq k :children)
+                      append (list k v)))
+         (children (getf (rest node) :children))
+         (styled-children (mapcar (lambda (child)
+                                    (apply-stylesheet-to-tree child stylesheet nil))
+                                  children))
+         (styled-node (make-styled-node :type type :props props :children styled-children :parent parent)))
+    ;; Now, call apply-stylesheet-to-tree on this new styled-node to ensure full style application
+    (apply-stylesheet-to-tree styled-node stylesheet parent)))
 (defgeneric apply-stylesheet-to-tree (node stylesheet &optional parent)
   (:documentation
    "Recursively applies styles from STYLESHEET to NODE and its descendants.
@@ -134,25 +163,23 @@
     new-node))
 
 (defmethod apply-stylesheet-to-tree ((node ui-node) stylesheet &optional parent)
-  "Handle plain ui-nodes by converting them first, then applying styles. Returns a new styled node."
+  "Handle plain ui-nodes by converting them first, then applying styles. Returns a new styled node.
+   Ensures that all children are also styled-ui-nodes before proceeding."
   (log:debug "STYLED: apply-stylesheet-to-tree for plain ui-node - Type: ~S. Converting to styled-ui-node. Parent ID: ~S"
-             (ui-node-type node) (if parent (stylable-id parent) "NIL_PARENT"))
+             (ui-node-type node) (if parent (ignore-errors (stylable-id parent)) "NIL_PARENT"))
 
-  ;; 1. Convert the plain ui-node to a styled-ui-node.
-  ;;    'make-styled-node' sets its parent, initializes ID, classes from props,
-  ;;    and sets initial styles (defaults + inline styles from props).
-  ;;    Children are taken from the original plain node.
-  (let ((styled-node (make-styled-node
-                      :type (ui-node-type node)
-                      :props (ui-node-props node)
-                      :children (ui-node-children node)
-                      :parent parent)))
-
-    ;; 2. Now, call apply-stylesheet-to-tree on this new styled-node.
-    ;;    This will dispatch to the method for styled-ui-node, which will
-    ;;    apply the stylesheet and recursively process its children.
-    ;;    The 'parent' argument remains the same for this call, as 'styled-node'
-    ;;    is the current node being processed relative to that parent.
+  ;; Recursively style all children first, ensuring the entire tree is styled.
+  (let* ((styled-children (mapcar (lambda (child)
+                                    (if (typep child 'styled-ui-node)
+                                        child
+                                        (apply-stylesheet-to-tree child stylesheet nil)))
+                                  (ui-node-children node)))
+         (styled-node (make-styled-node
+                       :type (ui-node-type node)
+                       :props (ui-node-props node)
+                       :children styled-children
+                       :parent parent)))
+    ;; Now, call apply-stylesheet-to-tree on this new styled-node.
     (apply-stylesheet-to-tree styled-node stylesheet parent)))
 
 (defmethod apply-stylesheet-to-tree ((node null) stylesheet &optional parent)
@@ -166,10 +193,19 @@
 
 (defun style-value (node property &optional default)
   "Get the computed style value of PROPERTY for NODE.
-   Returns DEFAULT if NODE is not a styled-ui-node, not styled, or property not found."
-  (if (and (typep node 'styled-ui-node) (slot-boundp node 'elmtui.style-lib.api::styles) (styles node))
-      (value-of (styles node) property default)
-      default))
+   Returns DEFAULT if NODE is not a styled-ui-node, not styled, or property not found.
+   Looks up in style-map (computed/cascaded), then falls back to inline :style in props, then DEFAULT."
+  (cond
+    ((typep node 'styled-ui-node)
+     (let* ((style-map (ignore-errors (styled-ui-node-style-map node)))
+            (inline-style (getf (ui-node-props node) :style)))
+       (cond
+         ((and style-map (listp style-map) (getf style-map property))
+          (getf style-map property))
+         ((and inline-style (listp inline-style) (getf inline-style property))
+          (getf inline-style property))
+         (t default))))
+    (t default)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Attribute Macro

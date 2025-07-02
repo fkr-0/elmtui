@@ -69,22 +69,26 @@
      (make-update-result))))
 
 (defun rainbow-content-view (app-state)
-  "Defines the UI DSL for the rainbow app's content."
-  (declare (ignore app-state)) ; app-state not used in this simple static view
-  ;; This is PURE DSL DATA for the content that will be the child of the root-viewport
+  "Defines the UI DSL for the rainbow app's content. The root viewport is set via :root-viewport-id in defapplication."
+  (declare (ignore app-state))
   `(:container
     :id :rainbow-main-container
-    :direction :row ; Stripes are laid out horizontally
+    :direction :row
     :height :fill
     :width :fill
-    :style (:bg-color ,(elmtui.style-lib.styles:rgb '(10 10 10))) ; Dark background for main container
-    :children ,(loop for (color-name class-name rgb-val) in *rainbow-colors-with-names*
-                     collect `(:container ; Each stripe is a container
-                               :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
-                               :classes ,(string-downcase (if (symbolp class-name) (symbol-name class-name)
-                                                               class-name)) ; Ensure class name is a string
-                               ;; width and height come from the stylesheet class
-                               :children nil))))
+    :style (:bg-color ,(elmtui.style-lib.styles:rgb '(10 10 10)))
+    :children
+    ,(loop for (color-name class-name rgb-val) in *rainbow-colors-with-names*
+           collect `(:container
+                     :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
+                     :classes ,(if (stringp class-name)
+                                   class-name
+                                   (string-downcase (symbol-name class-name)))
+                     :children nil))))
+(defun rainbow-app-subscriptions (model)
+  (declare (ignore model))
+  (log-debug "RAINBOW-APP: Subscriptions function called.")
+  nil)
 
 (defapplication rainbow-example-app
   :root-viewport-id :rainbow-root-vp
@@ -93,7 +97,8 @@
   :root-component-dsl (rainbow-content-view nil) ; Directly use the DSL form
   :update-fn 'app-update
   :view-fn 'rainbow-content-view  ; Function that generates the content DSL
-  :subscriptions-fn (lambda (model)
-                      (declare (ignore model))
-                      (log-debug "RAINBOW-APP: Subscriptions function called.")
-                      nil))
+  :subscriptions-fn
+  rainbow-app-subscriptions)
+
+
+;; (initialize-app-state-rainbow-example-app)

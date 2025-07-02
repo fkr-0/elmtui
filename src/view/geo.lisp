@@ -3,10 +3,12 @@
 ;;; Geometric Primitives (Ported/Refactored from uncharming-tui.geo)
 ;;; ===============================================================
 (uiop:define-package :elmtui.view.geo
-  (:use :cl)
+  (:use :cl :log4cl)
   (:nicknames :et.geo)
   ;; Removed :ut.config import, defining =? locally
   (:import-from :cl :make-instance)
+  (:import-from :sb-pcl
+                #:make-instance)
   (:export #:=? #:area #:area< #:contains-p #:normalize!
            #:rectangle-union #:border #:bounding-box #:circle
            #:corner #:dim #:dim-length #:dim-pos #:flip #:grow-view!
@@ -500,6 +502,8 @@
 
       (nreverse rects))))
 
+
+                                        ; Example usage
 ;; Border
 (defmethod border ((r rectangle) &key (side :all) (width 1))
   "Get the border(s) of the rectangle as a list of rectangles."

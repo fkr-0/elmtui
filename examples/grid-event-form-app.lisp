@@ -92,23 +92,14 @@
 
 (defupdate form-tab-pressed (state msg)
   "Handle tab key for form navigation"
-  (let ((shift-pressed (getf msg :shift-pressed))
-        (focus-manager (slot-value state 'focus-manager))
-        (current-focus (slot-value state 'focus-manager)))
-    
-    ;; Get the next focusable element in the appropriate direction
-    (let ((next-focus (if shift-pressed
-                          (elmtui.core.focus-manager:get-previous-focusable
-                           focus-manager
-                           (elmtui.core.focus-manager:focus-manager-current-focus focus-manager))
-                          (elmtui.core.focus-manager:get-next-focusable
-                           focus-manager
-                           (elmtui.core.focus-manager:focus-manager-current-focus focus-manager)))))
-      
-      ;; Set focus to the next element
-      (when next-focus
-        (set-focus focus-manager next-focus)))
-    
+  (let* ((shift-pressed (getf msg :shift-pressed))
+         (focus-manager (slot-value state 'focus-manager))
+         (current-focus (elmtui.core.focus-manager:focus-manager-current-focus focus-manager))
+         (next-focus (if shift-pressed
+                        (elmtui.core.focus-manager:get-previous-focusable focus-manager current-focus)
+                        (elmtui.core.focus-manager:get-next-focusable focus-manager current-focus))))
+    (when next-focus
+      (set-focus focus-manager next-focus))
     state))
 
 ;;;-----------------------------------------------------------------------------
@@ -184,7 +175,11 @@
    :on-change (lambda (event)
                 (elmtui.state.msg:send-message
                  (list :type :update-field
-                       :field (intern (string-upcase (symbol-name id)))
+                       :field (case id
+                                (:name-field 'name)
+                                (:email-field 'email)
+                                (:subject-field 'subject)
+                                (otherwise id))
                        :value (getf event :value))))))
 
 (defun make-textarea (id value &optional placeholder)
@@ -198,7 +193,9 @@
    :on-change (lambda (event)
                 (elmtui.state.msg:send-message
                  (list :type :update-field
-                       :field (intern (string-upcase (symbol-name id)))
+                       :field (case id
+                                (:message-field 'message)
+                                (otherwise id))
                        :value (getf event :value))))))
 
 (defun make-validation-message (errors field-name)

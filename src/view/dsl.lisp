@@ -50,6 +50,14 @@
                  spec))) ; If not a component spec, return as is (e.g. string, number)
     (process-node dsl-spec nil)))
 
+;;; --- DSL to UI-Node Conversion Utility ---
+(defun dsl->ui-node (dsl-spec app-state)
+  "Converts a DSL spec to a ui-node tree using render-dsl-to-resolved-tree.
+   Ensures the result is a ui-node, not a raw DSL/plist. Raises an error if not."
+  (let ((resolved (render-dsl-to-resolved-tree dsl-spec app-state)))
+    (unless (and resolved (not (listp (first resolved))))
+      (error "dsl->ui-node: Conversion did not produce a ui-node. Got: ~S" resolved))
+    resolved))
 ;; Example Usage (conceptual - actual components need to be defined and registered)
 ;; (defcomponent-dsl :my-box my-box-component)
 ;; (defcomponent-dsl :my-label my-label-component)

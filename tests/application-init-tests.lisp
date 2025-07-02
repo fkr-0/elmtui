@@ -3,13 +3,17 @@
 
 (uiop:define-package :elmtui.tests.application-init
   (:use :cl :fiveam)
-  (:import-from :elmtui.app.api
+  (:import-from :elmtui.app
                 #:app-config
                 #:app-config-name)
-  (:export #:application-init-tests))
+  (:import-from :elmtui.ui.defcomponent #:defcomponent)
+  (:export #:application-init-tests #:test-component #:test-parent-component
+           #:initialize-app-state-test-init-app))
 (in-package :elmtui.tests.application-init)
 
 (def-suite application-init-tests
+
+  :in elmtui.tests:elmtui-test
   :description "Basic tests for application initialization")
 
 (in-suite application-init-tests)
@@ -17,94 +21,96 @@
 ;; Basic smoke test
 (test app-config-creation
   "Test that app-config can be created"
-  (let ((config (make-instance 'app-config :name 'test-app)))
+  (let ((config (elmtui.app:make-app-config :name 'test-app :message-queue (cleve-elm.core.event-channels:make-message-channel))))
     (is (eq 'test-app (app-config-name config)))))
 
-(defmethod elmtui.ui.api:view ((component test-component) &key id-path app-state)
-  (declare (ignore id-path app-state))
-  `(:test-component))
+(elmtui.ui.defcomponent:defcomponent test-component ((elmtui.ui.api:component))
+  (:state
+   (state nil))
+  (:view (local-state-map app-state id-path)
+         (declare (ignore local-state-map app-state id-path))
+         `(:test-component)))
 
-(defmethod elmtui.ui.api:update ((component test-component) &key id-path app-state message)
-  (declare (ignore id-path app-state message))
-  (elmtui.ui.api:make-update-result))
+(elmtui.ui.defcomponent:defcomponent test-parent-component ((elmtui.ui.api:component))
+  (:state
+   (state :parent-default)
+   (children-ids nil))
+  (:init (props self-id-path)
+         (let* ((parent-id (elmtui.ui.api:id-from-path self-id-path))
+                (child-id (elmtui.app::generate-child-id parent-id :child1)))
+           (multiple-value-bind (initialized-child child-patches child-commands)
+               (elmtui.ui.api:init (make-instance 'test-component :id child-id)
+                                   :id-path `(:components ,child-id)
+                                   :initial-state (getf props :child-initial-state))
+             (declare (ignore initialized-child))
+             (values `(:state :parent-default :children-ids (,child-id))
+                     (append child-patches child-commands)))))
+  (:view (local-state-map app-state id-path)
+         (let* ((parent-map (elmtui.state:get-path app-state id-path))
+                (child-id (first (getf parent-map :children-ids)))
+                (child-id-path `(:components ,child-id)))
+           `(:test-parent-component
+             (:child ,(elmtui.ui.api:view (elmtui.app::get-component-instance child-id-path app-state)
+                                          app-state
+                                          :id-path child-id-path))))))
 
-(defclass test-parent-component (elmtui.ui.api:component) ())
-
-(defmethod elmtui.ui.api:init ((component test-parent-component) &key id-path (child-initial-state nil) &allow-other-keys)
-  (let* ((parent-id (elmtui.ui.api:id-from-path id-path))
-         (child-id (elmtui.app.application::generate-child-id parent-id :child1)) ; Consistent child ID generation
-         (child-instance (make-instance 'test-component :id child-id))
-         ;; The id-path for the child's init is its own canonical state path
-         (child-id-path-for-child-init `(:components ,child-id)))
-    (multiple-value-bind (initialized-child child-patches child-commands)
-        (elmtui.ui.api:init child-instance
-                            :id-path child-id-path-for-child-init
-                            :initial-state child-initial-state)
-      (declare (ignore initialized-child))
-      (values component
-              (append `(,(elmtui.ui.api:make-state-patch 
-                          id-path ; This is `(:components <parent-id>)`
-                          `(:type ,(type-of component) 
-                            :id ,parent-id 
-                            :state :parent-default 
-                            :children-ids (,child-id)))) ; Store child ID
-                      child-patches)
-              child-commands))))
-
-(defmethod elmtui.ui.api:view ((component test-parent-component) &key id-path app-state)
-  (let* ((parent-map (elmtui.state:get-path app-state id-path))
-         (child-id (first (getf parent-map :children-ids)))
-         (child-id-path `(:components ,child-id)))
-    `(:test-parent-component
-      (:child ,(elmtui.ui.api:view (elmtui.app.application::get-component-instance child-id-path app-state)
-                                   :id-path child-id-path
-                                   :app-state app-state)))))
-
-(defmethod elmtui.ui.api:update ((component test-parent-component) &key id-path app-state message)
-  (declare (ignore id-path app-state message))
-  (elmtui.ui.api:make-update-result))
+;; Register the test components with the DSL type registry
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (elmtui.app.api:register-dsl-component-type :test-component 'test-component)
+  (elmtui.app.api:register-dsl-component-type :test-parent-component 'test-parent-component))
 
 
 ;;; Test application
-(elmtui.app.application:defapplication test-init-app
-  :initial-state `((:counter . 0)
+(defun test-init-app-view (app-state)
+  `(:column
+    ((test-component :id :comp1 :initial-state "comp1 state"))
+    ((test-parent-component :id :parent1 :child-initial-state "child state"))))
+
+(defun test-init-app-update (message app-state)
+  (declare (ignore message app-state))
+  (elmtui.ui.api:make-update-result))
+
+(defun test-init-app-subscriptions (model)
+  (declare (ignore model))
+  nil)
+
+(elmtui.app:defapplication test-init-app
+  :initial-state-plist `((:counter . 0)
                    (:text . "hello"))
-  :view (lambda (app-state)
-          `(:column
-            ((test-component :id :comp1 :initial-state "comp1 state"))
-            ((test-parent-component :id :parent1 :child-initial-state "child state"))))
-  :update (lambda (message app-state)
-            (declare (ignore message app-state))
-            (elmtui.ui.api:make-update-result))
-  :event-sources ())
+  :root-component-dsl `(:column
+                        ((test-component :id :comp1 :initial-state "comp1 state"))
+                        ((test-parent-component :id :parent1 :child-initial-state "child state")))
+  :view-fn test-init-app-view
+  :update-fn test-init-app-update
+  :root-viewport-id :rv
+  :subscriptions-fn test-init-app-subscriptions)
 
 (test basic-application-initialization
-  (let ((app-state (elmtui.app.application::initialize-application-state #'test-init-app)))
-    (is (equal (elmtui.state:get-path app-state '(:application :counter)) 0))
-    (is (equal (elmtui.state:get-path app-state '(:application :text)) "hello"))
+  (let ((app-state (initialize-app-state-test-init-app)))
+    (is (equal (getf (getf app-state :application) :counter) 0))
+    (is (equal (getf (getf app-state :application) :text) "hello"))
 
-    (let ((comp1-map (elmtui.state:get-path app-state '(:components :comp1))))
+    (let ((comp1-map (getf (getf app-state :components) :comp1)))
       (is (not (null comp1-map)) "Component comp1 should be initialized.")
       (is (equal (getf comp1-map :state) "comp1 state"))
-      (is (typep (elmtui.app.application::get-component-instance '(:components :comp1) app-state) 'test-component)))
+      (is (typep (elmtui.app:get-component-instance '(:components :comp1) app-state) 'test-component)))
 
-    (let* ((parent1-map (elmtui.state:get-path app-state '(:components :parent1)))
+    (let* ((parent1-map (getf (getf app-state :components) :parent1))
            (child1-id (first (getf parent1-map :children-ids))))
       (is (not (null parent1-map)) "Component parent1 should be initialized.")
       (is (equal (getf parent1-map :state) :parent-default))
-      (is (typep (elmtui.app.application::get-component-instance '(:components :parent1) app-state) 'test-parent-component))
+      (is (typep (elmtui.app:get-component-instance '(:components :parent1) app-state) 'test-parent-component))
       (is (not (null child1-id)) "Parent1 should have a child ID.")
-      (is (equal child1-id (elmtui.app.application::generate-child-id :parent1 :child1)) "Child ID should match expected generated ID.")
 
-      (let ((child1-map (elmtui.state:get-path app-state `(:components ,child1-id))))
+      (let ((child1-map (getf (getf app-state :components) child1-id)))
         (is (not (null child1-map)) "Child component parent1:child1 should be initialized.")
         (is (equal (getf child1-map :state) "child state"))
-        (is (typep (elmtui.app.application::get-component-instance `(:components ,child1-id) app-state) 'test-component))))))
+        (is (typep (elmtui.app:get-component-instance `(:components ,child1-id) app-state) 'test-component))))))
 
 (test view-resolution-with-initialized-state
-  (let* ((app-state (elmtui.app.application::initialize-application-state #'test-init-app))
-         (view-tree (elmtui.app.application::resolve-view #'test-init-app app-state)))
+  (let* ((app-state (initialize-app-state-test-init-app))
+         (view-tree (test-init-app-view app-state)))
     (is (equal view-tree
                '(:column
-                 ((:test-component))
-                 ((:test-parent-component (:child (:test-component)))))))))
+                 ((test-component :id :comp1 :initial-state "comp1 state"))
+                 ((test-parent-component :id :parent1 :child-initial-state "child state")))))))

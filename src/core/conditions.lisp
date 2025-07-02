@@ -32,7 +32,6 @@
    ;; Event validation
    :event-validation-error))
 (in-package :elmtui.core.conditions)
-
 (defun log-condition (condition &optional (level :error))
   "Log CONDITION with the given LEVEL."
   (format *error-output* "[~A] Condition: ~A~%" level condition))

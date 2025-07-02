@@ -39,6 +39,7 @@
    #:copy-term-style
    #:ansi-seqs
    #:as-plist
+   #:terminal-color
    ))
 (in-package :elmtui.platform.backend.common.ansi-styling)
 

@@ -37,9 +37,42 @@
 
 ;; Generic function signatures with improved type declarations
 (declaim (ftype (function (list t) t) get-component-instance))
+
 (defgeneric get-component-instance (id-path state)
-  (:documentation "Retrieve a component instance by its ID path in the application context.")
-  )
+  (:method ((id-path t) (state t))
+    (log-debug "Retrieving component instance for ID path: ~S in state: ~S" id-path state)
+    (let ((component (getf state id-path)))
+      (if component
+          component
+          (progn
+            (log-error "Component with ID path ~S not found in state: ~S" id-path state)
+            ;; Signal an error if the component is not found
+            (error "Component with ID path ~S not found in state." id-path))))))
+(defmethod get-component-instance ((id-path list) (state t))
+  "Recursively retrieve a component instance from STATE by following ID-PATH.
+Logs each step and signals a detailed error if the path is invalid or not found."
+  (log-debug "Retrieving component instance for ID path: ~S in state: ~S" id-path state)
+  (labels ((descend (path current)
+             (cond
+               ((null path)
+                (log-debug "End of path reached. Returning: ~S" current)
+                current)
+               ((hash-table-p current)
+                (let ((next (gethash (first path) current)))
+                  (log-debug "Hash-table step: ~S => ~S" (first path) next)
+                  (if next
+                      (descend (rest path) next)
+                      (error "Key ~S not found in hash-table at path ~S" (first path) path))))
+               ((and (listp current) (not (null current)))
+                (let ((plist-index (position (first path) current :test #'equal)))
+                  (if plist-index
+                      (let ((next (nth (1+ plist-index) current)))
+                        (log-debug "Plist step: ~S => ~S" (first path) next)
+                        (descend (rest path) next))
+                      (error "Key ~S not found in plist at path ~S" (first path) path))))
+               (t
+                (error "Cannot descend: current value ~S is not a hash-table or plist at path ~S" current path)))))
+    (descend id-path state)))
 
 (declaim (ftype (function (t &key (:backend-type keyword) (:platform-options list)) t) run-application))
 (defgeneric run-application (app-spec &key backend-type platform-options)
@@ -108,7 +141,7 @@ Workflow:
     (log-debug "DSL Type: ~S, Resolved Component Class: ~S" dsl-type component-class)
     (if component-class
         (let ((instance (make-instance component-class :id id-path)))
-          (log-info "Successfully instantiated component of type ~S with ID ~S."
+          (log-info "Successfully instantiated component of type ~S with ID-Path ~S."
                     dsl-type id-path)
           (log-debug "Instantiated instance: ~A" instance)
           instance)

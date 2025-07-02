@@ -1108,7 +1108,8 @@
           (if is-row
               (setf child-x (+ container-content-x
                                (if is-main-axis-reverse
-                                   main-pos))
+                                   main-pos
+                                   (- main-axis-size main-pos final-main)))
                     child-y (+ container-content-y cross-pos)
                     child-w final-main
                     child-h final-cross)

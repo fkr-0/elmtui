@@ -7,6 +7,10 @@
   (:import-from :log4cl #:log-debug #:log-info #:log-warn #:log-error)
   (:import-from :elmtui.style-lib.style-set #:set-style #:style-set) ; Function to add styles to a set
   (:import-from :elmtui.style-lib.api #:styles)
+  (:import-from :elmtui.view.api #:styled-ui-node-style-map
+                #:ui-node-type #:ui-node-props #:ui-node-children
+                )
+  (:import-from :elmtui.view.core #:ui-node-p)
   (:import-from :elmtui.view.geo
                 #:make-pos #:make-size
                 #:rectangle #:make-rectangle #:copy-rectangle
@@ -16,9 +20,41 @@
   ;; Import specific layout engines
   (:import-from :elmtui.view.layout.flex #:compute-flex-layout)
 
-  (:export :layout-tree :layout-node #:dispatch-layout #:layout-grid-container-impl))
+  (:export :layout-tree :layout-node #:dispatch-layout #:layout-grid-container-impl
+           #:box-model #:content-box #:padding-box #:border-box))
 
 (in-package :elmtui.view.layout)
+
+;;;-----------------------------------------------------------------------------
+;;; Box Model Definition
+;;;-----------------------------------------------------------------------------
+(defclass box-model ()
+  ((border-box :initarg :border-box :accessor border-box
+               :type rectangle
+               :documentation "The outermost box, including margins, borders, and padding.")
+   (padding-box :initarg :padding-box :accessor padding-box
+                :type rectangle
+                :documentation "The area inside the border, including padding but excluding borders.")
+   (content-box :initarg :content-box :accessor content-box
+                :type rectangle
+                :documentation "The innermost box, containing the actual content."))
+  (:documentation "Represents the CSS Box Model for a UI element."))
+
+(defgeneric content-box (box-model)
+  (:documentation "Returns the content-box rectangle of a box-model.")
+  (:method ((bm box-model))
+    (slot-value bm 'content-box)))
+
+(defgeneric padding-box (box-model)
+  (:documentation "Returns the padding-box rectangle of a box-model.")
+  (:method ((bm box-model))
+    (slot-value bm 'padding-box)))
+
+(defgeneric border-box (box-model)
+  (:documentation "Returns the border-box rectangle of a box-model.")
+  (:method ((bm box-model))
+    (slot-value bm 'border-box)))
+
 (defgeneric layout-grid-container-impl (grid-container-node available-rect))
 
 ;;;-----------------------------------------------------------------------------
@@ -100,6 +136,7 @@
                       (* avail-h
                          (/ (parse-integer req-h :end (1- (length req-h))) 100.0))
                       avail-h))
+
                  (t                           avail-h)))
 
 
@@ -195,10 +232,62 @@
   (unless (typep node 'styled-ui-node)
     (log-warn "LAYOUT: Attempting to lay out a non-styled-ui-node: ~A" node)
     (return-from layout-node node))
-
+  (log-debug "LAYOUT: Starting layout for node ~A with parent-absolute-content-rect: ~S"
+             (getf (ui-node-props node) :id (gensym "ANON-NODE-")) parent-absolute-content-rect)
   (let* ((node-id (getf (ui-node-props node) :id (gensym "ANON-NODE-")))
          (display (style-value node :display :block)) ; Default to block display
-         (node-styles (styles node))
+         ;; Canonical: use style-map slot if present, else inline :style from props, else nil
+         (node-styles (cond
+                        ((and (typep node 'styled-ui-node)
+                              (ignore-errors (slot-exists-p node 'elmtui.view.api::style-map)))
+                         (ignore-errors (styled-ui-node-style-map node)))
+                        ((getf (ui-node-props node) :style))
+                        (t nil)))
+         ;; --- PATCH: Robust width/height resolution for root and containers ---
+         (requested-w (style-value node :width :auto))
+         (requested-h (style-value node :height :auto))
+         (is-root (null parent-absolute-content-rect)) ; If parent rect is NIL, treat as root
+         (available-outer-w (if is-root
+                                ;; Defensive: try to get from node's props, else fallback to 80
+                                (let ((screen-w (getf (ui-node-props node) :screen-width)))
+                                  (or (and screen-w (numberp screen-w) screen-w) 80))
+                                (max 0 (- (w parent-absolute-content-rect)
+                                          (style-value node :margin-left 0)
+                                          (style-value node :margin-right 0)))))
+         (available-outer-h (if is-root
+                                (let ((screen-h (getf (ui-node-props node) :screen-height)))
+                                  (or (and screen-h (numberp screen-h) screen-h) 24))
+                                (max 0 (- (h parent-absolute-content-rect)
+                                          (style-value node :margin-top 0)
+                                          (style-value node :margin-bottom 0)))))
+         (eff-w (cond ((numberp requested-w) (min requested-w available-outer-w))
+                      ((or (eq requested-w :auto) (eq requested-w :fill) (null requested-w)) available-outer-w)
+                      ((stringp requested-w)
+                       (if (and (alexandria:ends-with-subseq "%" requested-w) (> (length requested-w) 1))
+                           (let* ((percentage-val (parse-integer (subseq requested-w 0 (1- (length requested-w)))))
+                                  (parent-dim-for-percentage (if is-root available-outer-w (w parent-absolute-content-rect))))
+                             (max 0 (min available-outer-w
+                                         (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
+                           available-outer-w))
+                      (t available-outer-w)))
+         (eff-h (cond ((numberp requested-h) (min requested-h available-outer-h))
+                      ((or (eq requested-h :auto) (eq requested-h :fill) (null requested-h)) available-outer-h)
+                      ((stringp requested-h)
+                       (if (and (alexandria:ends-with-subseq "%" requested-h) (> (length requested-h) 1))
+                           (let* ((percentage-val (parse-integer (subseq requested-h 0 (1- (length requested-h)))))
+                                  (parent-dim-for-percentage (if is-root available-outer-h (h parent-absolute-content-rect))))
+                             (max 0 (min available-outer-h
+                                         (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
+                           available-outer-h))
+                      (t available-outer-h)))
+         (node-layout-rect (let ((r (make-rectangle :pos (make-pos :x (if is-root 0 (x parent-absolute-content-rect))
+                                                                   :y (if is-root 0 (y parent-absolute-content-rect)))
+                                                    :size (make-size :w eff-w :h eff-h))))
+                             (setf (getf (ui-node-props node) :layout-rect) r)
+                             r))
+         ;; Actually assign the computed rect to the node's props for downstream use
+
+
 
          ;; Margins for the current node
          (margin-top (style-value node :margin-top 0))
@@ -247,7 +336,8 @@
          ;; This is the initial estimate for the node's own border-box rectangle.
          ;; Flex/Grid might adjust eff-w and eff-h if they were :auto.
          (node-layout-rect (make-rectangle :pos (make-pos :x available-outer-x :y available-outer-y) :size (make-size :w eff-w :h eff-h))))
-
+    (log-debug "LAYOUT: ~A (~A) display:~S. ParentAbsContentRect:~S. Assigned initial layout_rect:~S"
+               (ui-node-type node) node-id display parent-absolute-content-rect node-layout-rect)
     (setf (getf (ui-node-props node) :layout-rect) node-layout-rect)
     (log-debug "LAYOUT: Initial frame for ~A (~A) display:~S. ParentAbsContentRect:~S. Assigned initial layout_rect:~S"
                (ui-node-type node) node-id display parent-absolute-content-rect node-layout-rect)
@@ -316,7 +406,7 @@
                                               :size (make-size :w (w self-content-rect)
                                                                :h (max 0 (- (h self-content-rect) current-child-y-offset effective-margin-top)))))
                                            (laid-out-child (layout-node child-node child-available-parent-rect node-styles)))
-                                      ;; Y offset for next child is current offset + this child's margin-top + this child's height + this child's margin-bottom
+                                      ;; Y offset for next child is current offset + this child's margin-top + this child's height + this child's border-box
                                       ;; However, layout-node already placed the child considering its own margins relative to child-available-parent-rect.
                                       ;; So, the height of its layout-rect IS its border-box height.
                                       ;; The current-child-y-offset should advance by the space taken by the child, including its top margin (already handled by effective-margin-top)
@@ -363,18 +453,30 @@
   "Computes and sets the :LAYOUT-RECT property for STYLED-ROOT-NODE and all its descendants.
    SCREEN-RECT: The initial RECTANGLE representing the available screen space.
    Returns the modified STYLED-ROOT-NODE with layout information."
-  (unless (typep styled-root-node 'styled-ui-node)
-    (log-error "LAYOUT-TREE: Root node is not a styled-ui-node: ~A" styled-root-node)
-    (return-from layout-tree styled-root-node))
-  (unless (typep screen-rect 'rectangle)
-    (log-error "LAYOUT-TREE: screen-rect is not a rectangle: ~A" screen-rect)
-    (return-from layout-tree styled-root-node))
+  (let ((root-node
+          (cond
+            ((typep styled-root-node 'styled-ui-node) styled-root-node)
+            ((and (listp styled-root-node)
+                  (= (length styled-root-node) 1)
+                  (typep (first styled-root-node) 'styled-ui-node))
+             (first styled-root-node))
+            ((and (listp styled-root-node)
+                  (every #'ui-node-p styled-root-node))
+             (progn
+               (log-warn "LAYOUT-TREE: Root is a list of multiple nodes. Using first node for layout. List: ~S" styled-root-node)
+               (first styled-root-node)))
+            (t
+             (log-error "LAYOUT-TREE: Root node is not a styled-ui-node: ~A" styled-root-node)
+             (return-from layout-tree styled-root-node)))))
+    (unless (typep screen-rect 'rectangle)
+      (log-error "LAYOUT-TREE: screen-rect is not a rectangle: ~A" screen-rect)
+      (return-from layout-tree root-node))
 
-  (log-info "LAYOUT-TREE: Starting layout for root ~S in screen rect ~S"
-            (getf (ui-node-props styled-root-node) :id "N/A") screen-rect)
+    (log-info "LAYOUT-TREE: Starting layout for root ~S in screen rect ~S"
+              (getf (ui-node-props root-node) :id "N/A") screen-rect)
 
-  (layout-node styled-root-node screen-rect nil)
-  styled-root-node)
+    (layout-node root-node screen-rect nil)
+    root-node))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Dispatch Methods (Placeholder for explicit grid dispatch if needed)
