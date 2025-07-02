@@ -1,5 +1,5 @@
 (uiop:define-package :elmtui.ui.api
-  (:use :cl )
+  (:use :cl #:log4cl)
   (:import-from :elmtui.state.api #:state-ref #:make-update-result)
   (:import-from :elmtui.utils #:ensure-keyword)
   (:export
@@ -14,6 +14,8 @@
    ;; Update Macro and its local functions
    #:with-update-patch #:add-patch #:add-command #:get-property
    ;; Note: elmtui.state:update-result is the return type for update methods
+   #:id ; Export the new generic function
+   #:make-update-result
    ))
 (in-package :elmtui.ui.api)
 ;;; ===================================================================
@@ -27,6 +29,12 @@
   ((id :initarg :id :accessor component-id :type list ; Path list
        :documentation "A unique identifier for the component instance. This ID is crucial for namespacing its state within the global app-state."))
   (:documentation "Base class for UI components. Instances primarily serve as typed holders of an ID. All behavioral state is in app-state."))
+
+(declaim (ftype (function (component) t) id))
+(defgeneric id (object)
+  (:documentation "Returns the ID of a component or UI node.")
+  (:method ((component component))
+    (component-id component)))
 
 ;; (declaim (ftype (function (component &key (:id-path list) (:dsl list) &allow-other-keys) list) init))
 ;;; ===================================================================
@@ -148,7 +156,7 @@
 ;;;---------------------------------------------------------------
 ;;; Component Lifecycle & Behavior Generics
 ;;;---------------------------------------------------------------
-(declaim (ftype (function (component &key (:id-path list) (:dsl list) &allow-other-keys) (values component list list)) init))
+;; (declaim (ftype (function (component &key (:id-path list) (:dsl list) &allow-other-keys) (values component list list)) init))
 (defgeneric init (component &key id-path dsl &allow-other-keys)
   (:documentation "Initializes a component instance after it has been created.
    This method is responsible for setting up the component's own behavioral state
@@ -173,12 +181,17 @@
       (error "Component ~A init called without :id-path." component))
     (check-type id-path list)
     (check-type dsl list)
+    (log-debug "Component ~A init called with id-path: ~A and dsl: ~A"
+               (component-id component) id-path dsl)
     (let* ((state-props (copy-list initargs))
            (local-remove-fn (lambda (plist key) (remf plist key) plist)))
       ;; Ensure keys are keywords for remf
+      (format t "~&Component ~A init with id-path: ~A and dsl: ~A~%"
+              (component-id component) id-path dsl)
       (funcall local-remove-fn state-props :id)
       (funcall local-remove-fn state-props :id-path)
       (funcall local-remove-fn state-props :allow-other-keys)
+      (log-info "State properties after cleanup: ~A~%" state-props)
 
       (let* ((component-base-path (component-state-map-path id-path))
              (patches (list (make-state-patch
@@ -192,7 +205,7 @@
                        patches))
         (values component (nreverse patches) nil)))))
 
-(declaim (ftype (function (component &key (:id-path list)) (values list list)) destroy))
+;; (declaim (ftype (function (component &key (:id-path list)) (values list list)) destroy))
 (defgeneric destroy (component &key id-path)
   (:documentation "Prepares patches and commands to remove a component and its children from the app-state.
    Returns (values patches commands).")
@@ -208,7 +221,7 @@
                     (make-state-patch state-map-path :elmtui-delete-path))
               nil))))
 
-(declaim (ftype (function (component t t &key (:id-path list)) elmtui.state.api:update-result) update))
+;; (declaim (ftype (function (component t t &key (:id-path list)) elmtui.state.api:update-result) update))
 (defgeneric update (component msg app-state &key id-path)
   (:documentation "Processes a message for a component instance. Returns an `update-result` struct.")
   (:method ((component component) msg app-state &key id-path)
@@ -221,7 +234,7 @@
     (make-update-result)))
 
 
-(declaim (ftype (function (component t &key (:id-path list)) list) view))
+;; (declaim (ftype (function (component t &key (:id-path list)) list) view))
 (defgeneric view (component app-state &key id-path)
   (:documentation "Generates a view representation (DSL spec) for a component instance.")
   (:method ((component component) app-state &key id-path)
@@ -233,7 +246,7 @@
     (list (component-type component) :id (id-from-path id-path))))
 
 
-(declaim (ftype (function (component t t &key (:id-path list)) t) resolve-component-node))
+;; (declaim (ftype (function (component t t &key (:id-path list)) t) resolve-component-node))
 (defgeneric resolve-component-node (component app-state style-context &key id-path)
   (:documentation "Resolves a component into a concrete UI node for layout and rendering.")
   (:method ((component component) app-state style-context &key id-path)
@@ -245,7 +258,7 @@
     (view component app-state :id-path id-path)))
 
 
-(declaim (ftype (function (component t &key (:id-path list)) t) component-children))
+;; (declaim (ftype (function (component t &key (:id-path list)) t) component-children))
 (defgeneric component-children (component app-state &key id-path)
   (:documentation "Returns a list of child component *IDs* or *instances*.
    Reads from the :children key in the component's state map in app-state,
@@ -258,7 +271,7 @@
     (check-type id-path list)
     (get-path app-state (append (component-state-map-path id-path) '(:children)))))
 
-(declaim (ftype (function (component t &key (:id-path list)) t) component-width))
+;; (declaim (ftype (function (component t &key (:id-path list)) t) component-width))
 (defgeneric component-width (component app-state &key id-path)
   (:documentation "Returns the width of the component.
    Reads from the :width key in the component's state map in app-state,
@@ -271,7 +284,7 @@
     (check-type id-path list)
     (get-path app-state (append (component-state-map-path id-path) '(:width)))))
 
-(declaim (ftype (function (component t &key (:id-path list)) t) component-height))
+;; (declaim (ftype (function (component t &key (:id-path list)) t) component-height))
 (defgeneric component-height (component app-state &key id-path)
   (:documentation "Returns the height of the component.
    Reads from the :height key in the component's state map in app-state,
@@ -292,11 +305,33 @@
 (defun get-path (state full-path &optional default-value)
   "Retrieves a value from the state at the specified FULL-PATH.
    If the path does not exist, returns DEFAULT-VALUE (nil if not provided).
-   This is a wrapper around elmtui.state.api:state-ref."
+   Handles both application-state objects and raw data structures."
   (declare (type t state default-value) ; state can be any app-state type
            (type list full-path))
   (check-type full-path list)
-  (elmtui.state.api:state-ref state full-path default-value))
+  (cond
+    ;; If state is an application-state object, get its raw data first
+    ((typep state 'elmtui.state.api:application-state)
+     (let ((raw-data (elmtui.state.api:get-state state (first full-path))))
+       (if (and raw-data (rest full-path))
+           (elmtui.state::get-path raw-data (rest full-path) default-value)
+           (or raw-data default-value))))
+    ;; If state has a components-store slot (test case)
+    ((and (typep state 'standard-object)
+          (slot-exists-p state 'components-store))
+     ;; Handle test-app-state structure
+     (case (first full-path)
+       (:components
+        (let ((components (slot-value state 'components-store)))
+          (if (rest full-path)
+              (elmtui.state::get-path components (rest full-path) default-value)
+              (or components default-value))))
+       (t (elmtui.state.api:state-ref state (first full-path) default-value))))
+    ;; If state is raw data (list/plist), use the raw get-path function
+    ((listp state)
+     (elmtui.state::get-path state full-path default-value))
+    ;; Fallback
+    (t default-value)))
 
 (declaim (ftype (function (list) (or keyword symbol)) id-from-path))
 (defun id-from-path (path)

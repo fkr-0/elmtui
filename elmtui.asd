@@ -15,7 +15,6 @@
   :components ((:file "utils")
                (:file "core/logging")
                (:file "core/globals")
-               (:file "core/conditions")
                (:module "cleve-elm"
                 :pathname "clevelib/"
                 :serial t
@@ -41,28 +40,28 @@
                (:file "state/msg")
                (:file "view/position") ; Load position before focus manager
                (:file "view/api") ; Imports: cl (pure declarations)
+
+               (:file "core/conditions")
                ;; Load state module early since focus manager needs it
-               (:file "state/statelib/state")
-               (:file "state/api")
                (:module "state"
                 :pathname "state/"
                 :serial t
-                :components (
+                :components ((:file "api")
                              (:module "state-lib"
                               :serial t
                               :pathname "statelib/"
                               :components (
+                                           (:file "state")
                                            (:file "observe")
                                            (:file "transaction")
                                            (:file "package")))
 
                              (:file "state")
                              (:file "model")
-                                        ; Added transactions.lisp
+                             (:file "transactions") ; Added transactions.lisp
                              (:file "elm")
                              (:file "update")
-
-                             (:file "transactions"))) ; Moved here - loads after state implementation
+                             )) ; Moved here - loads after state implementation
                (:module "core"
                 :pathname "./core/"
                 :serial t
@@ -139,6 +138,7 @@
                ;; Load selector implementations (depends on view/styled)
 
                ;; Load UI Components (depend on view/core, view/styled, view/style-lib)
+               (:file "contracts")
                (:module "ui"
                 :serial t
                 :pathname "ui/"
@@ -174,6 +174,7 @@
                (:file "view/dsl")
                (:file "view/flex")
                (:file "view/layout") ; Load layout before grid
+               (:file "view/tree-transforms")
                (:file "view/grid")   ; Grid depends on layout now
                (:file "view/grid-layout") ; Load layout before grid
                (:file "view/reactive") ; Reactive view system
@@ -195,87 +196,40 @@
                              ;; Platform API Definition is loaded earlier in the "API LAYER" block
                              (:file "backend/common/ansi-styling")
                              (:file "backend/common/virtual-buffer")
-                             ;; (:file "canvas" :depends-on ("api"
-                             ;;                              "backend/common/virtual-buffer"))
                              (:file "backend/common/utils")
                              (:file "backend/terminal/terminal")
-                             (:file "backend/terminal/diff-renderer") ;;; depends-on ("src/platform/backend/common/virtual-buffer"
-                             ;;             "src/platform/backend/common/ansi-styling"
-                             ;;             "src/platform/api")) ; Added dependency
-
-                             (:file "tree-renderer" :depends-on (
-                                                                 "backend/common/ansi-styling"))
-
-                             (:file "input") ;; :depends-on ("src/platform/api"
-                             (:file "driver" ;; :depends-on ("src/platform/api"
-                                    ;;              "src/platform/canvas"
-                                    ;;              "src/platform/tree-renderer"
-                                    ;;              "src/platform/backend/terminal/diff-renderer" ; Added dependency
-                                    ;;              "src/core/loop"
-                                    ;;              "src/core/async"
-                                    ;;              "src/core/focus"
-                                    ;;              "src/core/keymap"
-                                    ;;              "src/view/styled"
-                                    ;;              "src/view/layout"
-                                    ;;              "src/ui/widgets/root-viewport")
-                                    )
+                             (:file "backend/terminal/diff-renderer")
+                             (:file "tree-renderer" :depends-on ("backend/common/ansi-styling"))
+                             (:file "input")
                              ;; Backend Implementations
                              (:module "backend"
                               :pathname "backend/"
                               :serial t
                               :components (
-                                           ;; Common utilities for backends
-                                           ;; (:module "common"
-                                           ;;  :serial t
-                                           ;;  :pathname "common/"
-                                           ;;  :components ((:file "utils")
-                                           ;;               (:file "ansi-styling")
-                                           ;;               ))
-                                           ;; Fake Terminal Backend
                                            (:module "faketerm"
                                             :pathname "faketerm/"
                                             :components ((:file "faketerm")))
-                                           ;; Standard Terminal Backend
                                            (:module "terminal"
                                             :pathname "terminal/"
                                             :serial t
                                             :components ((:file "terminal")
                                                          (:file "diff-renderer")))
-                                           ;; URxvt Backend
                                            (:module "urxvt"
                                             :pathname "urxvt/"
-                                            :components ((:file "urxvt")))
-                                           ))
-
-                             ;; Original driver/input/output
-
-                             ;; (:file "driver")
-                             ))
+                                            :components ((:file "urxvt")))))))
 
                ;; Files loaded after modules
+               (:file "pipeline")
+               (:file "platform/driver")
                (:file "runtime")
 
                ;; Development Utilities
-               ;; (:module "dev"
-               ;;   :serial t
-               ;;   :pathname "dev/"
-               ;;   :components (
-               ;;                 (:file "dev")))
                (:module "examples"
                 :serial t
                 :pathname "../examples/"
                 :components (
-                             ;; (:file "keymap-app")
                              (:file "rainbow-app")
-                             (:file "rainbow-app-canvas")
-                             ;; (:file "boxes-app")
-                             ;; (:file "dirli")
-                             ;; (:file "colortext-app")
-                             ))
-               ;; (:module "dirlister"
-               ;;  :serial t
-               ;;  :pathname "../examples/dirlister_poc/"
-               ;;  :components ((:file "dirlister_poc")))
+                             (:file "rainbow-app-canvas")))
                (:file "../dev-setup")
                (:file "elmtui"))
   ;; Build a binary:
@@ -301,20 +255,20 @@
                  )))
   :description "Examples for elmtui.")
 
-(asdf:defsystem "elmtui/tests"
-  :author "User <user@archlinux>"
-  :license "GNU GPL, version 3"
-  :depends-on (:elmtui :fiveam :alexandria)
-  :components ((:module "tests"
-                :serial t ; Ensure tests run in a defined order if necessary, or remove if not.
-                :components
-                ((:file "elmtui-tests")
-                 (:file "application-init-tests")
-                 (:file "component-init-tests")
-                 ;; (:file "flex-layout-tests")
-                 ;; (:file "grid-layout-engine-tests")
-                 ;; (:file "tree-renderer-tests") ; Added tree-renderer tests
-                 ;; Add other test files here
-                 )))
-  :description "Test suite for elmtui."
-  :perform (test-op (op c) (symbol-call :fiveam :run! c)))
+;; (asdf:defsystem "elmtui/tests"
+;;   :author "User <user@archlinux>"
+;;   :license "GNU GPL, version 3"
+;;   :depends-on (:elmtui :fiveam :alexandria)
+;;   :components ((:module "tests"
+;;                 :serial t ; Ensure tests run in a defined order if necessary, or remove if not.
+;;                 :components
+;;                 ((:file "elmtui-tests")
+;;                  (:file "application-init-tests")
+;;                  (:file "component-init-tests")
+;;                  ;; (:file "flex-layout-tests")
+;;                  ;; (:file "grid-layout-engine-tests")
+;;                  ;; (:file "tree-renderer-tests") ; Added tree-renderer tests
+;;                  ;; Add other test files here
+;;                  )))
+;;   :description "Test suite for elmtui."
+;;   :perform (test-op (op c) (symbol-call :fiveam :run! c)))

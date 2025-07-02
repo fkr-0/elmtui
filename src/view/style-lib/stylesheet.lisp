@@ -66,8 +66,8 @@
         (let ((selector (rule-selector r)))
           (when (cond
                   ((keywordp selector) ; Type selector (e.g., :button)
-                   (and (typep stylable 'elmtui.view.core:ui-node) ; Ensure stylable is a node
-                        (eq selector (elmtui.view.core:ui-node-type stylable))))
+                   (and (typep stylable 'elmtui.view.api:ui-node) ; Ensure stylable is a node
+                        (eq selector (elmtui.view.api:ui-node-type stylable))))
                   ((stringp selector) ; Raw string selector - workaround
                    (log:warn "QUERY-STYLESHEET: Encountered raw string selector \"~A\" in rule. Treating as class selector. Rule: ~S" selector r)
                    (selects (elmtui.style-lib.selector:cls> selector) stylable))

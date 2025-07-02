@@ -392,7 +392,7 @@
     ;; Second pass: Place items according to their grid properties
     (loop for child in children
           for props = (if (elmtui.view.core:ui-node-p child)
-                          (elmtui.view.core:ui-node-props child)
+                          (elmtui.view.api:ui-node-props child)
                           (when (typep child 'hash-table) ; Fallback for other possible formats
                             (gethash :props child)))
           for grid-area = (getf props :grid-area)

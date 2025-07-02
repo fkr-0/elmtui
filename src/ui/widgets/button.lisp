@@ -16,7 +16,6 @@
 ;;   "lurch")
 ;; Define component with its state properties
 (defcomponent button ()
-  () ;; No direct CLOS slots
   (:state
    (label "Button" :type string :documentation "The text displayed on the button."
                    :initarg :label :accessor button-label)
@@ -29,7 +28,7 @@
   (:on-unhandled-message :log)
 
   (:init (props self-id-path)
-         (declare (ignore self-id-path))
+         ;; (declare (ignore self-id-path))
          ;; :initargs :label, :on-click-msg, :disabled (if provided to make-instance)
          ;; are handled by defcomponent's default initarg processing.
          ;; This inline :init can still override or supplement.

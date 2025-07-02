@@ -4,8 +4,9 @@
   ;; UI Utilities
   (:export :ensure-list
    :ensure-keyword
-           :hex-str-to-rgb
-           ))
+           :coerce-fn
+   :hex-str-to-rgb
+   ))
 
 
 (in-package :elmtui.utils)
@@ -37,3 +38,12 @@ Useful for ensuring path segments are keywords."
           (g (parse-integer (subseq hex-str 3 5) :radix 16))
           (b (parse-integer (subseq hex-str 5 7) :radix 16)))
       (list r g b))))
+(defun coerce-fn (v)
+  "Coerce V to a symbol or lambda form."
+  (cond ((symbolp v) `',v) ; Quote symbol for later evaluation
+        ((and (consp v) (eq (car v) 'lambda)) `',v) ; Quote lambda form to store as cons
+        ;; ((null v)
+        ;;  (if err-on-nil
+        ;;      (error "DEFAPPLICATION: :subscriptions-fn cannot be NIL")
+        ;;      ''(lambda (model) (declare (ignore model)) nil)))
+        ))

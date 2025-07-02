@@ -3,16 +3,16 @@
 
 (uiop:define-package :elmtui.tests
   (:use :cl :fiveam)
-  (:export #:run-tests #:elmtui-test-suite #:run-all-tests))
+  (:export #:run-tests #:elmtui-test #:run-all-elmtui-tests))
 
 (in-package :elmtui.tests)
 
 ;; Define the main test suite
-(def-suite elmtui-test-suite
+(def-suite elmtui-test
   :description "Main test suite for elmtui TUI framework")
 
 ;; Set this as the default test suite
-(in-suite elmtui-test-suite)
+(in-suite elmtui-test)
 
 ;; Basic smoke test to ensure the package loads
 (test package-loads
@@ -25,9 +25,9 @@
   (run! 'elmtui-test-suite))
 
 ;; Also provide this function for ASDF integration
-(defun run-all-tests ()
+(defun run-all-elmtui-tests ()
   "Run all elmtui tests (alias for run-tests)"
-  (run-tests))
+  (fiveam:run-all-tests))
 ;;   (let ((msg-no-args (make-message 'schema-validation-msg '(:noargsvariant)))
 ;;         (msg-typed-args (make-message 'schema-validation-msg '(:typedargvariant :count 123 :label "hello")))
 ;;         (msg-optional-args (make-message 'schema-validation-msg '(:optionalargvariant :id "test-id" :activep nil)))

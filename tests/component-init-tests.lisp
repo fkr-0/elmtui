@@ -3,13 +3,30 @@
 
 (uiop:define-package :elmtui.tests.component-init
   (:use :cl :fiveam)
+  (:import-from :elmtui.app
+                #:defapplication)
   (:import-from :elmtui.ui.api
                 #:component)
+  (:import-from :elmtui.ui.defcomponent
+                #:defcomponent
+                #:defcomponent-slots)
+  (:import-from :elmtui.state.api
+                #:make-update-result
+                #:state-ref)
+  (:import-from :elmtui.ui.api
+                #:id-from-path
+                #:component-id)
+  (:import-from :elmtui.ui.widgets.viewport #:viewport-rect)
+  (:import-from :elmtui.ui.widgets.viewport #:viewport)
+  (:import-from :elmtui.ui.widgets.layout #:layout)
+  (:import-from :elmtui.ui.widgets.label #:label)
   (:export #:component-init-tests))
 
 (in-package :elmtui.tests.component-init)
 
 (def-suite component-init-tests
+
+  :in elmtui.tests:elmtui-test
   :description "Basic tests for component initialization")
 
 (in-suite component-init-tests)
@@ -18,14 +35,11 @@
 (test component-class-exists
   "Test that component class exists"
   (is (find-class 'component nil)))
-  (:import-from :elmtui.ui.widgets.viewport #:viewport-component)
-  )
 
-(in-package :elmtui.tests.component-init)
 
-(def-suite component-init-tests
-  :description "Tests for component initialization using defcomponent and the new API.")
-(in-suite component-init-tests)
+;; (def-suite component-init-tests
+;;   :description "Tests for component initialization using defcomponent and the new API.")
+;; (in-suite component-init-tests)
 
 ;;;------------------------------------------------------------------------------------
 ;;; Test Application and State Setup
@@ -37,9 +51,9 @@
 
 (defun my-app-update (state msg) ; Changed from &key id-path to standard update signature
   "Default update function for the test application."
-  (declare (ignore msg))
+  (declare (ignore msg state))
   ;; For testing, we just return the state unchanged and no commands
-  (make-update-result))
+  (elmtui.state.api:make-update-result))
 
 (defun my-app-view (state) ; Changed from &key id-path
   "Default view function for the test application."
@@ -72,6 +86,12 @@
     ;; Add other top-level state keys if your test-app-state has them
     (t (getf (list) key default)))) ; Simplified: assume other keys might be in a different part of state or handled by get-path
 
+(defmethod elmtui.state.api:get-state ((s test-app-state) key)
+  (case key
+    (:components (components-store s))
+    ;; Add other top-level state keys if your test-app-state has them
+    (t nil)))
+
 ;; Helper to get component state from the app's component store (which is a plist in test-app-state)
 (defun get-component-state (app-state-instance component-id)
   (getf (components-store app-state-instance) component-id))
@@ -92,16 +112,23 @@
 ;;; Define some test components using defcomponent
 ;;;------------------------------------------------------------------------------------
 
-(defcomponent test-simple-component ()
-    ((text :accessor test-simple-component-text :initform "Default Text")
-     (count :accessor test-simple-component-count :initform 0 :type integer)
-     )
-    )
+(defcomponent test-simple-component (elmtui.ui.api:component)
+  (:state
+   (type :test-simple-component)
+   (id nil)
+   (text "Default Text" :accessor test-simple-component-text :initarg :text)
+   (count 0 :accessor test-simple-component-count :initarg :count))
+  (:view (local-state-map app-state id-path)
+         (declare (ignore local-state-map app-state id-path))
+         `(:test-simple-component)))
 
-(defcomponent test-parent-component (layout-component) ; Inherits from layout
-    ((title :accessor test-parent-component-title :initform "Parent Title")
-     (child-components :accessor test-parent-component-children :initform nil)))
-
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defcomponent test-parent-component (elmtui.ui.widgets.layout:layout)
+    (:state
+     (title "Default Title" :initarg :title)
+     (child-ids nil)
+     (child-refs nil)
+     (child-components nil))))
 ;; Override init for test-parent-component to handle children
 (defmethod elmtui.ui.api:init ((component test-parent-component) &key id-path initial-title initial-child-specs &allow-other-keys)
   (let (;; (component-id (elmtui.ui.api:id-from-path id-path))
@@ -119,9 +146,7 @@
 
     (multiple-value-bind (self-instance self-patches self-commands)
         (call-next-method component :id-path id-path
-                                    :initial-title
-                                    (or initial-title
-                                        (slot-value component 'title))
+                                    :title initial-title
                                     ;; Other initargs for test-parent-component's own defcomponent-slots
                                     ;; are passed via &allow-other-keys and handled by defcomponent's generated init.
                                     )
@@ -154,14 +179,14 @@
     ;; Test with default initforms
     (multiple-value-bind (instance patches commands)
         (elmtui.ui.api:init comp-instance :id-path id-path)
-      (is eq comp-instance instance)
+      (is (eq comp-instance instance))
       (is-true patches)
       (is-false commands)
       (apply-patches app-state patches)
       (let ((state (get-component-state app-state comp-id)))
         (is (listp state))
-        (is eq :test-simple-component (getf state :type))
-        (is eq comp-id (getf state :id))
+        (is (eq :test-simple-component (getf state :type)))
+        (is (eq comp-id (getf state :id)))
         (is (string= "Default Text" (getf state :text)))
         (is (= 0 (getf state :count)))))
 
@@ -169,7 +194,7 @@
     (setf (components-store app-state) nil) ; Reset component store
     (multiple-value-bind (instance patches commands)
         (elmtui.ui.api:init comp-instance :id-path id-path :initial-text "Hello" :initial-count 42)
-      (is eq comp-instance instance)
+      (is (eq comp-instance instance))
       (apply-patches app-state patches)
       (let ((state (get-component-state app-state comp-id)))
         (is (listp state))
@@ -184,14 +209,14 @@
 
     (multiple-value-bind (instance patches commands)
         (elmtui.ui.api:init comp-instance :id-path id-path :initial-title "Test Parent")
-      (is eq comp-instance instance)
+      (is (eq comp-instance instance))
       (is-true patches)
       (is-false commands)
       (apply-patches app-state patches)
       (let ((state (get-component-state app-state comp-id)))
         (is (listp state))
-        (is eq :test-parent-component (getf state :type))
-        (is eq comp-id (getf state :id))
+        (is (eq :test-parent-component (getf state :type)))
+        (is (eq comp-id (getf state :id)))
         (is (string= "Test Parent" (getf state :title)))
         (is (null (getf state :child-components)))
         (is-false (getf state :child-ids))
@@ -211,7 +236,7 @@
         (elmtui.ui.api:init parent-instance :id-path id-path
                                             :initial-title "Parent With Children"
                                             :initial-child-specs child-specs)
-      (is eq parent-instance instance)
+      (is (eq parent-instance instance))
       (is-true patches)
       (is-false commands)
       (apply-patches app-state patches)
@@ -219,7 +244,7 @@
       ;; Check parent state
       (let ((parent-comp-state (get-component-state app-state parent-id)))
         (is (listp parent-comp-state))
-        (is eq :test-parent-component (getf parent-comp-state :type))
+        (is (eq :test-parent-component (getf parent-comp-state :type)))
         (is (string= "Parent With Children" (getf parent-comp-state :title)))
         (let ((child-ids (getf parent-comp-state :child-ids))
               (child-refs (getf parent-comp-state :child-refs)))
@@ -235,14 +260,14 @@
       ;; Check child1 state
       (let ((child1-state (get-component-state app-state child1-id)))
         (is (listp child1-state))
-        (is eq :test-simple-component (getf child1-state :type))
+        (is (eq :test-simple-component (getf child1-state :type)))
         (is (string= "Child One Text" (getf child1-state :text)))
         (is (= 0 (getf child1-state :count)))) ; Default count
 
       ;; Check child2 state
       (let ((child2-state (get-component-state app-state child2-id)))
         (is (listp child2-state))
-        (is eq :test-simple-component (getf child2-state :type))
+        (is (eq :test-simple-component (getf child2-state :type)))
         (is (string= "Default Text" (getf child2-state :text))) ; Default text
         (is (= 99 (getf child2-state :count)))))))
 
@@ -263,9 +288,38 @@
 ;; (assuming it's defined with defcomponent or compatible)
 ;; For :initial-text to be handled by test-label-component's defcomponent-generated init,
 ;; it must also have a 'text' slot.
-(defcomponent test-label-component (label-component) ; Use label-component as superclass
-    ((text :accessor test-label-component-text :initform "Default Label Text") ; Added for testing initarg
-     (extra-info :accessor test-label-extra-info :initform "Extra!")))
+;; (defcomponent test-label-component ((label)) ; Use label-component as superclass
+;;   )
+;; (defmethod elmtui.ui.api:init ((component test-label-component) &key id-path initial-title initial-child-specs &allow-other-keys)
+;;   )
+
+(defclass my-button (component)
+  ()  ;; No state slots!
+  (:documentation "Button component. State stored in app-state."))
+
+;; State stored at: (:components :my-button-id :text) in app-state
+(defmethod init ((component my-button) &key id-path initial-text &allow-other-keys)
+  (values component
+          ;; Patches: list of (path new-value) pairs
+          (list (elmtui.ui.api:make-state-patch `(:components ,(id-from-path id-path) :text)
+                                                (or initial-text "Click Me")))
+          nil)) ; No commands
+
+(defmethod update ((component my-button) app-state message &key id-path)
+  (case (car message)
+    (:set-text
+     (make-update-result
+      :patches (list (elmtui.ui.api:make-state-patch `(:components ,(id-from-path id-path) :text)
+                                                     (cdr message)))))
+    (t (make-update-result)))) ; No changes
+
+(defmethod view ((component my-button) app-state &key id-path)
+  ;; ✅ Returns PURE DSL DATA, not objects
+  (let ((text (elmtui.ui.api:get-component-property app-state id-path :text "Click Me")))
+    `(:button :id ,(id-from-path id-path) :text ,text)))
+(defcomponent test-label-component (label)
+  (:state
+   (extra-info nil)))
 
 (test init-label-component-via-defcomponent
   (let* ((app-state (make-instance 'test-app-state))
@@ -275,22 +329,20 @@
 
     (multiple-value-bind (instance patches commands)
         (elmtui.ui.api:init comp-instance :id-path id-path :initial-text "Hello Label" :initial-extra-info "Special Info")
-      (is eq comp-instance instance)
+      (is (eq comp-instance instance))
       (apply-patches app-state patches)
       (let ((state (get-component-state app-state comp-id)))
         (is (listp state))
-        (is eq :test-label-component (getf state :type))
+        (is (eq :test-label-component (getf state :type)))
         (is (string= "Hello Label" (getf state :text)))
         (is (string= "Special Info" (getf state :extra-info)))
         ))))
 
 ;; Ensure that :default-initargs in defcomponent's options are passed to defclass
 (defcomponent test-default-initargs-component ()
-    ((value :accessor test-default-initargs-value))
-    (:default-initargs :id :my-defaulted-id)) ; This is a class option for defclass
+  (:default-initargs :id :my-defaulted-id))  ; This is a class option for defclass
 
 (test defcomponent-default-initargs-passed-to-defclass
   (let ((instance (make-instance 'test-default-initargs-component)))
     ;; This tests that the :id slot in the base 'component' class was set via :default-initargs
-    (is eq :my-defaulted-id (elmtui.ui.api:component-id instance))))
-
+    (is (eq :my-defaulted-id (elmtui.ui.api:component-id instance)))))

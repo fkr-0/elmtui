@@ -355,7 +355,8 @@ Buffered channels have a capacity.  CLOSED is t if the channel is closed,"
              (channel-name channel) value (channel-queue channel) (cleve-elm.queue:counter (channel-queue channel)))
   (bt:with-lock-held ((channel-lock-s channel))
     (when (channel-closed channel)
-      (log-error :channel.send "Channel ~A is closed. Cannot send value ~S." (channel-name channel) value)
+      (log-error :channel.send "Channel ~A is closed. Cannot send value ~S. Stack:~%~A"
+                 (channel-name channel) value (with-output-to-string (s) (uiop:print-backtrace :stream s)))
       (error "Channel is closed."))
     (let ((nw (no-wait channel :send t)))
       (cleve-elm.queue:enqueue (channel-queue channel) value)
@@ -375,6 +376,8 @@ Buffered channels have a capacity.  CLOSED is t if the channel is closed,"
   "Receive a value from the channel.  If the channel is closed, an error is signaled."
   (bt:with-lock-held ((channel-lock-r channel))
     (when (channel-closed channel)
+      (log-error :channel.receive "Channel ~A is closed. Attempted receive. Stack:~%~A"
+                 (channel-name channel) (with-output-to-string (s) (uiop:print-backtrace :stream s)))
       (error "Channel is closed."))
                                         ;format t "broadcasting receive condition~%")
                                         ;format t "waiting on queue blockread~%")

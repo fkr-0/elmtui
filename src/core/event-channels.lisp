@@ -18,6 +18,8 @@
    #:channel-of #:name #:priority #:filters #:handlers
    ;; constructors / helpers
    #:make-event-channel #:standard-event-channels #:wait-for-event
+   #:make-keyboard-channel #:make-mouse-channel #:make-system-channel
+   #:make-ui-channel #:make-command-channel #:make-focus-channel #:make-message-channel
    #:add-event-filter #:remove-event-filter
    #:register-event-handler #:unregister-event-handler
    #:send-event #:receive-event #:try-receive-event

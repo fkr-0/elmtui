@@ -3,6 +3,7 @@
   (:use :cl :elmtui.style-lib.util :elmtui.style-lib.types :elmtui.style-lib.api :elmtui.view.core)
   (:import-from :elmtui.style-lib.api
    :selector :selects :specificity :stylable)
+  (:import-from :elmtui.view.api :ui-node-type )
   (:export
    ;; selector classes
    :selector :type-selector :class-selector :id-selector

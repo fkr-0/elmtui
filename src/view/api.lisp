@@ -12,7 +12,7 @@
 ;;; and specialise the generics on their own subclasses.
 ;;; -----------------------------------------------------------------------
 
-(defpackage #:elmtui.view.api
+(uiop:define-package #:elmtui.view.api
   (:use #:cl)
   (:export
    ;; Transformation generics
@@ -25,17 +25,26 @@
    #:diff-buffer
    #:apply-diff
    #:stylable-id
+   #:ui-node-type
+   #:ui-node-props
+   #:ui-node-children
    ;; Abstract node classes
    #:ui-node
    #:styled-ui-node
    #:atomic-ui-node
+   #:ui-node-p
    #:laid-out-ui-node))
 
 (in-package #:elmtui.view.api)
+
+(defgeneric ui-node-p (object)
+  (:method ((object t))
+    (typep object 'ui-node))
+  (:documentation
+   "Predicate to check if OBJECT is a UI-NODE instance."))
 ;;; ===================================================================
 ;;; INTERFACE SECTION - Public API declarations
 ;;; ===================================================================
-
 ;; Removed FTYPE declarations to avoid clobbering warnings - generic functions provide the interface
 
 ;;; -----------------------------------------------------------------------
@@ -124,24 +133,23 @@ RICH-TREE  – Tree produced by RENDER-VIEW.
 RESULT     – Tree of STYLED-UI-NODE objects whose STYLE-MAP slot is *complete*.
 Must not change tree topology."))
 
-(defgeneric resolve-view (styled-tree)
-  (:method ((styled-tree list))
-    (error "RESOLVE-VIEW not implemented for ~S" (type-of styled-tree)))
-  (:documentation
-   "Lower complex widgets to a minimal atomic vocabulary.
+;; (defgeneric resolve-view (styled-tree app-state)
+;;   (:documentation
+;;    "Lower complex widgets to a minimal atomic vocabulary.
 
-STYLED-TREE – Output of APPLY-STYLE.
-RESULT       – Tree of ATOMIC-UI-NODE objects (:drawable-content, :layout, …)."))
+;; STYLED-TREE – Output of APPLY-STYLE.
+;; RESULT       – Tree of ATOMIC-UI-NODE objects (:drawable-content, :layout, …)."))
 
-(defgeneric layout-view (atomic-tree available-rect)
-  (:method ((atomic-tree list) (available-rect list))
-    (error "LAYOUT-VIEW not implemented for ~S and ~S" (type-of atomic-tree) (type-of available-rect)))
-  (:documentation
-   "Compute absolute geometry for every node.
+;; (defgeneric layout-view (atomic-tree available-rect stylesheet)
+;;   (:method ((atomic-tree list) (available-rect list) (stylesheet t))
+;;     (error "LAYOUT-VIEW not implemented for ~S, ~S and ~S" (type-of atomic-tree) (type-of available-rect) (type-of stylesheet)))
+;;   (:documentation
+;;    "Compute absolute geometry for every node.
 
-ATOMIC-TREE     – Result of RESOLVE-VIEW.
-AVAILABLE-RECT  – Rect structure (x y w h) representing constraints.
-RESULT          – Tree of LAID-OUT-UI-NODE objects with LAYOUT-RECT populated."))
+;; ATOMIC-TREE     – Result of RESOLVE-VIEW.
+;; AVAILABLE-RECT  – Rect structure (x y w h) representing constraints.
+;; STYLESHEET      – The stylesheet to use for layout calculations.
+;; RESULT          – Tree of LAID-OUT-UI-NODE objects with LAYOUT-RECT populated."))
 
 (defgeneric render-to-buffer (laid-out-tree backbuffer)
   (:method ((laid-out-tree list) (backbuffer t))
@@ -227,8 +235,27 @@ These nodes may still be declarative/high-level."))
 ;; then explicit method definitions here might only be needed for customization.
 (defgeneric stylable-id (node)
   (:documentation "Return the ID of the styled node."))
-                                        ; Or fallback to (getf (ui-node-props node) :id) if that's desired policy
 
+(defmethod stylable-id ((node styled-ui-node))
+  (and (slot-boundp node 'props)
+       (getf (slot-value node 'props) :id))) ; Inherit ID from ui-node props
+
+(defmethod stylable-id ((node ui-node))
+  (error (format nil "stylable-id called on plain ui-node (~A%). Returning NIL." node)))
+
+(defmethod ui-node-p ((object styled-ui-node))
+  t) ; Inherit from ui-node-p
+
+(defmethod ui-node-type ((node styled-ui-node))
+  (and (slot-boundp node 'type)
+       (slot-value node 'type))) ; Inherit type from ui-node
+                                        ;
+(defmethod ui-node-props ((node styled-ui-node))
+  (and (slot-boundp node 'props)
+       (slot-value node 'props))) ; Inherit props from ui-node
+(defmethod ui-node-children ((node styled-ui-node))
+  (and (slot-boundp node 'children)
+       (slot-value node 'children))) ; Inherit children from ui-node)
 (defmethod initialize-instance :after ((node styled-ui-node) &key)
   (check-type (styled-ui-node-style-map node) list)) ; Plists are lists
 

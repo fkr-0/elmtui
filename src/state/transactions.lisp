@@ -57,7 +57,7 @@
           name (transaction-record-id *current-transaction*)))
   (setf *current-transaction*
         (make-transaction-record :name name
-                                 :previous-state-data (copy-tree (elmtui.statelib.state:state-data-data app-state))))
+                                 :previous-state-data (copy-tree (elmtui.state.api:state-data-data app-state))))
   app-state) ; Return app-state as context
 
 (defun commit-transaction (app-state)
@@ -65,11 +65,11 @@
    Stores the transaction in history."
   (unless *current-transaction*
     (error "No active transaction to commit for app-state."))
-  (unless (eq (elmtui.statelib.state:state-data-data app-state)
+  (unless (eq (elmtui.state.api:state-data-data app-state)
               (transaction-record-previous-state-data *current-transaction*))
     ;; State has changed, finalize the record
     (setf (transaction-record-next-state-data *current-transaction*)
-          (copy-tree (elmtui.statelib.state:state-data-data app-state)))
+          (copy-tree (elmtui.state.api:state-data-data app-state)))
 
     (push *current-transaction* *transaction-history*)
     (setf *undone-history* nil) ; Clear redo stack on new commit
@@ -85,7 +85,7 @@
    Restores the state data from before the transaction started."
   (unless *current-transaction*
     (error "No active transaction to rollback for app-state."))
-  (setf (elmtui.statelib.state:state-data-data app-state)
+  (setf (elmtui.state.api:state-data-data app-state)
         (transaction-record-previous-state-data *current-transaction*))
   (let ((rolled-back-tx *current-transaction*))
     (setf *current-transaction* nil)
@@ -118,7 +118,7 @@
    Returns the undone transaction record or NIL if history is empty."
   (when *transaction-history*
     (let ((last-tx (pop *transaction-history*)))
-      (setf (elmtui.statelib.state:state-data-data app-state)
+      (setf (elmtui.state.api:state-data-data app-state)
             (transaction-record-previous-state-data last-tx))
       (push last-tx *undone-history*)
       last-tx)))
@@ -128,7 +128,7 @@
    Returns the redone transaction record or NIL if undone history is empty."
   (when *undone-history*
     (let ((tx-to-redo (pop *undone-history*)))
-      (setf (elmtui.statelib.state:state-data-data app-state)
+      (setf (elmtui.state.api:state-data-data app-state)
             (transaction-record-next-state-data tx-to-redo))
       (push tx-to-redo *transaction-history*)
       tx-to-redo)))

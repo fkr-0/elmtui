@@ -17,7 +17,7 @@
    :async-task-error :log-condition)
   ;; Import lower-level statelib components if they are not exposed via elmtui.state.api
   ;; but are needed for the implementation details within elmtui.state.
-  (:import-from :elmtui.statelib.state
+  (:import-from :elmtui.state.api
    ;; :application-state :make-application-state :state-ref :get-state :set-state ; Now from API
    :with-state :with-comp-state :state-if-unset-else ; Keep if specific to this level
                 :application-state-observers :application-state-lock

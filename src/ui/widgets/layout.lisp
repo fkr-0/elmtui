@@ -22,7 +22,6 @@
 (in-package :elmtui.ui.widgets.layout)
 
 (defcomponent layout ()
-  ()
   (:state
    (display :flex
             :type keyword
