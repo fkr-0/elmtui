@@ -1,0 +1,293 @@
+;;;; Comprehensive tests for the defcomponent macro
+;;;; Tests all aspects of defcomponent: state, init, update, view, accessors
+
+(uiop:define-package :elmtui.tests.defcomponent
+
+  (:use :cl :fiveam)
+  (:import-from :elmtui.ui.defcomponent #:defcomponent #:cclass-name)
+  (:import-from :elmtui.ui.api #:component #:component-id #:id-from-path #:init #:update #:view)
+  (:import-from :elmtui.state.api #:make-update-result #:get-path #:ur-patches #:ur-commands)
+  (:export #:defcomponent-tests))
+
+(in-package :elmtui.tests.defcomponent)
+
+(def-suite defcomponent-tests
+  :in elmtui.tests:elmtui-test
+  :description "Comprehensive tests for the defcomponent macro")
+
+(in-suite defcomponent-tests)
+
+;;; Test component definitions
+
+;; Simple component with state slots
+(defcomponent test-simple ()
+  (:state
+   (name "test" :type string :documentation "Component name")
+   (value 42 :type integer :documentation "Component value" :accessor simple-value)
+   (enabled t :type boolean :documentation "Component enabled state" :accessor simple-enabled)))
+
+;; Component with custom init
+(defcomponent test-with-init ()
+  (:state
+   (data nil :type list :documentation "Component data")
+   (initialized nil :type boolean :documentation "Init flag"))
+
+  (:init (props self-id-path)
+         (let ((initial-data (getf props :data '(1 2 3))))
+           (values `(:data ,initial-data :initialized t)
+                   nil))))
+
+;; Component with custom update
+(defcomponent test-with-update ()
+  (:state
+   (counter 0 :type integer :documentation "Counter value")
+   (messages nil :type list :documentation "Message history"))
+
+  (:update (msg local-state app-state id-path)
+           (:increment (amount)
+                       (let ((new-counter (+ (getf local-state :counter 0) amount)))
+                         (values `(:counter ,new-counter
+                                   :messages ,(cons msg (getf local-state :messages)))
+                                 nil)))
+           (:reset ()
+                   (values `(:counter 0 :messages ,(cons msg (getf local-state :messages)))
+                           nil))
+           (:otherwise (full-msg)
+                       (values `(:messages ,(cons full-msg (getf local-state :messages)))
+                               nil))))
+
+;; Component with custom view
+(defcomponent test-with-view ()
+  (:state
+   (label "View Test" :type string :documentation "Label text"))
+
+  (:view (local-state app-state id-path)
+         (let ((text (getf local-state :label "Default")))
+           `(:div :id ,(id-from-path id-path) :text ,text))))
+
+;; Component with all features
+(defcomponent test-complete ()
+  (:state
+   (name "complete" :type string :accessor complete-name)
+   (data nil :type list :accessor complete-data)
+   (active t :type boolean :accessor complete-active))
+
+  (:documentation "A complete test component")
+  (:on-unhandled-message :log)
+
+  (:init (props self-id-path)
+         (values `(:name ,(getf props :name "complete")
+                   :data ,(getf props :data '())
+                   :active t)
+                 nil))
+
+  (:update (msg local-state app-state id-path)
+           (:set-name (new-name)
+                      (values `(:name ,new-name) nil))
+           (:toggle-active ()
+                           (values `(:active ,(not (getf local-state :active))) nil)))
+
+  (:view (local-state app-state id-path)
+         `(:component :type :test-complete
+                      :id ,(id-from-path id-path)
+                      :name ,(getf local-state :name)
+                      :active ,(getf local-state :active))))
+
+;;; Tests
+
+(test defcomponent-class-creation
+  "Test that defcomponent creates proper CLOS classes"
+  (is (find-class 'test-simple nil))
+  (is (subtypep 'test-simple 'component))
+  (let ((instance (make-instance 'test-simple)))
+    (is (typep instance 'test-simple))
+    (is (typep instance 'component))))
+
+(test defcomponent-cclass-name
+  "Test that cclass-name method works correctly"
+  (let ((instance (make-instance 'test-simple)))
+    (is (eq :test-simple (cclass-name instance)))))
+
+(test defcomponent-default-init
+  "Test default init method generation"
+  (let* ((instance (make-instance 'test-simple))
+         (id-path '(:components :test1)))
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path)
+      (is (eq instance returned-instance))
+      (is (= 1 (length patches)))
+      (is (null commands))
+
+      (let* ((patch (first patches))
+             (path (first patch))
+             (state (second patch)))
+        (is (equal id-path path))
+        (is (eq :test-simple (getf state :type)))
+        (is (equal (id-from-path id-path) (getf state :id)))
+        (is (string= "test" (getf state :name)))
+        (is (= 42 (getf state :value)))
+        (is (eq t (getf state :enabled)))))))
+
+(test defcomponent-init-with-params
+  "Test default init with custom parameters"
+  (let* ((instance (make-instance 'test-simple))
+         (id-path '(:components :test2)))
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :initial-name "custom" :initial-value 100)
+      (is (eq instance returned-instance))
+      (is (= 1 (length patches)))
+
+      (let* ((patch (first patches))
+             (state (second patch)))
+        (is (string= "custom" (getf state :name)))
+        (is (= 100 (getf state :value)))
+        (is (eq t (getf state :enabled)))))))
+
+(test defcomponent-custom-init
+  "Test component with custom init method"
+  (let* ((instance (make-instance 'test-with-init))
+         (id-path '(:components :test3)))
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :data '(a b c))
+      (is (eq instance returned-instance))
+      (is (= 1 (length patches)))
+      (is (null commands))
+
+      (let* ((patch (first patches))
+             (state (second patch)))
+        (is (equal '(a b c) (getf state :data)))
+        (is (eq t (getf state :initialized)))))))
+
+(test defcomponent-default-update
+  "Test default update method (no-op)"
+  (let* ((instance (make-instance 'test-simple))
+         (mock-app-state '())
+         (message '(:some-message :data)))
+    (let ((result (update instance mock-app-state message :id-path '(:components :test))))
+      (is (typep result 'elmtui.state.api:update-result))
+      (is (null (elmtui.state.api:ur-patches result)))
+      (is (null (elmtui.state.api:ur-commands result))))))
+
+(test defcomponent-custom-update
+  "Test component with custom update method"
+  (let* ((instance (make-instance 'test-with-update))
+         (id-path '(:components :test))
+         ;; Create a simple mock app state with just the required component state
+         (mock-app-state `(:components (:test (:counter 5 :messages () :type :test-with-update :id :test)))))
+
+    ;; Test increment message
+    (let ((result (update instance mock-app-state '(:increment 3) :id-path id-path)))
+      (is (typep result 'elmtui.state.api:update-result))
+      (let ((patches (ur-patches result)))
+        (is (= 2 (length patches))) ; counter and messages patches
+        (is (= 8 (second (find-if (lambda (patch)
+                                    (equal '(:components :test :counter) (first patch)))
+                                  patches))))))
+
+    ;; Test reset message
+    (let ((result (update instance mock-app-state '(:reset) :id-path id-path)))
+      (is (typep result 'elmtui.state.api:update-result))
+      (let ((patches (ur-patches result)))
+        (is (= 2 (length patches)))
+        (is (= 0 (second (find-if (lambda (patch)
+                                    (equal '(:components :test :counter) (first patch)))
+                                  patches))))))
+
+    ;; Test unhandled message (otherwise clause)
+    (let ((result (update instance mock-app-state '(:unknown-message) :id-path id-path)))
+      (is (typep result 'elmtui.state.api:update-result))
+      (let ((patches (ur-patches result)))
+        (is (= 1 (length patches))) ; only messages patch
+        ))))
+
+(test defcomponent-default-view
+  "Test default view method"
+  (let* ((instance (make-instance 'test-simple))
+         (mock-app-state '())
+         (id-path '(:components :test)))
+    (let ((view-result (view instance mock-app-state :id-path id-path)))
+      (is (listp view-result))
+      (is (eq :test-simple (first view-result)))
+      (is (getf (cdr view-result) :id))
+      (is (getf (cdr view-result) :message)))))
+
+(test defcomponent-custom-view
+  "Test component with custom view method"
+  (let* ((instance (make-instance 'test-with-view))
+         (mock-app-state (list :components (list :test (list :label "Custom Label"))))
+         (id-path '(:components :test)))
+    (let ((view-result (view instance mock-app-state :id-path id-path)))
+      (is (listp view-result))
+      (is (eq :div (first view-result)))
+      (is (equal (id-from-path id-path) (getf (cdr view-result) :id)))
+      (is (string= "Custom Label" (getf (cdr view-result) :text))))))
+
+(test defcomponent-accessors
+  "Test generated accessor functions"
+  (let* ((mock-app-state (list :components (list :test (list :value 123 :enabled nil))))
+         (instance (make-instance 'test-simple)))
+    (setf (component-id instance) :test)
+
+    (is (= 123 (simple-value mock-app-state instance)))
+    (is (eq nil (simple-enabled mock-app-state instance)))))
+
+(test defcomponent-complete-component
+  "Test component with all features enabled"
+  (let* ((instance (make-instance 'test-complete))
+         (id-path '(:components :complete-test)))
+
+    ;; Test init
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :name "my-complete" :data '(x y z))
+      (is (eq instance returned-instance))
+      (is (= 1 (length patches)))
+
+      (let* ((patch (first patches))
+             (state (second patch)))
+        (is (string= "my-complete" (getf state :name)))
+        (is (equal '(x y z) (getf state :data)))
+        (is (eq t (getf state :active)))))
+
+    ;; Test update
+    (let* ((mock-app-state (list :components (list :complete-test (list :name "test" :active t))))
+           (result (update instance mock-app-state '(:set-name "updated") :id-path id-path)))
+      (is (typep result 'elmtui.state.api:update-result))
+      (let ((patches (ur-patches result)))
+        (is (= 1 (length patches)))
+        (is (string= "updated" (second (first patches))))))
+
+    ;; Test view
+    (let* ((mock-app-state (list :components (list :complete-test (list :name "view-test" :active nil))))
+           (view-result (view instance mock-app-state :id-path id-path)))
+      (is (eq :component (first view-result)))
+      (is (eq :test-complete (getf (cdr view-result) :type)))
+      (is (string= "view-test" (getf (cdr view-result) :name)))
+      (is (eq nil (getf (cdr view-result) :active))))
+
+    ;; Test accessors
+    (let ((mock-app-state (list :components (list :complete-test (list :name "accessor-test" :data '(1 2 3) :active t)))))
+      (setf (component-id instance) :complete-test)
+      (is (string= "accessor-test" (complete-name mock-app-state instance)))
+      (is (equal '(1 2 3) (complete-data mock-app-state instance)))
+      (is (eq t (complete-active mock-app-state instance))))))
+
+(test defcomponent-class-options
+  "Test that class options are passed through correctly"
+  (let ((class (find-class 'test-complete)))
+    (is (string= "A complete test component"
+                 (documentation class t)))))
+
+(test defcomponent-inheritance
+  "Test that component inheritance works properly"
+  (defcomponent test-child (test-simple)
+    (:state
+     (child-prop "child" :type string :documentation "Child property")))
+
+  (is (subtypep 'test-child 'test-simple))
+  (is (subtypep 'test-child 'component))
+
+  (let ((instance (make-instance 'test-child)))
+    (is (typep instance 'test-child))
+    (is (typep instance 'test-simple))
+    (is (typep instance 'component))
+    (is (eq :test-child (cclass-name instance)))))
