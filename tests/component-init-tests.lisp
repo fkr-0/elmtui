@@ -144,15 +144,18 @@
           (push (second init-values) child-patch-lists) ; (second init-values) is the list of patches from child
           (push child-instance child-instances))))
 
+    ;; First call the defcomponent-generated init for this component's slots
     (multiple-value-bind (self-instance self-patches self-commands)
-        (call-next-method component :id-path id-path
-                                    :title initial-title
-                                    ;; Other initargs for test-parent-component's own defcomponent-slots
-                                    ;; are passed via &allow-other-keys and handled by defcomponent's generated init.
-                                    )
-      ;; self-patches is a list containing one patch: (list path value-plist)
+        ;; Call the defcomponent-generated init by calling the next method after layout's init
+        ;; We need to bypass the layout's custom init and call the defcomponent one directly
+        (call-next-method component :id-path id-path)
+      
+      ;; Handle the title slot manually since the layout's init method interferes
       (let ((parent-patch (first self-patches))) ; parent-patch is (list path value-plist)
         (when parent-patch
+          ;; Set the title directly in the patch
+          (when initial-title
+            (setf (getf (second parent-patch) :title) initial-title))
           ;; Modify the value-plist part of the parent's patch
           (setf (getf (second parent-patch) :child-ids) (mapcar #'elmtui.ui.api:component-id child-instances))
           (setf (getf (second parent-patch) :child-refs) (reverse child-instances)))
@@ -183,7 +186,9 @@
       (is-true patches)
       (is-false commands)
       (apply-patches app-state patches)
-      (let ((state (get-component-state app-state comp-id)))
+      (let ((state (or (get-component-state app-state
+                                            comp-id))))
+        (format t "~&State after init: ~A~%" state)
         (is (listp state))
         (is (eq :test-simple-component (getf state :type)))
         (is (eq comp-id (getf state :id)))
@@ -199,7 +204,8 @@
       (let ((state (get-component-state app-state comp-id)))
         (is (listp state))
         (is (string= "Hello" (getf state :text)))
-        (is (= 42 (getf state :count)))))))
+        (is (= 42 (getf state :count))))))
+  )
 
 (test init-parent-component-no-children
   (let* ((app-state (make-instance 'test-app-state))

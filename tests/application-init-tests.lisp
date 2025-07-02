@@ -24,14 +24,14 @@
   (let ((config (elmtui.app:make-app-config :name 'test-app :message-queue (cleve-elm.core.event-channels:make-message-channel))))
     (is (eq 'test-app (app-config-name config)))))
 
-(elmtui.ui.defcomponent:defcomponent test-component ((elmtui.ui.api:component))
+(elmtui.ui.defcomponent:defcomponent test-component (elmtui.ui.api:component)
   (:state
    (state nil))
   (:view (local-state-map app-state id-path)
          (declare (ignore local-state-map app-state id-path))
          `(:test-component)))
 
-(elmtui.ui.defcomponent:defcomponent test-parent-component ((elmtui.ui.api:component))
+(elmtui.ui.defcomponent:defcomponent test-parent-component (elmtui.ui.api:component)
   (:state
    (state :parent-default)
    (children-ids nil))
@@ -75,8 +75,8 @@
   nil)
 
 (elmtui.app:defapplication test-init-app
-  :initial-state-plist `((:counter . 0)
-                   (:text . "hello"))
+  :initial-state-plist `(:counter 0
+                         :text "hello")
   :root-component-dsl `(:column
                         ((test-component :id :comp1 :initial-state "comp1 state"))
                         ((test-parent-component :id :parent1 :child-initial-state "child state")))
@@ -87,8 +87,8 @@
 
 (test basic-application-initialization
   (let ((app-state (initialize-app-state-test-init-app)))
-    (is (equal (getf (getf app-state :application) :counter) 0))
-    (is (equal (getf (getf app-state :application) :text) "hello"))
+    (is (= (getf (getf app-state :application) :counter) 0))
+    (is (string= (getf (getf app-state :application) :text) "hello"))
 
     (let ((comp1-map (getf (getf app-state :components) :comp1)))
       (is (not (null comp1-map)) "Component comp1 should be initialized.")

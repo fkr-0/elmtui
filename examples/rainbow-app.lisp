@@ -8,8 +8,11 @@
   (:use :cl :alexandria :log4cl)
   (:import-from :log4cl #:log-info #:log-debug)
   (:import-from :elmtui.app #:defapplication)
+  ;; MISSING: :elmtui.style-lib.rule package doesn't exist - need stylesheet system
   (:import-from :elmtui.style-lib.rule #:defrule)
+  ;; MISSING: :elmtui.style-lib.sheet package doesn't exist - need stylesheet system
   (:import-from :elmtui.style-lib.sheet #:defstylesheet)
+  ;; MISSING: :elmtui.core.event-types may need to be updated
   (:import-from :elmtui.core.event-types #:key-event)
   (:import-from :elmtui.state.api #:make-update-result)
   (:export
@@ -32,6 +35,8 @@
 
 (defun generate-stripe-rules-forms ()
   "Generates a list of (defrule ...) forms for stripes."
+  ;; MISSING: defrule macro doesn't exist - need stylesheet rule system
+  ;; MISSING: elmtui.style-lib.styles:rgb function doesn't exist - need color system
   (loop for (color-name class-name rgb) in *rainbow-colors-with-names*
         collect (defrule class-name
                   :bg-color (funcall #'elmtui.style-lib.styles:rgb rgb)
@@ -39,6 +44,7 @@
                   :height :fill)))
 
 ;; Define the stylesheet for the rainbow app
+;; MISSING: defstylesheet macro doesn't exist - need stylesheet system
 (defparameter rainbow-stylesheet
   (defstylesheet (generate-stripe-rules-forms)))
 
@@ -71,6 +77,11 @@
 (defun rainbow-content-view (app-state)
   "Defines the UI DSL for the rainbow app's content. The root viewport is set via :root-viewport-id in defapplication."
   (declare (ignore app-state))
+  ;; ISSUE: This DSL format may not match current framework expectations
+  ;; MISSING: :container component type may not exist - need layout components
+  ;; MISSING: :direction property may not be supported - check layout API
+  ;; MISSING: :classes property support for CSS-like styling
+  ;; MISSING: elmtui.style-lib.styles:rgb function doesn't exist
   `(:container
     :id :rainbow-main-container
     :direction :row
@@ -94,11 +105,28 @@
   :root-viewport-id :rainbow-root-vp
   :initial-state-plist (list :current-stylesheet rainbow-stylesheet
                              :should-quit nil)
+  ;; ISSUE: :root-component-dsl parameter may not exist in current defapplication API
   :root-component-dsl (rainbow-content-view nil) ; Directly use the DSL form
   :update-fn 'app-update
   :view-fn 'rainbow-content-view  ; Function that generates the content DSL
+  ;; ISSUE: :subscriptions-fn parameter may not exist in current defapplication API
   :subscriptions-fn
   rainbow-app-subscriptions)
 
 
+;; MISSING: Application runner function not provided
 ;; (initialize-app-state-rainbow-example-app)
+
+;;;--------------------------------------------------------------
+;;; FRAMEWORK COMPONENTS MISSING FOR THIS EXAMPLE:
+;;;--------------------------------------------------------------
+;; 1. :elmtui.style-lib.rule package with defrule macro
+;; 2. :elmtui.style-lib.sheet package with defstylesheet macro
+;; 3. :elmtui.style-lib.styles package with rgb function
+;; 4. CSS-like class system for styling (:classes property)
+;; 5. :container component type (may need to use layout component)
+;; 6. :direction property support for layout direction
+;; 7. Color system and RGB color support
+;; 8. Stylesheet application and integration system
+;; 9. Application runner function to actually start the app
+;; 10. :subscriptions-fn and :root-component-dsl parameters in defapplication
