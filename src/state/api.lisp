@@ -71,7 +71,11 @@ defining models and messages, and creating update functions, following Elm Archi
   ;; Define the public interface by exporting the imported symbols.
   (:export
    ;; Global application state instance
+   #:get-path-enhanced
 
+   #:app-state-p
+   #:resolve-path-in-hash
+   #:apply-patches-enhanced
 
 
    #:*app-state*
@@ -179,6 +183,11 @@ and commands to be executed."
   (patches nil :type list)
   (commands nil :type list))
 
+;; (defgeneric app-state-p (state))
+;; (defmethod app-state-p ((state t))
+;;   nil)
+;; (defmethod app-state-p ((state null))
+;;   nil)
 ;; Define a generic function with proper FTYPE
 (defgeneric ur-has-command-p (result command)
   (:documentation "Checks if the update result contains a specific command."))
@@ -345,3 +354,201 @@ and commands to be executed."
 (defgeneric undo-last-transaction (app-state)
   (:method ((app-state application-state))
     (error "No implementation for undo-last-transaction")))
+
+;;;--------------------------------------------------------------
+;;; Enhanced TEA State API Implementation
+;;;--------------------------------------------------------------
+
+;; Enhanced app-state structure for TEA compliance
+;; custom constructor: defstru
+;;
+(defstruct (app-state (:constructor *make-app-state))
+  "Enhanced application state structure for TEA architecture.
+Provides unified interface for both hash-table and plist operations."
+  (data (make-hash-table :test 'equal) :type hash-table)
+  (version 0 :type integer)
+  (metadata (list) :type list))
+
+;; Core state creation function
+(defun make-app-state (&key initial-plist)
+  "Creates a new application state with hash-table backing.
+Optionally initializes from INITIAL-PLIST."
+  (let ((state (*make-app-state)))
+    (when initial-plist
+      (setf state (merge-patches state (plist-to-patches initial-plist))))
+    state))
+
+;; Enhanced path resolution for app-state
+(defun get-path-enhanced (state path &optional default)
+  "Gets value at path from state. Works with app-state, hash-table, and plist inputs."
+  (declare (type (or app-state hash-table list application-state) state)
+           (type list path)
+           (type t default))
+  (cond
+    ;; Handle app-state struct
+    ((app-state-p state)
+     (resolve-path-in-hash (app-state-data state) path default))
+    ;; Handle application-state struct
+    ((application-state-p state)
+     (let ((data (application-state-data state)))
+       (if (state-data-p data)
+           (resolve-path-in-hash (state-data-data data) path default)
+           ;; (get-path data path default)
+           nil
+           )))
+    ;; Handle direct hash-table
+    ((hash-table-p state)
+     (resolve-path-in-hash state path default))
+    ;; Handle plist
+    ((listp state)
+     (get-path state path default))
+    ;; (t (error "Unsupported state type: ~S" (type-of state)))
+    ))
+
+;; Helper function for hash-table path resolution
+(defun resolve-path-in-hash (hash-table path &optional default)
+  "Resolves a path in nested hash-table structure."
+  (declare (type hash-table hash-table)
+           (type list path)
+           (type t default))
+  (if (null path)
+      hash-table
+      (let ((current (gethash (first path) hash-table default)))
+        (if (rest path)
+            (if (hash-table-p current)
+                (resolve-path-in-hash current (rest path) default)
+                default)
+            current))))
+
+;; Enhanced patch application
+(defun apply-patches-enhanced (state patches)
+  "Applies list of patches to state, returning new state.
+Handles app-state, application-state, hash-table, and plist inputs."
+  (declare (type (or app-state application-state hash-table list) state)
+           (type list patches))
+  (cond
+    ;; Handle app-state struct
+    ((app-state-p state)
+     (let ((new-state (copy-app-state state)))
+       (loop for patch in patches
+             do (destructuring-bind (path value) patch
+                  (set-path-in-hash (app-state-data new-state) path value)))
+       (incf (app-state-version new-state))
+       new-state))
+    ;; Handle application-state struct
+    ((application-state-p state)
+     (let ((data (application-state-data state)))
+       (if (state-data-p data)
+           (progn
+             (loop for patch in patches
+                   do (destructuring-bind (path value) patch
+                        (set-path-in-hash (state-data-data data) path value)))
+             state)
+           ;; (let ((new-data (merge-patches data patches)))
+           ;;   (setf (application-state-data state) new-data)
+           ;;   state)
+           )))
+    ;; Handle direct hash-table
+    ((hash-table-p state)
+     (let ((new-table (make-hash-table :test 'equal)))
+       ;; Copy existing data
+       (loop for key being the hash-keys of state
+             do (setf (gethash key new-table) (gethash key state)))
+       ;; Apply patches
+       (loop for patch in patches
+             do (destructuring-bind (path value) patch
+                  (set-path-in-hash new-table path value)))
+       new-table))
+    ;; Handle plist
+    ((listp state)
+     (merge-patches state patches))
+    ;; (t (error "Unsupported state type: ~S" (type-of state)))
+    ))
+
+;; Helper function for setting paths in hash-tables
+(defun set-path-in-hash (hash-table path value)
+  "Sets value at path in hash-table, creating intermediate tables as needed."
+  (declare (type hash-table hash-table)
+           (type list path)
+           (type t value))
+  (if (null (rest path))
+      (setf (gethash (first path) hash-table) value)
+      (let ((next (gethash (first path) hash-table)))
+        (unless (hash-table-p next)
+          (setf next (make-hash-table :test 'equal))
+          (setf (gethash (first path) hash-table) next))
+        (set-path-in-hash next (rest path) value)))
+  hash-table)
+
+;; Component state utilities
+(defun component-state-path (id-path &optional slot-key)
+  "Generates path for component state access."
+  (declare (type list id-path)
+           (type (or null keyword symbol) slot-key))
+  (if slot-key
+      (append (list :components) id-path (list slot-key))
+      (append (list :components) id-path)))
+
+(defun get-component-state (state component-id)
+  "Gets full component state from state."
+  (declare (type (or app-state application-state hash-table list) state)
+           (type (or keyword symbol) component-id))
+  (get-path-enhanced state (list :components component-id)))
+
+(defun get-component-property (state id-path property &optional default)
+  "Gets specific property from component state."
+  (declare (type (or app-state application-state hash-table list) state)
+           (type list id-path)
+           (type (or keyword symbol) property)
+           (type t default))
+  (get-path-enhanced state (component-state-path id-path property) default))
+
+;; Utility functions for backward compatibility
+(defun plist-to-patches (plist)
+  "Converts a plist to a list of patches."
+  (declare (type list plist))
+  (loop for (key value) on plist by #'cddr
+        collect (list (list key) value)))
+
+(defun plist-to-app-state (plist)
+  "Converts plist to app-state structure."
+  (declare (type list plist))
+  (make-app-state :initial-plist plist))
+
+(defun app-state-to-plist (app-state)
+  "Converts app-state to plist for compatibility."
+  (declare (type app-state app-state))
+  (let ((result nil))
+    (loop for key being the hash-keys of (app-state-data app-state)
+          do (setf result (append result (list key (gethash key (app-state-data app-state))))))
+    result))
+
+;; Implementation of GET-PATH generic
+(defmethod GET-PATH ((app-state application-state) path &optional comp-id)
+  "Get the value at PATH in the application state."
+  (declare (type list path)
+           (type (or null keyword symbol) comp-id))
+  (let ((full-path (if comp-id
+                       (append (list :components comp-id) path)
+                       path)))
+    (get-path-enhanced app-state full-path)))
+
+(defmethod GET-PATH ((app-state app-state) path &optional comp-id)
+  "Get the value at PATH in the enhanced app-state."
+  (declare (type list path)
+           (type (or null keyword symbol) comp-id))
+  (let ((full-path (if comp-id
+                       (append (list :components comp-id) path)
+                       path)))
+    (get-path-enhanced app-state full-path)))
+
+;; Implementation of MERGE-PATCHES generic
+(defmethod MERGE-PATCHES ((app-state application-state) patches)
+  "Merge PATCHES into the application state."
+  (declare (type list patches))
+  (apply-patches-enhanced app-state patches))
+
+(defmethod MERGE-PATCHES ((app-state app-state) patches)
+  "Merge PATCHES into the enhanced app-state."
+  (declare (type list patches))
+  (apply-patches-enhanced app-state patches))

@@ -146,6 +146,7 @@ Args:
 
 (defun process-initial-commands (cmds publish-fn app-spec)
   (declare (type list cmds) (type function publish-fn) (type list app-spec))
+  ;; TODO publish-fn?
   (when cmds
     (log:debug "DRIVER: Processing initial commands...")
     (let ((cmd-proc-fn (getf app-spec :command-processor-fn))
@@ -205,7 +206,8 @@ Args:
             (list :app-model current-model
                   :view-fn view-fn
                   :stylesheet (or stylesheet (make-instance 'elmtui.style-lib.api:stylesheet))
-                  :viewport-rect (make-instance 'elmtui.view.geo:rectangle :x 0 :y 0 :w viewport-width :h viewport-height)
+                  :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
+                                                 :size (make-size :w viewport-width :h viewport-height))
                   :front-buffer *previous-frame-buffer*
                   :backend backend-instance
                   :origin-x viewport-offset-x
@@ -223,7 +225,7 @@ Args:
 (defun app-loop (app-spec backend-instance)
   (declare (type list app-spec)
            (type t backend-instance))
-  (let* ((publish-fn (lambda (event) (publish event))) ; publish is from elmtui.core.loop
+  (let* ((publish-fn (lambda (event) (publish event))) ; TODO publish is from elmtui.core.loop
          (message-queue (getf app-spec :message-queue))
          (update-fn (getf app-spec :update-fn))
          (raw-subs-fn (getf app-spec :subscriptions-fn))
@@ -232,7 +234,7 @@ Args:
              ((functionp raw-subs-fn) raw-subs-fn)
              ((and (consp raw-subs-fn) (eq (car raw-subs-fn) 'lambda)) (eval raw-subs-fn))
              ((symbolp raw-subs-fn) (symbol-function raw-subs-fn))
-             (t (error "Invalid :subscriptions-fn"))))
+             (t (error "Invalid :subscriptions-fn")))) ;; TODO
          (cmd-proc-fn (getf app-spec :command-processor-fn))
          (app-name (getf app-spec :name))
          (app-cfg-for-cmd (gethash app-name elmtui.core.globals:*applications*)))
@@ -320,8 +322,8 @@ Args:
         *driver-initiated-shutdown-p* nil *previous-frame-buffer* nil
         *current-app-model* nil *root-viewport-id-path* nil
         elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t)
-
-  (let ((event-loop (start-loop)) ; Start the main event loop
+  (start-loop)
+  (let (;(event-loop ) ; Start the main event loop
         (initial-model nil)
         (initial-commands nil))
     (declare (type list initial-model initial-commands))

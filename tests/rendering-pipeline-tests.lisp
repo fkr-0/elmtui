@@ -19,12 +19,12 @@
 
 (defun setup-test-context (&optional (width 80) (height 24))
   "Helper to create a default context for pipeline tests."
-  (let ((app-state (elmtui.tests.application-init::initialize-app-state-test-init-app
+  (let ((app-state (elmtui.tests.application-init:initialize-app-state-test-init-app
                     :initial-terminal-dimensions (list width height)
                     :initial-cursor-position (list 0 0))))
     (list
      :app-model app-state
-     :view-fn #'rainbow-content-view
+     :view-fn (fdefinition 'elmtui.tests.application-init::test-init-app-view)
      :stylesheet rainbow-stylesheet
      :viewport-rect (make-rectangle :size (make-size :w width :h height) :pos (make-pos :x 0 :y 0) )
      :front-buffer (make-virtual-buffer width height)
@@ -49,7 +49,7 @@
     ;; Stage 0: Generate DSL
     (let ((ctx-after-dsl (generate-dsl context)))
       (is-true (listp (getf ctx-after-dsl :tree)) "generate-dsl should add a DSL list to the context tree.")
-      (is (eq :container (first (getf ctx-after-dsl :tree))) "The root of the DSL should be a :container.")
+      (is (eq :column (first (getf ctx-after-dsl :tree))) "The root of the DSL should be a :column.")
       (setf context ctx-after-dsl))
 
     ;; Stage 1: Render DSL to UI-Node

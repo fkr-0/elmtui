@@ -4,8 +4,10 @@
 ;;;===============================================================
 (uiop:define-package #:elmtui.view.dsl
   (:use #:cl)
+  (:import-from #:elmtui.view.styled #:make-styled-node)
   (:export #:render-dsl-to-resolved-tree
-           #:defcomponent-dsl))
+           #:defcomponent-dsl
+           #:dsl->ui-node))
 
 (in-package #:elmtui.view.dsl)
 
@@ -52,12 +54,48 @@
 
 ;;; --- DSL to UI-Node Conversion Utility ---
 (defun dsl->ui-node (dsl-spec app-state)
-  "Converts a DSL spec to a ui-node tree using render-dsl-to-resolved-tree.
-   Ensures the result is a ui-node, not a raw DSL/plist. Raises an error if not."
-  (let ((resolved (render-dsl-to-resolved-tree dsl-spec app-state)))
-    (unless (and resolved (not (listp (first resolved))))
-      (error "dsl->ui-node: Conversion did not produce a ui-node. Got: ~S" resolved))
-    resolved))
+  "Converts a DSL spec to a ui-node tree. Handles both component-based DSL and raw DSL.
+   For raw DSL (simple property lists), converts directly to styled-ui-node.
+   For component-based DSL, uses render-dsl-to-resolved-tree."
+  (if (and (listp dsl-spec)
+           (keywordp (first dsl-spec))
+           (not (getf (rest dsl-spec) :id))) ; Raw DSL doesn't require :id
+    ;; Handle raw DSL directly
+    (convert-raw-dsl-to-styled-node dsl-spec)
+    ;; Handle component-based DSL
+    (let ((resolved (render-dsl-to-resolved-tree dsl-spec app-state)))
+      (unless (and resolved (not (listp (first resolved))))
+        (error "dsl->ui-node: Conversion did not produce a ui-node. Got: ~S" resolved))
+      resolved)))
+
+(defun convert-raw-dsl-to-styled-node (dsl-spec)
+  "Converts raw DSL (property list format) directly to styled-ui-node.
+   Example: (:container :id :main :style (:bg-color red) :children (...))
+   -> styled-ui-node"
+  (unless (and (listp dsl-spec) (keywordp (first dsl-spec)))
+    (error "Invalid DSL spec: ~S" dsl-spec))
+  
+  (let* ((node-type (first dsl-spec))
+         (props (rest dsl-spec))
+         (id (getf props :id))
+         (style (getf props :style))
+         (classes (getf props :classes))
+         (children-specs (getf props :children))
+         (text (getf props :text)))
+    
+    ;; Convert children recursively
+    (let ((converted-children
+           (when children-specs
+             (mapcar #'convert-raw-dsl-to-styled-node children-specs))))
+      
+      ;; Create the styled node using the imported function
+      (make-styled-node
+       :type node-type
+       :props (append (when id (list :id id))
+                     (when classes (list :classes classes))
+                     (when text (list :text text))
+                     (when style (list :style style)))
+       :children converted-children))))
 ;; Example Usage (conceptual - actual components need to be defined and registered)
 ;; (defcomponent-dsl :my-box my-box-component)
 ;; (defcomponent-dsl :my-label my-label-component)
