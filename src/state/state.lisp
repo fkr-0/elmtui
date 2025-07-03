@@ -6,6 +6,7 @@
   (:use :cl )
   (:import-from :elmtui.state.api ; Import from the central API
    :application-state :make-application-state :state-ref :get-state :set-state
+
    #:application-state-data #:state-data #:state-data-data
    :with-transaction :undo-last-transaction
    :update-result :make-update-result :ur-patches :ur-commands
@@ -19,7 +20,9 @@
   ;; but are needed for the implementation details within elmtui.state.
   (:import-from :elmtui.state.api
    ;; :application-state :make-application-state :state-ref :get-state :set-state ; Now from API
-   :with-state :with-comp-state :state-if-unset-else ; Keep if specific to this level
+   #:app-state
+                :with-state :with-comp-state :state-if-unset-else ; Keep if specific to this level
+                #:app-state-p
                 :application-state-observers :application-state-lock
                 :application-state-transaction-log :application-state-transaction-history
                 :log-state-data)
@@ -65,21 +68,36 @@
 ;;; Path Utilities for Plists (Functional: return new plists on change)
 ;;; (defined here, exported via API)
 ;;;--------------------------------------------------------------
-(declaim (ftype (function (list list &optional t) t) get-path))
+;; (declaim (ftype (function ((or list hash-table application-state elmtui.state.api:app-state) list &optional t) t) get-path))
 (defun get-path (data path &optional default)
-  "Retrieves a value from a nested plist using a list of keys (path)."
-  (declare (type list data path)
+  "Retrieves a value from nested data using a list of keys (path).
+Supports plists, hash-tables, application-state, and app-state structures."
+  (declare (type (or list hash-table application-state app-state) data)
+           (type list path)
            (type t default))
-  (check-type data list)
-  (check-type path list)
-  (loop with current-data = data
-        for key in path
-        do (if (and (listp current-data) (evenp (length current-data)))
-               (multiple-value-bind (value foundp) (getf current-data key)
-                 (declare (ignore foundp)) ; Ignore foundp, we just want the value
-                 (setf current-data value)) ; Key not found in path
-               (return default)) ; Path broken (non-plist encountered)
-        finally (return current-data)))
+  (cond
+    ;; Enhanced app-state structure
+    ((app-state-p data)
+     (elmtui.state.api:get-path-enhanced data path default))
+    ;; Application-state structure
+    ((app-state-p data)
+     (elmtui.state.api:get-path-enhanced data path default))
+    ;; Direct hash-table
+    ;; ((hash-table-p data)
+    ;;  (elmtui.state.api:resolve-path-in-hash data path default))
+    ;; Plist (original implementation)
+    ((listp data)
+     (check-type path list)
+     (loop with current-data = data
+           for key in path
+           do (if (and (listp current-data) (evenp (length current-data)))
+                  (multiple-value-bind (value foundp) (getf current-data key)
+                    (declare (ignore foundp))
+                    (setf current-data value))
+                  (return default))
+           finally (return current-data)))
+    ;; (t (error "Unsupported data type for get-path: ~S" (type-of data)))
+    ))
 
 (declaim (ftype (function (list list t) list) set-path))
 (defun set-path (data path new-value)
@@ -166,41 +184,53 @@ Supports both hash-table and plist based state-data."
        (if (eq value :elmtui-delete-path)
            (remove-path state-data path)
            (set-path state-data path value)))
-      (t (error "Unsupported state type ~S for merging patch" state-data)))))
+      ;; (t (error "Unsupported state type ~S for merging patch" state-data))
+      )))
 
 ;; Declare the function type that matches the API expectation
-(declaim (ftype (function ((or hash-table list) list) (or hash-table list)) merge-patches))
+
 (defun merge-patches (state-data patches)
-  "Merges a list of patches or a property list into the state data. Handles hash-tables and plists.
-Returns the updated state-data (hash-table or plist)."
-  ;; Handle both hash-tables and lists directly, not state-data structs
-  (declare (type (or hash-table list) state-data)
-           (type list patches)) ; Patches can be a plist or list of patch-forms
-  (check-type state-data (or hash-table list))
-  (check-type patches list)
-  
-  ;; Normalize property list form '(:k1 v1 :k2 v2 ...)' into list of patch pairs ((k1) v1) ...
-  (let* ((patch-list
-           (cond
-             ((and (listp patches)
-                   (every #'atom patches)
-                   (evenp (length patches)))
-              (loop for (k v) on patches by #'cddr
-                    collect (list (list k) v)))
-             ((listp patches) patches)
-             (t (error "Invalid patches format: ~S" patches)))))
-    (cond
-      ((hash-table-p state-data)
-       ;; Destructively apply each patch to the hash-table
-       (dolist (p patch-list state-data)
-         (merge-patch state-data p)))
-      ((listp state-data)
-       ;; Merge into new plist
-       (reduce (lambda (current-state p)
-                 (merge-patch current-state p))
-               patch-list
-               :initial-value state-data))
-      (t (error "Unsupported state type ~S for merging patches" state-data)))))
+  "Merges a list of patches or a property list into the state data.
+Handles hash-tables, plists, application-state, and app-state structures.
+Returns the updated state-data."
+  (declare (type (or hash-table list application-state app-state) state-data)
+           (type list patches))
+
+  ;; Use enhanced API if available, otherwise fall back to original implementation
+  (cond
+    ;; Enhanced app-state or application-state
+    ((or (app-state-p state-data)
+         (app-state-p state-data))
+     (elmtui.state.api:apply-patches-enhanced state-data patches))
+    ;; Hash-table or plist (original implementation with normalization)
+    (t
+     (check-type state-data (or hash-table list))
+     (check-type patches list)
+
+     ;; Normalize property list form '(:k1 v1 :k2 v2 ...)' into list of patch pairs ((k1) v1) ...
+     (let* ((patch-list
+              (cond
+                ((and (listp patches)
+                      (every #'atom patches)
+                      (evenp (length patches)))
+                 (loop for (k v) on patches by #'cddr
+                       collect (list (list k) v)))
+                ((listp patches) patches)
+                ;; (t (error "Invalid patches format: ~S" patches))
+                )))
+       (cond
+         ((hash-table-p state-data)
+          ;; Destructively apply each patch to the hash-table
+          (dolist (p patch-list state-data)
+            (merge-patch state-data p)))
+         ((listp state-data)
+          ;; Merge into new plist
+          (reduce (lambda (current-state p)
+                    (merge-patch current-state p))
+                  patch-list
+                  :initial-value state-data))
+         ;; (t (error "Unsupported state type ~S for merging patches" state-data))
+         )))))
 
 (declaim (ftype (function (application-state list) t) get-component-by-path))
 (defun get-component-by-path (app-state component-id-path)

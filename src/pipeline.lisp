@@ -3,7 +3,7 @@
   (:import-from :elmtui.view.dsl #:dsl->ui-node)
   (:import-from :elmtui.view.styled #:apply-stylesheet-to-tree)
   (:import-from :elmtui.view.tree-transforms #:resolve-view #:layout-view)
-  (:import-from :elmtui.platform.tree-renderer #:render-laid-out-tree-to-canvas)
+  (:import-from :elmtui.platform.tree-renderer #:render-laid-out-tree-to-buffer)
   (:import-from :elmtui.platform.backend.common.virtual-buffer #:make-virtual-buffer #:copy-virtual-buffer)
   (:import-from :elmtui.platform.backend.terminal.diff-renderer #:compute-buffer-diff #:apply-diff-to-backend)
   (:import-from :elmtui.view.geo #:w #:h #:make-rectangle)
@@ -39,7 +39,7 @@
   (let* ((dsl-tree (getf context :tree))
          (model (getf context :app-model))
          (raw-tree (dsl->ui-node dsl-tree model)))
-    (list* :tree raw-tree context)))
+    (list* :tree (dsl->ui-node dsl-tree model) (remf context :tree))))
 
 ;; STAGE 2: Apply styles to the raw UI-Node tree
 (define-stage apply-styles
@@ -76,7 +76,7 @@
   (let* ((laid-out-tree (getf context :tree))
          (rect (getf context :viewport-rect))
          (target-buffer (make-virtual-buffer (w rect) (h rect)))
-         (rendered-buffer (render-laid-out-tree-to-canvas laid-out-tree target-buffer)))
+         (rendered-buffer (render-laid-out-tree-to-buffer (list laid-out-tree) :buffer target-buffer)))
     (list* :back-buffer rendered-buffer context)))
 
 ;; STAGE 6: Display the back buffer, handling diffing.

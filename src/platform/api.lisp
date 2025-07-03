@@ -126,7 +126,7 @@
 (declaim (ftype (function (t) null) disable-mouse-support))
 (declaim (ftype (function (t symbol) boolean) set-input-mode))
 (declaim (ftype (function (t keyword) boolean) query-feature))
-(declaim (ftype (function (t) boolean) supports-unicode-p supports-mouse-p))
+
 (declaim (ftype (function (t) t) get-native-handle))
 
 (defclass lockable ()

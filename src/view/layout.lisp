@@ -280,11 +280,11 @@
                                          (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
                            available-outer-h))
                       (t available-outer-h)))
-         (node-layout-rect (let ((r (make-rectangle :pos (make-pos :x (if is-root 0 (x parent-absolute-content-rect))
-                                                                   :y (if is-root 0 (y parent-absolute-content-rect)))
-                                                    :size (make-size :w eff-w :h eff-h))))
-                             (setf (getf (ui-node-props node) :layout-rect) r)
-                             r))
+         (node-layout-rect-tmp (let ((r (make-rectangle :pos (make-pos :x (if is-root 0 (x parent-absolute-content-rect))
+                                                                       :y (if is-root 0 (y parent-absolute-content-rect)))
+                                                        :size (make-size :w eff-w :h eff-h))))
+                                 (setf (getf (ui-node-props node) :layout-rect) r)
+                                 r))
          ;; Actually assign the computed rect to the node's props for downstream use
 
 
@@ -320,7 +320,8 @@
                            (progn (log-warn "LAYOUT: Invalid percentage width string: ~S for node ~A. Using available." requested-w node-id)
                                   available-outer-w)))
                       ((eq requested-w :auto) available-outer-w) ; Placeholder, flex/grid/block will determine
-                      (t available-outer-w)))
+                      ;; (t available-outer-w)
+                      ))
          (eff-h (cond ((numberp requested-h) (min requested-h available-outer-h))
                       ((stringp requested-h) ; Percentage string e.g. "50%"
                        (if (and (alexandria:ends-with-subseq "%" requested-h) (> (length requested-h) 1))
@@ -331,11 +332,15 @@
                            (progn (log-warn "LAYOUT: Invalid percentage height string: ~S for node ~A. Using available." requested-h node-id)
                                   available-outer-h)))
                       ((eq requested-h :auto) available-outer-h) ; Placeholder, flex/grid/block will determine
-                      (t available-outer-h)))
+                      ;; (t available-outer-h)
+                      ))
 
          ;; This is the initial estimate for the node's own border-box rectangle.
          ;; Flex/Grid might adjust eff-w and eff-h if they were :auto.
+
          (node-layout-rect (make-rectangle :pos (make-pos :x available-outer-x :y available-outer-y) :size (make-size :w eff-w :h eff-h))))
+    (declare (ignore node-layout-rect-tmp)) ; We use node-layout-rect directly now
+    ;; --------------------------------------------------------------
     (log-debug "LAYOUT: ~A (~A) display:~S. ParentAbsContentRect:~S. Assigned initial layout_rect:~S"
                (ui-node-type node) node-id display parent-absolute-content-rect node-layout-rect)
     (setf (getf (ui-node-props node) :layout-rect) node-layout-rect)
