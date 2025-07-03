@@ -230,7 +230,8 @@
                 (:min-content min-c)
                 (:max-content max-c)
                 (:auto min-c) ; Default :auto to min-content behavior
-                (otherwise min-c)))
+                ;; (otherwise min-c) unreachable
+                ))
         (setf (grid-track-growth-limit track) (max (grid-track-base-size track) max-c))
         (setf (grid-track-is-flexible track) nil)))) ; Considered resolved for this sizing step
   tracks)
@@ -253,7 +254,10 @@
                               ((eq max-bound :auto) (grid-track-max-contribution track)) ;; Needs item contributions
                               ((eq max-bound :fr) most-positive-double-float) ;; fr in max behaves like auto for growth limit
                               ;; TODO: Handle :min-content, :max-content for max-bound
-                              (t most-positive-double-float))) ;; Default for unhandled max-bound
+                              ((eq max-bound :min-content) (grid-track-min-contribution track)) ;; Use min contribution for min-content
+                              ((eq max-bound :max-content) (grid-track-max-contribution track)) ;; Use max contribution for max-content
+                              ;; (t most-positive-double-float) unreachable
+                              )) ;; Default for unhandled max-bound
 
         (setf (grid-track-base-size track) (max min-bound (grid-track-base-size track) (grid-track-min-contribution track)))
         (setf (grid-track-growth-limit track) (min max-bound (grid-track-max-contribution track)))

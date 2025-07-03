@@ -6,6 +6,6 @@
   elmtui.view.styled-wrapper:apply-style+contract
   elmtui.view.tree-transforms:resolve-view
   elmtui.view.tree-transforms:layout-view
-  elmtui.platform.tree-renderer:render-laid-out-tree-to-virtual-terminal-buffer
+  elmtui.platform.tree-renderer:render-laid-out-tree-to-buffer
   elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff)
 ;;; == end/main.lisp ==

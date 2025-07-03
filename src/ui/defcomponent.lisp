@@ -1,12 +1,11 @@
 (uiop:define-package :elmtui.ui.defcomponent
   (:use :cl)
-  (:import-from :elmtui.state.api #:make-state-patch #:make-update-result)
+  (:import-from :elmtui.state.api #:make-update-result)
   (:import-from :elmtui.ui.api
                 #:component      ;; Base class for components
                 #:component-id      ;; Base class for components
                 #:id-from-path
-                #:get-path        ;; Use the UI API version that takes app-state
-                #:component-state-path)
+                #:get-path)        ;; Use the UI API version that takes app-state
   (:export #:defcomponent #:cclass-name))
 
 (in-package :elmtui.ui.defcomponent)
@@ -149,7 +148,7 @@ SYNTAX:
 
   (:view (local-state-map app-state self-id-path)
     `(:label :id (elmtui.ui.api:id-from-path self-id-path)
-             :text (getf local-state-map :text "Default Text View")))
+             :text (getf local-state-map :text \"Default Text View\")))
 
   ...other-class-options...)
 "
@@ -217,8 +216,10 @@ SYNTAX:
                  (let ((,id-sym (elmtui.ui.api:id-from-path id-path))
                        (,(first init-lambda-list) initargs)
                        (,(second init-lambda-list) id-path))
-                   (multiple-value-bind (user-initial-state-plist user-commands)
-                       (progn ,@init-user-code)
+                   ;; (declare (ignorable ,@(remove nil (rest init-lambda-list))))
+                   (declare (ignorable ,@(remove nil init-lambda-list)))
+                   (destructuring-bind (user-initial-state-plist user-commands)
+                       (multiple-value-list (multiple-value-call #'values (progn ,@init-user-code)))
                      (let ((final-state-plist (list :type (cclass-name self)
                                                     :id ,id-sym)))
                        ,@(loop for slot in parsed-state-slots
@@ -234,7 +235,7 @@ SYNTAX:
                                                               (getf initargs ,generated-initarg)
                                                               ,(getf slot :initial-value))
                                                          `(getf initargs ,generated-initarg
-                                                                ,(getf slot :initial-value))))))
+                                                           ,(getf slot :initial-value))))))
                        (loop for (key val) on user-initial-state-plist by #'cddr
                              unless (find key ',(mapcar (lambda (s) (getf s :keyword)) parsed-state-slots) :test #'eq)
                                do (setf (getf final-state-plist key) val))
@@ -270,23 +271,29 @@ SYNTAX:
                    (update-lambda-list (first update-body-forms))
                    (update-user-code-block (rest update-body-forms)))
               `(defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
-                 (declare (ignorable app-state))
+                 (declare (ignorable app-state id-path))
                  (let* ((,(second update-lambda-list) (elmtui.ui.api:get-path app-state id-path))
                         (,(third update-lambda-list) app-state)
                         (,(fourth update-lambda-list) id-path))
+                   ;; (declare (ignorable ,@(remove nil (rest update-lambda-list))))
                    (declare (ignorable ,@(remove nil (rest update-lambda-list))))
                    (let ((,(first update-lambda-list) message))
-                     (multiple-value-bind (local-changes-plist commands)
-                         ,(generate-update-dispatch-code (first update-lambda-list)
-                                                         (second update-lambda-list)
-                                                         (third update-lambda-list)
-                                                         (fourth update-lambda-list)
-                                                         update-user-code-block
-                                                         component-class-name
-                                                         on-unhandled-behavior)
+                     (declare (ignorable ,(first update-lambda-list)))
+                     (destructuring-bind (local-changes-plist commands)
+                         (multiple-value-list
+                          (multiple-value-call #'values
+                            ,(generate-update-dispatch-code (first update-lambda-list)
+                                                            (second update-lambda-list)
+                                                            (third update-lambda-list)
+                                                            (fourth update-lambda-list)
+                                                            update-user-code-block
+                                                            component-class-name
+                                                            on-unhandled-behavior)))
                        (elmtui.state.api:make-update-result
                         :patches (loop for (key val) on local-changes-plist by #'cddr
-                                       collect (list (elmtui.ui.api:component-state-path id-path key) val))
+                                       collect (list (elmtui.ui.api:component-state-path id-path
+                                         (if (keywordp key) key (intern (symbol-name key) :keyword)))
+                                         val))
                         :commands commands))))))
             `(defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
                (declare (ignore app-state message id-path))
@@ -300,6 +307,8 @@ SYNTAX:
                  (let ((,(first view-lambda-list) (elmtui.ui.api:get-path app-state id-path))
                        (,(second view-lambda-list) app-state)
                        (,(third view-lambda-list) id-path))
+                   ;; (declare (ignorable ,@(remove nil (rest view-lambda-list))))
+                   (declare (ignorable ,@(remove nil view-lambda-list)))
                    ,@view-user-code)))
             `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path)
                (declare (ignore app-state))
@@ -313,6 +322,7 @@ SYNTAX:
                for slot-initial-value = (getf slot :initial-value)
                when accessor-name
                  collect `(defun ,(intern (symbol-name accessor-name)) (app-state component &key (id-path (list :components (elmtui.ui.api:component-id component))))
+                            (declare (ignore id-path))
                             (let ((comp-state (cond
                                                 ((and (typep app-state 'standard-object)
                                                       (search "TEST-APP-STATE" (symbol-name (type-of app-state))))

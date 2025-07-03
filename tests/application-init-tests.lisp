@@ -62,7 +62,8 @@
 
 ;;; Test application
 (defun test-init-app-view (app-state)
-  `(:column
+  (declare (ignore app-state))
+  `(:column :id :main-column
     ((test-component :id :comp1 :initial-state "comp1 state"))
     ((test-parent-component :id :parent1 :child-initial-state "child state"))))
 
@@ -111,6 +112,6 @@
   (let* ((app-state (initialize-app-state-test-init-app))
          (view-tree (test-init-app-view app-state)))
     (is (equal view-tree
-               '(:column
+               '(:column :id :main-column
                  ((test-component :id :comp1 :initial-state "comp1 state"))
                  ((test-parent-component :id :parent1 :child-initial-state "child state")))))))
