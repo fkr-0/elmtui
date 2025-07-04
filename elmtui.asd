@@ -13,6 +13,8 @@
   :pathname "./src/"
   :serial t
   :components ((:file "utils")
+               (:file "state/msg")
+               (:file "contracts")
                (:file "core/logging")
                (:file "core/globals")
                (:module "cleve-elm"
@@ -37,9 +39,9 @@
 
                (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
                ;; Core Modules (Load after cleve-elm, before API Layer)
-               (:file "state/msg")
                (:file "view/position") ; Load position before focus manager
                (:file "view/api") ; Imports: cl (pure declarations)
+               (:file "view/dsl/base") ;
 
                (:file "core/conditions")
                ;; Load state module early since focus manager needs it
@@ -138,7 +140,7 @@
                ;; Load selector implementations (depends on view/styled)
 
                ;; Load UI Components (depend on view/core, view/styled, view/style-lib)
-               (:file "contracts")
+
                (:module "ui"
                 :serial t
                 :pathname "ui/"

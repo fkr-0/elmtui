@@ -97,17 +97,17 @@
 (declaim (ftype (function (t) null) shutdown-backend))
 (declaim (ftype (function (t) string) backend-name backend-version))
 (declaim (ftype (function (t) (values integer integer)) get-screen-dimensions))
-(declaim (ftype (function (t) null) clear-screen flush-output))
-(declaim (ftype (function (t boolean) null) set-cursor-visibility))
-(declaim (ftype (function (t integer integer) null) set-cursor-position))
-(declaim (ftype (function (t) (values integer integer)) get-cursor-position))
-(declaim (ftype (function (t) null) hide-cursor show-cursor))
+
+
+
+
+
 (declaim (ftype (function (t integer integer) null) handle-backend-resize))
-(declaim (ftype (function (t t integer integer string &key (:style t)) null) draw-text-at))
-(declaim (ftype (function (t t integer integer character &key (:style t)) null) draw-char-at))
-(declaim (ftype (function (t t integer integer integer integer &key (:char character) (:style t)) null) fill-rectangle))
-(declaim (ftype (function (t t integer integer integer integer &key (:style t) (:corners list) (:sides list)) null) draw-box-outline))
-(declaim (ftype (function (t t integer integer integer integer &key (:border-style t) (:border-color t) (:box-char-set t) (:style t)) null) draw-styled-box))
+
+
+
+
+
 (declaim (ftype (function (t t integer integer &key (:style t)) null) set-cell-style))
 (declaim (ftype (function (t t integer integer integer integer &key (:style t)) null) clear-area))
 (declaim (ftype (function (t t) t) render-and-present))

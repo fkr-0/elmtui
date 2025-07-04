@@ -296,13 +296,16 @@ that is: at this point already a character with a style."
                  (is-term-style style2))
             (elmtui.view.geo:=? style1 style2))
            ;; Fallback for plist comparison if necessary, though ideally styles are always terminal-style structs
-           ((and (listp style1) (listp style2))
-            (and (= (length style1) (length style2))
-                 (loop for (key value) on style1 by #'cddr
-                       always (let ((other-value (getf style2 key :not-found)))
-                                (if (eq other-value :not-found)
-                                    nil
-                                    (elmtui.view.geo:=? value other-value))))))
+           ((and (listp style1) ;; (listp style2) UNREACHABLE CODE
+                 )
+            ;; UNREACHABLE CODE
+            ;; (and (= (length style1) (length style2))
+            ;;      (loop for (key value) on style1 by #'cddr
+            ;;            always (let ((other-value (getf style2 key :not-found)))
+            ;;                     (if (eq other-value :not-found)
+            ;;                         nil
+            ;;                         (elmtui.view.geo:=? value other-value)))))
+            )
            (t nil))))) ; Different types or one is not a style representation
 
 (defun %check-bounds (buffer row col)

@@ -218,10 +218,12 @@ SYNTAX:
                        (,(second init-lambda-list) id-path))
                    ;; (declare (ignorable ,@(remove nil (rest init-lambda-list))))
                    (declare (ignorable ,@(remove nil init-lambda-list)))
-                   (destructuring-bind (user-initial-state-plist user-commands)
-                       (multiple-value-list (multiple-value-call #'values (progn ,@init-user-code)))
-                     (let ((final-state-plist (list :type (cclass-name self)
-                                                    :id ,id-sym)))
+                   (destructuring-bind (user-initial-state-plist &rest other-values)
+                       (multiple-value-list (progn ,@init-user-code))
+                     (let* ((user-patches (first other-values))
+                            (user-commands (second other-values))
+                            (final-state-plist (list :type (cclass-name self)
+                                                     :id ,id-sym)))
                        ,@(loop for slot in parsed-state-slots
                                for slot-kw = (getf slot :keyword)
                                for slot-name-sym = (getf slot :name)
@@ -229,7 +231,6 @@ SYNTAX:
                                for generated-initarg = (intern (format nil "INITIAL-~A" (symbol-name slot-name-sym)) :keyword)
                                collect `(setf (getf final-state-plist ,slot-kw)
                                               (getf user-initial-state-plist ,slot-kw
-                                                    ;; Try custom initarg first, then generated initarg, then default
                                                     ,(if custom-initarg
                                                          `(or (getf initargs ,custom-initarg)
                                                               (getf initargs ,generated-initarg)
@@ -240,7 +241,7 @@ SYNTAX:
                              unless (find key ',(mapcar (lambda (s) (getf s :keyword)) parsed-state-slots) :test #'eq)
                                do (setf (getf final-state-plist key) val))
                        (values self
-                               (list (list id-path final-state-plist))
+                               (append (list (list id-path final-state-plist)) user-patches)
                                user-commands))))))
             `(defmethod elmtui.ui.api:init ((self ,component-class-name) &rest other-keys &key id-path ,@state-initarg-names &allow-other-keys)
                (declare (ignorable id-path ,@state-initarg-names))

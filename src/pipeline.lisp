@@ -39,7 +39,7 @@
   (let* ((dsl-tree (getf context :tree))
          (model (getf context :app-model))
          (raw-tree (dsl->ui-node dsl-tree model)))
-    (list* :tree (dsl->ui-node dsl-tree model) (remf context :tree))))
+    (list* :tree raw-tree (remf context :tree))))
 
 ;; STAGE 2: Apply styles to the raw UI-Node tree
 (define-stage apply-styles
