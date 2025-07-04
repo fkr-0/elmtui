@@ -50,7 +50,7 @@
 ;;   (list (make-state-patch (append (component-state-map-path id-path) (list :dsl))
 ;;                           dsl)))
 
-(declaim (ftype (function (component) symbol) component-type))
+
 (defgeneric component-type (component)
   (:documentation "Returns a symbol representing the type of the component, used for namespacing state and potentially for type-specific logic if not covered by method dispatch.")
   (:method ((component component))
@@ -80,7 +80,7 @@
            (type keyword property-key))
   (check-type id-path list)
   (check-type property-key keyword)
-  (append '(:components) id-path (list property-key)))
+  (append id-path (list property-key)))
 
 (declaim (ftype (function (list t) list) make-state-patch))
 (defun make-state-patch (path value)
@@ -312,10 +312,7 @@
   (cond
     ;; If state is an application-state object, get its raw data first
     ((typep state 'elmtui.state.api:application-state)
-     (let ((raw-data (elmtui.state.api:get-state state (first full-path))))
-       (if (and raw-data (rest full-path))
-           (elmtui.state::get-path raw-data (rest full-path) default-value)
-           (or raw-data default-value))))
+     (elmtui.state.api:get-path-enhanced state full-path default-value))
     ;; If state has a components-store slot (test case)
     ((and (typep state 'standard-object)
           (slot-exists-p state 'components-store))

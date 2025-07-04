@@ -2,6 +2,9 @@
   (:use :cl :fiveam :elmtui.pipeline)
   (:import-from :elmtui.view.core #:ui-node-p)
   (:import-from :elmtui.view.styled #:styled-ui-node-p)
+  (:import-from :elmtui.pipeline
+                #:generate-dsl)
+
   (:import-from :elmtui.view.geo #:make-rectangle #:w #:h #:rectangle #:make-size
                 #:make-pos)
   (:import-from :elmtui.platform.backend.common.virtual-buffer

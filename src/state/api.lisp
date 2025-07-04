@@ -76,7 +76,7 @@ defining models and messages, and creating update functions, following Elm Archi
    #:app-state-p
    #:resolve-path-in-hash
    #:apply-patches-enhanced
-
+   #:plist-to-app-state
 
    #:*app-state*
    #:application-state
@@ -84,6 +84,7 @@ defining models and messages, and creating update functions, following Elm Archi
    #:make-application-state
    #:application-state
    #:state-data
+   #:app-state
    #:application-state-data
    #:application-state-lock
    #:application-state-observers
@@ -513,7 +514,10 @@ Handles app-state, application-state, hash-table, and plist inputs."
 (defun plist-to-app-state (plist)
   "Converts plist to app-state structure."
   (declare (type list plist))
-  (make-app-state :initial-plist plist))
+  (let ((state-data (make-state-data)))
+    (loop for (key value) on plist by #'cddr
+          do (setf (gethash key (state-data-data state-data)) value))
+    state-data))
 
 (defun app-state-to-plist (app-state)
   "Converts app-state to plist for compatibility."
