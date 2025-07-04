@@ -213,7 +213,7 @@ Args:
                   :origin-x viewport-offset-x
                   :origin-y viewport-offset-y)))
 
-      (let ((final-context (elmtui.contracts:full-view-pipeline initial-context)))
+      (let ((final-context (full-view-pipeline initial-context)))
         (setf *previous-frame-buffer* (getf final-context :front-buffer))
         (flush-output backend-instance)))
 

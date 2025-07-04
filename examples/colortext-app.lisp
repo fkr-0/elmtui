@@ -88,13 +88,13 @@
   (let ((patch-list nil) (commands-list nil))
     (case (if (listp message) (first message) message)
       (:key-event
-       (log:info "COLORTEXT-APP: Key event, requesting quit.")
+       (log-info "COLORTEXT-APP: Key event, requesting quit.")
        (push :should-quit patch-list) (push t patch-list)
        (setf commands-list (list '(:app-quit-requested (:source :key-event)))))
       (:app-quit-requested
        (push :should-quit patch-list) (push t patch-list)
-       (log:info "COLORTEXT-APP: Quit requested."))
-      (otherwise (log:debug "COLORTEXT-APP: Unhandled message: ~S" message)))
+       (log-info "COLORTEXT-APP: Quit requested."))
+      (otherwise (log-debug "COLORTEXT-APP: Unhandled message: ~S" message)))
     (values (nreverse patch-list) commands-list)))
 
 (defun app-view (app-state dispatch-fn)

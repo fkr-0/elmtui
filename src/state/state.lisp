@@ -199,9 +199,13 @@ Returns the updated state-data."
   ;; Use enhanced API if available, otherwise fall back to original implementation
   (cond
     ;; Enhanced app-state or application-state
-    ((or (app-state-p state-data)
-         (app-state-p state-data))
-     (elmtui.state.api:apply-patches-enhanced state-data patches))
+    ((or (typep state-data 'application-state)
+         (typep state-data 'elmtui.state.api:app-state))
+     (let ((new-data (merge-patches
+                      (elmtui.state.api:application-state-data state-data)
+                      patches)))
+       (setf (elmtui.state.api:application-state-data state-data) new-data)
+       state-data))
     ;; Hash-table or plist (original implementation with normalization)
     (t
      (check-type state-data (or hash-table list))
@@ -252,7 +256,7 @@ Returns the updated state-data."
           (if (and (listp components-path) (= (length components-path) 1))
               (gethash (first components-path) hash-table-data)
               ;; For nested paths in a hash-table (not well supported)
-              (error "Nested paths in hash-table not supported: ~S" components-path)))
+              (error (format nil "Nested paths in hash-table not supported: ~A~%" components-path))))
         ;; If app-data is a direct plist, use get-path normally
         (get-path app-data components-path))))
 

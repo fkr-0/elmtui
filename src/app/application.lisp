@@ -104,14 +104,11 @@
                         (component-id (getf component-props :id))
                         (component-id-path `(:components ,component-id)))
                    (when component-id
-                     ;; Instantiate the component using the API function
-                     (let ((component-instance (elmtui.app.api:instantiate-component-from-dsl
-                                                 node component-id-path)))
+                     (let ((component-instance (instantiate-component-from-dsl node component-id-path)))
                        (when component-instance
                          (multiple-value-bind (instance init-patches init-commands)
                              (elmtui.ui.api:init component-instance
                                                  :id-path component-id-path
-                                                 ;; Pass through any initial-* properties as initargs
                                                  :initial-state (getf component-props :initial-state)
                                                  :initial-text (getf component-props :initial-text)
                                                  :initial-count (getf component-props :initial-count)
@@ -122,22 +119,16 @@
                            (declare (ignore instance))
                            (setf patches (nconc patches init-patches))
                            (setf commands (nconc commands init-commands))))))
-                   
-                   ;; Process any nested components
                    (dolist (child (remove-if-not #'consp component-props))
                      (when (and (consp child) (consp (car child)))
                        (process-node (car child) component-id-path))))))
-             
              (process-dsl-list (dsl-list)
                (when (consp dsl-list)
                  (if (keywordp (car dsl-list))
-                     ;; Single component
                      (process-node dsl-list nil)
-                     ;; List of components
                      (dolist (node dsl-list)
                        (when (consp node)
                          (process-node node nil)))))))
-      
       (process-dsl-list dsl)
       (values patches commands))))
 
@@ -210,59 +201,12 @@
            (defun ,init-fn-sym (&key (initial-terminal-dimensions '(80 24))
                                   (initial-cursor-position '(0 0))
                                 &allow-other-keys) ; Allow other platform-options
-             (declare (ignorable initial-terminal-dimensions initial-cursor-position)) ; May not be used if root-dsl is complex
-             (let ((state ,state) ; Initialize state from macro parameter
-                   (patches nil)
-                   (commands nil)
-                   (rv-id ,root-vp-id) ; Use the required root-viewport-id
-                   (rv-path (list :components ,root-vp-id)))
-
-               ;; Instantiate the root-viewport component
-               ;; The DSL for the root-viewport itself, including its initial child.
-               (let* ((current-root-dsl ,root-dsl) ; root-dsl is from the outer let*
-                      (rv-dsl-spec
-                        `(root-viewport ; This is a literal symbol
-                          :id ,rv-id
-                          ;; Pass explicit initargs that root-viewport's init method expects
-                          ;; :initial-terminal-dimensions ,initial-terminal-dimensions
-                          ;; :initial-cursor-pos ,initial-cursor-position
-                          ;; :initial-child-spec ,current-root-dsl
-                          ;; Other props for root-viewport itself can be in its dsl if needed
-                          :props (:anchor :below-cursor) ; Example: default anchor if not in platform-options
-                          )))
-                 (when rv-id
-                   (let ((rv-inst (instantiate-component-from-dsl rv-dsl-spec rv-path)))
-                     (when rv-inst
-                       (log4cl:log-info "Initialized root viewport instance: ~A for app ~A" rv-inst ',name)
-                       (log4cl:log-info "With DSL spec: ~A" rv-dsl-spec)
-                       (multiple-value-bind (init-patches init-commands)
-                           (elmtui.ui.api:init rv-inst
-                                               :id-path rv-path
-                                               :dsl ;; TODO use the actual dsl without root viewport, because
-                                               ;; that makes it no valid plist
-                                               (cdr rv-dsl-spec) ; Pass the dsl for the root-viewport
-                                               ;; Pass options needed by root-viewport's init
-                                               :initial-terminal-dimensions initial-terminal-dimensions
-                                               :initial-cursor-pos initial-cursor-position
-                                               :initial-child-spec current-root-dsl)
-                         (setf patches (nconc patches init-patches))
-                         (setf commands (nconc commands init-commands))
-                         (log4cl:log-info "Root viewport initialized with patches: ~A and commands: ~A"
-                                          patches commands)))
-                     ;; Store the root viewport instance itself if needed (e.g., for direct access, though usually via get-component-instance)
-                     ;; (setf state (merge-patches state (list (list rv-path rv-inst)))) ; Storing instance might be redundant if state is pure data
-                     ))
-
-                 ;; Initialize components from the root DSL
-                 (multiple-value-bind (component-patches component-commands)
-                     (initialize-components-from-dsl current-root-dsl state)
-                   (setf patches (nconc patches component-patches))
-                   (setf commands (nconc commands component-commands)))
-
-                 ;; Merge initial state with patches from root viewport and component init
-                 (setf state (merge-patches state patches))
-                 (log4cl:log-info "Initial state after root viewport and component init: ~A" state)
-                 (values state commands))))
+             (declare (ignorable initial-terminal-dimensions initial-cursor-position))
+             (let* ((app-state (elmtui.state.api:make-application-state :data (elmtui.state.api:plist-to-app-state ,state))))
+               (multiple-value-bind (patches commands)
+                   (initialize-components-from-dsl ,root-dsl app-state)
+                 (let ((final-state (elmtui.state.api:merge-patches app-state patches)))
+                   (values final-state commands)))))
 
 
            ;; --------------------------------------------------------------
