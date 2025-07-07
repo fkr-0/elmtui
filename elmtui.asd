@@ -13,6 +13,7 @@
   :pathname "./src/"
   :serial t
   :components ((:file "utils")
+               (:file "state/utils")
                (:file "state/msg")
                (:file "contracts")
                (:file "core/logging")

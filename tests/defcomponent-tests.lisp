@@ -304,3 +304,10 @@
           (is (= 42 (getf state :value)))
           (is (eq t (getf state :enabled)))
           (is (string= "child" (getf state :child-prop))))))))
+;; (init '(test-simple))
+
+;; Lambda List: (ELMTUI.UI.DEFCOMPONENT::SELF &REST ELMTUI.UI.DEFCOMPONENT::OTHER-KEYS &KEY ELMTUI.UI.DEFCOMPONENT::ID-PATH ELMTUI.TESTS.DEFCOMPONENT::INITIAL-NAME ELMTUI.TESTS.DEFCOMPONENT::INITIAL-VALUE ELMTUI.TESTS.DEFCOMPONENT::INITIAL-ENABLED &ALLOW-OTHER-KEYS)
+;; Test initialization of a simple component with custom parameters eg:
+;; (init (make-instance 'test-simple) :id-path '(:my-app :main-layout :submit-button)
+;;     :initial-state '(:name "Submit Button" :value 100 :enabled t)
+;;                    :initial-name '(:button :label "Submit" :on-click #'submit-handler))

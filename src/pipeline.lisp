@@ -30,7 +30,9 @@
   (let* ((view-fn (getf context :view-fn))
          (model (getf context :app-model))
          (dsl (funcall view-fn model)))
-    (list* :tree dsl context)))
+    (let ((new-context (copy-list context)))
+      (setf (getf new-context :tree) dsl)
+      new-context)))
 
 ;; STAGE 1: Render DSL to a raw UI-Node tree
 (define-stage render-dsl
@@ -39,7 +41,9 @@
   (let* ((dsl-tree (getf context :tree))
          (model (getf context :app-model))
          (raw-tree (dsl->ui-node dsl-tree model)))
-    (list* :tree raw-tree (remf context :tree))))
+    (let ((new-context (copy-list context)))
+      (setf (getf new-context :tree) raw-tree)
+      new-context)))
 
 ;; STAGE 2: Apply styles to the raw UI-Node tree
 (define-stage apply-styles
@@ -47,8 +51,13 @@
     (context)
   (let* ((raw-tree (getf context :tree))
          (stylesheet (getf context :stylesheet))
-         (styled-tree (elmtui.view.styled:apply-stylesheet-to-tree raw-tree stylesheet)))
-    (list* :tree styled-tree context)))
+         (styled-tree
+           (elmtui.view.styled:apply-stylesheet-to-tree raw-tree stylesheet)))
+    (if raw-tree
+        (let ((new-context (copy-list context)))
+          (setf (getf new-context :tree) styled-tree)
+          new-context)
+        context)))
 
 ;; STAGE 3: Resolve view (e.g., handle :overflow, :display: none)
 (define-stage resolve-view-stage
@@ -57,7 +66,9 @@
   (let* ((styled-tree (getf context :tree))
          (app-state (getf context :app-model))
          (atomic-tree (resolve-view (list styled-tree) app-state)))
-    (list* :tree (first atomic-tree) context)))
+    (let ((new-context (copy-list context)))
+      (setf (getf new-context :tree) (first atomic-tree))
+      new-context)))
 
 ;; STAGE 4: Layout view
 (define-stage layout-view-stage
@@ -67,7 +78,9 @@
          (rect (getf context :viewport-rect))
          (stylesheet (getf context :stylesheet))
          (laid-out-tree (layout-view (list atomic-tree) rect stylesheet)))
-    (list* :tree (first laid-out-tree) context)))
+    (let ((new-context (copy-list context)))
+      (setf (getf new-context :tree) (first laid-out-tree))
+      new-context)))
 
 ;; STAGE 5: Render the laid-out tree to a virtual buffer (back buffer)
 (define-stage render-to-buffer
@@ -77,7 +90,9 @@
          (rect (getf context :viewport-rect))
          (target-buffer (make-virtual-buffer (w rect) (h rect)))
          (rendered-buffer (render-laid-out-tree-to-buffer (list laid-out-tree) :buffer target-buffer)))
-    (list* :back-buffer rendered-buffer context)))
+    (let ((new-context (copy-list context)))
+      (setf (getf new-context :back-buffer) rendered-buffer)
+      new-context)))
 
 ;; STAGE 6: Display the back buffer, handling diffing.
 (define-stage display-buffer
@@ -91,7 +106,9 @@
     (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
       (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-x origin-y)
       ;; The new front-buffer for the next frame is the current back-buffer
-      (list* :front-buffer (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer) context))))
+      (let ((new-context (copy-list context)))
+        (setf (getf new-context :front-buffer) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))
+        new-context))))
 
 ;; Compose stages 0-5 into a pipeline for rendering without display
 (define-pipeline render-pipeline-0-to-5

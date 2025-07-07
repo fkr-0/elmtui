@@ -4,6 +4,8 @@
 ;; Public package for state management
 (uiop:define-package :elmtui.state
   (:use :cl )
+
+  (:import-from :elmtui.state.utils #:get-path #:set-path #:remove-path)
   (:import-from :elmtui.state.api ; Import from the central API
    :application-state :make-application-state :state-ref :get-state :set-state
 
@@ -42,7 +44,7 @@
    :merge-patch :merge-patches
    :get-path :set-path :remove-path
    :get-component-by-path :store-component-at-path :remove-component-at-path
-   :rollback-state 
+   :rollback-state
    ;; Re-exports from other packages that are part of this package's interface
    :update-result :make-update-result :ur-patches :ur-commands
    :ur-has-command-p
@@ -69,84 +71,147 @@
 ;;; (defined here, exported via API)
 ;;;--------------------------------------------------------------
 ;; (declaim (ftype (function ((or list hash-table application-state elmtui.state.api:app-state) list &optional t) t) get-path))
-(defun get-path (data path &optional default)
-  "Retrieves a value from nested data using a list of keys (path).
-Supports plists, hash-tables, application-state, and app-state structures."
-  (declare (type (or list hash-table application-state app-state) data)
-           (type list path)
-           (type t default))
-  (cond
-    ;; Enhanced app-state structure
-    ((app-state-p data)
-     (elmtui.state.api:get-path-enhanced data path default))
-    ;; Application-state structure
-    ((app-state-p data)
-     (elmtui.state.api:get-path-enhanced data path default))
-    ;; Direct hash-table
-    ;; ((hash-table-p data)
-    ;;  (elmtui.state.api:resolve-path-in-hash data path default))
-    ;; Plist (original implementation)
-    ((listp data)
-     (check-type path list)
-     (loop with current-data = data
-           for key in path
-           do (if (and (listp current-data) (evenp (length current-data)))
-                  (multiple-value-bind (value foundp) (getf current-data key)
-                    (declare (ignore foundp))
-                    (setf current-data value))
-                  (return default))
-           finally (return current-data)))
-    ;; (t (error "Unsupported data type for get-path: ~S" (type-of data)))
-    ))
+;; (defun get-path (data path &optional default)
+;;   "Recursively retrieves a value from a nested structure of plists and hash-tables."
+;;   (declare (type list path))
+;;   (if (null path)
+;;       data
+;;       (let ((key (first path))
+;;             (rest-path (rest path)))
+;;         (cond
+;;           ((hash-table-p data)
+;;            (multiple-value-bind (value foundp) (gethash key data)
+;;              (if foundp
+;;                  (get-path value rest-path default)
+;;                  default)))
+;;           ((listp data)
+;;            (let ((value (getf data key default)))
+;;              (if (eq value default)
+;;                  default
+;;                  (get-path value rest-path default))))
+;;           (t default)))))
+;;; -----------------------------------------
+;;; 2-D dispatch: (data-type × path-type)
+;;; -----------------------------------------
 
-(declaim (ftype (function (list list t) list) set-path))
-(defun set-path (data path new-value)
-  "Sets a value in a nested plist using a list of keys (path).
-   Creates intermediate plists if they don't exist.
-   Returns a new plist with the modification."
-  (declare (type list data path)
-           (type t new-value))
-  (check-type data list)
-  (check-type path list)
-  (if (null path) (error "Path cannot be empty for set-path"))
-  (let ((key (car path))
-        (rest-path (cdr path)))
-    (let ((new-data (copy-list  data ))) ; Copy current level
-      (if (null rest-path) ; At the level to set the value
-          (setf (getf new-data key) new-value)
-          (let ((current-child (getf new-data key)))
-            ;; Ensure child is a plist for recursion, otherwise start fresh
-            (unless (and (listp current-child) (evenp (length current-child)))
-              (setf current-child nil))
-            (setf (getf new-data key) (set-path current-child rest-path new-value))))
-      new-data)))
+;; (defgeneric get-path (data path &optional default)
+;;   (:documentation "Retrieve a nested value designated by PATH from DATA.
+;;    Return DEFAULT when any intermediate lookup fails."))
 
-(declaim (ftype (function (list list) list) remove-path))
-(defun remove-path (data path)
-  "Removes a key-value pair from a nested plist.
-   Returns a new plist with the modification, or original if path not found or data is nil."
-  (declare (type list data path))
-  (check-type data list)
-  (check-type path list)
-  (if (or (null path) (null data)) (return-from remove-path data))
-  (let ((key (car path))
-        (rest-path (cdr path)))
-    (if (null rest-path) ; Key to remove is at this level
-        ;; Check if key exists before copying and remf-ing
-        (if (getf data key nil) ; Use getf with default nil to check existence
-            (let ((new-data (copy-list data)))
-              (remf new-data key)
-              new-data)
-            data) ; Key not found, return original data
-        (let ((child (getf data key)))
-          (if (and (listp child) (evenp (length child))) ; If child is a plist, recurse
-              (let ((new-child (remove-path child rest-path)))
-                (if (eq child new-child) ; No change in child, return original data
-                    data
-                    (let ((new-data (copy-list data))) ; Child changed, create new parent
-                      (setf (getf new-data key) new-child)
-                      new-data)))
-              data))))) ; Child not a plist or doesn't exist, no change, return original data
+;; ;;; ──────────────────────────────────────────
+;; ;;; Base cases (PATH exhausted)
+;; ;;; ──────────────────────────────────────────
+;; (defmethod get-path (data (path null) &optional default)
+;;   ;; PATH is NIL ⇒ we have arrived
+;;   (declare (ignore default))
+;;   data)
+
+;; ;;; ──────────────────────────────────────────
+;; ;;; HASH-TABLE containers
+;; ;;; ──────────────────────────────────────────
+;; (defmethod get-path ((table hash-table) (key symbol) &optional default)
+;;   (multiple-value-bind (val foundp) (gethash key table)
+;;     (if foundp val default)))
+
+;; (defmethod get-path ((table hash-table) (path cons) &optional default)
+;;   (let* ((key  (car path))
+;;          (rest (cdr path))
+;;          (next (get-path table key default)))
+;;     (if (eq next default)
+;;         default
+;;         (get-path next rest default))))
+
+;; ;;; ──────────────────────────────────────────
+;; ;;; PLIST (property-list) containers
+;; ;;; ──────────────────────────────────────────
+;; ;; (defmethod get-path ((plist list) (key symbol) &optional default)
+;; ;;   (getf plist key default))
+
+;; ;; (defmethod get-path ((plist list) (path cons) &optional default)
+;; ;;   (let* ((key  (car path))
+;; ;;          (rest (cdr path))
+;; ;;          (next (get-path plist key default)))
+;; ;;     (if (eq next default)
+;; ;;         default
+;; ;;         (get-path next rest default))))
+
+;; (defun alist-p (obj)
+;;   "Heuristic: every element is a dotted pair."
+;;   (and (listp obj)
+;;        (every #'consp obj)))
+
+;; (defmethod get-path ((lst list) (key symbol) &optional default)
+;;   (cond
+;;     ((alist-p lst)
+;;      (let ((pair (assoc key lst)))
+;;        (if pair (cdr pair) default)))
+;;     (t                         ; treat as plist
+;;      (getf lst key default))))
+
+;; (defmethod get-path ((lst list) (path cons) &optional default)
+;;   (cond
+;;     ((alist-p lst)
+;;      (let* ((pair (assoc (car path) lst)))
+;;        (if pair
+;;            (get-path (cdr pair) (cdr path) default)
+;;            default)))
+;;     (t ;; plist
+;;      (let* ((val (getf lst (car path) default)))
+;;        (if (eq val default)
+;;            default
+;;            (get-path val (cdr path) default))))))
+;; ;;; ──────────────────────────────────────────
+;; ;;; Fallback for unsupported DATA
+;; ;;; ──────────────────────────────────────────
+;; (defmethod get-path ((data t) (path t) &optional default)
+;;   (declare (ignore data path))
+;;   default)
+
+;; (declaim (ftype (function (list list t) list) set-path))
+;; (defun set-path (data path new-value)
+;;   "Sets a value in a nested structure of plists and hash-tables."
+;;   (if (null path)
+;;       new-value
+;;       (let ((key (first path))
+;;             (rest-path (rest path)))
+;;         (cond
+;;           ((hash-table-p data)
+;;            (setf (gethash key data) (set-path (gethash key data) rest-path new-value))
+;;            data)
+;;           ((listp data)
+;;            (let ((new-data (copy-list data)))
+;;              (setf (getf new-data key) (set-path (getf data key) rest-path new-value))
+;;              new-data))
+;;           (t (set-path (if (keywordp key) '() (make-hash-table)) path new-value))))))
+
+;; (declaim (ftype (function (list list) list) remove-path))
+;; (defun remove-path (data path)
+;;   "Removes a key-value pair from a nested plist.
+;;    Returns a new plist with the modification, or original if path not found or data is nil."
+;;   (declare (type list data path))
+;;   (check-type data list)
+;;   (check-type path list)
+;;   (if (or (null path) (null data)) ;;         (setf (getf new-data key ;; Use getf to set the value
+;;                                         ;                                  :test #'equal) new-value
+;;       data
+;;       (let ((key (car path))
+;;             (rest-path (cdr path)))
+;;         (if (null rest-path) ; Key to remove is at this level
+;;             ;; Check if key exists before copying and remf-ing
+;;             (if (getf data key nil) ; Use getf with default nil to check existence
+;;                 (let ((new-data (copy-list data)))
+;;                   (remf new-data key)
+;;                   new-data)
+;;                 data) ; Key not found, return original data
+;;             (let ((child (getf data key)))
+;;               (if (and (listp child) (evenp (length child))) ; If child is a plist, recurse
+;;                   (let ((new-child (remove-path child rest-path)))
+;;                     (if (eq child new-child) ; No change in child, return original data
+;;                         data
+;;                         (let ((new-data (copy-list data))) ; Child changed, create new parent
+;;                           (setf (getf new-data key) new-child)
+;;                           new-data)))
+;;                   data)))))) ; Child not a plist or doesn't exist, no change, return original data
 
 ;;;--------------------------------------------------------------
 ;;; State Patching and Component Path Management
@@ -166,7 +231,7 @@ Supports both hash-table and plist based state-data."
   (check-type patch list)
   (unless (and (= (length patch) 2) (listp (first patch)))
     (error "Invalid patch format. Expected (path-list new-value), got ~S" patch))
-  
+
   (let ((path (first patch))
         (value (second patch)))
     (cond
@@ -236,29 +301,46 @@ Returns the updated state-data."
          ;; (t (error "Unsupported state type ~S for merging patches" state-data))
          )))))
 
-(declaim (ftype (function (application-state list) t) get-component-by-path))
-(defun get-component-by-path (app-state component-id-path)
+(defgeneric get-component-by-path (root path)
+  (:documentation
+   "Retrieve a component instance by path from a root object.
+    Specialized for application-state. For other types, signals an error.
+    The path is a list of component IDs. For application-state, the component is stored under
+    '(:components <id1> <id2> ... :component-instance)."))
+
+(defmethod get-component-by-path ((app-state application-state) component-id-path)
   "Retrieves a component instance from the application state using its ID path.
    The component itself is stored under '(:components <id1> <id2> ... :component-instance)."
   (declare (type application-state app-state)
            (type list component-id-path))
   (check-type app-state application-state)
   (check-type component-id-path list)
-  
-  ;; Get the raw application state data
   (let* ((app-data (application-state-data app-state))
          (components-path (append '(:components) component-id-path '(:component-instance))))
-    ;; If app-data is a state-data struct, get its hash-table data
     (if (typep app-data 'state-data)
-        ;; Since state-data.data is always a hash-table, handle it specially
         (let ((hash-table-data (state-data-data app-data)))
-          ;; Use get-path which will handle hash-table data
-          (if (and (listp components-path) (= (length components-path) 1))
-              (gethash (first components-path) hash-table-data)
-              ;; For nested paths in a hash-table (not well supported)
-              (error (format nil "Nested paths in hash-table not supported: ~A~%" components-path))))
-        ;; If app-data is a direct plist, use get-path normally
-        (get-path app-data components-path))))
+          (get-path components-path hash-table-data)
+          ;; (if (and (listp components-path) (= (length components-path) 1))
+          ;;     (gethash (first components-path) hash-table-data)
+          ;;     ;; Old: error on list-paths
+          ;;     ;; (error (format nil "Nested component-paths in hash-table not supported: ~A~%"
+          ;;     ;;                components-path))
+          ;;     ;; New: resolve first, then get the component instance
+          ;;     ;; components-path is '(:components <id1> <id2> ... :component-instance).
+          ;;     ;; (let ((components-path (append '(:components) path '(:component-instance))))
+          ;;     ;;   (declare (type list path))
+          ;;     ;;   (declare (type list path))
+          ;;     ;;   (get-path root components-path nil))
+          ;;                               ; Use get-path to resolve the path)
+          ;;     )
+          )
+        ;; (get-path app-data components-path)
+        )))
+
+(defmethod get-component-by-path (root path)
+  "Fallback method for unsupported root types."
+  (declare (ignore root path))
+  (error "get-component-by-path is not implemented for this object type."))
 
 (declaim (ftype (function (application-state list t) (or list hash-table)) store-component-at-path))
 (defun store-component-at-path (app-state component-id-path component-instance)
@@ -268,7 +350,7 @@ Returns the updated state-data."
            (type t component-instance))
   (check-type app-state application-state)
   (check-type component-id-path list)
-  
+
   ;; Get the raw application state data and modify it
   (let* ((app-data (application-state-data app-state))
          (full-path (append '(:components) component-id-path '(:component-instance))))
@@ -278,13 +360,15 @@ Returns the updated state-data."
         (let ((hash-table-data (state-data-data app-data)))
           ;; Handle storing in hash-table (direct key only for simplicity)
           (if (and (listp full-path) (= (length full-path) 1))
-              (progn 
+              (progn
                 (setf (gethash (first full-path) hash-table-data) component-instance)
                 hash-table-data)
-              ;; For now, error on nested paths in hash-tables 
-              (error "Nested paths in hash-table not supported: ~S" full-path)))
+              ;; For now, error on nested paths in hash-tables
+              (error "Nested full-paths in hash-table not supported: ~S"
+                     full-path)))
         ;; If app-data is a direct plist, use set-path normally
-        (set-path app-data full-path component-instance))))
+        ;; (set-path app-data full-path component-instance)
+        )))
 
 (declaim (ftype (function (application-state list) list) remove-component-at-path))
 (defun remove-component-at-path (app-state component-id-path)
@@ -295,12 +379,12 @@ Returns the updated state-data."
            (type list component-id-path))
   (check-type app-state application-state)
   (check-type component-id-path list)
-  
+
   ;; Get the raw application state data
   (let* ((app-data (application-state-data app-state))
          (instance-path (append '(:components) component-id-path '(:component-instance)))
          (state-subtree-path (append '(:components) component-id-path)))
-    
+
     ;; If app-data is a state-data struct, get its hash-table data
     (if (typep app-data 'state-data)
         ;; Since state-data.data is always a hash-table, handle it specially
@@ -314,11 +398,13 @@ Returns the updated state-data."
                   (remhash (first state-subtree-path) hash-table-data))
                 '()) ; Return empty list to represent success
               ;; For now, error on nested paths in hash-tables
-              (error "Nested paths in hash-table not supported: ~S" instance-path)))
+              (error "Nested instance-paths in hash-table not supported: ~S"
+                     instance-path)))
         ;; If app-data is a direct plist, use remove-path normally
-        (let ((temp-data (remove-path app-data instance-path))
-              (final-data (remove-path app-data state-subtree-path)))
-          final-data))))
+        ;; (let ((temp-data (remove-path app-data instance-path))
+        ;;       (final-data (remove-path app-data state-subtree-path)))
+        ;;   final-data)
+        )))
 
 ;; Ensure application-state-data is accessible if used directly
 ;; This might need to be an exported accessor from elmtui.statelib.state if not already.
