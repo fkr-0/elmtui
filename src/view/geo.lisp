@@ -42,7 +42,11 @@
   "Check if two lists are equal by comparing lengths and elements recursively using =?."
   (and (= (length a) (length b))
        (every #'=? a b)))
-
+;; (let ((l '(:column :id :main-column
+;;               :children
+;;               ((:test-component :id :comp1 :initial-state "comp1 state")
+;;                (:test-parent-component :id :parent1 :child-initial-state "child state")))))
+;;   (=? l l))
 ;;;-----------------------------------------------------------------------------
 ;;; Struct Definitions
 ;;;-----------------------------------------------------------------------------

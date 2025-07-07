@@ -298,6 +298,7 @@
 
 (defun validate-children (children element-type context)
   "Validates children of a DSL element"
+  (declare (ignore element-type))
   (let ((child-context (format nil "~A > children" context)))
     (cond
       ((null children) nil)  ; No children is valid

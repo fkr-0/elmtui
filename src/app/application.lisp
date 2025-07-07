@@ -95,41 +95,28 @@
 (defun initialize-components-from-dsl (dsl app-state)
   "Recursively traverses a component DSL, instantiates components,
    and returns the accumulated patches and commands."
+  (declare (ignorable app-state))
   (let ((patches nil)
         (commands nil))
-    (labels ((process-node (node parent-path)
-               (when (and (consp node) (symbolp (car node)))
+    (labels ((process-node (node)
+               (when (and (consp node) (keywordp (car node)))
                  (let* ((component-type (car node))
                         (component-props (cdr node))
-                        (component-id (getf component-props :id))
-                        (component-id-path `(:components ,component-id)))
+                        (component-id (getf component-props :id)))
+                   (declare (ignorable component-type))
                    (when component-id
-                     (let ((component-instance (instantiate-component-from-dsl node component-id-path)))
+                     (let* ((component-id-path `(:components ,component-id))
+                            (component-instance (instantiate-component-from-dsl node component-id-path)))
                        (when component-instance
                          (multiple-value-bind (instance init-patches init-commands)
-                             (elmtui.ui.api:init component-instance
-                                                 :id-path component-id-path
-                                                 :initial-state (getf component-props :initial-state)
-                                                 :initial-text (getf component-props :initial-text)
-                                                 :initial-count (getf component-props :initial-count)
-                                                 :initial-title (getf component-props :initial-title)
-                                                 :initial-data (getf component-props :initial-data)
-                                                 :initial-child-specs (getf component-props :initial-child-specs)
-                                                 :child-initial-state (getf component-props :child-initial-state))
+                             (apply #'init component-instance :id-path component-id-path component-props)
                            (declare (ignore instance))
                            (setf patches (nconc patches init-patches))
                            (setf commands (nconc commands init-commands))))))
-                   (dolist (child (remove-if-not #'consp component-props))
-                     (when (and (consp child) (consp (car child)))
-                       (process-node (car child) component-id-path))))))
-             (process-dsl-list (dsl-list)
-               (when (consp dsl-list)
-                 (if (keywordp (car dsl-list))
-                     (process-node dsl-list nil)
-                     (dolist (node dsl-list)
-                       (when (consp node)
-                         (process-node node nil)))))))
-      (process-dsl-list dsl)
+                   (let ((children (getf component-props :children)))
+                     (dolist (child children)
+                       (process-node child)))))))
+      (process-node dsl)
       (values patches commands))))
 
 ;;; ---------------------------------------------------------------------------
@@ -304,6 +291,122 @@
                       nil)
   :root-viewport-id :rv-myid)
 
+(defvar *application-modules* (make-hash-table :test 'eq)
+  "A registry for application modules defined with defmodule.")
+
+(defmacro defmodule (name &key state messages update view subscriptions
+                            components dependencies exports)
+  "Defines a reusable application module."
+  `(progn
+     ;; Define module messages
+     ,@(when messages
+         `((defmsg ,(intern (format nil "~A-MSG" name))
+               (:docstring ,(format nil "Messages for ~A module" name))
+               ,@messages)))
+
+     ;; Register module
+     (setf (gethash ',name *application-modules*)
+           (list :state-schema ',state
+                 :messages ',messages
+                 :update ',update
+                 :view ',view
+                 :subscriptions ',subscriptions
+                 :components ',components
+                 :dependencies ',dependencies
+                 :exports ',exports))
+
+     ',name))
+
+(defmacro defapplication-contracted (name &key root-dsl initial-state
+                                            update view subscriptions
+                                            message-schema validation-mode
+                                            modules platform-options)
+  "Enhanced defapplication with contract enforcement and modular architecture."
+  (let ((app-msg-type (or message-schema
+                          (intern (format nil "~A-MSG" name))))
+        (update-fn-name (intern (format nil "~A-UPDATE" name)))
+        (view-fn-name (intern (format nil "~A-VIEW" name)))
+        (subs-fn-name (intern (format nil "~A-SUBSCRIPTIONS" name))))
+
+    `(progn
+       ;; Define application message schema
+       ,@(when message-schema
+           `((defmsg ,app-msg-type
+                 (:docstring ,(format nil "Messages for ~A application" name))
+                 ;; Include common application messages
+                 AppInitialized
+                 AppShutdown
+                 (ModuleMessage :module keyword :message t)
+                 (ComponentMessage :component keyword :message t)
+                 ;; Custom messages from modules
+                 ,@(mapcan (lambda (module)
+                             (getf module :messages))
+                           modules))))
+
+       ;; Contract-enforced update function
+       ,(ecase (or validation-mode :hybrid)
+          (:flexible
+           `(elmtui.contracts:defupdate-flexible ,update-fn-name (model message)
+              ,@(if update (list update)
+                    `((declare (ignore model message))
+                      (values nil nil)))))
+          (:typed
+           `(elmtui.contracts:defupdate-typed ,update-fn-name (model message) ,app-msg-type
+              ,@(if update (list update)
+                    `((declare (ignore model message))
+                      (values nil nil)))))
+          (:hybrid
+           `(elmtui.contracts:defupdate-hybrid ,update-fn-name (model message)
+             :message-type ,app-msg-type
+             ,@(if update (list update)
+                   `((declare (ignore model message))
+                     (values nil nil))))))
+
+       ;; Contract-enforced view function
+       (elmtui.contracts:defview ,view-fn-name (model)
+         ,@(if view (list view)
+               `(,root-dsl)))
+
+       ;; Contract-enforced subscriptions
+       (elmtui.contracts:defsubscriptions ,subs-fn-name (model)
+         ,@(if subscriptions (list subscriptions)
+               `((declare (ignore model)) nil)))
+
+       ;; Standard defapplication with contract functions
+       (defapplication ,name
+         :root-component-dsl ,root-dsl
+         :initial-state-plist ,initial-state
+         :update-fn ',update-fn-name
+         :view-fn ',view-fn-name
+         :subscriptions-fn ',subs-fn-name
+         :root-viewport-id ,(intern (format nil "~A-ROOT" name) :keyword)
+         ,@platform-options)
+
+       ;; Module integration
+       ,@(mapcar (lambda (module)
+                   `(integrate-module ',name ,module))
+                 modules)
+
+       ',name)))
+
+;; (defmacro compose-application (name &key modules root-module platform-options)
+;;   "Composes an application from multiple modules."
+;;   (let ((combined-state (combine-module-states modules))
+;;         (combined-messages (combine-module-messages modules))
+;;         (combined-update (generate-module-router modules))
+;;         (combined-view (generate-module-view-compositor modules root-module))
+;;         (combined-subscriptions (combine-module-subscriptions modules)))
+
+;;     `(defapplication-contracted ,name
+;;        :root-dsl ,combined-view
+;;        :initial-state ,combined-state
+;;        :message-schema ,(intern (format nil "~A-MSG" name))
+;;        :update ,combined-update
+;;        :view ,combined-view
+;;        :subscriptions ,combined-subscriptions
+;;        :modules ,modules
+;;        ,@platform-options)))
+
 ;;; ---------------------------------------------------------------------------
 ;;; FiveAM sanity tests
 ;;; ---------------------------------------------------------------------------
@@ -318,7 +421,7 @@
 ;;   (in-suite sanity)
 
 ;;   (test expansion
-;;     (eval '(elmtui.app:defapplication my-test-app
+;;     (eval '(defapplication my-test-app
 ;;             :root-component-dsl *dummy-root-dsl*
 ;;             :root-viewport-id   :rv))
 ;;     (is (fboundp 'initialize-app-state-my-test-app))
@@ -327,7 +430,7 @@
 
 ;;   (test missing-arg
 ;;     (is-error (macroexpand
-;;                '(elmtui.app:defapplication bad-app
+;;                '(defapplication bad-app
 ;;                  :root-component-dsl *dummy-root-dsl*))))
 
 ;;   (defun run-tests () (run! 'sanity)))

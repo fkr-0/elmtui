@@ -108,6 +108,12 @@
            (let ((*print-length* 10) (*print-level* 4))
              (sb-debug:backtrace 10 s)))))
 ;;;-----------------------------------------------------------------------------
+(defun parse-plist-and-children (args)
+  "Parses a list of arguments into a property list and a list of children."
+  (let ((i (loop for i from 0 below (length args) by 2
+                 unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
+                 return i)))
+    (values (subseq args 0 i) (subseq args i))))
 ;;; Style Application
 ;;;-----------------------------------------------------------------------------
 
@@ -117,20 +123,21 @@
 
 ;; Improved: Always convert DSL list directly to styled-ui-node, not ui-node, for robust style handling
 (defmethod apply-stylesheet-to-tree ((node list) stylesheet &optional parent)
-  "Handle DSL property list trees by converting directly to a styled-ui-node, then applying styles. Correctly threads parent."
-  (log:debug "STYLED: apply-stylesheet-to-tree for DSL list. Converting to styled-ui-node. Parent: ~S"
-             (if parent (ignore-errors (stylable-id parent)) "NIL_PARENT"))
-  (let* ((type (first node))
-         (props (loop for (k v) on (rest node) by #'cddr
-                      until (eq k :children)
-                      append (list k v)))
-         (children (getf (rest node) :children))
-         (styled-children (mapcar (lambda (child)
-                                    (apply-stylesheet-to-tree child stylesheet nil))
-                                  children))
-         (styled-node (make-styled-node :type type :props props :children styled-children :parent parent)))
-    ;; Now, call apply-stylesheet-to-tree on this new styled-node to ensure full style application
-    (apply-stylesheet-to-tree styled-node stylesheet parent)))
+  (when node
+    (when (and (listp node) (listp (first node)) (= 1 (length node)))
+      (setf node (first node)))
+    "Handle DSL property list trees by converting directly to a styled-ui-node, then applying styles. Correctly threads parent."
+    (log:debug "STYLED: apply-stylesheet-to-tree for DSL list. Converting to styled-ui-node. Parent: ~S"
+               (if parent (ignore-errors (stylable-id parent)) "NIL_PARENT"))
+    (let* ((type (first node))
+           (args (rest node)))
+      (multiple-value-bind (props children)
+          (parse-plist-and-children args)
+        (let* ((styled-children (mapcar (lambda (child)
+                                          (apply-stylesheet-to-tree child stylesheet nil))
+                                        children))
+               (styled-node (make-styled-node :type type :props props :children styled-children :parent parent)))
+          (apply-stylesheet-to-tree styled-node stylesheet parent))))))
 (defgeneric apply-stylesheet-to-tree (node stylesheet &optional parent)
   (:documentation
    "Recursively applies styles from STYLESHEET to NODE and its descendants.
