@@ -142,8 +142,15 @@ Workflow:
           (log-error "Failed to instantiate component: No component class found for DSL type: ~S. DSL: ~S, ID-PATH: ~S"
                      dsl-type dsl id-path)
           (error "No component class found for DSL type: ~a" dsl-type)))))
+(defmethod get-component-class-for-dsl-type ((dsl-type list))
+  "Retrieve the component class registered for a given DSL type."
+  (when (null dsl-type)
+    (log-error "DSL type is nil or empty. Cannot retrieve component class.")
+    (error "DSL type cannot be nil or empty."))
+  (get-component-class-for-dsl-type (first dsl-type)))
 
-(defun get-component-class-for-dsl-type (dsl-type)
+
+(defmethod get-component-class-for-dsl-type ((dsl-type symbol))
   "Retrieve the component class registered for a given DSL type."
   (declare (type (or symbol keyword) dsl-type))
   (let* ((keyword-dsl-type (intern (symbol-name dsl-type) :keyword))
@@ -154,7 +161,7 @@ Workflow:
           class)
         (progn
           (log-error "No component class registered for DSL type: ~S" keyword-dsl-type)
-          nil))))
+          (error (format nil "No component class registered for DSL type: ~S" keyword-dsl-type))))))
 
 (defun register-dsl-component-type (dsl-type class-name)
   "Registers a component class for a given DSL type keyword."

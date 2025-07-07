@@ -39,11 +39,30 @@
     (list list) ; context -> context
     (context)
   (let* ((dsl-tree (getf context :tree))
-         (model (getf context :app-model))
-         (raw-tree (dsl->ui-node dsl-tree model)))
-    (let ((new-context (copy-list context)))
-      (setf (getf new-context :tree) raw-tree)
-      new-context)))
+         (model (getf context :app-model)))
+    (labels ((expand-components (dsl)
+               (if (and (consp dsl) (elmtui.app.api:get-component-class-for-dsl-type (first dsl)))
+                   (let* ((component-id (getf (cdr dsl) :id))
+                          (id-path `(:components ,component-id))
+                          (instance (elmtui.app.api:get-component-instance id-path model)))
+                     (if instance
+                         (expand-components (elmtui.ui.api:view instance model :id-path id-path))
+                         (error "Component instance not found for ID ~A in state ~A" component-id model)))
+                   (if (and (consp dsl) (getf (cdr dsl) :children))
+                       (let* ((children (getf (cdr dsl) :children))
+                              (expanded-children (mapcar #'expand-components children))
+                              (new-dsl (copy-list dsl)))
+                         (setf (getf (cdr new-dsl) :children) expanded-children)
+                         new-dsl)
+                       dsl))))
+      (let* ((expanded-dsl (expand-components dsl-tree))
+             (raw-tree (dsl->ui-node expanded-dsl model)))
+        (setf (getf context :tree) raw-tree))
+      context
+      ;; (let ((new-context (copy-list context)))
+      ;;   (setf (getf new-context :tree) raw-tree)
+      ;;   new-context)
+      )))
 
 ;; STAGE 2: Apply styles to the raw UI-Node tree
 (define-stage apply-styles
