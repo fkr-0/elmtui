@@ -6,6 +6,7 @@
   (:use #:cl)
   (:import-from #:elmtui.view.styled #:make-styled-node)
   (:import-from #:elmtui.app.api #:registered-dsl-component-p)
+  (:import-from #:elmtui.state.utils #:parse-plist-and-children)
   (:export #:render-dsl-to-resolved-tree
            #:defcomponent-dsl
            #:dsl->ui-node))
@@ -35,40 +36,28 @@
          (list* ,dsl-type :id id args))
        (export ',helper-fn-name))))
 
-(defun parse-plist-and-children (args)
-  "Parses a list of arguments into a property list and a list of children."
-  (let ((i (loop for i from 0 below (length args) by 2
-                 unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
-                   return i)))
-    (values (subseq args 0 i) (subseq args i))))
 
 ;;; --- DSL Rendering ---
 (defun render-dsl-to-resolved-tree (dsl-spec app-state)
   "Renders a view DSL spec into a tree of resolved component nodes.
    This function is called by the application's renderer."
-  (labels ((process-node (spec current-path)
-             (if (and spec (listp spec) (keywordp (first spec)))
-                 (let* ((component-type (first spec))
-                        (args (rest spec)))
-                   (if (registered-dsl-component-p component-type)
-                       ;; It's a stateful component.
-                       (let* ((id (getf args :id))
-                              (component-path (append current-path (list id))))
-                         (unless id (error "View DSL spec for component ~S missing :id at path ~S" component-type current-path))
-                         (let* ((component (elmtui.state:get-component-by-path app-state component-path))
-                                (view-result (elmtui.ui.api:view component app-state)))
-                           ;; The view-result itself is a DSL spec. We need to recursively process it.
-                           (list component-type :id id :resolved-view (process-node view-result component-path))))
-                       ;; It's a layout element. It doesn't have a view method.
-                       (multiple-value-bind (props children)
-                           (parse-plist-and-children args)
-                         (let ((id (getf props :id)))
-                           (list* component-type props
-                                  (mapcar (lambda (child-spec)
-                                            (process-node child-spec (if id (append current-path (list id)) current-path)))
-                                          (or (getf props :children) children)))))))
-                 spec))) ; If not a component spec, return as is (e.g. string, number)
-    (process-node dsl-spec nil)))
+  (labels ((process-node (spec)
+              (if (and spec (listp spec) (keywordp (first spec)))
+                  (let* ((component-type (first spec))
+                         (args (rest spec)))
+                    (if (registered-dsl-component-p component-type)
+                        (let* ((id (getf args :id))
+                               (component-path (list :components id)))
+                          (unless id (error "View DSL spec for component ~S missing :id" component-type))
+                          (let* ((component (elmtui.state.api:get-component-by-path app-state component-path))
+                                 (view-result (elmtui.ui.api:view component app-state :id-path component-path)))
+                            (process-node view-result)))
+                        (multiple-value-bind (props children)
+                            (parse-plist-and-children args)
+                          (let ((resolved-children (mapcar #'process-node children)))
+                            (list* component-type (append props (list :children resolved-children)))))))
+                  spec)))
+    (process-node dsl-spec)))
 
 ;;; --- DSL to UI-Node Conversion Utility ---
 (defun dsl->ui-node (dsl-spec app-state)
