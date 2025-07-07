@@ -29,8 +29,9 @@
   (:state
    (state nil))
   (:view (local-state-map app-state id-path)
-         (declare (ignore local-state-map app-state id-path))
-         `(:test-component)))
+         (declare (ignore app-state))
+         `(:text :id ,(elmtui.ui.api:id-from-path id-path)
+                 :content ,(format nil "State: ~A" (getf local-state-map :state)))))
 
 (elmtui.ui.defcomponent:defcomponent test-parent-component (elmtui.ui.api:component)
   (:state
@@ -54,9 +55,8 @@
                 (child-id (first (getf parent-map :children-ids)))
                 (child-id-path `(:components ,child-id)))
            `(:test-parent-component
-             (:child ,(elmtui.ui.api:view (elmtui.app::get-component-instance child-id-path app-state)
-                                          app-state
-                                          :id-path child-id-path))))))
+             :id ,(elmtui.ui.api:id-from-path id-path)
+             :children ((:test-component :id ,child-id))))))
 
 ;; Register the test components with the DSL type registry
 (eval-when (:compile-toplevel :load-toplevel :execute)

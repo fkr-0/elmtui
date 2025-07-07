@@ -12,7 +12,7 @@
 ;; (register-dsl-component-type :scrollable-container 'elmtui.ui.widgets.scrollable-container:scrollable-container)
 ;; (register-dsl-component-type :counter 'elmtui.ui.widgets.counter:counter)
 (register-dsl-component-type :layout 'elmtui.ui.widgets.layout:layout)
-
+(register-dsl-component-type :column 'elmtui.ui.widgets.layout:layout)
 ;;; Sanity check (can be removed in production)
 (assert (eq (elmtui.app.api:get-component-class-for-dsl-type :label)
             'elmtui.ui.widgets.label:label))

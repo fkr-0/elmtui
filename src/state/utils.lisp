@@ -12,7 +12,8 @@
   ;; For now, assuming elmtui.state.api handles all public exports.
   ;; If elmtui.state defines functions that are part of the API, they should be exported there.
   (:export
-   #:get-path #:set-path #:remove-path))
+   #:get-path #:set-path #:remove-path
+   #:parse-plist-and-children))
 (in-package :elmtui.state.utils)
 
 ;;; 1. Helpers ────────────────────────────────────────────────────────────────
@@ -20,6 +21,14 @@
   "True when OBJ is a proper association list (every element is a dotted pair)."
   (and (listp obj)
        (every #'consp obj)))
+
+(defun parse-plist-and-children (args)
+ "Parses a list of arguments into a property list and a list of children."
+ (let ((i (or (loop for i from 0 below (length args) by 2
+                    unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
+                      return i)
+              (length args))))
+   (values (subseq args 0 i) (subseq args i))))
 
 (defun %empty-container-p (obj)
   "Predicate used by REMOVE-PATH to decide whether to prune a branch."

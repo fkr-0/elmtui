@@ -21,6 +21,7 @@
                 #:merge-sets!) ; Added merge-sets! for inline styles
   ;; Import query-stylesheet from sheet package
   (:import-from :elmtui.style-lib.sheet #:query-stylesheet)
+  (:import-from #:elmtui.state.utils #:parse-plist-and-children)
   (:export
    #:ui-node-children
    #:ui-node-props
@@ -108,12 +109,6 @@
            (let ((*print-length* 10) (*print-level* 4))
              (sb-debug:backtrace 10 s)))))
 ;;;-----------------------------------------------------------------------------
-(defun parse-plist-and-children (args)
-  "Parses a list of arguments into a property list and a list of children."
-  (let ((i (loop for i from 0 below (length args) by 2
-                 unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
-                 return i)))
-    (values (subseq args 0 i) (subseq args i))))
 ;;; Style Application
 ;;;-----------------------------------------------------------------------------
 
@@ -193,6 +188,11 @@
   "Base case for recursion: nil node returns nil."
   (declare (ignore stylesheet parent))
   nil)
+
+(defmethod apply-stylesheet-to-tree ((node t) stylesheet &optional parent)
+  "Catch-all for non-list, non-ui-node data (e.g., strings, numbers)."
+  (declare (ignore stylesheet parent))
+  node)
 
 ;;;-----------------------------------------------------------------------------
 ;;; Style Value Access Helper
