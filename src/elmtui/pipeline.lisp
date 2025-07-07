@@ -37,9 +37,11 @@
     (list list) ; context -> context
     (context)
   (let* ((raw-tree (getf context :tree))
-         (stylesheet (getf context :stylesheet))
-         (styled-tree (elmtui.view.styled:apply-stylesheet-to-tree raw-tree stylesheet)))
-    (list* :tree styled-tree context)))
+         (stylesheet (getf context :stylesheet)))
+    (if raw-tree
+        (let ((styled-tree (elmtui.view.styled:apply-stylesheet-to-tree raw-tree stylesheet)))
+          (list* :tree styled-tree context))
+        context)))
 
 ;; STAGE 3: Resolve view (e.g., handle :overflow, :display: none)
 (define-stage resolve-view-stage

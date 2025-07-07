@@ -166,7 +166,11 @@
               state map within the `(:components ...)` section of the app-state.
               Example: '(:my-app :main-layout :submit-button)
    `initargs`: Other initargs passed during component creation.
-   Returns (values component patches commands).")
+   Returns (values component patches commands).
+
+   Example usage:
+   (init my-component :id-path '(:my-app :main-layout :submit-button)
+         :dsl '(:button :label \"Submit\" :on-click #'submit-handler))")
   (:method ((component component)
             &rest initargs              ;; capture *all* remaining args
             &key id-path dsl                ;; explicitly parse :id-path

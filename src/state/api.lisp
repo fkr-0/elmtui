@@ -70,6 +70,8 @@ defining models and messages, and creating update functions, following Elm Archi
 
   ;; Define the public interface by exporting the imported symbols.
   (:export
+   #:pprinc-application-state
+   #:get-component-state
    ;; Global application state instance
    #:get-path-enhanced
 
@@ -170,12 +172,12 @@ defining models and messages, and creating update functions, following Elm Archi
 
 ;; (defgeneric APPLICATION-STATE-LOCK (app-state))
 ;; (defgeneric APPLICATION-STATE-OBSERVERS (app-state))
-(defgeneric GET-PATH (app-state path &optional comp-id)
-  (:documentation "Get the value at `PATH` in the application state `APP-STATE`.
-  Optionally provide `COMP-ID` to scope the key."))
-(defgeneric MERGE-PATCHES (app-state patches)
-  (:documentation "Merge `PATCHES` into the application state `APP-STATE`.
-  This applies a list of patches to the current state, updating it accordingly."))
+;; (defgeneric get-path (app-state path &optional comp-id)
+;;   (:documentation "Get the value at `PATH` in the application state `APP-STATE`.
+;;   Optionally provide `COMP-ID` to scope the key."))
+;; (defgeneric merge-patches (app-state patches)
+;;   (:documentation "Merge `PATCHES` into the application state `APP-STATE`.
+;;   This applies a list of patches to the current state, updating it accordingly."))
 
 
 (defstruct (update-result (:conc-name ur-))
@@ -228,7 +230,8 @@ and commands to be executed."
 (declaim (ftype (function (state-data) hash-table) state-data-data)) 
 ;; Correct writer signature - the value comes first, then the instance
 (declaim (ftype (function (hash-table state-data) hash-table) (setf state-data-data)))
-
+(defvar *global-h* 0)
+(setq *global-h* 0)
 (defstruct application-state
   "A struct to hold the application state.
   The application state holds the state data, observers, a lock, a transaction log,
@@ -240,7 +243,28 @@ and commands to be executed."
   (transaction-history (list) :type list) ; Stack of committed transactions (undo stack)
   (undone-history (list) :type list)) ; Stack of undone transactions (redo stack)
 
-;; Correct FTYPE declarations for application-state constructor with proper keyword parameters
+(defun -tabl-to-str (tabl)
+  (loop for key being the hash-keys of tabl
+        collect (cons key
+                      (let ((value (gethash key tabl)))
+                        (if (hash-table-p value)
+                            (progn
+                              (incf *global-h* 1)
+                              (let ((v (format nil "~A</H~A>"
+                                               (format nil "~&~%~A<H~A>~A"
+                                                       (str:repeat *global-h*  " ")
+                                                       *global-h*
+                                                       (-tabl-to-str value))
+                                               (- *global-h* 0))))
+                                (decf *global-h* 1)
+                                v))
+                            (format nil "~A" value))))))
+(defun pprinc-application-state (state)
+  "Pretty print the application state."
+  (let ((data (-tabl-to-str (state-data-data (application-state-data state)))))
+    ;; Correct FTYPE declarations for application-state constructor with proper keyword parameters
+    (format nil "~&~% ~A~%Data: ~A~%" (format nil "~&Application State:~%") data)))
+
 (declaim (ftype (function 
                  (&key 
                   (:data state-data)
@@ -493,8 +517,13 @@ Handles app-state, application-state, hash-table, and plist inputs."
 (defun get-component-state (state component-id)
   "Gets full component state from state."
   (declare (type (or app-state application-state hash-table list) state)
-           (type (or keyword symbol) component-id))
-  (get-path-enhanced state (list :components component-id)))
+           (type (or keyword symbol list) component-id))
+  (get-path ;-enhanced
+   state (if (listp component-id)
+             component-id
+                                        ;(component-state-path component-id)
+             (list :components component-id)
+             )))
 
 (defun get-component-property (state id-path property &optional default)
   "Gets specific property from component state."

@@ -7,7 +7,7 @@
    :event-channel)
   (:export #:defapplication
            #:run-application
-
+           #:registered-dsl-component-p
            #:get-component-instance
            #:instantiate-component-from-dsl
            #:register-dsl-component-type #:get-component-class-for-dsl-type
@@ -37,21 +37,36 @@
 
 ;; Generic function signatures with improved type declarations
 (declaim (ftype (function (list t) t) get-component-instance))
-
+(defun %kw (x)
+  (etypecase x
+    (null     nil)
+    (keyword  x)
+    (symbol   (intern (string-upcase x) "KEYWORD"))
+    (string   (intern (string-upcase x) "KEYWORD"))))
 (defgeneric get-component-instance (id-path state)
   (:method ((id-path list) (state t))
     "Recursively retrieve a component instance from STATE by following ID-PATH.
 Logs each step and signals a detailed error if the path is invalid or not found."
     (log-debug "Retrieving component instance for ID path: ~S in state: ~S" id-path state)
-    (let ((component-state (elmtui.state:get-path state id-path)))
+    (let ((component-state (elmtui.state.api:get-component-state state id-path)))
       (if component-state
           (let ((component-class (get-component-class-for-dsl-type (getf component-state :type))))
             (when component-class
               (make-instance component-class :id (getf component-state :id))))
           (progn
             (log-error "Component with ID path ~S not found in state: ~S" id-path state)
-            (error "Component with ID path ~S not found in state." id-path))))))
-
+            (error (format nil "Component with ID listp ~A~% path ~A~% not found in state ~A~%"
+                           (listp id-path)
+                           id-path
+                           (elmtui.state.api:pprinc-application-state state))))))))
+(defmethod get-component-instance ((id-path t) (state t))
+  "Retrieve a component instance by ID path symbol."
+  (let ((idp (%kw id-path)))
+    (when (null idp)
+      (log-error "Invalid ID path: ~S" id-path)
+      (error "Invalid ID path: ~S" id-path))
+    (get-component-instance (list :components
+                                  idp) state)))
 (declaim (ftype (function (t &key (:backend-type keyword) (:platform-options list)) t) run-application))
 (defgeneric run-application (app-spec &key backend-type platform-options)
   (:documentation "Run the application with the given app-spec and platform options.")
@@ -146,6 +161,18 @@ Workflow:
   (declare (type (or symbol keyword) dsl-type) (type symbol class-name))
   (setf (gethash (intern (symbol-name dsl-type) :keyword) *dsl-type-to-component-class*) class-name)
   (log-info "Registered DSL type ~S with class ~S." dsl-type class-name))
+
+(defun registered-dsl-component-p (dsl-type)
+  "Check if a component class is registered for the given DSL type."
+  (declare (type (or symbol keyword) dsl-type))
+  (let ((keyword-dsl-type (intern (symbol-name dsl-type) :keyword)))
+    (if (gethash keyword-dsl-type *dsl-type-to-component-class*)
+        (progn
+          (log-debug "Component class found for DSL type: ~S" keyword-dsl-type)
+          t)
+        (progn
+          (log-debug "No component class registered for DSL type: ~S" keyword-dsl-type)))))
+
 
 (defun validate-platform-options (platform platform-options)
   "Validate PLATFORM-OPTIONS for the given PLATFORM, signalling an error on invalid keys."
