@@ -90,7 +90,7 @@ in the external application state as *patches* rather than CLOS slots."))
   "Return the live child component instance, or NIL when absent.
    Assumes the child's specification is stored at (append id-path '(:child))
    and the first element of this spec is the child's ID (a keyword)."
-  (let ((child-spec (get-path state (append id-path '(:child)))))
+  (let ((child-spec (get-path (append id-path '(:child))state )))
     (when (and child-spec (consp child-spec)) ; Ensure spec is a non-nil list
       (let ((child-id (car child-spec)))
         ;; Ensure ID is a keyword, which is the convention for component IDs.
@@ -208,9 +208,9 @@ Initial child spec is stored in state for the view method to use."
        (destructuring-bind (&key new-dimensions) (cdr message)
          (let* ((term-cols (car new-dimensions))
                 (term-rows (cdr new-dimensions))
-                (anchor    (get-path state (append id-path '(:state :anchor))))
-                (cursor-row (get-path state (append id-path '(:state :initial-cursor-row))))
-                (cursor-col (get-path state (append id-path '(:state :initial-cursor-col))))
+                (anchor    (get-path (append id-path '(:state :anchor)) state ))
+                (cursor-row (get-path (append id-path '(:state :initial-cursor-row)) state ))
+                (cursor-col (get-path (append id-path '(:state :initial-cursor-col)) state ))
                 (new-width  term-cols) ; root-viewport width is usually term-cols
                 (new-height (nth-value 1 (compute-view-size anchor
                                                             term-cols
@@ -240,7 +240,7 @@ Initial child spec is stored in state for the view method to use."
                                &key id-path)
   (declare (type list id-path) (type t state)) ; state can be complex
   (check-type id-path list)
-  (let* ((vp-state (get-path state (append id-path '(:state))))
+  (let* ((vp-state (get-path (append id-path '(:state)) state ))
          (child-dsl-spec (getf vp-state :child-dsl-spec)) ; Get the child's DSL
          (width (getf vp-state :width))
          (height (getf vp-state :height))

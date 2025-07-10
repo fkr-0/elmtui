@@ -65,21 +65,21 @@
     ;; Set a value at a simple path
     (setf (state-data-data (application-state-data app-state))
           (elmtui.state:set-path initial-data '(:user :name) "Alice"))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:user :name)) "Alice"))
+    (is (equal (get-path '(:user :name) (state-data-data (application-state-data app-state))) "Alice"))
 
     ;; Set a value at a new path, creating intermediate plists
     (setf (state-data-data (application-state-data app-state))
           (elmtui.state:set-path (state-data-data (application-state-data app-state)) '(:settings :theme) :dark))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:settings :theme)) :dark))
+    (is (equal (get-path '(:settings :theme) (state-data-data (application-state-data app-state))) :dark))
 
     ;; Overwrite an existing value
     (setf (state-data-data (application-state-data app-state))
           (elmtui.state:set-path (state-data-data (application-state-data app-state)) '(:user :name) "Bob"))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:user :name)) "Bob"))
+    (is (equal (get-path '(:user :name) (state-data-data (application-state-data app-state))) "Bob"))
 
     ;; Get a non-existent path
-    (is (null (get-path (state-data-data (application-state-data app-state)) '(:user :age))))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:user :age) :not-found) :not-found))))
+    (is (null (get-path '(:user :age) (state-data-data (application-state-data app-state)))))
+    (is (equal (get-path '(:user :age) :not-found (state-data-data (application-state-data app-state))) :not-found))))
 
 ;; Test case for REMOVE-PATH
 (test remove-path-basic
@@ -95,8 +95,8 @@
     ;; Remove an existing path
     (setf (state-data-data (application-state-data app-state))
           (remove-path (state-data-data (application-state-data app-state)) '(:user :age)))
-    (is (null (get-path (state-data-data (application-state-data app-state)) '(:user :age))))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:user :name)) "Alice"))
+    (is (null (get-path '(:user :age) (state-data-data (application-state-data app-state)))))
+    (is (equal (get-path '(:user :name) (state-data-data (application-state-data app-state))) "Alice"))
 
     ;; Remove a non-existent path (should return original data)
     (let ((original-data (state-data-data (application-state-data app-state))))
@@ -107,7 +107,7 @@
     ;; Remove a nested path
     (setf (state-data-data (application-state-data app-state))
           (remove-path (state-data-data (application-state-data app-state)) '(:settings :theme)))
-    (is (null (get-path (state-data-data (application-state-data app-state)) '(:settings :theme))))))
+    (is (null (get-path '(:settings :theme) (state-data-data (application-state-data app-state)))))))
 
 ;; Test case for MERGE-PATCH and MERGE-PATCHES
 (test merge-patches-basic
@@ -121,20 +121,20 @@
     ;; Merge a single patch
     (setf (state-data-data (application-state-data app-state))
           (merge-patch (state-data-data (application-state-data app-state)) '((:user :name) "Bob")))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:user :name)) "Bob"))
+    (is (equal (get-path '(:user :name) (state-data-data (application-state-data app-state))) "Bob"))
 
     ;; Merge multiple patches
     (setf (state-data-data (application-state-data app-state))
           (merge-patches (state-data-data (application-state-data app-state))
                          '(((user :age) 31)
                            ((settings :theme) :light))))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:user :age)) 31))
-    (is (equal (get-path (state-data-data (application-state-data app-state)) '(:settings :theme)) :light))
+    (is (equal (get-path '(:user :age) (state-data-data (application-state-data app-state))) 31))
+    (is (equal (get-path '(:settings :theme) (state-data-data (application-state-data app-state))) :light))
 
     ;; Test :elmtui-delete-path
     (setf (state-data-data (application-state-data app-state))
           (merge-patch (state-data-data (application-state-data app-state)) '((:user :age) :elmtui-delete-path)))
-    (is (null (get-path (state-data-data (application-state-data app-state)) '(:user :age))))))
+    (is (null (get-path '(:user :age) (state-data-data (application-state-data app-state)))))))
 
 ;; Test case for GET-COMPONENT-BY-PATH and STORE-COMPONENT-AT-PATH
 (test component-path-management

@@ -7,12 +7,12 @@
 
   (:import-from :elmtui.state.utils #:get-path #:set-path #:remove-path)
   (:import-from :elmtui.state.api ; Import from the central API
-   :application-state :make-application-state :state-ref :get-state :set-state
-
+   #:application-state #:make-application-state #:state-ref #:get-state #:set-state
+   #:application-state-p
    #:application-state-data #:state-data #:state-data-data
-   :with-transaction :undo-last-transaction
-   :update-result :make-update-result :ur-patches :ur-commands
-   :ur-has-command-p)
+                :with-transaction :undo-last-transaction
+                :update-result :make-update-result :ur-patches :ur-commands
+                :ur-has-command-p)
   (:import-from :elmtui.core.globals
    :*app-state*)
   ;; Import the conditions package directly to avoid qualified references
@@ -41,6 +41,8 @@
   (:export
    :with-async-restarts ; This is a utility for async task handling, not part of the API
    ;; Functions defined here that are exported to the public API
+   #:app-state-p
+   #:application-state-p
    :merge-patch :merge-patches
    :get-path :set-path :remove-path
    :get-component-by-path :store-component-at-path :remove-component-at-path
@@ -109,7 +111,7 @@
 ;; ;;; ──────────────────────────────────────────
 ;; ;;; HASH-TABLE containers
 ;; ;;; ──────────────────────────────────────────
-;; (defmethod get-path ((table hash-table) (key symbol) &optional default)
+;; (defmethod get-path ( (key symbol) (table hash-table) &optional default)
 ;;   (multiple-value-bind (val foundp) (gethash key table)
 ;;     (if foundp val default)))
 
@@ -119,7 +121,7 @@
 ;;          (next (get-path table key default)))
 ;;     (if (eq next default)
 ;;         default
-;;         (get-path next rest default))))
+;;         (get-path rest next default))))
 
 ;; ;;; ──────────────────────────────────────────
 ;; ;;; PLIST (property-list) containers
@@ -130,7 +132,7 @@
 ;; ;; (defmethod get-path ((plist list) (path cons) &optional default)
 ;; ;;   (let* ((key  (car path))
 ;; ;;          (rest (cdr path))
-;; ;;          (next (get-path plist key default)))
+;; ;;          (next (get-path key plist default)))
 ;; ;;     (if (eq next default)
 ;; ;;         default
 ;; ;;         (get-path next rest default))))
@@ -319,7 +321,7 @@ Returns the updated state-data."
          (components-path (append '(:components) component-id-path '(:component-instance))))
     (if (typep app-data 'state-data)
         (let ((hash-table-data (state-data-data app-data)))
-          (get-path components-path hash-table-data)
+          (get-path hash-table-data components-path )
           ;; (if (and (listp components-path) (= (length components-path) 1))
           ;;     (gethash (first components-path) hash-table-data)
           ;;     ;; Old: error on list-paths

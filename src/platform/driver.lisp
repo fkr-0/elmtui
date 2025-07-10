@@ -165,7 +165,7 @@ Args:
   (unless *root-viewport-id-path*
     (error "Root viewport ID path not set before previous buffer initialization."))
   (let* ((rv-state-path (append *root-viewport-id-path* '(:state)))
-         (root-viewport-behavioral-state (elmtui.state:get-path current-model rv-state-path)))
+         (root-viewport-behavioral-state (elmtui.state:get-path rv-state-path current-model)))
     (unless root-viewport-behavioral-state
       (error (format nil "Root viewport behavioral state not found at ~S in model ~S" rv-state-path current-model)))
     (let ((buffer-width (getf root-viewport-behavioral-state :width))
@@ -189,12 +189,12 @@ Args:
     (return-from render-frame))
 
   (let* ((view-fn (getf app-spec :view-fn))
-         (root-viewport-state (elmtui.state:get-path current-model (append *root-viewport-id-path* '(:state))))
+         (root-viewport-state (elmtui.state:get-path (append *root-viewport-id-path* '(:state)) current-model ))
          (viewport-width (getf root-viewport-state :width))
          (viewport-height (getf root-viewport-state :height))
          (viewport-offset-x (getf root-viewport-state :offset-x 0))
          (viewport-offset-y (getf root-viewport-state :offset-y 0))
-         (stylesheet (elmtui.state:get-path current-model '(:current-stylesheet))))
+         (stylesheet (elmtui.state:get-path '(:current-stylesheet) current-model )))
 
     (unless (and (typep view-fn 'function)
                  (numberp viewport-width) (plusp viewport-width)
@@ -247,7 +247,7 @@ Args:
     (setf *driver-initiated-shutdown-p* nil)
     (log:info "DRIVER: Starting application loop for ~A." app-name)
     (loop
-      (let ((should-quit (elmtui.state:get-path *current-app-model* '(:should-quit))))
+      (let ((should-quit (elmtui.state:get-path '(:should-quit) *current-app-model* )))
         (log:debug "DRIVER: Loop check: *driver-initiated-shutdown-p* = ~A, :should-quit = ~A" *driver-initiated-shutdown-p* should-quit)
         (when (or *driver-initiated-shutdown-p* should-quit)
           (log:info "DRIVER: Shutdown condition met. Exiting app loop for ~A. (*driver-initiated-shutdown-p* = ~A, :should-quit = ~A)" app-name *driver-initiated-shutdown-p* should-quit)
@@ -269,7 +269,7 @@ Args:
            (multiple-value-bind (next-model commands)
                (funcall update-fn *current-app-model* msg)
              (declare (type list next-model commands))
-             (log:debug "DRIVER: After update-fn, next-model :should-quit = ~A" (elmtui.state:get-path next-model '(:should-quit)))
+             (log:debug "DRIVER: After update-fn, next-model :should-quit = ~A" (elmtui.state:get-path '(:should-quit)  next-model))
              (setf *current-app-model* next-model)
              (when cmd-proc-fn
                (dolist (c commands)

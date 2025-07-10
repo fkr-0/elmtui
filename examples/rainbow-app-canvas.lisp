@@ -87,7 +87,10 @@
 
 (defapplication rainbow-canvas-example-app
   :root-viewport-id :rainbow-root-vp ; Matches ID in app-init for root-viewport state
-  :initial-state-plist (app-init)
+  ;; :initial-state-plist ;; (app-init)
+
+  :initial-state-plist `(:counter 0
+                         :text "hello")
   :root-component-dsl (rainbow-content-view nil) ; DSL for the CHILD of the root viewport
   :update-fn 'app-update
   :view-fn 'rainbow-content-view ; Function providing DSL for the CHILD
