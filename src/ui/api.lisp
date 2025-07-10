@@ -1,7 +1,7 @@
 (uiop:define-package :elmtui.ui.api
   (:use :cl #:log4cl)
   (:import-from :elmtui.state.api #:state-ref #:make-update-result)
-  (:import-from :elmtui.utils #:ensure-keyword)
+  (:import-from :elmtui.utils #:ensure-keyword #:get-path)
   (:export
    ;; Component Class & Generics
    #:component #:component-id #:component-type
@@ -273,7 +273,7 @@
              (type list id-path))
     (check-type component component)
     (check-type id-path list)
-    (get-path app-state (append (component-state-map-path id-path) '(:children)))))
+    (get-path (append (component-state-map-path id-path) '(:children)) app-state)))
 
 ;; (declaim (ftype (function (component t &key (:id-path list)) t) component-width))
 (defgeneric component-width (component app-state &key id-path)
@@ -286,7 +286,7 @@
              (type list id-path))
     (check-type component component)
     (check-type id-path list)
-    (get-path app-state (append (component-state-map-path id-path) '(:width)))))
+    (get-path (append (component-state-map-path id-path) '(:width)) app-state )))
 
 ;; (declaim (ftype (function (component t &key (:id-path list)) t) component-height))
 (defgeneric component-height (component app-state &key id-path)
@@ -299,40 +299,40 @@
              (type list id-path))
     (check-type component component)
     (check-type id-path list)
-    (get-path app-state (append (component-state-map-path id-path) '(:height)))))
+    (get-path (append (component-state-map-path id-path) '(:height)) app-state )))
 
 ;;;---------------------------------------------------------------
 ;;; Path and ID Utilities
 ;;;---------------------------------------------------------------
 
-(declaim (ftype (function (t list &optional t) t) get-path))
-(defun get-path (state full-path &optional default-value)
-  "Retrieves a value from the state at the specified FULL-PATH.
-   If the path does not exist, returns DEFAULT-VALUE (nil if not provided).
-   Handles both application-state objects and raw data structures."
-  (declare (type t state default-value) ; state can be any app-state type
-           (type list full-path))
-  (check-type full-path list)
-  (cond
-    ;; If state is an application-state object, get its raw data first
-    ((typep state 'elmtui.state.api:application-state)
-     (elmtui.state.api:get-path-enhanced state full-path default-value))
-    ;; If state has a components-store slot (test case)
-    ((and (typep state 'standard-object)
-          (slot-exists-p state 'components-store))
-     ;; Handle test-app-state structure
-     (case (first full-path)
-       (:components
-        (let ((components (slot-value state 'components-store)))
-          (if (rest full-path)
-              (elmtui.state::get-path components (rest full-path) default-value)
-              (or components default-value))))
-       (t (elmtui.state.api:state-ref state (first full-path) default-value))))
-    ;; If state is raw data (list/plist), use the raw get-path function
-    ((listp state)
-     (elmtui.state::get-path state full-path default-value))
-    ;; Fallback
-    (t default-value)))
+;; (declaim (ftype (function (t list &optional t) t) get-path))
+;; (defun get-path (full-path state  &optional default-value)
+;;   "Retrieves a value from the state at the specified FULL-PATH.
+;;    If the path does not exist, returns DEFAULT-VALUE (nil if not provided).
+;;    Handles both application-state objects and raw data structures."
+;;   (declare (type t state default-value) ; state can be any app-state type
+;;            (type list full-path))
+;;   (check-type full-path list)
+;;   (cond
+;;     ;; If state is an application-state object, get its raw data first
+;;     ;; ((typep state 'elmtui.state.api:application-state)
+;;     ;;  (elmtui.state.api:get-path-enhanced full-path state default-value))
+;;     ;; ;; If state has a components-store slot (test case)
+;;     ;; ((and (typep state 'standard-object)
+;;     ;;       (slot-exists-p state 'components-store))
+;;     ;;  ;; Handle test-app-state structure
+;;     ;;  (case (first full-path)
+;;     ;;    (:components
+;;     ;;     (let ((components (slot-value state 'components-store)))
+;;     ;;       (if (rest full-path)
+;;     ;;           (elmtui.state:get-path (rest full-path) components default-value)
+;;     ;;           (or components default-value))))
+;;     ;;    (t (elmtui.state.api:state-ref state (first full-path) default-value))))
+;;     ;; If state is raw data (list/plist), use the raw get-path function
+;;     ((listp state)
+;;      (elmtui.state::get-path full-path state default-value))
+;;     ;; Fallback
+;;     (t default-value)))
 
 (declaim (ftype (function (list) (or keyword symbol)) id-from-path))
 (defun id-from-path (path)

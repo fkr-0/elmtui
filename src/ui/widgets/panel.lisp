@@ -158,7 +158,7 @@
                      :border-style ,border-style)
        :children ,(mapcar (lambda (child-id-segment)
                             (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
-                                   (child-type (elmtui.state.api:get-path app-state child-full-id-path :type)))
+                                   (child-type (elmtui.state.api:get-path child-full-id-path app-state :type)))
                               (if child-type
                                   (let ((child-instance (make-instance child-type)))
                                     (elmtui.ui.api:view child-instance app-state :id-path child-full-id-path))
@@ -168,13 +168,13 @@
 
 ;; Method to handle destruction of the panel and its children
 (defmethod elmtui.ui.api:destroy ((self panel) app-state &key id-path)
-  (let ((panel-local-state (elmtui.state.api:get-path app-state id-path))
+  (let ((panel-local-state (elmtui.state.api:get-pat id-pathh app-state))
         (all-patches nil)
         (all-commands nil))
 
     (loop for child-id-segment in (getf panel-local-state :children-ids)
           for child-full-id-path = (append id-path (list child-id-segment))
-          for child-type = (elmtui.state.api:get-path app-state child-full-id-path :type)
+          for child-type = (elmtui.state.api:get-path child-full-id-path app-state :type)
           when child-type
             do (let ((child-instance (make-instance child-type)))
                  (multiple-value-bind (child-patches child-commands-from-destroy)

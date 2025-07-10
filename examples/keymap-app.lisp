@@ -95,7 +95,7 @@
               (component-action (cddr message)) 
               (component-instance (find-component-by-id app-state target-component-id))
               (component-state-path (list :components target-component-id))
-              (component-state (get-path app-state component-state-path)))
+              (component-state (get-path component-state-path app-state )))
          (if (and component-instance component-state)
              (multiple-value-bind (comp-patches comp-commands)
                  ;; Pass the action directly, not as a list if it's already the action keyword
@@ -118,8 +118,8 @@
   "Main application view function. Uses the elmtui.view.dsl:view macro."
   (view box-layout (:orientation :vertical :spacing 1)
         (element label (:id *info-label-id* 
-                        :text (get-path app-state (list :components *info-label-id* :text))))
-        (let* ((counter-st (get-path app-state (list :components *counter-a-id*))))
+                        :text (get-path (list :components *info-label-id* :text) app-state )))
+        (let* ((counter-st (get-path (list :components *counter-a-id*) app-state)))
           (element counter (:id *counter-a-id*
                             :value (getf counter-st :value))))))
 

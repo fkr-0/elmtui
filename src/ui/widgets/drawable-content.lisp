@@ -67,7 +67,7 @@ Its state (content, style) is stored in the application state."))
 (defmethod view ((component drawable-content) state &key id-path)
   "Generates a view model for the drawable-content component."
   (let* ((component-id (id-from-path id-path))
-         (component-props (get-path state `(:components ,component-id))))
+         (component-props (get-path `(:components ,component-id) state)))
     (unless component-props
       (warn "Drawable-content ~A state not found. Generating error view." component-id)
       (return-from view `(:error "Drawable-content state not found for ID: ~a" ,component-id)))

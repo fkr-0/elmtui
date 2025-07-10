@@ -1,5 +1,5 @@
 (uiop:define-package :elmtui.tests.rendering-pipeline
-  (:use :cl :fiveam :elmtui.pipeline)
+  (:use :cl :fiveam :elmtui.contracts :elmtui.pipeline)
   (:import-from :elmtui.view.core #:ui-node-p)
   (:import-from :elmtui.view.styled #:styled-ui-node-p)
   (:import-from :elmtui.pipeline
@@ -20,81 +20,101 @@
   :description "Tests for the rendering pipeline contracts.")
 (in-suite rendering-pipeline-suite)
 
+;; (defun setup-test-context (&optional (width 80) (height 24))
+;;   "Helper to create a default context for pipeline tests."
+;;   (let ((app-state
+;;           (elmtui.tests.application-init:initialize-app-state-test-init-app
+;;            :initial-terminal-dimensions (list width height)
+;;            :initial-cursor-position (list 0 0))))
+;;     (make-app-context
+;;      :state app-state
+;;      :viewport-rect (make-rectangle
+;;                      :size (make-size :w width :h height)
+;;                      :pos (make-pos :x 0 :y 0))
+;;      :front-buffer (make-virtual-buffer width height)
+;;      :backend nil)))
 (defun setup-test-context (&optional (width 80) (height 24))
   "Helper to create a default context for pipeline tests."
-  (let ((app-state (elmtui.tests.application-init:initialize-app-state-test-init-app
-                    :initial-terminal-dimensions (list width height)
-                    :initial-cursor-position (list 0 0))))
-    (list
-     :app-model app-state
-     :view-fn (fdefinition 'elmtui.tests.application-init::test-init-app-view)
-     :stylesheet rainbow-stylesheet
-     :viewport-rect (make-rectangle :size (make-size :w width :h height) :pos (make-pos :x 0 :y 0) )
-     :front-buffer (make-virtual-buffer width height)
-     :backend nil ; Not needed for most stages
-     :origin-x 0
-     :origin-y 0)))
+  (multiple-value-bind (app-state commands)
+      (elmtui.examples.rainbow-app:initialize-app-state-rainbow-example-app
+       :initial-terminal-dimensions (list width height)
+       :initial-cursor-position (list 0 0))
+    (declare (ignore commands))
+    (make-app-context
+     :state app-state)
+    :viewport-rect (make-rectangle
+                    :size (make-size :w width :h height)
+                    :pos (make-pos :x 0 :y 0))
+    :front-buffer (make-virtual-buffer width height)
+    :view-fn #'elmtui.examples.rainbow-app:rainbow-content-view
+    :backend nil))
+;; (setup-test-context)
+(test rainbow-app-example-state
+  "Tests the initial state of the rainbow app example."
+  (let ((context (setup-test-context)))
+    (is-true (ctx-state context) "Context should have an application state.")
+    (is-true (elmtui.state:application-state-p (ctx-state context)) "Context state should be a valid app state.")
+    (is-true (ctx-viewport-rect context) "Context should have a viewport rectangle.")
+    (is-true (ctx-front-buffer context) "Context should have a front buffer.")
+    (is-true (virtual-terminal-buffer-p (ctx-front-buffer context))
+             "Front buffer should be a virtual-terminal-buffer.")))
 
 (test full-pipeline-macro-execution
   "Tests the entire full-view-pipeline from DSL generation to buffer rendering."
   (let* ((initial-context (setup-test-context))
-         ;; We test up to the stage before display, as display has side-effects
-         ;; and requires a backend.
          (final-context (render-pipeline-0-to-5 initial-context)))
-    (is-true (getf final-context :tree) "Pipeline should produce a tree.")
-    (is-true (getf final-context :back-buffer) "Pipeline should produce a back-buffer.")
-    (is (typep (getf final-context :back-buffer) 'elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer)
+    (is-true (ctx-laid-out-tree final-context) "Pipeline should produce a laid-out tree.")
+    (is-true (ctx-back-buffer final-context) "Pipeline should produce a back-buffer.")
+    (is (typep (ctx-back-buffer final-context) 'elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer)
         "The back-buffer should be a virtual-terminal-buffer.")))
 
 (test pipeline-step-by-step-transformation
   "Tests each stage of the rendering pipeline individually."
-  (let ((context (setup-test-context)))
+  (let ((context (setup-test-context )))
     ;; Stage 0: Generate DSL
+    ;; (let ((ctx-after-dsl ( context)))
     (let ((ctx-after-dsl (generate-dsl context)))
-      (is-true (listp (getf ctx-after-dsl :tree)) "generate-dsl should add a DSL list to the context tree.")
-      (is (eq :column (first (getf ctx-after-dsl :tree))) "The root of the DSL should be a :column.")
+      ;; context))
+      (is (typep (ctx-dsl-tree ctx-after-dsl) 'dsl-tree) "generate-dsl should add a dsl-tree struct to the context.")
+      (is (eq :container (first (root (ctx-dsl-tree ctx-after-dsl))))
+          "The root of the DSL should be a :column.")
       (setf context ctx-after-dsl))
 
-                                        ;context)
-    ;; Stage 1: Render DSL to UI-Node
-    (let ((ctx-after-render (render-dsl context)))
-      (is (ui-node-p (getf ctx-after-render :tree)) "render-dsl should produce a ui-node.")
-      (setf context ctx-after-render)) ;(apply-styles context))
-                                        ;context)
+    ;; Stage 1: DSL -> Raw
+    (let ((ctx-after-raw (dsl->raw-stage context)))
+      ;; context))
+      (is (typep (ctx-raw-tree ctx-after-raw) 'raw-tree)
+          "dsl->raw-stage should produce a raw-tree struct.")
+      (setf context ctx-after-raw))
 
-    ;; Stage 2: Apply Styles
-    (let ((ctx-after-style (apply-styles context)))
-      (is (typep (getf ctx-after-style :tree) 'elmtui.view.styled:styled-ui-node)
-          "apply-styles should produce a styled-ui-node.")
-      (setf context ctx-after-style))
+    ;; Stage 2: Raw -> Styled
+    (let ((ctx-after-styled (raw->styled-stage context)))
+      (is (typep (ctx-styled-tree ctx-after-styled) 'styled-tree)
+          "raw->styled-stage should produce a styled-tree struct.")
+      (setf context ctx-after-styled))
 
-    ;; Stage 3: Resolve View
-    (let ((ctx-after-resolve (resolve-view-stage context)))
-      (is (typep (getf ctx-after-resolve :tree) 'elmtui.view.styled:styled-ui-node)
-          "resolve-view-stage should return a styled-ui-node.")
-      ;; More specific checks could be added here, e.g., for :overflow transformations
-      (setf context ctx-after-resolve))
+    ;; Stage 3: Styled -> Atomic
+    (let ((ctx-after-atomic (styled->atomic-stage context)))
+      (is (typep (ctx-atomic-tree ctx-after-atomic) 'atomic-tree) "styled->atomic-stage should produce an atomic-tree struct.")
+      (setf context ctx-after-atomic))
 
-    ;; Stage 4: Layout View
-    (let ((ctx-after-layout (layout-view-stage context)))
-      (is (typep (getf ctx-after-layout :tree) 'elmtui.view.styled:styled-ui-node)
-          "layout-view-stage should return a styled-ui-node.")
-      (is-true (getf (elmtui.view.api:ui-node-props (getf ctx-after-layout :tree)) :layout-rect)
-               "The laid-out node should have a :layout-rect property.")
+    ;; Stage 4: Atomic -> Laid-out
+    (let ((ctx-after-layout (atomic->layout-stage context)))
+      (is (typep (ctx-laid-out-tree ctx-after-layout) 'laid-out-tree) "atomic->layout-stage should produce a laid-out-tree struct.")
       (setf context ctx-after-layout))
 
     ;; Stage 5: Render to Buffer
     (let ((ctx-after-render-buffer (render-to-buffer context)))
-      (is (virtual-terminal-buffer-p (getf ctx-after-render-buffer :back-buffer))
+      (is (virtual-terminal-buffer-p (ctx-back-buffer ctx-after-render-buffer))
           "render-to-buffer should produce a virtual-terminal-buffer in :back-buffer.")
       (setf context ctx-after-render-buffer))
 
     ;; Stage 6: Display Buffer (simulated)
     (let ((ctx-after-display (display-buffer context)))
-      (is (virtual-terminal-buffer-p (getf ctx-after-display :front-buffer))
+      (is (virtual-terminal-buffer-p (ctx-front-buffer ctx-after-display))
           "display-buffer should place a new buffer in :front-buffer."))))
-(test render-dsl-contract-violation
-  "Should signal pipeline-contract-violation if render-dsl receives a non-DSL input."
-  (let ((bad-context (list :tree 42))) ; 42 is not a DSL list
+(test dsl->raw-contract-violation
+  "Should signal pipeline-contract-violation if dsl->raw-stage receives a non-dsl-tree input."
+  (let ((bad-context (make-app-context :dsl-tree 42)))
     (signals elmtui.contracts:pipeline-contract-violation
-      (render-dsl bad-context))))
+      (dsl->raw-stage bad-context))))

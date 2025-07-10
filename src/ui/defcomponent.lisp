@@ -1,11 +1,13 @@
 (uiop:define-package :elmtui.ui.defcomponent
   (:use :cl)
   (:import-from :elmtui.state.api #:make-update-result)
+  (:import-from :elmtui.utils
+                #:get-path)
   (:import-from :elmtui.ui.api
                 #:component      ;; Base class for components
                 #:component-id      ;; Base class for components
                 #:id-from-path
-                #:get-path)        ;; Use the UI API version that takes app-state
+                )        ;; Use the UI API version that takes app-state
   (:export #:defcomponent #:cclass-name))
 
 (in-package :elmtui.ui.defcomponent)
@@ -273,7 +275,7 @@ SYNTAX:
                    (update-user-code-block (rest update-body-forms)))
               `(defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
                  (declare (ignorable app-state id-path))
-                 (let* ((,(second update-lambda-list) (elmtui.ui.api:get-path app-state id-path))
+                 (let* ((,(second update-lambda-list) (elmtui.utils:get-path id-path app-state))
                         (,(third update-lambda-list) app-state)
                         (,(fourth update-lambda-list) id-path))
                    ;; (declare (ignorable ,@(remove nil (rest update-lambda-list))))
@@ -293,8 +295,8 @@ SYNTAX:
                        (elmtui.state.api:make-update-result
                         :patches (loop for (key val) on local-changes-plist by #'cddr
                                        collect (list (elmtui.ui.api:component-state-path id-path
-                                         (if (keywordp key) key (intern (symbol-name key) :keyword)))
-                                         val))
+                                                                                         (if (keywordp key) key (intern (symbol-name key) :keyword)))
+                                                     val))
                         :commands commands))))))
             `(defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
                (declare (ignore app-state message id-path))
@@ -305,7 +307,7 @@ SYNTAX:
                    (view-lambda-list (first view-body-forms))
                    (view-user-code (rest view-body-forms)))
               `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path)
-                 (let ((,(first view-lambda-list) (elmtui.ui.api:get-path app-state id-path))
+                 (let ((,(first view-lambda-list) (elmtui.utils:get-path id-path app-state))
                        (,(second view-lambda-list) app-state)
                        (,(third view-lambda-list) id-path))
                    ;; (declare (ignorable ,@(remove nil (rest view-lambda-list))))
@@ -334,7 +336,7 @@ SYNTAX:
                                                 ((listp app-state)
                                                  (getf (getf app-state :components)
                                                        (elmtui.ui.api:component-id component)))
-                                                (t (elmtui.ui.api:get-path app-state (append (list :components (elmtui.ui.api:component-id component))))))))
+                                                (t (elmtui.utils:get-path (append (list :components (elmtui.ui.api:component-id component))) app-state )))))
                               (if comp-state
                                   (getf comp-state ,slot-keyword ,slot-initial-value)
                                   ,slot-initial-value))))

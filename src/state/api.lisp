@@ -9,6 +9,9 @@ defining models and messages, and creating update functions, following Elm Archi
   ;; From elmtui.core.globals
   (:import-from :elmtui.core.globals
    :*app-state*)
+  (:import-from :elmtui.api #:get-component-class-for-dsl-type)
+  (:import-from :elmtui.utils
+                #:get-path #:set-path #:remove-path)
 
 
   ;; From elmtui.state (which wraps/uses elmtui.statelib)
@@ -73,7 +76,8 @@ defining models and messages, and creating update functions, following Elm Archi
    #:pprinc-application-state
    #:get-component-state
    ;; Global application state instance
-   #:get-path-enhanced
+   ;;#:get-path-enhanced
+   #:get-path
 
    #:app-state-p
    #:resolve-path-in-hash
@@ -82,11 +86,11 @@ defining models and messages, and creating update functions, following Elm Archi
 
    #:*app-state*
    #:application-state
-   #:application-state
    #:make-application-state
    #:application-state
    #:state-data
    #:app-state
+   #:application-state-p
    #:application-state-data
    #:application-state-lock
    #:application-state-observers
@@ -172,7 +176,7 @@ defining models and messages, and creating update functions, following Elm Archi
 
 ;; (defgeneric APPLICATION-STATE-LOCK (app-state))
 ;; (defgeneric APPLICATION-STATE-OBSERVERS (app-state))
-;; (defgeneric get-path (app-state path &optional comp-id)
+;; (defgeneric get-path (path app-state &optional comp-id)
 ;;   (:documentation "Get the value at `PATH` in the application state `APP-STATE`.
 ;;   Optionally provide `COMP-ID` to scope the key."))
 ;; (defgeneric merge-patches (app-state patches)
@@ -403,32 +407,44 @@ Optionally initializes from INITIAL-PLIST."
       (setf state (merge-patches state (plist-to-patches initial-plist))))
     state))
 
+(defmethod get-path (path (state app-state) &optional default)
+  "Gets value at PATH from app-state."
+  (get-path path (app-state-data state) default))
+(defmethod get-path (path (state application-state) &optional default)
+  "Gets value at PATH from application-state."
+  (let ((data (application-state-data state)))
+    (get-path path (state-data-data data) default)))
+
+(defmethod get-path (path (state state-data) &optional default)
+  "Gets value at PATH from state-data."
+  (get-path path (state-data-data state) default))
+
 ;; Enhanced path resolution for app-state
-(defun get-path-enhanced (state path &optional default)
-  "Gets value at path from state. Works with app-state, hash-table, and plist inputs."
-  (declare (type (or app-state hash-table list application-state) state)
-           (type list path)
-           (type t default))
-  (cond
-    ;; Handle app-state struct
-    ((app-state-p state)
-     (resolve-path-in-hash (app-state-data state) path default))
-    ;; Handle application-state struct
-    ((application-state-p state)
-     (let ((data (application-state-data state)))
-       (if (state-data-p data)
-           (resolve-path-in-hash (state-data-data data) path default)
-           ;; (get-path data path default)
-           nil
-           )))
-    ;; Handle direct hash-table
-    ((hash-table-p state)
-     (resolve-path-in-hash state path default))
-    ;; Handle plist
-    ((listp state)
-     (get-path state path default))
-    ;; (t (error "Unsupported state type: ~S" (type-of state)))
-    ))
+;; (defun get-path-enhanced (path state &optional default)
+;;   "Gets value at path from state. Works with app-state, hash-table, and plist inputs."
+;;   (declare (type (or app-state hash-table list application-state) state)
+;;            (type list path)
+;;            (type t default))
+;;   (cond
+;;     ;; Handle app-state struct
+;;     ((app-state-p state)
+;;      (resolve-path-in-hash (app-state-data state) path default))
+;;     ;; Handle application-state struct
+;;     ((application-state-p state)
+;;      (let ((data (application-state-data state)))
+;;        (if (state-data-p data)
+;;            (resolve-path-in-hash (state-data-data data) path default)
+;;            ;; (get-path path data default)
+;;            nil
+;;            )))
+;;     ;; Handle direct hash-table
+;;     ((hash-table-p state)
+;;      (resolve-path-in-hash state path default))
+;;     ;; Handle plist
+;;     ((listp state)
+;;      (get-path path state default))
+;;     ;; (t (error "Unsupported state type: ~S" (type-of state)))
+;;     ))
 
 ;; Helper function for hash-table path resolution
 (defun resolve-path-in-hash (hash-table path &optional default)
@@ -531,7 +547,7 @@ Handles app-state, application-state, hash-table, and plist inputs."
            (type list id-path)
            (type (or keyword symbol) property)
            (type t default))
-  (get-path-enhanced state (component-state-path id-path property) default))
+  (get-path (component-state-path id-path property) state  default))
 
 ;; Utility functions for backward compatibility
 (defun plist-to-patches (plist)
@@ -556,24 +572,45 @@ Handles app-state, application-state, hash-table, and plist inputs."
           do (setf result (append result (list key (gethash key (app-state-data app-state))))))
     result))
 
-;; Implementation of GET-PATH generic
-(defmethod GET-PATH ((app-state application-state) path &optional comp-id)
-  "Get the value at PATH in the application state."
-  (declare (type list path)
-           (type (or null keyword symbol) comp-id))
-  (let ((full-path (if comp-id
-                       (append (list :components comp-id) path)
-                       path)))
-    (get-path-enhanced app-state full-path)))
+(defun get-component-by-path (id-path state)
+  "Retrieves a component instance from STATE by following ID-PATH."
+  (declare (type list id-path)
+           (type (or app-state application-state hash-table list) state))
+  (let* ((path-keys (rest id-path))
+         (components-root (get-path :components state))
+         (component-state
+           (reduce (lambda (ht key)
+                     (when (hash-table-p ht)
+                       (gethash key ht)))
+                   path-keys
+                   :initial-value components-root)))
+    (if (and (hash-table-p component-state)
+             (gethash :type component-state))
+        (let ((component-class
+                (get-component-class-for-dsl-type
+                 (gethash :type component-state))))
+          (when component-class
+            (make-instance component-class :id (gethash :id component-state))))
+        (error "Component with ID path ~S not found in state." id-path))))
 
-(defmethod GET-PATH ((app-state app-state) path &optional comp-id)
-  "Get the value at PATH in the enhanced app-state."
-  (declare (type list path)
-           (type (or null keyword symbol) comp-id))
-  (let ((full-path (if comp-id
-                       (append (list :components comp-id) path)
-                       path)))
-    (get-path-enhanced app-state full-path)))
+;; Implementation of GET-PATH generic
+;; (defmethod GET-PATH ( path (app-state application-state) &optional comp-id)
+;;   "Get the value at PATH in the application state."
+;;   (declare (type list path)
+;;            (type (or null keyword symbol) comp-id))
+;;   (let ((full-path (if comp-id
+;;                        (append (list :components comp-id) path)
+;;                        path)))
+;;     (get-path full-path app-state )))
+
+;; (defmethod GET-PATH (path  (app-state app-state) &optional comp-id)
+;;   "Get the value at PATH in the enhanced app-state."
+;;   (declare (type list path)
+;;            (type (or null keyword symbol) comp-id))
+;;   (let ((full-path (if comp-id
+;;                        (append (list :components comp-id) path)
+;;                        path)))
+;;     (get-path full-path app-state )))
 
 ;; Implementation of MERGE-PATCHES generic
 (defmethod MERGE-PATCHES ((app-state application-state) patches)

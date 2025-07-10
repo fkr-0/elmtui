@@ -74,7 +74,7 @@
         (current-data (elmtui.statelib.state:state-data-data app-state))) ; Get raw data for get-path
     (cond
       ((eq msg-type :increment)
-       (values `(((:counter) ,(1+ (elmtui.state.api:get-path current-data '(:counter) 0))))) ; Patches
+       (values `(((:counter) ,(1+ (elmtui.state.api:get-path '(:counter) current-data  0))))) ; Patches
                nil)) ; No commands
 
       ((eq msg-type :set-focus)
