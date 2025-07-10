@@ -12,12 +12,14 @@
                               #:bordeaux-threads)
   :pathname "./src/"
   :serial t
-  :components ((:file "utils")
+  :components (
+               (:file "utils")
                (:file "state/utils")
                (:file "state/msg")
                (:file "contracts")
                (:file "core/logging")
                (:file "core/globals")
+               (:file "api")
                (:module "cleve-elm"
                 :pathname "clevelib/"
                 :serial t

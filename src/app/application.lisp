@@ -91,33 +91,60 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Helper function to initialize components from DSL
 ;;; ---------------------------------------------------------------------------
-
-(defun initialize-components-from-dsl (dsl app-state)
+(defun initialize-components-from-dsl (dsl)
   "Recursively traverses a component DSL, instantiates components,
    and returns the accumulated patches and commands."
-  (declare (ignorable app-state))
   (let ((patches nil)
         (commands nil))
-    (labels ((process-node (node)
+    (labels ((process-node (node parent-id-path)
                (when (and (consp node) (keywordp (car node)))
-                 (let* ((component-type (car node))
-                        (component-props (cdr node))
-                        (component-id (getf component-props :id)))
-                   (declare (ignorable component-type))
-                   (when component-id
-                     (let* ((component-id-path `(:components ,component-id))
-                            (component-instance (instantiate-component-from-dsl node component-id-path)))
-                       (when component-instance
-                         (multiple-value-bind (instance init-patches init-commands)
-                             (apply #'init component-instance :id-path component-id-path component-props)
-                           (declare (ignore instance))
+                 (destructuring-bind (component-type &rest component-props) node
+                   (let ((component-id (getf component-props :id)))
+                     (when component-id
+                       (let* ((current-id-path (append parent-id-path (list component-id)))
+                              (full-id-path `(:components ,@current-id-path))
+                              (component-instance (instantiate-component-from-dsl node full-id-path)))
+                         (multiple-value-bind (init-state-plist init-patches init-commands)
+                             (apply #'init component-instance :id-path full-id-path component-props)
+                           (let ((component-state-ht (make-hash-table :test 'eq)))
+                             (setf (gethash :type component-state-ht) component-type)
+                             (setf (gethash :id component-state-ht) component-id)
+                             (loop for (key val) on init-state-plist by #'cddr
+                                   do (setf (gethash key component-state-ht) val))
+                             (push `((:components ,@current-id-path) ,component-state-ht) patches))
                            (setf patches (nconc patches init-patches))
-                           (setf commands (nconc commands init-commands))))))
-                   (let ((children (getf component-props :children)))
-                     (dolist (child children)
-                       (process-node child)))))))
-      (process-node dsl)
-      (values patches commands))))
+                           (setf commands (nconc commands init-commands)))
+                         (dolist (child (getf component-props :children))
+                           (process-node child current-id-path)))))))))
+      (process-node dsl '()))
+    (values (nreverse patches) commands)))
+
+;; (defun initialize-components-from-dsl (dsl app-state)
+;;   "Recursively traverses a component DSL, instantiates components,
+;;    and returns the accumulated patches and commands."
+;;   (declare (ignorable app-state))
+;;   (let ((patches nil)
+;;         (commands nil))
+;;     (labels ((process-node (node)
+;;                (when (and (consp node) (keywordp (car node)))
+;;                  (let* ((component-type (car node))
+;;                         (component-props (cdr node))
+;;                         (component-id (getf component-props :id)))
+;;                    (declare (ignorable component-type))
+;;                    (when component-id
+;;                      (let* ((component-id-path `(:components ,component-id))
+;;                             (component-instance (instantiate-component-from-dsl node component-id-path)))
+;;                        (when component-instance
+;;                          (multiple-value-bind (instance init-patches init-commands)
+;;                              (apply #'init component-instance :id-path component-id-path component-props)
+;;                            (declare (ignore instance))
+;;                            (setf patches (nconc patches init-patches))
+;;                            (setf commands (nconc commands init-commands))))))
+;;                    (let ((children (getf component-props :children)))
+;;                      (dolist (child children)
+;;                        (process-node child)))))))
+;;       (process-node dsl)
+;;       (values patches commands))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; The macro itself
@@ -190,8 +217,10 @@
                                 &allow-other-keys) ; Allow other platform-options
              (declare (ignorable initial-terminal-dimensions initial-cursor-position))
              (let* ((app-state (elmtui.state.api:make-application-state :data (elmtui.state.api:plist-to-app-state ,state))))
+               ;; (let ((app-state (elmtui.state.api:make-application-state
+               ;;                   :initial-plist ,state)))
                (multiple-value-bind (patches commands)
-                   (initialize-components-from-dsl ,root-dsl app-state)
+                   (initialize-components-from-dsl ,root-dsl)
                  (let ((final-state (elmtui.state.api:merge-patches app-state patches)))
                    (values final-state commands)))))
 

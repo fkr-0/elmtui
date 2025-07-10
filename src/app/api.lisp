@@ -3,8 +3,10 @@
   (:import-from :log4cl #:log-debug #:log-error #:log-info)
   (:import-from #:bordeaux-threads #:mailbox) 
   (:import-from #:elmtui.core.globals #:*applications* #:*dsl-type-to-component-class*)
+  (:import-from :elmtui.api #:get-component-class-for-dsl-type)
   (:import-from :elmtui.core.event-channels
    :event-channel)
+  (:import-from :elmtui.state :get-path)
   (:export #:defapplication
            #:run-application
            #:registered-dsl-component-p
@@ -44,21 +46,22 @@
     (symbol   (intern (string-upcase x) "KEYWORD"))
     (string   (intern (string-upcase x) "KEYWORD"))))
 (defgeneric get-component-instance (id-path state)
-  (:method ((id-path list) (state t))
-    "Recursively retrieve a component instance from STATE by following ID-PATH.
-Logs each step and signals a detailed error if the path is invalid or not found."
-    (log-debug "Retrieving component instance for ID path: ~S in state: ~S" id-path state)
-    (let ((component-state (elmtui.state.api:get-component-state state id-path)))
-      (if component-state
-          (let ((component-class (get-component-class-for-dsl-type (getf component-state :type))))
+  (:method ((id-path list) (state elmtui.state.api:application-state))
+    "Retrieve a component instance from STATE by following ID-PATH."
+    (let* ((path-keys (rest id-path))
+           (components-root (get-path :components state))
+           (component-state
+             (reduce (lambda (ht key)
+                       (when (hash-table-p ht)
+                         (gethash key ht)))
+                     path-keys
+                     :initial-value components-root)))
+      (if (and (hash-table-p component-state) (gethash :type component-state))
+          (let ((component-class (get-component-class-for-dsl-type (gethash :type component-state))))
             (when component-class
-              (make-instance component-class :id (getf component-state :id))))
-          (progn
-            (log-error "Component with ID path ~S not found in state: ~S" id-path state)
-            (error (format nil "Component with ID listp ~A~% path ~A~% not found in state ~A~%"
-                           (listp id-path)
-                           id-path
-                           (elmtui.state.api:pprinc-application-state state))))))))
+              (make-instance component-class :id (gethash :id component-state))))
+          (error "Component with ID path ~S not found in state." id-path)))))
+
 (defmethod get-component-instance ((id-path t) (state t))
   "Retrieve a component instance by ID path symbol."
   (let ((idp (%kw id-path)))

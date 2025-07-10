@@ -16,6 +16,8 @@
   (:import-from :elmtui.state.api #:make-update-result)
   (:export
    :run-rainbow-example-app
+   :rainbow-content-view
+   :rainbow-stylesheet
    :initialize-app-state-rainbow-example-app))
 
 (in-package :elmtui.examples.rainbow-app)
@@ -44,16 +46,72 @@
 
 ;; Define the stylesheet for the rainbow app
 (defparameter rainbow-stylesheet
-  `(defstylesheet
-       ;; Container base style
-       (defrule (type> :container)
-         :display :flex
-         :flex-direction :row
-         :width :fill
-         :height :fill)
-
-       ;; Generate individual stripe rules
-       ,@(generate-stripe-rules-forms))
+  (defstylesheet
+    ;; Container base style
+    (defrule (type> :container)
+      :display :flex
+      :flex-direction :row
+      :width :fill
+      :height :fill)
+    (DEFRULE (CLS> "red-stripe")
+      :BG-COLOR
+      (list 255 0 0)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    (DEFRULE (CLS> "pink-stripe")
+      :BG-COLOR
+      (list 255 192 203)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    (DEFRULE (CLS> "orange-stripe")
+      :BG-COLOR
+      (list 255 165 0)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    (DEFRULE (CLS> "yellow-stripe")
+      :BG-COLOR
+      (list 255 255 0)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    (DEFRULE (CLS> "green-stripe")
+      :BG-COLOR
+      (list 0 255 0)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    (DEFRULE (CLS> "blue-stripe")
+      :BG-COLOR
+      (list 0 0 255)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    (DEFRULE (CLS> "indigo-stripe")
+      :BG-COLOR
+      (list 75 0 130)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    (DEFRULE (CLS> "violet-stripe")
+      :BG-COLOR
+      (list 238 130 238)
+      :WIDTH
+      12
+      :HEIGHT
+      :FILL)
+    ;; Generate individual stripe rules
+    ;; (generate-stripe-rules-forms)
+    )
 
   "Stylesheet for the rainbow application.")
 
@@ -99,7 +157,10 @@ Any key event or :app-quit-requested sets :should-quit to t."
   :root-viewport-id :rainbow-root-vp
   :initial-state-plist (list :current-stylesheet rainbow-stylesheet
                              :should-quit nil)
-  :root-component-dsl `(:column)
+  ;; :root-component-dsl `(:column)
+  :root-component-dsl '(:container :id :rainbow-main-container :children ((:column :id :main)))
+                                        ; or make nil and let view return full tree
+
   :update-fn 'app-update
   :view-fn 'rainbow-content-view)
 

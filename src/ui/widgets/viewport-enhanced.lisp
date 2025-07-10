@@ -245,7 +245,7 @@
 ;; Legacy update method with contract integration
 (defmethod update ((component viewport-enhanced) state message &key id-path)
   "Enhanced update method with contract enforcement"
-  (let* ((current-state (getf (get-path state id-path) :state))
+  (let* ((current-state (getf (get-path id-path state) :state))
          (patches nil)
          (commands nil))
     
@@ -264,7 +264,7 @@
 ;; Legacy view method with DSL integration
 (defmethod view ((component viewport-enhanced) state &key id-path)
   "Enhanced view method with base DSL output"
-  (let* ((component-state (getf (get-path state id-path) :state))
+  (let* ((component-state (getf (get-path id-path state) :state))
          (enhanced-state (list* :id (id-from-path id-path) component-state)))
     
     ;; Use the contract-enforced view function

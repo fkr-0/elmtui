@@ -7,6 +7,7 @@
                 #:app-config
                 #:app-config-name)
   (:import-from :elmtui.ui.defcomponent #:defcomponent)
+  (:import-from #:elmtui.state #:get-path)
   (:import-from :elmtui.view.geo #:=?)
   (:export #:application-init-tests #:test-component #:test-parent-component
            #:initialize-app-state-test-init-app))
@@ -51,9 +52,10 @@
               child-patches
               child-commands))))
   (:view (local-state-map app-state id-path)
-         (let* ((parent-map (elmtui.state:get-path app-state id-path))
+         (let* ((parent-map (elmtui.state:get-path id-path app-state))
                 (child-id (first (getf parent-map :children-ids)))
-                (child-id-path `(:components ,child-id)))
+                ;; (child-id-path `(:components ,child-id))
+                )
            `(:test-parent-component
              :id ,(elmtui.ui.api:id-from-path id-path)
              :children ((:test-component :id ,child-id))))))
@@ -95,10 +97,10 @@
 (test basic-application-initialization
 
   ;; (let ((app-state (initialize-app-state-test-init-app)))
-  ;;   ;; (is (= (elmtui.ui.api:get-path app-state '(:counter)) 0))
-  ;;   ;; (is (string= (elmtui.ui.api:get-path app-state '(:text)) "hello"))
+  ;;   ;; (is (= (elmtui.ui.api:get-path '(:counter) app-state) 0))
+  ;;   ;; (is (string= (elmtui.ui.api:get-path '(:text) app-state) "hello"))
 
-  ;;   (let ((comp1-map2 (elmtui.ui.api:get-path app-state '(:components :comp1)))
+  ;;   (let ((comp1-map2 (elmtui.ui.api:get-path '(:components :comp1)) app-state)
   ;;         (comp1-map3 (elmtui.state.api:get-component-state app-state '(:components :comp1)))
   ;;         (comp1-map (elmtui.state.api:get-component-state app-state :comp1)))
   ;;     ;; (is (not (null comp1-map)) "Component comp1 should be initialized.")
@@ -107,29 +109,33 @@
   ;;     ;; (typep (elmtui.app:get-component-instance :comp1 app-state) 'test-component)
   ;;     ;; (elmtui.app:get-component-instance 'comp1 app-state)
   ;;     ;app-state
-  ;;                                       ;(elmtui.ui.api:get-path app-state '(:components :parent1))
+  ;;                                       ;(elmtui.ui.api:get-path '(:components :parent1) app-state)
   ;;     ))
+  ;; (print (elmtui.state.api:pprinc-application-state
+  (multiple-value-bind (app-state commands)
+      (initialize-app-state-test-init-app)
+    (declare (ignore commands))
+    (let ((app-data ;; (elmtui.state.api:app-state-data app-state)
+            app-state))
+      (is (= (elmtui.state.api:get-path '(:counter) app-data) 0))
+      (is (string= (elmtui.state.api:get-path '(:text) app-data) "hello"))
 
-  (let ((app-state (initialize-app-state-test-init-app)))
-    (is (= (elmtui.ui.api:get-path app-state '(:counter)) 0))
-    (is (string= (elmtui.ui.api:get-path app-state '(:text)) "hello"))
+      (let ((comp1-map (elmtui.state.api:get-path '(:components :main-column :comp1) app-data)))
+        (is (not (null comp1-map)))
+        (is (equal (gethash :state comp1-map) "comp1 state"))
+        (is (typep (elmtui.app:get-component-instance '(:components :main-column :comp1) app-state) 'test-component)))
 
-    (let ((comp1-map (elmtui.ui.api:get-path app-state '(:components :comp1))))
-      (is (not (null comp1-map)) "Component comp1 should be initialized.")
-      (is (equal (elmtui.ui.api:get-path comp1-map '(:state)) "comp1 state"))
-      (is (typep (elmtui.app:get-component-instance '(:components :comp1) app-state) 'test-component)))
+      (let* ((parent1-map (elmtui.state.api:get-path '(:components :main-column :parent1) app-data))
+             (child1-id (first (gethash :children-ids parent1-map))))
+        (is (not (null parent1-map)))
+        (is (equal (gethash :state parent1-map) :parent-default))
+        (is (typep (elmtui.app:get-component-instance '(:components :main-column :parent1) app-state) 'test-parent-component))
+        (is (not (null child1-id)))
 
-    (let* ((parent1-map (elmtui.ui.api:get-path app-state '(:components :parent1)))
-           (child1-id (first (elmtui.ui.api:get-path parent1-map '(:children-ids)))))
-      (is (not (null parent1-map)) "Component parent1 should be initialized.")
-      (is (equal (elmtui.ui.api:get-path parent1-map '(:state)) :parent-default))
-      (is (typep (elmtui.app:get-component-instance '(:components :parent1) app-state) 'test-parent-component))
-      (is (not (null child1-id)) "Parent1 should have a child ID.")
-
-      (let ((child1-map (elmtui.ui.api:get-path app-state `(:components ,child1-id))))
-        (is (not (null child1-map)) "Child component parent1:child1 should be initialized.")
-        (is (equal (elmtui.ui.api:get-path child1-map '(:state)) "child state"))
-        (is (typep (elmtui.app:get-component-instance `(:components ,child1-id) app-state) 'test-component))))))
+        (let ((child1-map (elmtui.state.api:get-path `(:components :main-column :parent1 ,child1-id) app-data)))
+          (is (not (null child1-map)))
+          (is (equal (gethash :state child1-map) "child state"))
+          (is (typep (elmtui.app:get-component-instance `(:components :main-column :parent1 ,child1-id) app-state) 'test-component)))))))
 
 (test view-resolution-with-initialized-state
   (let* ((app-state (initialize-app-state-test-init-app))
@@ -137,5 +143,5 @@
     (is (equalp view-tree
                 '(:column :id :main-column
                   :children
-                  ((:test-component :id :comp1 :initial-state "comp1 state"))
-                  ((:test-parent-component :id :parent1 :child-initial-state "child state")))))))
+                  ((:test-component :id :comp1 :initial-state "comp1 state")
+                   (:test-parent-component :id :parent1 :child-initial-state "child state")))))))

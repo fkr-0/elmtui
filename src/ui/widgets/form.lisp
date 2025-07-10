@@ -153,7 +153,7 @@
 ;;                (actual-message (cddr msg)))
 ;;            (when (member target-child-id (getf form-props :children-ids))
 ;;              (let* ((child-component-id-path (list :components target-child-id))
-;;                     (child-state (get-path state child-component-id-path))
+;;                     (child-state (get-path child-component-id-path state ))
 ;;                     (child-type (getf child-state :type)))
 ;;                (when child-type
 ;;                  (let ((child-instance (make-instance child-type)))

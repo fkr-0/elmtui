@@ -3,6 +3,29 @@
   (:import-from :elmtui.state.msg
                 #:message-variant-p #:*message-schemas* #:message-schema)
   (:export
+   ;; transform macros
+   #:deftransform
+   #:deftransformer
+
+   ;; Structs constructors and accessors
+   #:make-app-context #:app-context
+   #:ctx-state #:ctx-viewport-rect
+   #:ctx-view-fn
+   #:ctx-stylesheet
+   #:ctx-dsl-tree #:ctx-raw-tree
+   #:ctx-styled-tree #:ctx-atomic-tree
+   #:ctx-laid-out-tree #:ctx-front-buffer
+   #:ctx-backend #:ctx-back-buffer
+   ;; trees
+   #:dsl-tree #:raw-tree #:styled-tree
+   #:atomic-tree #:laid-out-tree
+   ;; tree constructors
+   #:make-dsl-tree #:make-raw-tree
+   #:make-styled-tree #:make-atomic-tree
+   #:make-laid-out-tree
+
+   ;; Tree root accessors
+   #:root
    ;; Core contract macros
    #:defupdate #:defview #:defsubscriptions
    ;; Enhanced update macros with message type support
@@ -32,6 +55,123 @@
    #:subscription #:make-subscription #:subscription-p))
 
 (in-package #:elmtui.contracts)
+;;;--------------------------------------------------------------
+;;; Typed Tree Structs and Transform Macro for Pipeline
+;;;--------------------------------------------------------------
+
+(defstruct (app-context
+            (:conc-name ctx-)
+            (:constructor make-app-context (&key state viewport-rect
+                                              dsl-tree raw-tree styled-tree
+                                              view-fn
+                                              atomic-tree laid-out-tree
+                                              front-buffer backend)))
+  "Global application context for the pipeline. Holds all tree stages and frame state."
+  view-fn
+  state            ; original :app-model plist
+  stylesheet
+  viewport-rect    ; et.geo:rectangle
+  dsl-tree         ; dsl-tree struct
+  raw-tree         ; raw-tree struct
+  styled-tree      ; styled-tree struct
+  atomic-tree      ; atomic-tree struct
+  laid-out-tree    ; laid-out-tree struct
+  front-buffer
+  back-buffer
+  backend)
+
+(defstruct (dsl-tree (:conc-name dsl-))
+  "DSL tree: holds the nested DSL list."
+  root)
+
+(defstruct (raw-tree (:conc-name raw-))
+  "Raw tree: UI-node tree before styling."
+  root)
+
+(defstruct (styled-tree (:conc-name sty-))
+  "Styled tree: after stylesheet application."
+  root)
+
+(defstruct (atomic-tree (:conc-name at-))
+  "Atomic tree: visibility/overflow resolved."
+  root)
+
+(defstruct (laid-out-tree (:conc-name lay-))
+  "Laid-out tree: geometry resolved."
+  root)
+
+
+(defgeneric root (tree)
+  (:documentation "Returns the root node of a tree structure."))
+(defmethod root ((tree dsl-tree))
+  "Returns the root node of a DSL tree."
+  (dsl-root tree))
+(defmethod root ((tree raw-tree))
+  "Returns the root node of a raw tree."
+  (raw-root tree))
+(defmethod root ((tree styled-tree))
+  "Returns the root node of a styled tree."
+  (sty-root tree))
+(defmethod root ((tree atomic-tree))
+  "Returns the root node of an atomic tree."
+  (at-root tree))
+(defmethod root ((tree laid-out-tree))
+  "Returns the root node of a laid-out tree."
+  (lay-root tree))
+
+(defgeneric tree-from-root (root)
+  (:documentation "Creates a tree structure from a root node."))
+
+
+(defmacro deftransform (name (in-type) (out-type) (arg) &body body)
+  "Define a pure transformer and an App-Context plumbing stage."
+  (let* ((fun-name   name)
+         ;; 1.  AUTO-GENERATED STAGE NAME  -------------------------------
+         (stage-name (intern (format nil "~A-STAGE" (string-upcase (symbol-name name)))
+                             *package*))
+         ;; 2.  SYMBOLS FOR ACCESSORS (CTX-DSL-TREE, CTX-RAW-TREE, …) ---
+         (in-acc  (intern (format nil "CTX-~A" (string-upcase (symbol-name in-type)))
+                          *package*))
+         (out-acc (intern (format nil "CTX-~A" (string-upcase (symbol-name out-type)))
+                          *package*))
+         ;; 3.  GENSYM’D CTX VARIABLE ------------------------------------
+         (ctx-var  (gensym "CTX")))
+    `(progn
+       ;; ---------- PURE FUNCTION ---------------------------------------
+       (defun ,fun-name (,arg)
+         (check-type ,arg ,in-type)
+         (block ,fun-name ,@body))
+
+       ;; ---------- PIPELINE STAGE --------------------------------------
+       (define-stage ,stage-name (app-context app-context) (,ctx-var)
+         ;; Bind *CTX* so transforms can peek if they really need to
+         (let ((*ctx* ,ctx-var))
+           (let* ((,arg (,in-acc ,ctx-var))
+                  (result (,fun-name ,arg)))
+             ;; setf via the accessor, not SLOT-VALUE
+             (setf (,out-acc ,ctx-var) result)
+             ,ctx-var))))))
+
+;; (defmacro deftransform (name (in-type) (out-type) (arg) &body body)
+;;   "Define a pure transformer and auto-generate a pipeline wrapper.
+;; Signature: (in-tree) -> out-tree, plus a context-plumbing wrapper.
+;; Generates:
+;;   - (defun name (arg) ...) ; pure, type-checked
+;;   - (define-stage name-STAGE (in-type out-type) (ctx) ...)"
+;;   (let* ((trans-name  name)
+;;          (stage-name  (intern (format nil "~a-STAGE" name) *package*))
+;;          (ctx-var     (gensym "CTX"))
+;;          (in-slot     (intern (format nil "~:@(~a~)" in-type) :keyword))
+;;          (out-slot    (intern (format nil "~:@(~a~)" out-type) :keyword)))
+;;     `(progn
+;;        (defun ,trans-name (,arg)
+;;          (check-type ,arg ,in-type)
+;;          (block ,trans-name ,@body))
+;;        (define-stage ,stage-name (,in-type ,out-type) (,ctx-var)
+;;          (let* ((,arg (slot-value ,ctx-var (quote ,in-slot)))
+;;                 (result (,trans-name ,arg)))
+;;            (setf (slot-value ,ctx-var (quote ,out-slot)) result)
+;;            ,ctx-var)))))
 
 ;;;--------------------------------------------------------------
 ;;; Contract Violation Conditions
@@ -720,6 +860,11 @@
        ;; record the declared types for pipeline-linkage
        (setf (get ',name :pipeline/in-type)  ',in-type
              (get ',name :pipeline/out-type) ',out-type)
+       ;; (defun ,name ,arglist
+       ;; --- pre-condition -------------------------------------------------
+       ;; (when ,in-type (check-type ,input-sym ,in-type
+       ;;                            ,(format nil "~a input violated contract (expected ~a)."
+       ;;                                     name in-type)))
        (defun ,name ,arglist
          ;; --- pre-condition -------------------------------------------------
          (check-type ,input-sym ,in-type
@@ -750,6 +895,9 @@
                    (setq ,result-sym ,input-sym))))
              ,result-sym))))))
 
+;; (deftransformer generate-dsl (dsl-tree) (dsl-tree)
+;;                 (abc &key state view-fn)
+;;   (make-dsl-tree :root (funcall view-fn state)))
 (defmacro define-pipeline (name &rest stage-fns)
   "Compose STAGE-FNS into a single function that threads a context plist through them."
   (let ((context (gensym "CONTEXT")))
@@ -793,3 +941,62 @@
 ;;                  :report "Skip this stage and propagate input forward."
 ;;                  (setq ,result (first ,arglist)))))
 ;;            ,result)))))
+(defmacro deftransformer (name (in-type) (out-type) lambda-list &body body)
+  "Define a pure (tree &key …) → tree function and an APP-CONTEXT stage.
+
+   Example:
+
+     (deftransformer raw→styled (raw-tree) (styled-tree)
+       (raw-tree &key stylesheet theme)
+       ...)
+
+   The wrapper extracts :STYLESHEET and :THEME from CTX via CTX-STYLESHEET,
+   CTX-THEME accessors and calls RAW→STYLED with them."
+  ;; 0) Split lambda-list into positional TREE and &KEY specs -------------
+  (let* ((tree-var  (first lambda-list))
+         (key-tail  (member '&key lambda-list))
+         (key-specs (if key-tail (rest key-tail) '()))
+         ;; 1) Canonical keyword names  ------------------------------------
+         (keyword-syms
+           (mapcar (lambda (spec)
+                     (etypecase spec
+                       (symbol spec)          ;  stylesheet
+                       (cons   (first spec)))) ;  (stylesheet default)
+                   key-specs))
+         ;; 2) Generate CTX-<FOO> accessors for each keyword --------------
+         (accessor-syms
+           (mapcar (lambda (k)
+                     (intern (format nil "CTX-~:@(~A~)" k) *package*))
+                   keyword-syms))
+         ;; 3) Helper symbols ---------------------------------------------
+         (fn-name    name)
+         (stage-name (intern (format nil "~A-STAGE" (string-upcase name))
+                             *package*))
+         (ctx-var   (gensym "CTX"))
+         ;; Accessor for the incoming and outgoing tree slots -------------
+         (in-acc
+           (intern (format nil "CTX-~:@(~A~)" in-type) *package*))
+         (out-acc
+           (intern (format nil "CTX-~:@(~A~)" out-type) *package*)))
+    `(progn
+       ;; ---------- transformer FUNCTION ---------------------------------
+       (defun ,fn-name ,lambda-list
+         ;; (when (class-name
+         ;;        ',in-type)
+         (check-type ,tree-var ,in-type)
+         ,@body)
+       ;; ---------- pipeline STAGE ---------------------------------------
+       (define-stage ,stage-name (app-context app-context) (,ctx-var)
+         ;; Snapshot all needed values from CTX once
+         (let* ((,tree-var (,in-acc ,ctx-var))
+                ,@(mapcar (lambda (key acc)
+                            `(,key (,acc ,ctx-var)))
+                          keyword-syms accessor-syms)
+                (result (funcall #',fn-name ,tree-var
+                                 ,@(apply #'append
+                                          (mapcar (lambda (k)
+                                                    (list (intern (string k) :keyword)
+                                                          k))
+                                                  keyword-syms)))))
+           (setf (,out-acc ,ctx-var) result)
+           ,ctx-var)))))

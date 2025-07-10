@@ -169,7 +169,7 @@ The layout component demonstrates perfect TEA compliance:
                        (lambda (child-id)
                          ;; Recursively call child view methods
                          (let* ((child-path (append self-id-path (list child-id)))
-                                (child-type (get-path app-state child-path :type)))
+                                (child-type (get-path child-path app-state :type)))
                            (if child-type
                                (let ((child-instance (make-instance child-type)))
                                  ;; Child view also returns pure DSL data
@@ -194,7 +194,7 @@ Layout Component :view method called
         │
         └─ For each child:
            ├─ child-path = (:main-layout :child1)
-           ├─ child-type = (get-path app-state child-path :type)
+           ├─ child-type = (get-path child-path app-state :type)
            ├─ child-instance = (make-instance child-type)
            └─ (view child-instance app-state :id-path child-path)
                     │

@@ -1,3 +1,8 @@
+
+;; (let ((atab (make-hash-table)))
+;;   (setf (gethash 'a atab) 1)
+;;   (get-path 'a '((a . 1)))
+;;   )
 ;; == nested-path/src/path-utils.lisp =========================================
 ;;; Minimal “one-file library” – load it with  (load "path-utils.lisp")
 ;;; or drop it into ASDF/Quicklisp as you like.
@@ -23,12 +28,12 @@
        (every #'consp obj)))
 
 (defun parse-plist-and-children (args)
- "Parses a list of arguments into a property list and a list of children."
- (let ((i (or (loop for i from 0 below (length args) by 2
-                    unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
-                      return i)
-              (length args))))
-   (values (subseq args 0 i) (subseq args i))))
+  "Parses a list of arguments into a property list and a list of children."
+  (let ((i (or (loop for i from 0 below (length args) by 2
+                     unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
+                       return i)
+               (length args))))
+    (values (subseq args 0 i) (subseq args i))))
 
 (defun %empty-container-p (obj)
   "Predicate used by REMOVE-PATH to decide whether to prune a branch."
@@ -96,7 +101,7 @@
     (t (values container nil))))                            ; unsupported → nothing
 
 ;;; 2. Public API ─────────────────────────────────────────────────────────────
-(defun get-path (data path &optional (default nil))
+(defun get-path (path data &optional (default nil))
   "Read value at PATH inside DATA; return DEFAULT if anything is missing.
    PATH may be a symbol/keyword (single level) or a proper list."
   (cond
@@ -109,7 +114,7 @@
      (let ((next (%get-entry data (car path) default)))
        (if (eq next default)
            default
-           (get-path next (cdr path) default))))
+           (get-path (cdr path) next  default))))
 
     (t default)))
 
