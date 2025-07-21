@@ -112,7 +112,7 @@
   (:documentation "Default event reading function. Can be overridden by specific applications.")
   )
 
-(declaim (ftype (function (list list) t) instantiate-component-from-dsl))
+;; (declaim (ftype (function (list list) t) instantiate-component-from-dsl))
 
 ;;(declaim (ftype (function ((or symbol keyword)) (or null symbol)) get-component-class-for-dsl-type))
 

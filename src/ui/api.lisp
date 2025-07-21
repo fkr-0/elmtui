@@ -179,6 +179,7 @@ app-state.
 ;;; Helper function to initialize components from DSL
 ;;; ---------------------------------------------------------------------------
 (defgeneric instantiate-component-from-dsl (dsl id-path))
+
 (defun initialize-components-from-dsl (dsl)
   "Recursively traverses a component DSL, instantiates components,
    and returns the accumulated patches and commands."
@@ -304,7 +305,7 @@ app-state.
   (declare (ignore app-state id-path))
   component)
 ;; (declaim (ftype (function (component t &key (:id-path list)) list) view))
-(defgeneric view (component app-state &key id-path)
+(defgeneric view (component app-state &key id-path &allow-other-keys)
   (:documentation "Generates a view representation (DSL spec) for a component instance.")
   (:method ((component component) app-state &key id-path)
     (declare (type component component)

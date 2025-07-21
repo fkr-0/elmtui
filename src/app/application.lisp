@@ -37,6 +37,19 @@
 ;;; ---------------------------------------------------------------------------
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun maybe-wrap-with-root-viewport
+      (dsl
+       &optional (term-size (list 0 0))
+                                        ;(et.geo:make-size))
+         (cursor-pos (list 0 0)))
+                                        ; (et.geo:make-pos)))
+    (if (and (consp dsl) (keywordp (first dsl))
+             (not (eq (first dsl) :root-viewport)))
+        `(:root-viewport :id :root-viewport
+                         :initial-terminal-dimensions ,term-size
+                         :initial-cursor-pos ,cursor-pos
+                         :initial-child-spec ,dsl)
+        dsl))
   ;; Coerce X → keyword, return NIL on NIL.
   (defun %kw (x)
     (etypecase x
@@ -116,6 +129,7 @@
 ;;; The macro itself
 ;;; ---------------------------------------------------------------------------
 
+
 (defmacro defapplication (name &rest args)
   "Define an ElmTUI application called NAME."
   (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
@@ -185,7 +199,7 @@
              (declare (ignorable initial-terminal-dimensions initial-cursor-position))
              (let* ((app-state (elmtui.tea-state.api:make-state (alexandria:plist-hash-table ,initial-state-plist))))
                (multiple-value-bind (patches commands)
-                   (initialize-components-from-dsl ,root-dsl)
+                   (initialize-components-from-dsl (maybe-wrap-with-root-viewport ,root-dsl ))
                  (format t "~A ~A~%" app-state patches)
                  (elmtui.tea-state.api:apply-patches app-state patches)
                  (values app-state commands))))

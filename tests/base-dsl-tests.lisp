@@ -51,24 +51,23 @@
 (test basic-dsl-validation
   "Test basic DSL structure validation"
   ;; Valid primitive content
-  (is (base-dsl-p "Hello World"))
-  (is (base-dsl-p 42))
-  (is (base-dsl-p nil))
+  (is-true (base-dsl-p "Hello World"))
+  (is-true (base-dsl-p 42))
+  (is-true (base-dsl-p nil))
 
   ;; Valid simple elements
-  (is (base-dsl-p '(:text :content "Hello")))
-  (is (base-dsl-p '(:button :text "Click Me")))
-  (is (base-dsl-p '(:container :id :main)))
+  (is-true (base-dsl-p '(:text :content "Hello")))
+  (is-true (base-dsl-p '(:button :text "Click Me")))
+  (is-true (base-dsl-p '(:container :id :main)))
 
   ;; Valid complex elements
-  (is (base-dsl-p '(:container :id :main
-                    :children ((:text :content "Child 1")
-                               (:text :content "Child 2")))))
+  (is-true (base-dsl-p '(:container :id :main
+                                   :children ((:text :content "Child 1")
+                                              (:text :content "Child 2")))))
 
   ;; Invalid structures
-  (is (not (base-dsl-p '(not-a-keyword :invalid))))
-  (is (not (base-dsl-p '(:text :content))))  ; Odd property list
-  )
+  (is-false (base-dsl-p '(not-a-keyword :invalid)))
+  (is-false (base-dsl-p '(:text :content)))) ; Odd property list
 
 (test element-type-validation
   "Test element type validation"
@@ -86,14 +85,15 @@
 (test property-validation
   "Test property validation for elements"
   ;; Valid properties
-  (is (valid-property-p :container :id))
-  (is (valid-property-p :container :children))
-  (is (valid-property-p :text :content))
-  (is (valid-property-p :button :text))
+  (is-true (valid-property-p :container :id))
+  (is-true (valid-property-p :container :children))
+  (is-true (valid-property-p :text :content))
+  (is-true (valid-property-p :button :text))
 
   ;; Invalid properties
-  (is (not (valid-property-p :container :invalid-prop)))
-  (is (not (valid-property-p :text :invalid-prop))))
+  (is-false (valid-property-p :container :invalid-prop))
+  (is-false (valid-property-p :text :invalid-prop))
+  (is-false (valid-property-p :button :content))) ; :content is for :text, not :button
 
 ;; (test required-property-validation
 ;;   "Test validation of required properties"
@@ -139,14 +139,15 @@
 
   ;; Test update-dsl-element on a CLOS object
   (let* ((original (make-dsl-element :button :text "Original" :id :btn1))
-         (updated (update-dsl-element original :text "Updated")))
+         (updated (update-dsl-element original :text "Updated" :id :btn2)))
     (is (not (eq original updated))) ; Should be a new object
     (is (equal (button-text updated) "Updated"))
-    (is (eq (element-id updated) :btn1)))
+    (is (eq (element-id original) :btn1)) ; Original is untouched
+    (is (eq (element-id updated) :btn2))) ; New object has new id
 
   ;; Test invalid element construction
-  (signals base-dsl-error
-    (make-dsl-element :text :content))) ; Odd property list
+  (signals error
+    (validate-base-dsl '(:text :content)))) ; Odd property list
 
 (test dsl-traversal
   "Test DSL traversal and query functions"

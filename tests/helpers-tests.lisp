@@ -72,7 +72,7 @@
          (app-state (elmtui.state.api:plist-to-application-state '(:components (:test1 (:message "hello")))))
          (id-path '(:components :test1))
          (view (view instance app-state :id-path id-path)))
-    ;; (cddr view) view)
+    (cddr view) view;)
     ;; (state-ref app-state (append id-path (list :message)))
     ;; )
                                         ;(is (string= "hello" (state-ref app-state (append id-path (list :message)))))
@@ -83,21 +83,24 @@
 
 ;; (test children-split
 ;;   (let* ((dsl-1 '(:viewport :id :main
-;;                   :children ((:label :id :c1 :content "a")
-;;                              (:label :id :c2 :content "b"))))
-;;          (dsl '(:container :id :main
-;;                 :children ((:text :id :c1 :content "a")
-;;                            (:text :id :c2 :content "b"))))
+;;                   :children ((:text :id :c1 :content "a")
+;;                              (:text :id :c2 :content "b"))
+;;                   (:text :id :c3 :content "c")))
+;;          ;;          (dsl '(:container :id :main
+;;          ;;                 :children ((:text :id :c1 :content "a")
+;;          ;;                            (:text :id :c2 :content "b"))))
 ;;          (app-state (elmtui.state.api:plist-to-application-state
 ;;                      '(:components (:main (:message "hello")))))
+;;          ;; :c1 (list :content "a" )
+;;          ;;            :c2 (list :content "a"))))))
 ;;          ;; (tree (elmtui.view.dsl:render-dsl-to-resolved-tree dsl app-state))
 ;;          (tree-1 (elmtui.view.dsl:render-dsl-to-resolved-tree dsl-1 app-state)))
-;;     ;; tree-1)
-;;     (is ;; (every #'ui-node-p (ui-node-children tree))
-;;      (equalp '(:CONTAINER :ID :MAIN :CHILDREN
-;;                ((:TEXT :ID :C1 :CONTENT "a" :children nil) (:TEXT :ID :C2 :CONTENT "b" :children nil)))
-;;              tree)
-;;      )
+;;     tree-1)
+;; ;;     (is ;; (every #'ui-node-p (ui-node-children tree))
+;; ;;      (equalp '(:CONTAINER :ID :MAIN :CHILDREN
+;; ;;                ((:TEXT :ID :C1 :CONTENT "a" :children nil) (:TEXT :ID :C2 :CONTENT "b" :children nil)))
+;; ;;              tree)
+;; ;;      )
 ;;     ))
 
 (test defcomponent-view-honors-custom-view

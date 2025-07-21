@@ -49,6 +49,8 @@
      :view-fn #'elmtui.examples.rainbow-app:rainbow-content-view
      :backend nil)))
 ;; (setup-test-context)
+;; (setup-test-context)
+
 (test rainbow-app-example-state
   "Tests the initial state of the rainbow app example."
   (let ((context (setup-test-context)))
