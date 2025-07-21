@@ -44,7 +44,7 @@
                ;; Core Modules (Load after cleve-elm, before API Layer)
                (:file "view/position") ; Load position before focus manager
                (:file "view/api") ; Imports: cl (pure declarations)
-               (:file "view/dsl/base") ;
+               (:file "view/base-elements") ;
 
                (:file "core/conditions")
                ;; Load state module early since focus manager needs it

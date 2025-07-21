@@ -5,6 +5,7 @@
   (:import-from :elmtui.app.api
                 #:get-component-instance #:destroy-component-state)
   (:import-from :elmtui.ui.api #:id-from-path
+                #:view
                 #:get-path #:component #:make-state-patch)
   (:import-from :elmtui.view.geo #:rectangle)
   (:export
@@ -130,12 +131,15 @@ It stores the ID of its child component in app-state under :child."))
       )
     (values patches commands)))
 
-(defmethod view ((component viewport) state &key id-path)
+(defmethod view ((component viewport) (state elmtui.state:application-state) &key id-path)
   (let* ((viewport-component-registration (get-path id-path state )) ; Get the whole registration for this viewport component
          (viewport-attrs (getf viewport-component-registration :state)) ; Get the :state sub-plist with width, height, offsets
          (child-id (getf viewport-component-registration :child-id)) ; Get child-id from viewport's direct registration
          (child-view nil))
-    (log-info "Rendering viewport ~S with attributes: ~S" (id-from-path id-path) viewport-attrs)
+    (log-info "Rendering viewport ~S with attributes: ~S"
+              (id-from-path id-path) viewport-attrs)
+    (log-info "id-path ~S: Child ID is ~S vp registr ~A vp attrs: ~A" id-path child-id viewport-component-registration
+              viewport-attrs)
 
     (when child-id
       (let* ((child-canonical-id-path (list :components child-id)) ; Canonical path to child's registration

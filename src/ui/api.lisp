@@ -310,6 +310,8 @@ app-state.
     (declare (type component component)
              (type t app-state) ; app-state type can be more specific
              (type list id-path))
+    (log-info "Generic BASEMETHOD:view for component ~A with id-path: ~A"
+              component id-path)
     (check-type component component)
     (check-type id-path list)
     (list (component-type component) :id (id-from-path id-path))))
