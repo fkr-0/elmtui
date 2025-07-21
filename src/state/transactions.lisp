@@ -1,16 +1,8 @@
 (uiop:define-package :elmtui.state.transactions
   (:use :cl)
-  (:import-from :elmtui.statelib.state ; For application-state structure if needed
+  (:import-from :elmtui.tea-state.state ; For application-state structure if needed
    :application-state ;; Assuming this is the type from statelib
-                :state-data-data   ;; Accessor for the raw data within app-state
-                )
-  (:import-from :elmtui.statelib.transaction
-                ;; If we are wrapping statelib.transaction, import its symbols.
-                ;; If this *IS* the primary transaction implementation for the API,
-                ;; then these are defined here and exported via elmtui.state.api.
-                ;; Let's assume elmtui.statelib.transaction provides the base,
-                ;; and this file might extend or specialize it.
-                ;; For the current request, this file seems to *be* the transaction system.
+                :application-state-data   ;; Accessor for the raw data within app-state
                 )
   (:export ;; Symbols defined *in this file* that are part of the public API
    ;; These are already exported by elmtui.state.api, but good practice to list them here.
@@ -57,7 +49,7 @@
           name (transaction-record-id *current-transaction*)))
   (setf *current-transaction*
         (make-transaction-record :name name
-                                 :previous-state-data (copy-tree (elmtui.state.api:state-data-data app-state))))
+                                 :previous-state-data (copy-tree (application-state-data app-state))))
   app-state) ; Return app-state as context
 
 (defun commit-transaction (app-state)
@@ -65,11 +57,11 @@
    Stores the transaction in history."
   (unless *current-transaction*
     (error "No active transaction to commit for app-state."))
-  (unless (eq (elmtui.state.api:state-data-data app-state)
+  (unless (eq (application-state-data app-state)
               (transaction-record-previous-state-data *current-transaction*))
     ;; State has changed, finalize the record
     (setf (transaction-record-next-state-data *current-transaction*)
-          (copy-tree (elmtui.state.api:state-data-data app-state)))
+          (copy-tree (application-state-data app-state)))
 
     (push *current-transaction* *transaction-history*)
     (setf *undone-history* nil) ; Clear redo stack on new commit
@@ -85,7 +77,7 @@
    Restores the state data from before the transaction started."
   (unless *current-transaction*
     (error "No active transaction to rollback for app-state."))
-  (setf (elmtui.state.api:state-data-data app-state)
+  (setf (application-state-data app-state)
         (transaction-record-previous-state-data *current-transaction*))
   (let ((rolled-back-tx *current-transaction*))
     (setf *current-transaction* nil)
@@ -118,7 +110,7 @@
    Returns the undone transaction record or NIL if history is empty."
   (when *transaction-history*
     (let ((last-tx (pop *transaction-history*)))
-      (setf (elmtui.state.api:state-data-data app-state)
+      (setf (application-state-data app-state)
             (transaction-record-previous-state-data last-tx))
       (push last-tx *undone-history*)
       last-tx)))
@@ -128,7 +120,7 @@
    Returns the redone transaction record or NIL if undone history is empty."
   (when *undone-history*
     (let ((tx-to-redo (pop *undone-history*)))
-      (setf (elmtui.state.api:state-data-data app-state)
+      (setf (application-state-data app-state)
             (transaction-record-next-state-data tx-to-redo))
       (push tx-to-redo *transaction-history*)
       tx-to-redo)))

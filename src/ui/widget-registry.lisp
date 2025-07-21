@@ -23,7 +23,7 @@
 (defstruct widget-info
   (name nil :type symbol)
   (group nil :type (or null symbol))
-  (constructor nil :type (or null symbol function)) 
+  (constructor nil :type (or null symbol function))
   (props nil :type list)
   (documentation nil :type (or null string))
   (examples nil :type list))
@@ -48,7 +48,7 @@
                                       :default-value default
                                       :documentation doc)))
                   props)))
-    
+
     (setf (gethash name *widgets*)
           (make-widget-info :name name
                             :group group
@@ -60,7 +60,7 @@
     ;; Add to group if specified
     (when group
       (pushnew name (gethash group *widget-groups*)))
-    
+
     name))
 
 ;; Register a group of widgets
@@ -104,7 +104,7 @@
         (format stream "Group: ~a~%" (widget-info-group widget)))
       (when (widget-info-documentation widget)
         (format stream "~%~a~%~%" (widget-info-documentation widget)))
-      
+
       (format stream "~&Props:~%")
       (dolist (prop (widget-info-props widget))
         (format stream "  ~a: ~a~a~@[ (default: ~s)~]~%"
@@ -114,38 +114,38 @@
                 (prop-info-default-value prop))
         (when (prop-info-documentation prop)
           (format stream "    ~a~%" (prop-info-documentation prop))))
-      
+
       (when (widget-info-examples widget)
         (format stream "~%Examples:~%")
         (dolist (example (widget-info-examples widget))
           (format stream "~%~a~%" example)))
-      
+
       widget)))
 
 ;; Generate markdown documentation for all widgets
 (defun generate-widget-docs (&optional (stream *standard-output*))
   "Generate markdown documentation for all widgets"
   (format stream "# ElmTUI Widget Reference~%~%")
-  
+
   (format stream "## Widget Groups~%~%")
   (maphash (lambda (group-name widgets)
              (declare (ignore widgets))
-             (format stream "- [~a](#~a)~%" 
+             (format stream "- [~a](#~a)~%"
                      group-name (string-downcase (symbol-name group-name))))
            *widget-groups*)
-  
+
   (maphash (lambda (group-name widgets)
              (declare (ignore widgets))
              (format stream "~%## ~a~%~%" group-name)
              (when (get group-name :description)
                (format stream "~a~%~%" (get group-name :description)))
-             
+
              (dolist (widget-name (gethash group-name *widget-groups*))
                (let ((widget (find-widget widget-name)))
                  (format stream "### ~a~%~%" widget-name)
                  (when (widget-info-documentation widget)
                    (format stream "~a~%~%" (widget-info-documentation widget)))
-                 
+
                  (format stream "#### Props~%~%")
                  (format stream "| Name | Type | Required | Default | Description |~%")
                  (format stream "|------|------|----------|---------|-------------|~%")
@@ -154,11 +154,11 @@
                            (prop-info-name prop)
                            (prop-info-type prop)
                            (if (prop-info-required prop) "Yes" "No")
-                           (if (prop-info-default-value prop) 
+                           (if (prop-info-default-value prop)
                                (format nil "`~s`" (prop-info-default-value prop))
                                "")
                            (or (prop-info-documentation prop) "")))
-                 
+
                  (when (widget-info-examples widget)
                    (format stream "~%#### Examples~%~%")
                    (dolist (example (widget-info-examples widget))

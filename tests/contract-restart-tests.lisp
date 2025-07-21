@@ -83,7 +83,7 @@
                      x               ; improper—should be (x)
                      (1+ x)))
     (error (e)
-      (is (eq t t) "Malformed arglist to DEFINE-STAGE should signal an error"))
+      (is (eq t t) (format nil "Malformed arglist to DEFINE-STAGE should signal an error ~A" e)))
     ;; (otherwise (exp)
     ;;   (fail "Expected an error during macroexpand, got ~S" exp))
     ))

@@ -12,7 +12,7 @@
 ;;   (unless (find-package :elmtui.contracts)
 
 (asdf::require 'fiveam)
-(uiop:define-package #:elmtui-contract-tests
+(uiop:define-package #:elmtui-pipeline-contract-tests
   (:use #:cl #:fiveam)
   (:import-from #:elmtui.contracts
                 #:define-stage
@@ -21,7 +21,7 @@
                 #:violation-stage
                 #:violation-expected)
   (:use #:cl #:fiveam #:elmtui.contracts))
-(in-package #:elmtui-contract-tests)
+(in-package #:elmtui-pipeline-contract-tests)
 
 (def-suite pipeline-contract-suite
 

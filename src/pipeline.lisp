@@ -62,12 +62,19 @@
                (if (and (consp dsl) (elmtui.app.api:registered-dsl-component-p (first dsl)))
                    (let* ((component-id (getf (cdr dsl) :id))
                           (id-path (append parent-path (list component-id)))
-                          (full-id-path `(:components ,@id-path))
-                          (instance (elmtui.app.api:get-component-instance full-id-path state)))
+                          (full-id-path
+                            (if (eq (car  id-path) :components)
+                                id-path
+                                        ;(cons :components id-path))
+                                `(:components ,@id-path)))
+                          (instance (elmtui.app.api:get-component-instance
+                                     full-id-path state ;; (elmtui.utils:get-path
+                                     ;;  '(:components) state)
+                                     )))
                      (if instance
                          (funcall #'expand-components (elmtui.ui.api:view instance state :id-path full-id-path)
                                   id-path)
-                         (error "Component instance not found for ID ~A in state ~A" component-id state)))
+                         (error (format nil "Component instance not found for ID ~A in state ~A" component-id state))))
                    (if (and (consp dsl) (getf (cdr dsl) :children))
                        (let* ((children (getf (cdr dsl) :children))
                               (expanded-children (mapcar (lambda (child-dsl)
@@ -77,8 +84,10 @@
                          (setf (getf (cdr new-dsl) :children) expanded-children)
                          new-dsl)
                        dsl))))
-      (make-raw-tree :root (dsl->ui-node (expand-components dsl nil)
-                                         state)))))
+      (make-raw-tree
+       :root
+       (dsl->ui-node (expand-components dsl nil)
+                     (ctx-state state))))))
 
 
 (deftransformer raw->styled (raw-tree) (styled-tree)

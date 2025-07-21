@@ -41,19 +41,19 @@
        :initial-cursor-position (list 0 0))
     (declare (ignore commands))
     (make-app-context
-     :state app-state)
-    :viewport-rect (make-rectangle
-                    :size (make-size :w width :h height)
-                    :pos (make-pos :x 0 :y 0))
-    :front-buffer (make-virtual-buffer width height)
-    :view-fn #'elmtui.examples.rainbow-app:rainbow-content-view
-    :backend nil))
+     :state app-state
+     :viewport-rect (make-rectangle
+                     :size (make-size :w width :h height)
+                     :pos (make-pos :x 0 :y 0))
+     :front-buffer (make-virtual-buffer width height)
+     :view-fn #'elmtui.examples.rainbow-app:rainbow-content-view
+     :backend nil)))
 ;; (setup-test-context)
 (test rainbow-app-example-state
   "Tests the initial state of the rainbow app example."
   (let ((context (setup-test-context)))
     (is-true (ctx-state context) "Context should have an application state.")
-    (is-true (elmtui.state:application-state-p (ctx-state context)) "Context state should be a valid app state.")
+    (is-true (elmtui.tea-state.api:application-state-p (ctx-state context)) "Context state should be a valid app state.")
     (is-true (ctx-viewport-rect context) "Context should have a viewport rectangle.")
     (is-true (ctx-front-buffer context) "Context should have a front buffer.")
     (is-true (virtual-terminal-buffer-p (ctx-front-buffer context))

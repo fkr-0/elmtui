@@ -94,38 +94,38 @@
   (unless (keywordp backend-type)
     (log4cl:log-error "initialize-backend: backend-type is not a keyword! Type: ~A, Value: ~S" (type-of backend-type) backend-type)
     (error "initialize-backend: backend-type must be a keyword, got: ~S (type: ~A)" backend-type (type-of backend-type))))
-(declaim (ftype (function (t) null) shutdown-backend))
-(declaim (ftype (function (t) string) backend-name backend-version))
-(declaim (ftype (function (t) (values integer integer)) get-screen-dimensions))
+;; (declaim (ftype (function (t) null) shutdown-backend))
+;; (declaim (ftype (function (t) string) backend-name backend-version))
+;; (declaim (ftype (function (t) (values integer integer)) get-screen-dimensions))
 
 
 
 
 
-(declaim (ftype (function (t integer integer) null) handle-backend-resize))
+;; (declaim (ftype (function (t integer integer) null) handle-backend-resize))
 
 
 
 
 
-(declaim (ftype (function (t t integer integer &key (:style t)) null) set-cell-style))
-(declaim (ftype (function (t t integer integer integer integer &key (:style t)) null) clear-area))
+;; (declaim (ftype (function (t t integer integer &key (:style t)) null) set-cell-style))
+;; (declaim (ftype (function (t t integer integer integer integer &key (:style t)) null) clear-area))
 (declaim (ftype (function (t t) t) render-and-present))
-(declaim (ftype (function (t &key (:red (or null real)) (:green (or null real)) (:blue (or null real)) (:name symbol)) t) make-color))
-(declaim (ftype (function (t &key (:foreground-color t) (:background-color t) (:attributes list)) t) make-style))
-(declaim (ftype (function (t t t) null) apply-style))
+;; (declaim (ftype (function (t &key (:red (or null real)) (:green (or null real)) (:blue (or null real)) (:name symbol)) t) make-color))
+;; (declaim (ftype (function (t &key (:foreground-color t) (:background-color t) (:attributes list)) t) make-style))
+;; (declaim (ftype (function (t t t) null) apply-style))
 (declaim (ftype (function (t) t) default-foreground-color default-background-color))
-(declaim (ftype (function (t) boolean) supports-truecolor-p))
-(declaim (ftype (function (t) (or null integer)) max-colors))
-(declaim (ftype (function (t) integer) term-w term-h))
-(declaim (ftype (function (integer t) integer) (setf term-w) (setf term-h)))
-(declaim (ftype (function (t) stream) term-stream))
+;; (declaim (ftype (function (t) boolean) supports-truecolor-p))
+;; (declaim (ftype (function (t) (or null integer)) max-colors))
+;; (declaim (ftype (function (t) integer) term-w term-h))
+;; (declaim (ftype (function (integer t) integer) (setf term-w) (setf term-h)))
+;; (declaim (ftype (function (t) stream) term-stream))
 (declaim (ftype (function (t) t) term-style))
-(declaim (ftype (function (t &key (:timeout (or null real))) t) poll-input-event peek-input-event))
-(declaim (ftype (function (t &key (:motion-events-p boolean)) boolean) enable-mouse-support))
-(declaim (ftype (function (t) null) disable-mouse-support))
-(declaim (ftype (function (t symbol) boolean) set-input-mode))
-(declaim (ftype (function (t keyword) boolean) query-feature))
+;; (declaim (ftype (function (t &key (:timeout (or null real))) t) poll-input-event peek-input-event))
+;; (declaim (ftype (function (t &key (:motion-events-p boolean)) boolean) enable-mouse-support))
+;; (declaim (ftype (function (t) null) disable-mouse-support))
+;; (declaim (ftype (function (t symbol) boolean) set-input-mode))
+;; (declaim (ftype (function (t keyword) boolean) query-feature))
 
 (declaim (ftype (function (t) t) get-native-handle))
 
@@ -160,7 +160,7 @@ the current thread."
         l
       (bt:acquire-lock lock t) ; Ensure the lock is acquired before checking owner
       (if (eq lock-owner current-thread)
-          (incf (the unsigned-byte lock-owner-count))
+          (incf (the fixnum lock-owner-count))
           (progn
             (setf lock-owner current-thread)
             (setf lock-owner-count 1)))))
@@ -174,8 +174,8 @@ lock count. Otherwise, release the lock and set the lock owner to nil."
     (with-slots (lock lock-owner lock-owner-count)
         l
       (when (eq lock-owner current-thread)
-        (if (> (the unsigned-byte lock-owner-count) 1)
-            (decf (the unsigned-byte lock-owner-count))
+        (if (> (the fixnum lock-owner-count) 1)
+            (decf (the fixnum lock-owner-count))
             (progn
               (setf lock-owner nil)
               (setf lock-owner-count 0)

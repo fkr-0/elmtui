@@ -38,7 +38,8 @@
                      (values `(:for ,new-for-target) nil)))
 
   (:view (local-state app-state self-id-path)
-         (declare (ignore app-state)) ; app-state not directly used in this simple view
+         ;; (declare (ignore app-state))
+                                        ; app-state not directly used in this simple view
          (let* ((component-id (id-from-path self-id-path))
                 (text (getf local-state :text "Label"))
                 (for-target (getf local-state :for))

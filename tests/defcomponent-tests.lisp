@@ -6,7 +6,11 @@
   (:use :cl :fiveam)
   (:import-from :elmtui.ui.defcomponent #:defcomponent #:cclass-name)
   (:import-from :elmtui.ui.api #:component #:component-id #:id-from-path #:init #:update #:view)
-  (:import-from :elmtui.state.api #:make-update-result #:get-path #:ur-patches #:ur-commands)
+  (:import-from :elmtui.state.api #:get-path)
+  (:import-from :elmtui.state.api
+                #:make-update-result
+                #:make-state
+                #:ur-patches #:ur-commands)
   (:export #:defcomponent-tests))
 
 (in-package :elmtui.tests.defcomponent)
@@ -23,14 +27,14 @@
 (defcomponent test-simple ()
   (:state
    (name "test" :type string :documentation "Component name")
-   (value 42 :type integer :documentation "Component value" :accessor simple-value)
-   (enabled t :type boolean :documentation "Component enabled state" :accessor simple-enabled)))
+   (value 42 :type integer :documentation "Component value" :accessor test-simple-value)
+   (enabled t :type boolean :documentation "Component enabled state" :accessor test-simple-enabled)))
 
 ;; Component with custom init
 (defcomponent test-with-init ()
   (:state
-   (data nil :type list :documentation "Component data")
-   (initialized nil :type boolean :documentation "Init flag"))
+   (data (list) :type list :documentation "Component data")
+   (initialized nil :type (or null boolean) :documentation "Init flag"))
 
   (:init (props self-id-path)
          (let ((initial-data (getf props :data '(1 2 3))))
@@ -41,7 +45,7 @@
 (defcomponent test-with-update ()
   (:state
    (counter 0 :type integer :documentation "Counter value")
-   (messages nil :type list :documentation "Message history"))
+   (messages (list) :type list :documentation "Message history"))
 
   (:update (msg local-state app-state id-path)
            (:increment (amount)
@@ -69,7 +73,7 @@
 (defcomponent test-complete ()
   (:state
    (name "complete" :type string :accessor complete-name)
-   (data nil :type list :accessor complete-data)
+   (data (list) :type list :accessor complete-data)
    (active t :type boolean :accessor complete-active))
 
   (:documentation "A complete test component")
@@ -92,7 +96,9 @@
                       :id ,(id-from-path id-path)
                       :name ,(getf local-state :name)
                       :active ,(getf local-state :active))))
-
+(defcomponent test-child (test-simple)
+  (:state
+   (child-prop "child" :type string :documentation "Child property")))
 ;;; Tests
 
 (test defcomponent-class-creation
@@ -122,11 +128,11 @@
              (path (first patch))
              (state (second patch)))
         (is (equal id-path path))
-        (is (eq :test-simple (getf state :type)))
-        (is (equal (id-from-path id-path) (getf state :id)))
-        (is (string= "test" (getf state :name)))
-        (is (= 42 (getf state :value)))
-        (is (eq t (getf state :enabled)))))))
+        (is (eq :test-simple (gethash :type state)))
+        (is (equal (id-from-path id-path) (gethash :id state)))
+        (is (string= "test" (gethash :name state)))
+        (is (= 42 (gethash :value state)))
+        (is (eq t (gethash :enabled state)))))))
 
 (test defcomponent-init-with-params
   "Test default init with custom parameters"
@@ -139,9 +145,9 @@
 
       (let* ((patch (first patches))
              (state (second patch)))
-        (is (string= "custom" (getf state :name)))
-        (is (= 100 (getf state :value)))
-        (is (eq t (getf state :enabled)))))))
+        (is (string= "custom" (gethash :name state)))
+        (is (= 100 (gethash :value state)))
+        (is (eq t (gethash :enabled state)))))))
 
 (test defcomponent-custom-init
   "Test component with custom init method"
@@ -155,8 +161,8 @@
 
       (let* ((patch (first patches))
              (state (second patch)))
-        (is (equal '(a b c) (getf state :data)))
-        (is (eq t (getf state :initialized)))))))
+        (is (equal '(a b c) (gethash :data state)))
+        (is (eq t (gethash :initialized state)))))))
 
 (test defcomponent-default-update
   "Test default update method (no-op)"
@@ -172,7 +178,7 @@
   "Test component with custom update method"
   (let* ((instance (make-instance 'test-with-update))
          (id-path '(:components :test))
-         (mock-app-state `(:components (:test (:counter 5 :messages () :type :test-with-update :id :test)))))
+         (mock-app-state (make-state (alexandria:plist-hash-table `(:components (:test (:counter 5 :messages () :type :test-with-update :id :test)))))))
 
     ;; Test increment message
     (let* ((result (update instance mock-app-state '(:increment 3) :id-path id-path))
@@ -214,22 +220,22 @@
 (test defcomponent-custom-view
   "Test component with custom view method"
   (let* ((instance (make-instance 'test-with-view))
-         (mock-app-state (list :components (list :test (list :label "Custom Label"))))
+         (mock-app-state (make-state (alexandria:plist-hash-table `(:components (:test (:label "Custom Label"))))))
          (id-path '(:components :test)))
     (let ((view-result (view instance mock-app-state :id-path id-path)))
       (is (listp view-result))
       (is (eq :div (first view-result)))
-      (is (equal (id-from-path id-path) (getf (cdr view-result) :id)))
-      (is (string= "Custom Label" (getf (cdr view-result) :text))))))
+      (is (equal (id-from-path id-path) (gethash :id (alexandria:plist-hash-table (cdr view-result)))))
+      (is (string= "Custom Label" (gethash :text (alexandria:plist-hash-table (cdr view-result))))))))
 
 (test defcomponent-accessors
   "Test generated accessor functions"
-  (let* ((mock-app-state (list :components (list :test (list :value 123 :enabled nil))))
+  (let* ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:test (:value 123 :enabled nil))))))
          (instance (make-instance 'test-simple)))
     (setf (component-id instance) :test)
 
-    (is (= 123 (simple-value mock-app-state instance)))
-    (is (eq nil (simple-enabled mock-app-state instance)))))
+    (is (= 123 (test-simple-value mock-app-state instance)))
+    (is (eq nil (test-simple-enabled mock-app-state instance)))))
 
 (test defcomponent-complete-component
   "Test component with all features enabled"
@@ -244,12 +250,12 @@
 
       (let* ((patch (first patches))
              (state (second patch)))
-        (is (string= "my-complete" (getf state :name)))
-        (is (equal '(x y z) (getf state :data)))
-        (is (eq t (getf state :active)))))
+        (is (string= "my-complete" (gethash :name state)))
+        (is (equal '(x y z) (gethash :data state)))
+        (is (eq t (gethash :active state)))))
 
     ;; Test update
-    (let* ((mock-app-state (list :components (list :complete-test (list :name "test" :active t))))
+    (let* ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "test" :active t))))))
            (result (update instance mock-app-state '(:set-name "updated") :id-path id-path)))
       (is (typep result 'elmtui.state.api:update-result))
       (let ((patches (ur-patches result)))
@@ -257,18 +263,22 @@
         (is (string= "updated" (second (first patches))))))
 
     ;; Test view
-    (let* ((mock-app-state (list :components (list :complete-test (list :name "view-test" :active nil))))
+    (let* ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "view-test" :active nil))))))
            (view-result (view instance mock-app-state :id-path id-path)))
       (is (eq :component (first view-result)))
-      (is (eq :test-complete (getf (cdr view-result) :type)))
-      (is (string= "view-test" (getf (cdr view-result) :name)))
-      (is (eq nil (getf (cdr view-result) :active))))
+      (let ((props (alexandria:plist-hash-table (cdr view-result))))
+        (is (eq :test-complete (gethash :type props)))
+        (is (string= "view-test" (gethash :name props)))
+        (is (eq nil (gethash :active props)))))
 
     ;; Test accessors
-    (let ((mock-app-state (list :components (list :complete-test (list :name "accessor-test" :data '(1 2 3) :active t)))))
+    ;; (let* ((instance (make-instance 'test-complete))
+    ;;        (id-path '(:components :complete-test)))
+    (let ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "accessor-test" :data (1 2 3) :active t)))))))
       (setf (component-id instance) :complete-test)
+      ;; (complete-data mock-app-state instance)))
       (is (string= "accessor-test" (complete-name mock-app-state instance)))
-      (is (equal '(1 2 3) (complete-data mock-app-state instance)))
+      (is (equal (list 1 2 3) (complete-data mock-app-state instance)))
       (is (eq t (complete-active mock-app-state instance))))))
 
 (test defcomponent-class-options
@@ -277,11 +287,10 @@
     (is (string= "A complete test component"
                  (documentation class t)))))
 
+
 (test defcomponent-inheritance
   "Test that component inheritance works properly"
-  (defcomponent test-child (test-simple)
-    (:state
-     (child-prop "child" :type string :documentation "Child property")))
+
 
   (is (subtypep 'test-child 'test-simple))
   (is (subtypep 'test-child 'component))
@@ -300,10 +309,10 @@
         (is (null commands))
         (let* ((patch (first patches))
                (state (second patch)))
-          (is (string= "test" (getf state :name)))
-          (is (= 42 (getf state :value)))
-          (is (eq t (getf state :enabled)))
-          (is (string= "child" (getf state :child-prop))))))))
+          (is (string= "test" (gethash :name state)))
+          (is (= 42 (gethash :value state)))
+          (is (eq t (gethash :enabled state)))
+          (is (string= "child" (gethash :child-prop state))))))))
 ;; (init '(test-simple))
 
 ;; Lambda List: (ELMTUI.UI.DEFCOMPONENT::SELF &REST ELMTUI.UI.DEFCOMPONENT::OTHER-KEYS &KEY ELMTUI.UI.DEFCOMPONENT::ID-PATH ELMTUI.TESTS.DEFCOMPONENT::INITIAL-NAME ELMTUI.TESTS.DEFCOMPONENT::INITIAL-VALUE ELMTUI.TESTS.DEFCOMPONENT::INITIAL-ENABLED &ALLOW-OTHER-KEYS)
@@ -311,3 +320,8 @@
 ;; (init (make-instance 'test-simple) :id-path '(:my-app :main-layout :submit-button)
 ;;     :initial-state '(:name "Submit Button" :value 100 :enabled t)
 ;;                    :initial-name '(:button :label "Submit" :on-click #'submit-handler))
+;; (let* ((instance (make-instance 'test-complete))
+;;        (id-path '(:components :complete-test)))
+;;   (let ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "accessor-test" :data '(1 2 3) :active t)))))))
+;;     (setf (component-id instance) :complete-test)
+;;     (list '(1 2 3 ) (complete-data mock-app-state instance))))
