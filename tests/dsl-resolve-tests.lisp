@@ -33,7 +33,7 @@
         (app-state nil))
     (is (equal "hello" (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))))
 
-(test dsl-resolve-layout-element-with-positional-children
+(test dsl-resolve-layout-element-positional-children
   (elmtui.app.api:with-temporary-dsl-component-registry
     (elmtui.app.api:clear-dsl-component-registry)
     (let ((dsl '(:row (:text "a") (:text "b")))
@@ -41,13 +41,13 @@
       (is (equalp '(:row :children ((:text :children ("a")) (:text :children ("b"))))
                   (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))))
 
-(test dsl-resolve-layout-element-with-children-prop
+(test dsl-resolve-layout-element-children-prop
   (elmtui.app.api:with-temporary-dsl-component-registry
     (elmtui.app.api:clear-dsl-component-registry)
     (let ((dsl '(:column :class "p-2" :children ((:text "x") (:text "y"))))
           (app-state nil))
       (is (equalp
-           '(:column :class "p-2" :children ((:text :children ("x")) (:text :children ("y"))))
+           '(:column :class "p-2" :children ((:text "x") (:text :content "y")))
            (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))
     (let ((dsl '(:column :class "p-2" :children ((:text "x") (:text :content "y"))))
           (app-state nil))
@@ -92,7 +92,7 @@
            (elmtui.app.api:register-dsl-component-type :counter 'mock-counter-component)
            (let* ((app-state (setup-test-app-state `(((:ctr) ,(make-instance 'mock-counter-component)))))
                   (dsl '(:counter :id :ctr)))
-             (is (equalp '(:counter :id :ctr :resolved-view (:text :children ("0")))
+             (is (equalp '(:counter :id :ctr :resolved-view (:text "0"));:children ("0")))
                          (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))
            ;; Test that an error is signaled if :id is missing
            (signals error (elmtui.view.dsl::render-dsl-to-resolved-tree '(:counter) (make-instance 'mock-app-state))))

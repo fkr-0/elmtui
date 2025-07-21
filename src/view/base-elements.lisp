@@ -274,7 +274,6 @@
   (:documentation "Plain text node."))
 
 (defmethod validate-element ((txt text-element) &optional context)
-  (declare (ignore context))
   (unless (slot-boundp txt 'content)
     (error 'base-dsl-error
            :element txt
@@ -332,7 +331,7 @@
 ;;; Label
 ;;; ---------------------------------------------------------------
 (defclass label-element (base-element)
-  ((text  :initarg :text  :type string  :reader label-text  :documentation "Displayed label text.")
+  ((text  :initarg :text  :type string  :reader label-text  :documentation "Displayed label text." :initarg :text)
    (for   :initarg :for   :initform nil :reader label-for   :documentation "ID of the control this label describes.")
    (color :initarg :color :initform nil :reader label-color :documentation "Optional colour keyword."))
   (:default-initargs :content-model :text)
@@ -340,6 +339,13 @@
 
 (defmethod element-type ((e label-element)) :label)
 (%register-element-class :label 'label-element)
+
+(defmethod validate-element ((lbl label-element) &optional context)
+  (unless (slot-boundp lbl 'text)
+    (error 'base-dsl-error
+           :element lbl
+           :reason "Missing required property :text"
+           :context context)))
 
 ;;; ---------------------------------------------------------------
 ;;; Button
@@ -356,7 +362,6 @@
 (%register-element-class :button 'button-element)
 
 (defmethod validate-element ((btn button-element) &optional context)
-  (declare (ignore context))
   (unless (slot-boundp btn 'text)
     (error 'base-dsl-error
            :element btn
@@ -650,6 +655,44 @@
   "Return the list of initarg keywords for CLS."
   (mapcar #'slot-definition-name (class-direct-slots (class-of cls))))
 
+(defun slot-initargs (type-kw)
+  "Return the list of initargs for the class corresponding to TYPE-KW.
+
+  This is a list of keywords that can be used to initialize an element.
+  Arguments:
+  - TYPE-KW: a keyword representing the element type (e.g. :container, :text).
+
+  Returns:
+  A list of keywords that can be used as initargs for the class.
+
+  Example:
+  (slot-initargs :container) =>
+  (:id :children :style :class :layout :padding :margin :gap)"
+  (mapcar
+   (lambda (x) (car (sb-mop:slot-definition-initargs x)))
+   (sb-mop::class-slots
+    (find-class (element-class type-kw)))))
+
+(defmethod base-element-has-initarg ((base-element-kw symbol) (property symbol))
+  "Check if BASE-ELEMENT-KW has PROPERTY as an initarg."
+  (member property (slot-initargs base-element-kw) :test #'equalp))
+
+(defmethod base-element-has-initarg ((base-element-kw null) (property null))
+  "Check if BASE-ELEMENT-KW has PROPERTY as an initarg."
+  (values nil nil))
+
+(defmethod base-element-has-initarg-p ((base-element-kw null) (property list))
+  "Check if BASE-ELEMENT-KW has PROPERTY as an initarg."
+  (values nil nil))
+
+(defmethod base-element-has-initarg-p ((base-element-kw symbol) (property list))
+  "Check if BASE-ELEMENT-KW has PROPERTY as an initarg."
+  (let* ((args (slot-initargs base-element-kw))
+         (res (remove-if (lambda (x) (member x args :test #'equalp)) property)))
+    (if (< 0 (length res ))
+        (values nil res)
+        (values t nil))))
+
 ;;; ----------------------------------------------------------------
 ;;;  Predicates
 ;;; ----------------------------------------------------------------
@@ -661,21 +704,29 @@
   (handler-case
       (progn (validate-base-dsl dsl) t)
     (error () nil)))
-
 (defun element-type-p (type)
   (and (keywordp type) (element-class type)))
 
 (defun valid-property-p (element-type property)
-  (let ((proto (element-prototype element-type))) ;(log-info "Checking property ~A in ~A ~A" (string-downcase (symbol-name property)) element-type (append '("id" "children")
-    (if (member
-         (string-downcase (symbol-name property))
-         (append '("id" "children")
-                 (mapcar (lambda (x) (string-downcase (symbol-name x)))
-                         (slot-keywords proto)))
-         :test #'string=)
-        t
-        nil)))
+  "Checks if PROPERTY is a valid initarg for the class corresponding to ELEMENT-TYPE."
+  (base-element-has-initarg element-type property))
+;; (let ((element-type :container)
+;;       (property :id))
+;; (let ((class (element-class element-type)))
+;;   (when class
+;;     (let* (;; (all-slots (sb-mop:class-slots
+;;            ;;             (sb-mop::class-of
+;;            ;;              property)))
+;;            (initargs (mapcar
+;;                       (lambda (x) (sb-mop:slot-definition-initargs x))
+;;                       (sb-mop::class-slots
+;;                        (find-class class)))))
+;;       (member (list property) initargs :test #'equalp))))
+;; (valid-property-p :container :id)
+                                        ;(mapcar (lambda (x) (sb-mop:slot-definition-initargs x));; (sb-mop::class-slots
 
+;;                           class))
+;; (sb-mop:effective-slot-definition-class (sb-mop::class-of (make-instance 'container-element :id :d)))
 ;;; ----------------------------------------------------------------
 ;;;  Validation
 ;;; ----------------------------------------------------------------
@@ -718,14 +769,21 @@
              :reason "Odd-length initializer list"
              :context context))
     ;; Check properties against the class's initargs
-    (let ((valid-keys (slot-keywords (element-prototype element-type))))
-      (loop for (k v) on (rest element) by #'cddr
-            unless (member k valid-keys)
-              do (warn "Unknown property ~S for element type ~S in ~A"
-                       k element-type context)))
-    ;; Delegate further validation to the object instance
-    (let ((obj (apply #'make-instance cls (rest element))))
-      (validate-element obj context))))
+    (let (;; (valid-keys (slot-keywords (element-prototype element-type)))
+          (keys (loop for (k v) on (rest element) by #'cddr
+                      collect k)))
+      (multiple-value-bind (has-p missing)
+          (base-element-has-initarg-p element-type keys)
+        (unless has-p
+          (error 'base-dsl-error
+                 :element element
+                 :reason (format nil "Invalid properties ~A for element type ~A"
+                                 missing element-type)
+                 :context context)))
+      ;; Delegate further validation to the object instance
+      ;; (log-info "Validating element ~A in context ~A" (first element) (rest element))
+      (let ((obj (apply #'make-instance (append (list cls) (rest element)))))
+        (validate-element obj context)))))
 
 ;; Object path
 
@@ -839,15 +897,15 @@
     ((base-element-p element)
      (let* ((class (class-of element))
             (current-props
-              (loop for slot-def in (class-direct-slots class)
-                    for slot-name = (slot-definition-name slot-def)
+              (loop for slot-def in (sb-mop:class-direct-slots class)
+                    for slot-name = (sb-mop:slot-definition-name slot-def)
                     when (slot-boundp element slot-name)
-                    append (list (intern (symbol-name slot-name) :keyword)
-                                 (slot-value element slot-name))))
+                      append (list (intern (symbol-name slot-name) :keyword)
+                                   (slot-value element slot-name))))
             (new-props (copy-list property-updates)))
        (loop for (k v) on current-props by #'cddr
              unless (getf new-props k)
-             do (setf (getf new-props k) v))
+               do (setf (getf new-props k) v))
        (apply #'make-instance class new-props)))
     ((listp element)
      (let ((props (copy-list (rest element))))
@@ -872,11 +930,14 @@
          (dolist (n node) (funcall fn n))))))
 
 (defun map-dsl-elements (function dsl)
-  (labels ((recurse (node)
-             (let ((new (funcall function node)))
-               (%each-child new #'recurse)
-               new)))
-    (recurse dsl)))
+  "Recursively apply FUNCTION to each node in the DSL tree, transforming it.
+   Returns a new, transformed tree."
+  (let ((new-node (funcall function dsl)))
+    (when (and (typep new-node 'base-element) (element-children new-node))
+      (setf (element-children new-node)
+            (mapcar (lambda (child) (map-dsl-elements function child))
+                    (element-children new-node))))
+    new-node))
 
 (defun find-elements-by-type (dsl element-type)
   (let ((result '()))
@@ -968,3 +1029,6 @@
 ;; ⇒ returns an INPUT-ELEMENT instance (plus default values)
 
 ;; (make-instance 'text-element :content "dud")
+
+;; (validate-BASE-DSL '(:BUTTON :text "Click Me"))
+;; (make-instance 'button-element :text "Click Me")

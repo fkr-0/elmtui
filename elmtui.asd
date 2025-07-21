@@ -151,6 +151,10 @@
                ;; Load selector implementations (depends on view/styled)
 
                ;; Load UI Components (depend on view/core, view/styled, view/style-lib)
+               ;; Load remaining View components (depend on UI widgets, layout etc)
+               (:file "view/memo")
+               ;; (:file "view/dsl")
+               (:file "view/dsl")
 
                (:module "ui"
                 :serial t
@@ -179,12 +183,8 @@
                              ;; Load the main package file AFTER the individual widget files
                              (:file "widgets-pkg") ; Correct filename to load widgets.lisp
                              (:file "widget-registry")))
-               (:file "app/dsl-type-registry")
                (:file "app/application")
-               ;; Load remaining View components (depend on UI widgets, layout etc)
-               (:file "view/memo")
-               ;; (:file "view/dsl")
-               (:file "view/dsl")
+               (:file "app/dsl-type-registry")
                (:file "view/flex")
                (:file "view/layout") ; Load layout before grid
                (:file "view/tree-transforms")
