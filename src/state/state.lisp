@@ -5,32 +5,36 @@
 (uiop:define-package :elmtui.state
   (:use :cl )
 
-  (:import-from :elmtui.state.utils #:get-path #:set-path #:remove-path)
-  (:import-from :elmtui.state.api ; Import from the central API
-   #:application-state #:make-application-state #:state-ref #:get-state #:set-state
-   #:application-state-p
-   #:application-state-data #:state-data #:state-data-data
-                :with-transaction :undo-last-transaction
-                :update-result :make-update-result :ur-patches :ur-commands
-                :ur-has-command-p)
+  ;; (:import-from :elmtui.state.utils #:get-path #:set-path #:remove-path)
+  ;; (:import-from :elmtui.state.api ; Import from the central API
+  ;;  #:application-state #:make-application-state #:state-ref #:get-state #:set-state
+  ;;  #:application-state-p
+  ;;  #:application-state-data #:state-data #:state-data-data
+  ;;               :with-transaction :undo-last-transaction
+  ;;               :update-result :make-update-result :ur-patches :ur-commands
+  ;;               :ur-has-command-p)
   (:import-from :elmtui.core.globals
    :*app-state*)
+  (:import-from :elmtui.utils
+                #:get-path #:set-path #:remove-path)
   ;; Import the conditions package directly to avoid qualified references
   (:import-from :elmtui.core.conditions
    :async-task-error :log-condition)
   ;; Import lower-level statelib components if they are not exposed via elmtui.state.api
   ;; but are needed for the implementation details within elmtui.state.
-  (:import-from :elmtui.state.api
+  (:import-from :elmtui.tea-state.state
+                #:application-state-data)
+  (:import-from :elmtui.tea-state.api
    ;; :application-state :make-application-state :state-ref :get-state :set-state ; Now from API
-   #:app-state
-                :with-state :with-comp-state :state-if-unset-else ; Keep if specific to this level
-                #:app-state-p
+   #:undo
+   #:application-state
+   :with-state :with-comp-state :state-if-unset-else ; Keep if specific to this level
                 :application-state-observers :application-state-lock
                 :application-state-transaction-log :application-state-transaction-history
                 :log-state-data)
-  (:import-from :elmtui.statelib.transaction
-   :start-transaction :commit-transaction :rollback-transaction ; Keep if specific
-                :transaction-open-p)
+  ;; (:import-from :elmtui.statelib.transaction
+  ;;  :start-transaction :commit-transaction :rollback-transaction ; Keep if specific
+  ;;               :transaction-open-p)
   ;; (:import-from :elmtui.statelib.observe ...) ; If needed
 
   ;; Define what this package EXPORTS. Since elmtui.state.api is the public interface,
@@ -42,7 +46,6 @@
    :with-async-restarts ; This is a utility for async task handling, not part of the API
    ;; Functions defined here that are exported to the public API
    #:app-state-p
-   #:application-state-p
    :merge-patch :merge-patches
    :get-path :set-path :remove-path
    :get-component-by-path :store-component-at-path :remove-component-at-path
@@ -66,7 +69,7 @@
   "Rolls back the last transaction on the global *app-state*."
   ;; undo-last-transaction is now imported from elmtui.state.api,
   ;; which should export it from elmtui.state.transactions.
-  (undo-last-transaction elmtui.core.globals:*app-state*))
+  (undo elmtui.core.globals:*app-state*))
 
 ;;;--------------------------------------------------------------
 ;;; Path Utilities for Plists (Functional: return new plists on change)
@@ -260,18 +263,18 @@ Supports both hash-table and plist based state-data."
   "Merges a list of patches or a property list into the state data.
 Handles hash-tables, plists, application-state, and app-state structures.
 Returns the updated state-data."
-  (declare (type (or hash-table list application-state app-state) state-data)
+  (declare (type (or hash-table list application-state) state-data)
            (type list patches))
 
   ;; Use enhanced API if available, otherwise fall back to original implementation
   (cond
     ;; Enhanced app-state or application-state
-    ((or (typep state-data 'application-state)
-         (typep state-data 'elmtui.state.api:app-state))
+    ((or (typep state-data 'hash-table)
+         (typep state-data 'elmtui.tea-state.api:application-state))
      (let ((new-data (merge-patches
-                      (elmtui.state.api:application-state-data state-data)
+                      (application-state-data state-data)
                       patches)))
-       (setf (elmtui.state.api:application-state-data state-data) new-data)
+       (setf (application-state-data state-data) new-data)
        state-data))
     ;; Hash-table or plist (original implementation with normalization)
     (t
@@ -286,18 +289,23 @@ Returns the updated state-data."
                       (evenp (length patches)))
                  (loop for (k v) on patches by #'cddr
                        collect (list (list k) v)))
-                ((listp patches) patches)
+                ((listp patches)
+                 (remove-if-not (lambda (p)
+                                  (and (listp p)
+                                       (= (length p) 2)
+                                       (listp (first p))))
+                                patches))
                 ;; (t (error "Invalid patches format: ~S" patches))
                 )))
        (cond
-         ((hash-table-p state-data)
-          ;; Destructively apply each patch to the hash-table
-          (dolist (p patch-list state-data)
-            (merge-patch state-data p)))
+         ;; ((hash-table-p state-data)
+         ;;  ;; Destructively apply each patch to the hash-table
+         ;;  (dolist (p patch-list state-data)
+         ;;    (ignore-errors (merge-patch state-data p))))
          ((listp state-data)
           ;; Merge into new plist
           (reduce (lambda (current-state p)
-                    (merge-patch current-state p))
+                    (ignore-errors (merge-patch current-state p)))
                   patch-list
                   :initial-value state-data))
          ;; (t (error "Unsupported state type ~S for merging patches" state-data))
@@ -319,9 +327,9 @@ Returns the updated state-data."
   (check-type component-id-path list)
   (let* ((app-data (application-state-data app-state))
          (components-path (append '(:components) component-id-path '(:component-instance))))
-    (if (typep app-data 'state-data)
-        (let ((hash-table-data (state-data-data app-data)))
-          (get-path hash-table-data components-path )
+    (if (typep app-data 'hash-table)
+        (let ((hash-table-data app-data))
+          (get-path components-path hash-table-data)
           ;; (if (and (listp components-path) (= (length components-path) 1))
           ;;     (gethash (first components-path) hash-table-data)
           ;;     ;; Old: error on list-paths
@@ -357,9 +365,9 @@ Returns the updated state-data."
   (let* ((app-data (application-state-data app-state))
          (full-path (append '(:components) component-id-path '(:component-instance))))
     ;; If app-data is a state-data struct, get its hash-table data
-    (if (typep app-data 'state-data)
+    (if (typep app-data 'hash-table)
         ;; Since state-data.data is always a hash-table, handle it specially
-        (let ((hash-table-data (state-data-data app-data)))
+        (let ((hash-table-data app-data))
           ;; Handle storing in hash-table (direct key only for simplicity)
           (if (and (listp full-path) (= (length full-path) 1))
               (progn
@@ -388,9 +396,9 @@ Returns the updated state-data."
          (state-subtree-path (append '(:components) component-id-path)))
 
     ;; If app-data is a state-data struct, get its hash-table data
-    (if (typep app-data 'state-data)
+    (if (typep app-data 'hash-table)
         ;; Since state-data.data is always a hash-table, handle it specially
-        (let ((hash-table-data (state-data-data app-data)))
+        (let ((hash-table-data  app-data))
           ;; Handle removing from hash-table (direct key only for simplicity)
           (if (and (listp instance-path) (= (length instance-path) 1))
               (progn

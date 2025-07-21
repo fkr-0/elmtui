@@ -4,20 +4,23 @@
   (:import-from #:bordeaux-threads #:mailbox) 
   (:import-from #:elmtui.core.globals #:*applications* #:*dsl-type-to-component-class*)
   (:import-from :elmtui.api #:get-component-class-for-dsl-type)
+
+  (:import-from #:elmtui.ui.api #:instantiate-component-from-dsl)
   (:import-from :elmtui.core.event-channels
    :event-channel)
   (:import-from :elmtui.state :get-path)
   (:export #:defapplication
+           #:with-temporary-dsl-component-registry
            #:run-application
            #:registered-dsl-component-p
            #:get-component-instance
-           #:instantiate-component-from-dsl
            #:register-dsl-component-type #:get-component-class-for-dsl-type
            #:process-command-default #:render-view-default #:read-event-default
            #:app-config #:app-config-message-queue #:app-config-command-processor-fn #:app-config-renderer-fn
            #:app-config-name #:app-config-root-component-dsl #:app-config-initial-state-plist
            #:app-config-update-fn-sym #:app-config-view-fn-sym #:app-config-subscriptions-fn-form
-           #:validate-platform-options))
+           #:validate-platform-options
+           #:clear-dsl-component-registry))
 
 (in-package #:elmtui.app.api)
 
@@ -38,7 +41,7 @@
   (renderer-fn nil :type (or symbol function) :read-only t))
 
 ;; Generic function signatures with improved type declarations
-(declaim (ftype (function (list t) t) get-component-instance))
+;;(declaim (ftype (function (list t) t) get-component-instance))
 (defun %kw (x)
   (etypecase x
     (null     nil)
@@ -46,53 +49,72 @@
     (symbol   (intern (string-upcase x) "KEYWORD"))
     (string   (intern (string-upcase x) "KEYWORD"))))
 (defgeneric get-component-instance (id-path state)
-  (:method ((id-path list) (state elmtui.state.api:application-state))
+  (:method ((id-path list) (state elmtui.tea-state.api:application-state))
     "Retrieve a component instance from STATE by following ID-PATH."
-    (let* ((path-keys (rest id-path))
+    (let* ((path-keys (if (eq :components (car id-path))
+                          (rest id-path)
+                          id-path))
            (components-root (get-path :components state))
-           (component-state
-             (reduce (lambda (ht key)
-                       (when (hash-table-p ht)
-                         (gethash key ht)))
-                     path-keys
-                     :initial-value components-root)))
+           ;; (id-path (if (listp id-path)
+           ;;              (if (eql (first id-path) :components)
+           ;;                  (rest id-path)
+           ;;                  id-path)
+           ;;              (list :components id-path)))
+           (component-state (get-path path-keys components-root)
+                            ;; (reduce (lambda (ht key)
+                            ;;           (when (hash-table-p ht)
+                            ;;             (gethash key ht)))
+                            ;;         path-keys
+                            ;;         :initial-value components-root)
+                            ))
       (if (and (hash-table-p component-state) (gethash :type component-state))
-          (let ((component-class (get-component-class-for-dsl-type (gethash :type component-state))))
+          (let ((component-class
+                  (get-component-class-for-dsl-type
+                   (gethash :type component-state))))
             (when component-class
               (make-instance component-class :id (gethash :id component-state))))
-          (error "Component with ID path ~S not found in state." id-path)))))
+          (error
+           (format
+            nil
+            ">get-component-instance[list state]: Component[~S] not found(compt-state: ~A~%)"
+            id-path component-state))))))
 
 (defmethod get-component-instance ((id-path t) (state t))
   "Retrieve a component instance by ID path symbol."
-  (let ((idp (%kw id-path)))
+  (let ((idp
+          (if (listp id-path)
+              (mapcar #'%kw id-path)
+              (list :components (%kw id-path)))))
     (when (null idp)
       (log-error "Invalid ID path: ~S" id-path)
       (error "Invalid ID path: ~S" id-path))
-    (get-component-instance (list :components
-                                  idp) state)))
-(declaim (ftype (function (t &key (:backend-type keyword) (:platform-options list)) t) run-application))
+    (get-component-instance idp state)))
+;; (log-info "Retrieving ~A~%" idp)
+;; (unless (listp idp)
+;;   (get-component-instance (list :components
+;;                                 idp) state))))
+;;(declaim (ftype (function (t &key (:backend-type keyword) (:platform-options list)) t) run-application))
 (defgeneric run-application (app-spec &key backend-type platform-options)
-  (:documentation "Run the application with the given app-spec and platform options.")
-  )
+  (:documentation "Run the application with the given app-spec and platform options."))
 
-(declaim (ftype (function (t t &key (:id-path list)) t) process-command-default))
+;;(declaim (ftype (function (t t &key (:id-path list)) t) process-command-default))
 (defgeneric process-command-default (command state &key id-path)
   (:documentation "Default command processing function. Can be overridden by specific applications.")
   )
 
-(declaim (ftype (function (t t &key (:id-path list)) t) render-view-default))
+;;(declaim (ftype (function (t t &key (:id-path list)) t) render-view-default))
 (defgeneric render-view-default (view state &key id-path)
   (:documentation "Default view rendering function. Can be overridden by specific applications.")
   )
 
-(declaim (ftype (function (t t &key (:id-path list)) t) read-event-default))
+;;(declaim (ftype (function (t t &key (:id-path list)) t) read-event-default))
 (defgeneric read-event-default (event state &key id-path)
   (:documentation "Default event reading function. Can be overridden by specific applications.")
   )
 
 (declaim (ftype (function (list list) t) instantiate-component-from-dsl))
 
-(declaim (ftype (function ((or symbol keyword)) (or null symbol)) get-component-class-for-dsl-type))
+;;(declaim (ftype (function ((or symbol keyword)) (or null symbol)) get-component-class-for-dsl-type))
 
 (declaim (ftype (function ((or symbol keyword) symbol) t) register-dsl-component-type))
 
@@ -102,7 +124,7 @@
 ;;; IMPLEMENTATION SECTION
 ;;; ===================================================================
 
-(defun instantiate-component-from-dsl (dsl id-path)
+(defmethod instantiate-component-from-dsl (dsl id-path)
   "Instantiates a component instance from its Domain Specific Language (DSL) representation.
 
 This function serves as a bridge between the declarative component definitions
@@ -145,6 +167,7 @@ Workflow:
           (log-error "Failed to instantiate component: No component class found for DSL type: ~S. DSL: ~S, ID-PATH: ~S"
                      dsl-type dsl id-path)
           (error "No component class found for DSL type: ~a" dsl-type)))))
+
 (defmethod get-component-class-for-dsl-type ((dsl-type list))
   "Retrieve the component class registered for a given DSL type."
   (when (null dsl-type)
@@ -183,6 +206,15 @@ Workflow:
         (progn
           (log-debug "No component class registered for DSL type: ~S" keyword-dsl-type)))))
 
+(defun clear-dsl-component-registry ()
+  "Clears the DSL component registry. Useful for testing."
+  (clrhash *dsl-type-to-component-class*))
+
+(defmacro with-temporary-dsl-component-registry (&body body)
+  "Executes BODY with a temporary DSL component registry.
+   This is useful for testing purposes to avoid polluting the global registry."
+  `(let ((*dsl-type-to-component-class* (make-hash-table :test 'equal)))
+     ,@body))
 
 (defun validate-platform-options (platform platform-options)
   "Validate PLATFORM-OPTIONS for the given PLATFORM, signalling an error on invalid keys."

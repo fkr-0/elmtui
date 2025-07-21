@@ -1,5 +1,5 @@
 (uiop:define-package :elmtui.ui.widgets.viewport
-  (:use :cl :alexandria )
+  (:use :cl :log4cl )
   (:import-from :elmtui.utils
                 #:ensure-keyword)
   (:import-from :elmtui.app.api
@@ -53,7 +53,7 @@ It stores the ID of its child component in app-state under :child."))
           (setf child-id c-id)          ; Store ID for state
           (setf child-patches current-child-patches)
           (setf child-commands current-child-commands))))
-    
+
     (values component
             (append
              (list (make-state-patch id-path ; Path to the viewport's own component registration
@@ -135,6 +135,7 @@ It stores the ID of its child component in app-state under :child."))
          (viewport-attrs (getf viewport-component-registration :state)) ; Get the :state sub-plist with width, height, offsets
          (child-id (getf viewport-component-registration :child-id)) ; Get child-id from viewport's direct registration
          (child-view nil))
+    (log-info "Rendering viewport ~S with attributes: ~S" (id-from-path id-path) viewport-attrs)
 
     (when child-id
       (let* ((child-canonical-id-path (list :components child-id)) ; Canonical path to child's registration

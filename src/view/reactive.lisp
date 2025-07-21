@@ -9,9 +9,9 @@
                 #:make-channel
                 #:channel-put!
                 #:channel-take!)
-  (:import-from :elmtui.state
+  (:import-from :elmtui.tea-state.state
                 #:application-state)
-  (:import-from :elmtui.statelib.observe
+  (:import-from :elmtui.tea-state.observers
                 #:add-observer
                 #:remove-observer)
   (:import-from :elmtui.core.async
@@ -180,7 +180,7 @@
 
     ;; Remove all observers
     (dolist (observer-id (view-observers view))
-      (remove-observer app-state observer-id))
+      (remove-observer app-state observer-id (lambda () 0)))
 
     ;; Send shutdown message to the view's channel
     (channel-put! (view-update-channel view) :shutdown)))

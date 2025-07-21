@@ -8,7 +8,7 @@
 ;;; or drop it into ASDF/Quicklisp as you like.
 ;;; --------------------------------------------------------------------------
 (uiop:define-package :elmtui.state.utils
-  (:use :cl )
+  (:use :cl #:log4cl)
   ;; (:import-from :elmtui.statelib.observe ...) ; If needed
 
   ;; Define what this package EXPORTS. Since elmtui.state.api is the public interface,
@@ -18,7 +18,7 @@
   ;; If elmtui.state defines functions that are part of the API, they should be exported there.
   (:export
    #:get-path #:set-path #:remove-path
-   #:parse-plist-and-children))
+   #:%alist-p #:split-props/children))
 (in-package :elmtui.state.utils)
 
 ;;; 1. Helpers ────────────────────────────────────────────────────────────────
@@ -27,14 +27,70 @@
   (and (listp obj)
        (every #'consp obj)))
 
-(defun parse-plist-and-children (args)
-  "Parses a list of arguments into a property list and a list of children."
-  (let ((i (or (loop for i from 0 below (length args) by 2
-                     unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
-                       return i)
-               (length args))))
-    (values (subseq args 0 i) (subseq args i))))
+;; (defun split-props/children (args)
+;;   "Return two values: PROPS (a proper plist, without :children)
+;;    and CHILDREN (a list or NIL).
 
+;;   Arguments:
+;;   - ARGS: a list of keyword-value pairs, possibly ending with :children.
+;;            If :children is present, it will be separated from the rest.
+;;            If no :children is present, the function will return all key-value pairs
+;;            until a non-keyword value is encountered.
+;;   Returns:
+;;   - PROPS: a proper property list (plist) containing all key-value pairs
+;;            except for :children.
+;;   - CHILDREN: a list of children, or NIL if no :children was found.
+
+;;   This function is useful for parsing argument lists in UI components
+;;   where properties and children are often mixed in a single list.
+;;   Example:
+;;   (split-props/children '(:width 100 :height 200 :children (:child1 :child2)))
+;;   ⇒ (values '(:width 100 :height 200) '(:child1 :child2))"
+;;   (let* ((children (getf args :children))
+;;          (props    (if children
+;;                        (loop for (k v . rest) on args by #'cddr
+;;                              until (eq k :children)
+;;                              append (list k v))
+;;                        ;; no :children – walk until we hit a non-keyword
+;;                        (loop with out = nil
+;;                              for (k v . rest) on args by #'cddr
+;;                              do (if (and k (keywordp k) rest (not (keywordp v)))
+;;                                     (setf out (append out (list k v)))
+;;                                     (return out))))))
+;;     (log-info "split-props/children args:
+;; ~S" args)
+;;     (log-info "split-props/children result:
+;; props ~S, children ~S" props children)
+;;     (values props children)))
+;; (remove-if #'null args) ;; Remove any NILs from the end of ARGS
+
+;; remove children key + value from args
+;; (let ((args '(:a :b :c :d :children 'abcd :e :f)))
+;;   (if (member :children args)
+;;       (let ((v (getf  args :children)))
+;;         (remove :children (remove v args))))) ;:key #'car :test #'eq)))
+(defun split-props/children (args)
+  "Splits a list of arguments into a property list and a list of children.
+   It iterates through the list, collecting keyword/value pairs as properties.
+   The first non-keyword item marks the beginning of the children list."
+  (loop with props = ()
+        with current-args = args
+        while (and (keywordp (first current-args)) (rest current-args))
+        do (progn
+             (push (second current-args) props)
+             (push (first current-args) props)
+             (setf current-args (cddr current-args)))
+        finally (return (values (nreverse props) current-args))))
+
+;; (defun parse-plist-and-children (args)
+;;   "Parses a list of arguments into a property list and a list of children."
+;;   (let ((split-pos (position-if-not #'keywordp args)))
+;;     (if split-pos
+;;         (if (evenp split-pos)
+;;             (values (subseq args 0 split-pos) (subseq args split-pos))
+;;             (values (subseq args 0 (1- split-pos)) (subseq args (1- split-pos))))
+;;         (values args nil))))
+;; (split-props/children '(:width 100 :height 200 :children (:child1 :child2)))
 (defun %empty-container-p (obj)
   "Predicate used by REMOVE-PATH to decide whether to prune a branch."
   (typecase obj

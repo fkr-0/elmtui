@@ -1,7 +1,8 @@
 (uiop:define-package :elmtui.ui.defcomponent
   (:use :cl)
+  (:import-from :alexandria #:plist-hash-table)
   (:import-from :elmtui.state.api #:make-update-result)
-  (:import-from :elmtui.utils
+  (:import-from :elmtui.state.api
                 #:get-path)
   (:import-from :elmtui.ui.api
                 #:component      ;; Base class for components
@@ -44,6 +45,10 @@ Returns a list of plists, each representing a slot:
   (loop for spec in state-specs
         collect (destructuring-bind (name initial-value &key type documentation
                                                           accessor initarg) spec
+                  (when (and type (null initial-value)
+                             (not (and (consp type)
+                                       (member 'null type))))
+                    (error "defcomponent: Slot ~A declares type ~A but has NIL as initial value. Provide a valid default or use (or null <type>)." name type))
                   (list :name name
                         :accessor (when accessor (intern (symbol-name accessor) :keyword))
                         :initarg (when initarg (intern (symbol-name initarg) :keyword))
@@ -59,7 +64,17 @@ Returns a list of plists, each representing a slot:
 ;; Helper to get the body of a clause (everything after the keyword)
 (defun clause-body (clause)
   (cdr clause))
-
+(defun ensure-state-slots-strict (slot-spec state)
+  "Ensures all declared slots are present and of the correct type in STATE.
+Signals an error if any slot is missing or of the wrong type."
+  (loop for slot in slot-spec
+        for key = (getf slot :keyword)
+        for type = (getf slot :type)
+        do (unless (getf state key)
+             (error "Missing required slot ~A in state: ~S" key state))
+        do (when (and type (not (typep (getf state key) type)))
+             (error "Slot ~A has wrong type: ~S (expected ~A)" key (getf state key) type))
+        finally (return state)))
 ;; Helper to generate dispatch code for the :update clause
 (defun generate-update-dispatch-code (message-var local-state-var app-state-var id-path-var
                                       handler-specs component-class-name on-unhandled-message-behavior)
@@ -213,6 +228,7 @@ SYNTAX:
                    (init-lambda-list (first init-body-forms))
                    (init-user-code (rest init-body-forms))
                    (id-sym (gensym "ID")))
+
               `(defmethod elmtui.ui.api:init ((self ,component-class-name) &rest initargs &key id-path &allow-other-keys)
                  (declare (ignorable id-path initargs))
                  (let ((,id-sym (elmtui.ui.api:id-from-path id-path))
@@ -224,14 +240,15 @@ SYNTAX:
                        (multiple-value-list (progn ,@init-user-code))
                      (let* ((user-patches (first other-values))
                             (user-commands (second other-values))
-                            (final-state-plist (list :type (cclass-name self)
-                                                     :id ,id-sym)))
+                            (final-state-ht (make-hash-table :test 'eq)))
+                       (setf (gethash :type final-state-ht) (cclass-name self))
+                       (setf (gethash :id final-state-ht) ,id-sym)
                        ,@(loop for slot in parsed-state-slots
                                for slot-kw = (getf slot :keyword)
                                for slot-name-sym = (getf slot :name)
                                for custom-initarg = (getf slot :initarg)
                                for generated-initarg = (intern (format nil "INITIAL-~A" (symbol-name slot-name-sym)) :keyword)
-                               collect `(setf (getf final-state-plist ,slot-kw)
+                               collect `(setf (gethash ,slot-kw final-state-ht)
                                               (getf user-initial-state-plist ,slot-kw
                                                     ,(if custom-initarg
                                                          `(or (getf initargs ,custom-initarg)
@@ -241,33 +258,56 @@ SYNTAX:
                                                            ,(getf slot :initial-value))))))
                        (loop for (key val) on user-initial-state-plist by #'cddr
                              unless (find key ',(mapcar (lambda (s) (getf s :keyword)) parsed-state-slots) :test #'eq)
-                               do (setf (getf final-state-plist key) val))
+                               do (setf (gethash key final-state-ht) val))
                        (values self
-                               (append (list (list id-path final-state-plist)) user-patches)
+                               (append (list (list id-path final-state-ht)) user-patches)
                                user-commands))))))
             `(defmethod elmtui.ui.api:init ((self ,component-class-name) &rest other-keys &key id-path ,@state-initarg-names &allow-other-keys)
-               (declare (ignorable id-path ,@state-initarg-names))
+               (declare (ignorable id-path ,@state-initarg-names other-keys))
                (let ((component-id (elmtui.ui.api:id-from-path id-path))
-                     (state-plist (list)))
+                     (state-ht (make-hash-table :test 'eq)))
                  (setf (elmtui.ui.api:component-id self) component-id)
-                 (setf (getf state-plist :type) (cclass-name self))
-                 (setf (getf state-plist :id) component-id)
+                 (setf (gethash :type state-ht) (cclass-name self))
+                 (setf (gethash :id state-ht) component-id)
                  ,@(loop for slot in parsed-state-slots
                          for slot-kw = (getf slot :keyword)
                          for slot-name = (getf slot :name)
                          for custom-initarg = (getf slot :initarg)
                          for generated-initarg = (intern (format nil "INITIAL-~A" (symbol-name slot-name)) :keyword)
                          unless (eq slot-kw :id)
-                           collect `(setf (getf state-plist ,slot-kw)
-                                          ;; Try custom initarg first, then generated initarg, then default
+                           collect `(setf (gethash ,slot-kw state-ht)
                                           ,(if custom-initarg
                                                `(or (getf other-keys ,custom-initarg)
                                                     (getf other-keys ,generated-initarg)
                                                     ,(getf slot :initial-value))
                                                `(getf other-keys ,generated-initarg ,(getf slot :initial-value)))))
+                 ;; ensure-state-slots-strict needs to be adapted for hash-tables if used
                  (values self
-                         (list (list id-path state-plist))
+                         (list (list id-path state-ht))
                          nil))))
+       ;; `(defmethod elmtui.ui.api:init ((self ,component-class-name) &rest other-keys &key id-path ,@state-initarg-names &allow-other-keys)
+       ;;    (declare (ignorable id-path ,@state-initarg-names other-keys))
+       ;;    (let ((component-id (elmtui.ui.api:id-from-path id-path))
+       ;;          (state-plist (list)))
+       ;;      (setf (elmtui.ui.api:component-id self) component-id)
+       ;;      (setf (getf state-plist :type) (cclass-name self))
+       ;;      (setf (getf state-plist :id) component-id)
+       ;;      ,@(loop for slot in parsed-state-slots
+       ;;              for slot-kw = (getf slot :keyword)
+       ;;              for slot-name = (getf slot :name)
+       ;;              for custom-initarg = (getf slot :initarg)
+       ;;              for generated-initarg = (intern (format nil "INITIAL-~A" (symbol-name slot-name)) :keyword)
+       ;;              unless (eq slot-kw :id)
+       ;;                collect `(setf (getf state-plist ,slot-kw)
+       ;;                               ;; Try custom initarg first, then generated initarg, then default
+       ;;                               ,(if custom-initarg
+       ;;                                    `(or (getf other-keys ,custom-initarg)
+       ;;                                         (getf other-keys ,generated-initarg)
+       ;;                                         ,(getf slot :initial-value))
+       ;;                                    `(getf other-keys ,generated-initarg ,(getf slot :initial-value)))))
+       ;;      (values self
+       ;;              (list (list id-path state-plist))
+       ;;              nil))))
 
        ,(if update-clause
             (let* ((update-body-forms (clause-body update-clause))
@@ -282,22 +322,30 @@ SYNTAX:
                    (declare (ignorable ,@(remove nil (rest update-lambda-list))))
                    (let ((,(first update-lambda-list) message))
                      (declare (ignorable ,(first update-lambda-list)))
-                     (destructuring-bind (local-changes-plist commands)
-                         (multiple-value-list
-                          (multiple-value-call #'values
-                            ,(generate-update-dispatch-code (first update-lambda-list)
-                                                            (second update-lambda-list)
-                                                            (third update-lambda-list)
-                                                            (fourth update-lambda-list)
-                                                            update-user-code-block
-                                                            component-class-name
-                                                            on-unhandled-behavior)))
-                       (elmtui.state.api:make-update-result
-                        :patches (loop for (key val) on local-changes-plist by #'cddr
-                                       collect (list (elmtui.ui.api:component-state-path id-path
-                                                                                         (if (keywordp key) key (intern (symbol-name key) :keyword)))
-                                                     val))
-                        :commands commands))))))
+                     (multiple-value-bind (default-patches default-commands)
+                         (if (fboundp 'call-next-method)
+                             (call-next-method)
+                             (values nil nil))
+                       (destructuring-bind (local-changes-plist commands)
+                           (multiple-value-list
+                            (multiple-value-call #'values
+                              ,(generate-update-dispatch-code (first update-lambda-list)
+                                                              (second update-lambda-list)
+                                                              (third update-lambda-list)
+                                                              (fourth update-lambda-list)
+                                                              update-user-code-block
+                                                              component-class-name
+                                                              on-unhandled-behavior)))
+                         (let* ((local-changes-ht (when local-changes-plist
+                                                    (plist-hash-table local-changes-plist :test 'eq)))
+                                (custom-patches
+                                  (when local-changes-ht
+                                    (loop for key being the hash-keys of local-changes-ht
+                                            using (hash-value val)
+                                          collect (list (elmtui.ui.api:component-state-path id-path key) val)))))
+                           (elmtui.state.api:make-update-result
+                            :patches (append default-patches custom-patches)
+                            :commands (append default-commands commands)))))))))
             `(defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
                (declare (ignore app-state message id-path))
                (elmtui.state.api:make-update-result :patches nil :commands nil)))
@@ -307,12 +355,16 @@ SYNTAX:
                    (view-lambda-list (first view-body-forms))
                    (view-user-code (rest view-body-forms)))
               `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path)
-                 (let ((,(first view-lambda-list) (elmtui.utils:get-path id-path app-state))
-                       (,(second view-lambda-list) app-state)
-                       (,(third view-lambda-list) id-path))
-                   ;; (declare (ignorable ,@(remove nil (rest view-lambda-list))))
-                   (declare (ignorable ,@(remove nil view-lambda-list)))
-                   ,@view-user-code)))
+                 (declare (ignorable ;; ,@(remove nil view-lambda-list)
+                           id-path
+                           ))
+                 (let ((,(first view-lambda-list) (elmtui.utils:get-path id-path app-state)))
+                   (if ,(first view-lambda-list)
+                       (let ((,(second view-lambda-list) app-state)
+                             (,(third view-lambda-list) id-path))
+                         (declare (ignorable ,@(list (third view-lambda-list) (second view-lambda-list))));remove nil view-lambda-list)))
+                         ,@view-user-code)
+                       (call-next-method)))))
             `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path)
                (declare (ignore app-state))
                (list (cclass-name self)
@@ -324,22 +376,15 @@ SYNTAX:
                for slot-keyword = (getf slot :keyword)
                for slot-initial-value = (getf slot :initial-value)
                when accessor-name
-                 collect `(defun ,(intern (symbol-name accessor-name)) (app-state component &key (id-path (list :components (elmtui.ui.api:component-id component))))
+                 collect `(defmethod ,(intern (symbol-name accessor-name)) (app-state component &key (id-path (list :components (elmtui.ui.api:component-id component))))
                             (declare (ignore id-path))
-                            (let ((comp-state (cond
-                                                ((and (typep app-state 'standard-object)
-                                                      (search "TEST-APP-STATE" (symbol-name (type-of app-state))))
-                                                 (let ((accessor-fn (find-symbol "COMPONENTS-STORE" (symbol-package (type-of app-state)))))
-                                                   (when accessor-fn
-                                                     (getf (funcall accessor-fn app-state)
-                                                           (elmtui.ui.api:component-id component)))))
-                                                ((listp app-state)
-                                                 (getf (getf app-state :components)
-                                                       (elmtui.ui.api:component-id component)))
-                                                (t (elmtui.utils:get-path (append (list :components (elmtui.ui.api:component-id component))) app-state )))))
-                              (if comp-state
-                                  (getf comp-state ,slot-keyword ,slot-initial-value)
-                                  ,slot-initial-value))))
+                            (let* ((full-path (append '(:components) (list (component-id component))))
+                                   (comp-state (get-path full-path (elmtui.tea-state.state::application-state-data app-state))))
+                              (cond ((hash-table-p comp-state)
+                                     (gethash ,slot-keyword comp-state ,slot-initial-value))
+                                    ((listp comp-state)
+                                     (getf comp-state ,slot-keyword ,slot-initial-value))
+                                    (t ,slot-initial-value)))))
 
        (eval-when (:compile-toplevel :load-toplevel :execute)
          (setf (gethash ',component-class-name *component-state-slots*) ',parsed-state-slots))

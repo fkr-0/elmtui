@@ -4,7 +4,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.utils
   (:use :cl )
-  (:import-from :elmtui.state #:application-state #:state-ref)
+  (:import-from :elmtui.tea-state.api #:application-state #:state-ref)
   (:import-from :elmtui.core.focus #:get-current-focus)
   (:import-from :elmtui.view.styled #:make-styled-node)
   (:export
@@ -29,6 +29,7 @@
       (state-ref app-state (append (if (listp model-path) model-path (list model-path))
                                    (list widget-id)))
       (state-ref app-state widget-id)))
+
 (defun current-focus-id (app-state)
   "Retrieves the current focus ID from the application state.
    APP-STATE: The application state.

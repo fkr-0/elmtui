@@ -6,7 +6,8 @@
   (:use :cl :alexandria :log4cl)
   ;; State Management
   (:import-from :elmtui.state #:application-state #:make-application-state #:*app-state* #:state-ref)
-  (:import-from :ut.state.state #:set-state #:merge-state) ; Internal state management functions
+  ;; (:import-from :ut.state.state #:set-state #:merge-state)
+                                        ; Internal state management functions
   ;; Core Systems
   (:import-from :elmtui.core.globals #:*app-sender*)
   (:import-from :elmtui.core.loop #:start-loop #:elm-stop-loop #:elm-event-loop-active-p #:enqueue-event #:*event-loop*)

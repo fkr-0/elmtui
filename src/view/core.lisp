@@ -38,6 +38,7 @@
   (:documentation "Intermediate tree node: type, props, children.
     Contract: type (:text|:container|:vbox|:hbox|:widget), props plist, children list."))
 
+(defmethod ui-node-p ((n ui-node)) t)
 ;; Define the predicate function
 
 
@@ -48,7 +49,7 @@
   (check-type children list)
   (assert (evenp (length props)) (props) "Props must be a valid property list")
   ;; Ensure ui-node-p is defined before this assertion runs
-  (assert (every #'ui-node-p children) (children) "Children must be ui-nodes")
+  (assert (every #'ui-node-p children) (children) (format nil "Children must be ui-nodes: ~A~%" children))
   ;; Use make-instance instead of undefined %make-ui-node
   (make-instance 'ui-node :type type :props props :children children))
 

@@ -19,11 +19,11 @@
   (:state
    (label "Button" :type string :documentation "The text displayed on the button."
                    :initarg :label :accessor button-label)
-   (on-click-msg nil :type t :documentation "The message to dispatch when the button is clicked."
+   (on-click-msg nil :type (or null t) :documentation "The message to dispatch when the button is clicked."
                      :initarg :on-click-msg :accessor button-on-click-msg)
-   (disabled nil :type boolean :documentation "Whether the button is disabled."
+   (disabled nil :type (or null boolean) :documentation "Whether the button is disabled."
                  :initarg :disabled :accessor button-disabled-p)
-   (focused nil :type boolean :documentation "Whether the button currently has focus."))
+   (focused nil :type (or boolean null ) :documentation "Whether the button currently has focus."))
   (:documentation "A clickable button widget, refactored to the new defcomponent style.")
   (:on-unhandled-message :log)
 
@@ -55,7 +55,8 @@
                   (values `(:focused nil) nil)))
 
   (:view (local-state app-state self-id-path)
-         (declare (ignore app-state)) ; app-state not directly used
+         ;; (declare (ignore app-state))
+                                        ; app-state not directly used
          (let* ((component-id (id-from-path self-id-path))
                 (label (getf local-state :label))
                 (disabled (getf local-state :disabled))

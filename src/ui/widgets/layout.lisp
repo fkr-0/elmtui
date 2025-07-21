@@ -55,7 +55,7 @@
    (align-content "start" :type string :documentation "Align content." :initarg :align-content)
    (justify-items "stretch"
                   :type string :documentation "Justify items." :initarg :justify-items)
-   (children-ids nil :type list :documentation "Child component IDs.")
+   (children-ids '() :type list :documentation "Child component IDs.")
    (width nil :type (or null integer string) :documentation "Width." :initarg :width)
    (height nil :type (or null integer string) :documentation "Height." :initarg :height)
    (min-width nil :type (or null integer string) :documentation "Min width." :initarg :min-width)
@@ -79,7 +79,7 @@
    (overflow nil :type (or null keyword)
                  :documentation "Overflow."
                  :initarg :overflow)
-   (other-style-props nil
+   (other-style-props (list)
                       :type list
                       :documentation "Other style props."))
 
