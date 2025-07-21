@@ -5,7 +5,7 @@
 (uiop:define-package #:elmtui.view.dsl
   (:use #:cl #:log4cl)
   (:import-from #:elmtui.view.styled #:make-styled-node)
-  (:import-from #:elmtui.app.api #:registered-dsl-component-p)
+  (:import-from #:elmtui.app.api #:get-component-class-for-dsl-type #:registered-dsl-component-p)
   (:import-from #:elmtui.state.utils #:split-props/children)
   (:export #:render-dsl-to-resolved-tree
            #:defcomponent-dsl
@@ -41,6 +41,7 @@
 (defun render-dsl-to-resolved-tree (dsl-spec app-state)
   "Walks DSL-SPEC and returns a resolved DSL tree."
   (labels ((process-node (spec path)
+             (log-info "Processing DSL node at path ~S: ~S" path spec)
              (cond
                ;; Scalar Leaf
                ((not (and (listp spec) (keywordp (first spec))))
@@ -55,11 +56,13 @@
                       (let* ((id (getf args :id)))
                         (unless id
                           (error "Stateful component ~S at path ~S requires an :id" type path))
-                        (log-info "Resolving component ~S with ID ~S at path ~S: ~A" type id (append path (list id))
-                                  (elmtui.state:get-component-by-path app-state (append path (list id))))
+                        (log-info "Res:COMPONENT ~S with ID ~S at path ~S" type id (append path (list id)))
                         (let* ((new-path (append path (list id)))
-                               (component (elmtui.state:get-component-by-path app-state new-path))
-                               (view-dsl (elmtui.ui.api:view component app-state)))
+                               (component-class (get-component-class-for-dsl-type type))
+                               (component (make-instance ;'elmtui.ui.widgets.viewport:viewport)
+                                           component-class))
+                               (view-dsl (elmtui.ui.api:view component app-state :id-path new-path)))
+                          (log-info "Processing component ~A | ~A view DSL: ~S" new-path component view-dsl)
                           (list* type
                                  (append (copy-list args)
                                          (list :resolved-view (process-node view-dsl new-path))))))
@@ -75,6 +78,8 @@
                              (all-children (append children-from-prop positional-children))
                              (resolved-children (mapcar (lambda (child) (process-node child new-path))
                                                         all-children)))
+                        (log-info "Res:LAYOUT ~A at path ~S with children: ~S"
+                                  type new-path resolved-children)
                         (let ((clean-props (copy-list props)))
                           (remf clean-props :children)
                           (list* type (append clean-props (list :children resolved-children)))))))))))
