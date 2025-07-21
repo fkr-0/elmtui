@@ -246,14 +246,21 @@
            :expected-type "message type specification"
            :actual-value nil
            :context context))
-
-  (unless (message-variant-p message-type message)
-    (error 'message-contract-violation
-           :function-name 'validate-typed-message
-           :expected-type (format nil "valid ~A message variant" message-type)
-           :actual-value message
-           :context context))
-
+  (let ((is-variant (message-variant-p message-type message)))
+    (unless is-variant
+      (when (and (listp message) (keywordp (first message)))
+        (let* ((symbol-name (symbol-name (first message)))
+               (pkg (symbol-package message-type)))
+          (when pkg
+            (let ((sym (find-symbol (string-upcase symbol-name) pkg)))
+              (when sym
+                (setq is-variant (message-variant-p message-type (cons sym (rest message))))))))))
+    (unless is-variant
+      (error 'message-contract-violation
+             :function-name 'validate-typed-message
+             :expected-type (format nil "valid ~A message variant" message-type)
+             :actual-value message
+             :context context)))
   message)
 
 (defun validate-hybrid-message (message message-type &optional (context "hybrid message validation"))
@@ -346,7 +353,13 @@
        ,@(when doc-string (list doc-string))
 
        ;; Input validation
-       (validate-model ,model-param "update function input")
+       (handler-case (validate-model ,model-param "update function input")
+         (contract-violation (c)
+           (error 'update-contract-violation
+                  :function-name ',name
+                  :expected-type (cv-expected-type c)
+                  :actual-value (cv-actual-value c)
+                  :context (cv-context c))))
        (validate-message ,message-param :flexible nil "flexible update message")
 
        ;; Execute update logic with contract enforcement
@@ -392,7 +405,13 @@
        ,@(when doc-string (list doc-string))
 
        ;; Input validation
-       (validate-model ,model-param "update function input")
+       (handler-case (validate-model ,model-param "update function input")
+         (contract-violation (c)
+           (error 'update-contract-violation
+                  :function-name ',name
+                  :expected-type (cv-expected-type c)
+                  :actual-value (cv-actual-value c)
+                  :context (cv-context c))))
        (validate-message ,message-param :typed ',message-type "typed update message")
 
        ;; Execute update logic with contract enforcement
@@ -465,9 +484,9 @@
                (error (e)
                  (error 'update-contract-violation
                         :function-name ',name
-                        :expected-type \"successful update execution\"
+                        :expected-type "successful update execution"
                         :actual-value  e
-                        :context (format nil \"processing message ~S\"
+                        :context (format nil "processing message ~S"
                                          ,message-param))))
            ;; Output validation + optional debugging
            (validate-update-result new-model commands ',name
@@ -560,7 +579,13 @@
        ,@(when doc-string (list doc-string))
 
        ;; Input validation
-       (validate-model ,model-param "view function input")
+       (handler-case (validate-model ,model-param "view function input")
+         (contract-violation (c)
+           (error 'view-contract-violation
+                  :function-name ',name
+                  :expected-type (cv-expected-type c)
+                  :actual-value (cv-actual-value c)
+                  :context (cv-context c))))
 
        ;; Execute view logic with contract enforcement
        (let ((result (handler-case (progn ,@actual-body)
@@ -617,7 +642,13 @@
        ,@(when doc-string (list doc-string))
 
        ;; Input validation
-       (validate-model ,model-param "subscriptions function input")
+       (handler-case (validate-model ,model-param "subscriptions function input")
+         (contract-violation (c)
+           (error 'subscription-contract-violation
+                  :function-name ',name
+                  :expected-type (cv-expected-type c)
+                  :actual-value (cv-actual-value c)
+                  :context (cv-context c))))
 
        ;; Execute subscriptions logic
        (let ((result (handler-case (progn ,@actual-body)

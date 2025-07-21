@@ -48,18 +48,26 @@
 
                (:file "core/conditions")
                ;; Load state module early since focus manager needs it
+               (:module "tea-state"
+                :pathname "tea-state/"
+                :serial t
+                :components (
+                             (:file "state")
+                             (:file "transactions") ; Added transactions.lisp
+                             (:file "observers")
+                             (:file "api")))
                (:module "state"
                 :pathname "state/"
                 :serial t
                 :components ((:file "api")
-                             (:module "state-lib"
-                              :serial t
-                              :pathname "statelib/"
-                              :components (
-                                           (:file "state")
-                                           (:file "observe")
-                                           (:file "transaction")
-                                           (:file "package")))
+                             ;; (:module "state-lib"
+                             ;;  :serial t
+                             ;;  :pathname "statelib/"
+                             ;;  :components (
+                             ;;               (:file "state")
+                             ;;               (:file "observe")
+                             ;;               (:file "transaction")
+                             ;;               (:file "package")))
 
                              (:file "state")
                              (:file "model")
@@ -103,9 +111,9 @@
                ;; ================= API LAYER =================
                ;; These API files define the public interface for each module
                ;; Each contains both the interface declarations and implementations
+               (:file "ui/api") ; Imports: elmtui.state.api, elmtui.utils
                (:file "app/api") ; Imports: elmtui.core.globals, elmtui.core.event-channels
 
-               (:file "ui/api") ; Imports: elmtui.state.api, elmtui.utils
                (:file "platform/api") ; Imports: elmtui.utils, bordeaux-threads
 
 

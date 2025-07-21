@@ -7,6 +7,7 @@
   (:export :defmsg :message-variant-p :*message-schemas*
    ;; Structs and their accessors for schema introspection
    :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
+   #:make-focusnext-appmsg #:make-focusprevious-appmsg
    :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
            :arg-def #:arg-def-type #:arg-def-keyword
            ;; Example message type names
@@ -35,15 +36,23 @@
 ;;; Variant parsing helpers
 ;;; ------------------------------------------------------------------
 
-  ;; (defstruct arg-def
-  ;;   keyword   ;; e.g. :new-label
-  ;;   type)     ;; e.g. STRING
+  ;;   (defstruct arg-def
+  ;;     keyword   ;; e.g. :new-label
+  ;;     type)     ;; e.g. STRING
 
   (defstruct arg-def
     "Represents a single argument in a variant definition."
     ;; var-name is removed as we will use gensyms in the macro expansion
     (type t :type T)            ; The type specifier
     (keyword nil :type symbol)) ; The keyword used in the message list
+
+  (defun camel-case-to-kebab-case (s)
+    (with-output-to-string (out)
+      (loop for c across (string s)
+            for i from 0
+            do (when (and (plusp i) (upper-case-p c))
+                 (write-char #\- out))
+               (write-char (char-downcase c) out))))
 
   (defun %parse-variant (spec msg-type)
     "Return a VARIANT-DEFINITION for SPEC.
@@ -55,10 +64,10 @@
       ;; 1. lone symbol ⇒ no args
       (symbol
        (make-variant-definition
-        :name        (intern (string spec) :keyword)
+        :name        (intern (camel-case-to-kebab-case (symbol-name spec)) :keyword)
         :args        nil
         :constructor-name
-        (symbolicate "MAKE-" spec "-" msg-type)))
+        (symbolicate "MAKE-" (string spec) "-" msg-type)))
       ;; 2. list ⇒ variant plus (kw type) pairs
       (cons
        (destructuring-bind (head &rest rest) spec
@@ -70,10 +79,10 @@
                       (error "Expected keyword in ~S, got ~S." spec kw))
                  do (push (make-arg-def :keyword kw :type typ) args))
            (make-variant-definition
-            :name        (intern (string head) :keyword)
+            :name        (intern (camel-case-to-kebab-case (symbol-name head)) :keyword)
             :args        (nreverse args)
             :constructor-name
-            (symbolicate "MAKE-" head "-" msg-type)))))))
+            (symbolicate "MAKE-" (string head) "-" msg-type)))))))
 
 ;;; ------------------------------------------------------------------
 ;;; Constructor generation (excerpt)
@@ -258,3 +267,4 @@ Example:
 ;; (defmethod new ((msg-type (eql 'AppMsg)) (msg-name (eql :update-focusable-ids)) ids)
 ;;   "Creates an UpdateFocusableIds message with the given list of IDs."
 ;;   (make-update-focusable-ids-app-msg ids))
+;; elmtui.state.msg:make-s-e-t-t-h-e-m-e-appmsg

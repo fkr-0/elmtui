@@ -4,6 +4,8 @@
   (:import-from :elmtui.utils #:ensure-keyword #:get-path)
   (:export
    ;; Component Class & Generics
+   #:initialize-components-from-dsl
+   #:instantiate-component-from-dsl
    #:component #:component-id #:component-type
    #:init #:update #:view #:destroy ;; Core lifecycle
    #:component-children #:component-width #:component-height
@@ -30,7 +32,7 @@
        :documentation "A unique identifier for the component instance. This ID is crucial for namespacing its state within the global app-state."))
   (:documentation "Base class for UI components. Instances primarily serve as typed holders of an ID. All behavioral state is in app-state."))
 
-(declaim (ftype (function (component) t) id))
+;; (declaim (ftype (function (component) t) id))
 (defgeneric id (object)
   (:documentation "Returns the ID of a component or UI node.")
   (:method ((component component))
@@ -65,22 +67,43 @@
 (defun component-state-map-path (id-path)
   "Generates a path list for accessing the entire state map of a component.
    `id-path`: The path to the component's state within the :components map (e.g., '(:my-comp)).
-   Path: '(:components . id-path)"
+   Path: '(:components . id-path)
+
+   Arguments:
+    `id-path`: A list of keywords/symbols representing the unique path to this component's state map within the `(:components ...)` section of the app-state.
+   Returns:
+    A list representing the path to the component's state map, starting with '(:components . id-path).
+
+   Example:
+    (component-state-map-path '(:my-app :main-layout :submit-button))
+    => '(:components :my-app :main-layout :submit-button"
   (declare (type list id-path))
   (check-type id-path list)
-  (append '(:components) id-path))
+  (if (eql (car id-path) :components) ;;TODO why? clean impl!
+      id-path
+      ;; If the first element is not :components, prepend it
+      (append '(:components) id-path)))
 
 (declaim (ftype (function (list keyword) list) component-state-path))
 (defun component-state-path (id-path property-key)
-  "Generates a path list for accessing/updating a specific component property within app-state.
+  "Generates a path list for accessing/updating a specific component property within
+app-state.
+
+   Arguments:
    `id-path`: The path to the component's state within the :components map.
    `property-key`: The key for the specific property.
-   Path: '(:components . id-path . (list property-key))"
+   Returns:
+    A list representing the path to the component's property, starting with
+    '(:components . id-path) and ending with the property-key.
+
+   Example:
+    (component-state-path '(:my-app :main-layout :submit-button) :label)
+    => '(:components :my-app :main-layout :submit-button :label)"
   (declare (type list id-path)
            (type keyword property-key))
   (check-type id-path list)
   (check-type property-key keyword)
-  (append id-path (list property-key)))
+  (append (component-state-map-path id-path) (list property-key)))
 
 (declaim (ftype (function (list t) list) make-state-patch))
 (defun make-state-patch (path value)
@@ -152,6 +175,38 @@
          (make-update-result
           :patches  (nreverse ,patch-sym)
           :commands (nreverse ,command-sym))))))
+;;; ---------------------------------------------------------------------------
+;;; Helper function to initialize components from DSL
+;;; ---------------------------------------------------------------------------
+(defgeneric instantiate-component-from-dsl (dsl id-path))
+(defun initialize-components-from-dsl (dsl)
+  "Recursively traverses a component DSL, instantiates components,
+   and returns the accumulated patches and commands."
+  (let ((patches nil)
+        (commands nil))
+    (labels ((process-node (node parent-id-path)
+               (when (and (consp node) (keywordp (car node)))
+                 (destructuring-bind (component-type &rest component-props) node
+                   (declare (ignore component-type))
+                   (let ((component-id (getf component-props :id)))
+                     (when component-id
+                       (let* ((current-id-path (append parent-id-path (list component-id)))
+                              (current-id-path (if (eql (car current-id-path) :components)
+
+                                                   current-id-path
+                                                   (append '(:components) current-id-path)))
+                              (component-instance (instantiate-component-from-dsl node current-id-path)));current-id-path)))
+                         (when component-instance
+                           (multiple-value-bind (instance init-patches init-commands)
+                               (apply #'init component-instance :id-path current-id-path component-props)
+                             (declare (ignore instance))
+                             (setf patches (nconc patches init-patches))
+                             (setf commands (nconc commands init-commands))))
+                         (dolist (child (getf component-props :children))
+                           (process-node child current-id-path)))))))))
+      (process-node dsl '()))
+    (values patches commands)))
+
 
 ;;;---------------------------------------------------------------
 ;;; Component Lifecycle & Behavior Generics
@@ -201,13 +256,19 @@
              (patches (list (make-state-patch
                              (append
                               component-base-path (list :dsl))
-                             dsl))))
+                             dsl)))
+             (commands nil))
         (loop for (key value) on state-props by #'cddr
               do (push (make-state-patch
                         (append component-base-path
                                 (list (ensure-keyword key))) value)
                        patches))
-        (values component (nreverse patches) nil)))))
+        (when (getf dsl :children)
+          (multiple-value-bind (child-patches child-commands)
+              (initialize-components-from-dsl (getf dsl :children))
+            (setf patches (nconc patches child-patches))
+            (setf commands (nconc commands child-commands))))
+        (values component (nreverse patches) (nreverse commands))))))
 
 ;; (declaim (ftype (function (component &key (:id-path list)) (values list list)) destroy))
 (defgeneric destroy (component &key id-path)
@@ -238,6 +299,10 @@
     (make-update-result)))
 
 
+(defmethod view ((component cons) app-state &key id-path)
+  "Fallback view method for raw plists found in state, treating them as raw DSL."
+  (declare (ignore app-state id-path))
+  component)
 ;; (declaim (ftype (function (component t &key (:id-path list)) list) view))
 (defgeneric view (component app-state &key id-path)
   (:documentation "Generates a view representation (DSL spec) for a component instance.")
@@ -250,6 +315,11 @@
     (list (component-type component) :id (id-from-path id-path))))
 
 
+(defmethod view ((component null) app-state &key id-path)
+  "Fallback view method for when a component is not found in the state."
+  (declare (ignore app-state))
+  (warn "Component with id-path ~A not found in state, rendering nil." id-path)
+  nil)
 ;; (declaim (ftype (function (component t t &key (:id-path list)) t) resolve-component-node))
 (defgeneric resolve-component-node (component app-state style-context &key id-path)
   (:documentation "Resolves a component into a concrete UI node for layout and rendering.")

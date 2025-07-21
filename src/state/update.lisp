@@ -4,14 +4,19 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.state.update
   (:use :cl :alexandria)
+
+  (:import-from :elmtui.tea-state.state ; For application-state structure if needed
+   :application-state ;; Assuming this is the type from statelib
+                :application-state-data   ;; Accessor for the raw data within app-state
+                )
   (:import-from :elmtui.state.api ; Import from the central API
    :handle-async-command :application-state :get-state
                 :application-state :with-transaction
                 :merge-patches ; For applying patches to state data
    :publish-to-topic :dispatch-to-topic :handle-async-command
                 :malformed-update-result-error)
-  (:import-from :elmtui.statelib.state ; For direct access to app-state internals if needed
-   :state-data-data) ; Accessor for the raw data plist within app-state
+  ;; (:import-from :elmtui.statelib.state ; For direct access to app-state internals if needed
+  ;;  :state-data-data) ; Accessor for the raw data plist within app-state
   (:import-from :elmtui.core.globals #:*app-sender*)
   (:import-from :log4cl #:log-debug #:log-warn #:log-info)
   (:export ;; Symbols defined *in this file* that are part of the public API
@@ -126,8 +131,8 @@
   "
   `(defun ,name (,state-var ,msg-var)
      (declare (ignorable ,msg-var)
-              (type elmtui.state.api:application-state ,state-var))
-     (elmtui.state.api:with-transaction (,state-var :name ',name)
+              (type elmtui.tea-state.api:application-state ,state-var))
+     (elmtui.tea-state.api:with-transaction (,state-var :name ',name)
        (multiple-value-bind (returned-patches returned-commands)
            (progn ,@body) ; Execute the user-provided body
          (let ((processed-patches (process-update-result (list returned-patches returned-commands)
@@ -136,9 +141,9 @@
            (when processed-patches
              ;; Correctly access the nested data structure:
              ;; state-var (application-state) -> its 'data' slot (state-data instance) -> its 'data' slot (raw hash-table)
-             (let* ((the-state-data-object (elmtui.state.api:application-state-data ,state-var))
-                    (current-raw-data (elmtui.state.api:state-data-data the-state-data-object)))
-               (setf (elmtui.state.api:state-data-data the-state-data-object)
+             (let* ((the-state-data-object (application-state-data ,state-var))
+                    (current-raw-data (application-state-data the-state-data-object)))
+               (setf (application-state-data the-state-data-object)
                      (elmtui.state.api:merge-patches
                       current-raw-data
                       processed-patches))))

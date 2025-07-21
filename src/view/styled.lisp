@@ -21,7 +21,7 @@
                 #:merge-sets!) ; Added merge-sets! for inline styles
   ;; Import query-stylesheet from sheet package
   (:import-from :elmtui.style-lib.sheet #:query-stylesheet)
-  (:import-from #:elmtui.state.utils #:parse-plist-and-children)
+  (:import-from #:elmtui.state.utils #:split-props/children)
   (:export
    #:ui-node-children
    #:ui-node-props
@@ -127,7 +127,7 @@
     (let* ((type (first node))
            (args (rest node)))
       (multiple-value-bind (props children)
-          (parse-plist-and-children args)
+          (elmtui.state.utils:split-props/children args)
         (let* ((styled-children (mapcar (lambda (child)
                                           (apply-stylesheet-to-tree child stylesheet nil))
                                         children))
