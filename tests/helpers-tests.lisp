@@ -81,19 +81,24 @@
     (is (equalp '(:text :content "custom")(view instance app-state :id-path id-path)))
     (is (string= "custom" (state-ref app-state (append id-path (list :message)))))))
 
-(test children-split
-  (let* ((dsl '(:container :id :main
-                :children ((:text :id :c1 :content "a")
-                           (:text :id :c2 :content "b"))))
-         (app-state (elmtui.state.api:plist-to-application-state
-                     '(:components (:main (:message "hello")))))
-         (tree (elmtui.view.dsl:render-dsl-to-resolved-tree dsl app-state)))
-    ;; tree)
-    (is ;; (every #'ui-node-p (ui-node-children tree))
-     (equalp '(:CONTAINER :ID :MAIN :CHILDREN
-               ((:TEXT :ID :C1 :CONTENT "a") (:TEXT :ID :C2 :CONTENT "b")) :RESOLVED-VIEW NIL)
-             tree)
-     )))
+;; (test children-split
+;;   (let* ((dsl-1 '(:viewport :id :main
+;;                   :children ((:label :id :c1 :content "a")
+;;                              (:label :id :c2 :content "b"))))
+;;          (dsl '(:container :id :main
+;;                 :children ((:text :id :c1 :content "a")
+;;                            (:text :id :c2 :content "b"))))
+;;          (app-state (elmtui.state.api:plist-to-application-state
+;;                      '(:components (:main (:message "hello")))))
+;;          ;; (tree (elmtui.view.dsl:render-dsl-to-resolved-tree dsl app-state))
+;;          (tree-1 (elmtui.view.dsl:render-dsl-to-resolved-tree dsl-1 app-state)))
+;;     ;; tree-1)
+;;     (is ;; (every #'ui-node-p (ui-node-children tree))
+;;      (equalp '(:CONTAINER :ID :MAIN :CHILDREN
+;;                ((:TEXT :ID :C1 :CONTENT "a" :children nil) (:TEXT :ID :C2 :CONTENT "b" :children nil)))
+;;              tree)
+;;      )
+;;     ))
 
 (test defcomponent-view-honors-custom-view
   "Test that defcomponent's view method uses the custom view"

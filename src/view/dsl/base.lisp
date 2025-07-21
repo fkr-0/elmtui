@@ -43,88 +43,6 @@
      :default-properties (:wrap t :align :left)
      :content-model :text)
 
-    (:label
-     :description "Text label element"
-     :valid-properties (:id :text :style :class :for :color)
-     :required-properties (:text)
-     :default-properties ()
-     :content-model :text)
-
-    (:button
-     :description "Interactive button element"
-     :valid-properties (:id :text :style :class :disabled :on-click :focusable)
-     :required-properties (:text)
-     :default-properties (:disabled nil :focusable t)
-     :content-model :interactive)
-
-    (:input
-     :description "Text input element"
-     :valid-properties (:id :type :value :placeholder :style :class :disabled
-                            :on-change :on-focus :on-blur :focusable :required)
-     :required-properties (:type)
-     :default-properties (:type :text :disabled nil :focusable t :required nil)
-     :content-model :form)
-
-    (:textarea
-     :description "Multi-line text input"
-     :valid-properties (:id :value :placeholder :rows :cols :style :class
-                            :disabled :on-change :on-focus :on-blur :focusable :required)
-     :required-properties ()
-     :default-properties (:rows 4 :cols 40 :disabled nil :focusable t :required nil)
-     :content-model :form)
-
-    (:select
-     :description "Selection dropdown element"
-     :valid-properties (:id :value :options :style :class :disabled
-                        :on-change :focusable :multiple)
-     :required-properties (:options)
-     :default-properties (:disabled nil :focusable t :multiple nil)
-     :content-model :form)
-
-    (:checkbox
-     :description "Checkbox input element"
-     :valid-properties (:id :checked :label :style :class :disabled
-                        :on-change :focusable)
-     :required-properties ()
-     :default-properties (:checked nil :disabled nil :focusable t)
-     :content-model :form)
-
-    (:radio
-     :description "Radio button input element"
-     :valid-properties (:id :checked :label :name :value :style :class
-                            :disabled :on-change :focusable)
-     :required-properties (:name)
-     :default-properties (:checked nil :disabled nil :focusable t)
-     :content-model :form)
-
-    (:image
-     :description "Image display element"
-     :valid-properties (:id :src :alt :width :height :style :class)
-     :required-properties (:src)
-     :default-properties ()
-     :content-model :media)
-
-    (:link
-     :description "Hyperlink element"
-     :valid-properties (:id :href :text :target :style :class :on-click)
-     :required-properties (:href :text)
-     :default-properties (:target :_self)
-     :content-model :interactive)
-
-    (:list
-     :description "List container element"
-     :valid-properties (:id :items :style :class :ordered :item-style)
-     :required-properties (:items)
-     :default-properties (:ordered nil)
-     :content-model :children)
-
-    (:table
-     :description "Table element with rows and columns"
-     :valid-properties (:id :headers :rows :style :class :border :cell-padding)
-     :required-properties (:rows)
-     :default-properties (:border t :cell-padding 1)
-     :content-model :tabular)
-
     (:separator
      :description "Visual separator element"
      :valid-properties (:id :orientation :style :class :thickness)
@@ -137,7 +55,91 @@
      :valid-properties (:id :width :height :style :class)
      :required-properties ()
      :default-properties (:width 0 :height 0)
-     :content-model :void)))
+     :content-model :void)
+
+    ;; (:label
+    ;;  :description "Text label element"
+    ;;  :valid-properties (:id :text :style :class :for :color)
+    ;;  :required-properties (:text)
+    ;;  :default-properties ()
+    ;;  :content-model :text)
+
+    ;; (:button
+    ;;  :description "Interactive button element"
+    ;;  :valid-properties (:id :text :style :class :disabled :on-click :focusable)
+    ;;  :required-properties (:text)
+    ;;  :default-properties (:disabled nil :focusable t)
+    ;;  :content-model :interactive)
+
+    ;; (:input
+    ;;  :description "Text input element"
+    ;;  :valid-properties (:id :type :value :placeholder :style :class :disabled
+    ;;                         :on-change :on-focus :on-blur :focusable :required)
+    ;;  :required-properties (:type)
+    ;;  :default-properties (:type :text :disabled nil :focusable t :required nil)
+    ;;  :content-model :form)
+
+    ;; (:textarea
+    ;;  :description "Multi-line text input"
+    ;;  :valid-properties (:id :value :placeholder :rows :cols :style :class
+    ;;                         :disabled :on-change :on-focus :on-blur :focusable :required)
+    ;;  :required-properties ()
+    ;;  :default-properties (:rows 4 :cols 40 :disabled nil :focusable t :required nil)
+    ;;  :content-model :form)
+
+    ;; (:select
+    ;;  :description "Selection dropdown element"
+    ;;  :valid-properties (:id :value :options :style :class :disabled
+    ;;                     :on-change :focusable :multiple)
+    ;;  :required-properties (:options)
+    ;;  :default-properties (:disabled nil :focusable t :multiple nil)
+    ;;  :content-model :form)
+
+    ;; (:checkbox
+    ;;  :description "Checkbox input element"
+    ;;  :valid-properties (:id :checked :label :style :class :disabled
+    ;;                     :on-change :focusable)
+    ;;  :required-properties ()
+    ;;  :default-properties (:checked nil :disabled nil :focusable t)
+    ;;  :content-model :form)
+
+    ;; (:radio
+    ;;  :description "Radio button input element"
+    ;;  :valid-properties (:id :checked :label :name :value :style :class
+    ;;                         :disabled :on-change :focusable)
+    ;;  :required-properties (:name)
+    ;;  :default-properties (:checked nil :disabled nil :focusable t)
+    ;;  :content-model :form)
+
+    ;; (:image
+    ;;  :description "Image display element"
+    ;;  :valid-properties (:id :src :alt :width :height :style :class)
+    ;;  :required-properties (:src)
+    ;;  :default-properties ()
+    ;;  :content-model :media)
+
+    ;; (:link
+    ;;  :description "Hyperlink element"
+    ;;  :valid-properties (:id :href :text :target :style :class :on-click)
+    ;;  :required-properties (:href :text)
+    ;;  :default-properties (:target :_self)
+    ;;  :content-model :interactive)
+
+    ;; (:list
+    ;;  :description "List container element"
+    ;;  :valid-properties (:id :items :style :class :ordered :item-style)
+    ;;  :required-properties (:items)
+    ;;  :default-properties (:ordered nil)
+    ;;  :content-model :children)
+
+    ;; (:table
+    ;;  :description "Table element with rows and columns"
+    ;;  :valid-properties (:id :headers :rows :style :class :border :cell-padding)
+    ;;  :required-properties (:rows)
+    ;;  :default-properties (:border t :cell-padding 1)
+    ;;  :content-model :tabular)
+
+    ))
 
 (defun get-element-spec (element-type)
   "Retrieves the specification for a base element type"
