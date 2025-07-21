@@ -20,6 +20,7 @@
                              (:file "tea-state-tests")
                              (:file "contract-restart-tests")
                              (:file "dsl-test")
+                             (:file "base-elements-tests")
                              (:file "view/dsl")
                              (:file "helpers-tests"))))
   :perform (test-op (op c) (symbol-call :elmtui.tests :run-all-tests)))
