@@ -140,6 +140,7 @@
   ;; Test update-dsl-element on a CLOS object
   (let* ((original (make-dsl-element :button :text "Original" :id :btn1))
          (updated (update-dsl-element original :text "Updated")))
+    (is (not (eq original updated))) ; Should be a new object
     (is (equal (button-text updated) "Updated"))
     (is (eq (element-id updated) :btn1)))
 
@@ -165,7 +166,6 @@
 
     ;; Test find by ID
     (let ((title-element (find-element-by-id dsl :title)))
-      (is (not (null title-element)))
       (is (typep title-element 'text-element)))
 
     (let ((button-element (find-element-by-id dsl :btn)))
@@ -508,8 +508,8 @@
   (signals base-dsl-error
     (validate-base-dsl '(:text :content "Hello" :invalid-prop)))
 
-  ;; Test missing required properties by trying to build an object
-  (signals error ;; This signals a simple-error from make-instance, not base-dsl-error
+  ;; Test missing required properties
+  (signals base-dsl-error
     (expand-base-dsl '(:button :id :btn)))) ; Missing :text
 
 (test state-error-conditions
