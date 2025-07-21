@@ -275,6 +275,11 @@
 
 (defmethod validate-element ((txt text-element) &optional context)
   (declare (ignore context))
+  (unless (slot-boundp txt 'content)
+    (error 'base-dsl-error
+           :element txt
+           :reason "Missing required property :content"
+           :context context))
   (when (string= (text-content txt) "")
     (warn "Text element with empty CONTENT")))
 
@@ -349,6 +354,14 @@
 
 (defmethod element-type ((e button-element)) :button)
 (%register-element-class :button 'button-element)
+
+(defmethod validate-element ((btn button-element) &optional context)
+  (declare (ignore context))
+  (unless (slot-boundp btn 'text)
+    (error 'base-dsl-error
+           :element btn
+           :reason "Missing required property :text"
+           :context context)))
 
 ;;; ---------------------------------------------------------------
 ;;; Input (single-line)
@@ -824,9 +837,18 @@
 (defun update-dsl-element (element &rest property-updates)
   (cond
     ((base-element-p element)
-     (loop for (k v) on property-updates by #'cddr
-           do (setf (slot-value element k) v))
-     element)
+     (let* ((class (class-of element))
+            (current-props
+              (loop for slot-def in (class-direct-slots class)
+                    for slot-name = (slot-definition-name slot-def)
+                    when (slot-boundp element slot-name)
+                    append (list (intern (symbol-name slot-name) :keyword)
+                                 (slot-value element slot-name))))
+            (new-props (copy-list property-updates)))
+       (loop for (k v) on current-props by #'cddr
+             unless (getf new-props k)
+             do (setf (getf new-props k) v))
+       (apply #'make-instance class new-props)))
     ((listp element)
      (let ((props (copy-list (rest element))))
        (loop for (k v) on property-updates by #'cddr
@@ -838,12 +860,16 @@
 ;;; ----------------------------------------------------------------
 
 (defun %each-child (node fn)
-  (typecase node
-    (base-element
-     (let ((kids (dsl-children node)))
+  (cond
+    ((typep node 'base-element)
+     (let ((kids (element-children node)))
        (when kids (dolist (k kids) (funcall fn k)))))
-    (list
-     (dolist (n node) (funcall fn n)))))
+    ((listp node)
+     (if (keywordp (first node)) ; It's a legacy dsl element
+         (let ((kids (getf (rest node) :children)))
+           (when kids (dolist (k kids) (funcall fn k))))
+         ;; It's a list of nodes
+         (dolist (n node) (funcall fn n))))))
 
 (defun map-dsl-elements (function dsl)
   (labels ((recurse (node)
@@ -866,8 +892,13 @@
   (block found
     (map-dsl-elements
      (lambda (node)
-       (when (eql (getf (dsl-properties node) :id) id)
-         (return-from found node))
+       (typecase node
+         (base-element
+          (when (eql (element-id node) id)
+            (return-from found node)))
+         (list
+          (when (eql (getf (rest node) :id) id)
+            (return-from found node))))
        node)
      dsl)
     nil))
