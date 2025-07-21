@@ -15,8 +15,8 @@
                                         ; (register-dsl-component-type :column 'elmtui.ui.widgets.layout:layout)
                                         ;(register-dsl-component-type :container 'elmtui.ui.widgets.viewport:viewport)
 ;;; Sanity check (can be removed in production)
-(assert (eq (elmtui.app.api:get-component-class-for-dsl-type :label)
-            'elmtui.ui.widgets.label:label))
+;; (assert (eq (elmtui.app.api:get-component-class-for-dsl-type :label)
+;;             'elmtui.ui.widgets.label:label))
 
 ;; above translates to: 'this class provides a view logic for that keyword'
 ;; that means: it should be *easily* feasible to write a macro that

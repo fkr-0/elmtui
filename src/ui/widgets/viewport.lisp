@@ -131,29 +131,43 @@ It stores the ID of its child component in app-state under :child."))
       )
     (values patches commands)))
 
-(defmethod view ((component viewport) (state elmtui.state:application-state) &key id-path)
+(defmethod view ((component viewport) (state elmtui.state:application-state) &key id-path (children nil) &allow-other-keys)
   (let* ((viewport-component-registration (get-path id-path state )) ; Get the whole registration for this viewport component
          (viewport-attrs (getf viewport-component-registration :state)) ; Get the :state sub-plist with width, height, offsets
          (child-id (getf viewport-component-registration :child-id)) ; Get child-id from viewport's direct registration
-         (child-view nil))
+         ;; (child-view nil)
+         )
     (log-info "Rendering viewport ~S with attributes: ~S"
               (id-from-path id-path) viewport-attrs)
     (log-info "id-path ~S: Child ID is ~S vp registr ~A vp attrs: ~A" id-path child-id viewport-component-registration
               viewport-attrs)
+    (let ((children (when children
+                      (mapcar
+                       (lambda (c)
+                         (elmtui.view.dsl:render-dsl-to-resolved-tree c state))
+                       children))))
+      ;; (when child-id
+      ;;   (let* ((child-canonical-id-path (list :components child-id)) ; Canonical path to child's registration
+      ;;          (child-instance (get-component-instance child-canonical-id-path state)))
+      ;;     (if child-instance
+      ;;         (setf child-view (view child-instance state :id-path child-canonical-id-path))
+      ;;         (progn
+      ;;           (log4cl:log-warn "Viewport ~S: Child component ~S not found in state for rendering." (id-from-path id-path) child-id)
+      ;;           (setf child-view `(:element :id ,(gensym "ERROR-") :text ,(format nil "Error: Child ~A not found" child-id)))))))
 
-    (when child-id
-      (let* ((child-canonical-id-path (list :components child-id)) ; Canonical path to child's registration
-             (child-instance (get-component-instance child-canonical-id-path state)))
-        (if child-instance
-            (setf child-view (view child-instance state :id-path child-canonical-id-path))
-            (progn
-              (log4cl:log-warn "Viewport ~S: Child component ~S not found in state for rendering." (id-from-path id-path) child-id)
-              (setf child-view `(:element :id ,(gensym "ERROR-") :text ,(format nil "Error: Child ~A not found" child-id)))))))
-
-    (list :viewport
-          :id (id-from-path id-path)
-          :width (getf viewport-attrs :width 80)
-          :height (getf viewport-attrs :height 24)
-          :offset-x (getf viewport-attrs :offset-x 0)
-          :offset-y (getf viewport-attrs :offset-y 0)
-          :child child-view)))
+      (list :viewport
+            :id (id-from-path id-path)
+            :width (getf viewport-attrs :width 80)
+            :height (getf viewport-attrs :height 24)
+            :offset-x (getf viewport-attrs :offset-x 0)
+            :offset-y (getf viewport-attrs :offset-y 0)
+            :children (when children
+                        (if (= 1 (length children))
+                            ;; if there's only one child, just return it directly
+                            children
+                            ;; wrap children in a layout if there are multiple
+                            (list :layout :id
+                                  (gensym
+                                   (format nil "VIEWPORT-~A-CHILDREN-LAYOUT"
+                                           (id-from-path id-path)))
+                                  children)))))))

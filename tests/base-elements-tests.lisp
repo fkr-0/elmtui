@@ -27,15 +27,15 @@
   (let ((obj (normalize-base-dsl '(:label :id :greet :text "Hi"))))
     (is (typep obj 'elmtui.view.base-elements::label-element))
     (is (string= "Hi" (elmtui.view.base-elements::label-text obj)))
-    (is (eq :greet (slot-value obj 'id)))
-    (is (eq :label (dsl-element-type obj)))))
+    (is (eq :greet (element-id obj)))
+    (is (eq :label (elmtui.view.base-elements::element-type obj)))))
 
 (test base-elements-checkbox-defaults
-  (let ((obj (normalize-base-dsl '(:checkbox :id :agree))))
+  (let ((obj (normalize-base-dsl '(:checkbox :id :agree :label "I agree"))))
     (is (typep obj 'elmtui.view.base-elements::checkbox-element))
-    (is (not (elmtui.view.base-elements::checkbox-checked-p obj)))       ; default NIL
-    (is (elmtui.view.base-elements::checkbox-focusable-p obj))           ; default T
-    (is (not (elmtui.view.base-elements::checkbox-disabled-p obj)))))    ; default NIL
+    (is (not (elmtui.view.base-elements::checkbox-checked-p obj)))
+    (is (elmtui.view.base-elements::checkbox-focusable-p obj))
+    (is (not (elmtui.view.base-elements::checkbox-disabled-p obj)))))
 
 ;;; ---------------------------------------------------------------
 ;;; 2. Traversal helpers
@@ -58,16 +58,12 @@
 ;;; 3. map-dsl-elements can mutate / transform nodes
 ;;; ---------------------------------------------------------------
 (test base-elements-map-transform-uppercase-labels
-  (let* ((tree  (normalize-base-dsl
-                 '(:label :id :l1 :text "hello")))
+  (let* ((tree  (normalize-base-dsl '(:label :id :l1 :text "hello")))
          (upper (map-dsl-elements
                  (lambda (node)
-                   (typecase node
-                     (elmtui.view.base-elements::label-element
-                      (setf (slot-value node 'text)
-                            (string-upcase (elmtui.view.base-elements::label-text node)))
-                      node)
-                     (t node)))
+                   (if (typep node 'elmtui.view.base-elements::label-element)
+                       (update-dsl-element node :text (string-upcase (elmtui.view.base-elements::label-text node)))
+                       node))
                  tree)))
     (is (string= "HELLO" (elmtui.view.base-elements::label-text upper)))))
 
@@ -85,6 +81,6 @@
          (btn* (update-dsl-element btn :text "Confirm" :disabled t)))
     (is (typep btn* 'elmtui.view.base-elements::button-element))
     (is (string= "Confirm" (elmtui.view.base-elements::button-text btn*)))
-    (is (elmtui.view.base-elements::button-disabled-p btn*))))
+    (is-true (elmtui.view.base-elements::button-disabled-p btn*))))
 
 ;;; --- End of file ------------------------------------------------

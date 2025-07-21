@@ -326,6 +326,7 @@ SYNTAX:
                          (if (fboundp 'call-next-method)
                              (call-next-method)
                              (values nil nil))
+                       ;; (declare (ignore default-patches default-commands))
                        (destructuring-bind (local-changes-plist commands)
                            (multiple-value-list
                             (multiple-value-call #'values

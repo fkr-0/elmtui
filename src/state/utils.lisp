@@ -73,14 +73,60 @@
   "Splits a list of arguments into a property list and a list of children.
    It iterates through the list, collecting keyword/value pairs as properties.
    The first non-keyword item marks the beginning of the children list."
-  (loop with props = ()
-        with current-args = args
-        while (and (keywordp (first current-args)) (rest current-args))
-        do (progn
-             (push (second current-args) props)
-             (push (first current-args) props)
-             (setf current-args (cddr current-args)))
-        finally (return (values (nreverse props) current-args))))
+
+  ;; (let* ((pl )
+  ;;        ;; (props (first pl))
+  ;;       ;; (children (second pl))
+  ;;        )
+  ;; (loop for arg in args
+  ;;       do (if (keywordp arg)
+  ;;              (progn
+  ;;                (push (next arg) props)  ; Collect the value after the keyword
+  ;;                (push arg props))         ; Collect the keyword itself
+  ;;              (push arg children)))
+  (let ((children nil)
+        (props nil))
+    (loop
+      with current-args = args
+      while (and (keywordp (first current-args)) (rest current-args))
+      do (progn
+           (if (eq (first current-args) :children)
+               (setf children
+                     (append children (second current-args)))  ; Stop if we hit :children)
+               (progn
+                 (push (second current-args) props)
+                 (push (first current-args) props)))
+           (setf current-args (cddr current-args)))
+      finally (progn
+                ;; (setf props (nreverse props))
+                                        ; Reverse to maintain original order
+                (setf children (append children
+                                       (nreverse current-args))))) ; Remaining args are children
+
+    ;; Reverse to maintain original order
+    ;; (setf props (nreverse props))
+    ;; (setf children (nreverse children))
+    ;; ;; (if (getf props :children)
+    ;; ;;     (setf children (append children (getf props :children))  ; If :children is in props, move it to children
+    ;; ;;           props (remove :children
+    ;; ;;                         (remove (second (member :children props)) props))))
+    ;;                                     ; Remove :children from props
+    ;; ;; If children is empty, return nil instead of an empty list
+    (if (null children)
+        (values props nil)
+        (values props children))))
+
+;; (split-props/children '(:width 100 :height 200 :children (:child1 :child2)
+;;                         '(:c3) '(:c4)))
+;; (loop with props = ()
+;;      with current-args = args
+;;      while (and (keywordp (first current-args)) (rest current-args))
+;;      do (progn
+;;           (push (second current-args) props)
+;;           (push (first current-args) props)
+;;           (setf current-args (cddr current-args)))
+;;      finally  (list  props current-args))
+
 
 ;; (defun parse-plist-and-children (args)
 ;;   "Parses a list of arguments into a property list and a list of children."
