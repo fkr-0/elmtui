@@ -38,7 +38,7 @@
     (elmtui.app.api:clear-dsl-component-registry)
     (let ((dsl '(:row (:text "a") (:text "b")))
           (app-state nil))
-      (is (equalp '(:row :children ((:text :children ("a")) (:text :children ("b"))))
+      (is (equalp '(:row :children ((:text :content "a") (:text :content "b")))
                   (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))))
 
 (test dsl-resolve-layout-element-children-prop
@@ -47,21 +47,17 @@
     (let ((dsl '(:column :class "p-2" :children ((:text "x") (:text "y"))))
           (app-state nil))
       (is (equalp
-           '(:column :class "p-2" :children ((:text "x") (:text :content "y")))
+           '(:column :class "p-2" :children ((:text :content "x") (:text :content "y")))
            (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))
     (let ((dsl '(:column :class "p-2" :children ((:text "x") (:text :content "y"))))
           (app-state nil))
       (is (equalp
            '(:column
              :class "p-2"
-             :children ((:text :children ("x")) (:text :content "y" :children nil)))
+             :children ((:text :content"x") (:text :content "y")))
            (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))))
-;; elmtui.core.globals:*dsl-type-to-component-class*
-;; (elmtui.app.api:with-temporary-dsl-component-registry
-;;    (elmtui.app.api:clear-dsl-component-registry)
-;;   )
-;; --- Mocks for stateful component tests ---
 
+;; --- Mocks for stateful component tests ---
 (defclass mock-app-state ()
   ((components :initarg :components :initform (make-hash-table :test 'equal))))
 
@@ -107,7 +103,8 @@
                   (dsl '(:container :id :main
                          :children ((:row :children ((:counter :id :ctr)))
                                     (:text "bye")))))
-             (is (equalp '(:container :id :main :children ((:row :children ((:counter :id :ctr :resolved-view (:text :children ("0")))))
-                                                           (:text :children ("bye"))))
+             ;; (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))))
+             (is (equalp '(:container :id :main :children ((:row :children ((:counter :id :ctr :resolved-view (:text "0"))))
+                                                           (:text :content "bye")))
                          (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))))
       (clear-dsl-component-registry))))

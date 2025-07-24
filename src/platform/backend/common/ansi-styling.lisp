@@ -44,7 +44,17 @@
 (in-package :elmtui.platform.backend.common.ansi-styling)
 
 (defstruct terminal-color red green blue simple bg color-256)
-
+(defstruct terminal-style
+  fg-color
+  bg-color
+  bold
+  italic
+  underline
+  faint
+  blink
+  inverse
+  strike
+  invisible)
 (defun fuzz-color (in &optional (bg nil))
   (unless (null in)
     (etypecase in
@@ -112,17 +122,7 @@
 ;;      :strike (terminal-style-strike style)
 ;;      :invisible (terminal-style-invisible style))))
 
-(defstruct terminal-style
-  fg-color
-  bg-color
-  bold
-  italic
-  underline
-  faint
-  blink
-  inverse
-  strike
-  invisible)
+
 ;; (defun terminal-style-fg-color-val (style)
 ;;   "Get the simple color value from a terminal style's foreground color."
 ;;   (when (and style (terminal-style-fg-color style))

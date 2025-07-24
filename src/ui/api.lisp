@@ -206,6 +206,8 @@ app-state.
                          (dolist (child (getf component-props :children))
                            (process-node child current-id-path)))))))))
       (process-node dsl '()))
+    (log-info "Initialized components from DSL: ~A: " dsl)
+    (log-info "patches: ~A: " patches)
     (values patches commands)))
 
 
