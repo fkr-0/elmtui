@@ -46,9 +46,12 @@
     (if (and (consp dsl) (keywordp (first dsl))
              (not (eq (first dsl) :root-viewport)))
         `(:root-viewport :id :root-viewport
-                         :initial-terminal-dimensions ,term-size
-                         :initial-cursor-pos ,cursor-pos
-                         :initial-child-spec ,dsl)
+          ;; :initial-terminal-dimensions ,term-size
+          ;; :initial-cursor-pos ,cursor-pos
+                         :initial-terminal-dimensions (1 1)
+                         :initial-cursor-pos (1 1)
+
+                         :children ,dsl)
         dsl))
   ;; Coerce X → keyword, return NIL on NIL.
   (defun %kw (x)

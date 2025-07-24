@@ -70,51 +70,46 @@
 ;;       (let ((v (getf  args :children)))
 ;;         (remove :children (remove v args))))) ;:key #'car :test #'eq)))
 (defun split-props/children (args)
-  "Splits a list of arguments into a property list and a list of children.
-   It iterates through the list, collecting keyword/value pairs as properties.
-   The first non-keyword item marks the beginning of the children list."
+  "Splits a list of arguments into properties (a plist) and children.
+   Keyword arguments are considered properties. Anything else is a child.
+   The special :children property overrides positional children."
+  (let ((props '())
+        (children '())
+        (arg-list args))
+    (loop while (and arg-list (keywordp (car arg-list)))
+          do
+             (push (pop arg-list) props)
+             (push (pop arg-list) props))
+    (setf props (nreverse props))
+    (setf children arg-list)
+    (let ((explicit-children (getf props :children)))
+      (if explicit-children
+          (values (alexandria:remove-from-plist props :children) explicit-children)
+          (values props children)))))
+;; (defun split-props/children (args)
+;;   "Splits a list of arguments into properties (a plist) and children.
+;;    The special :children property overrides positional children."
+;;   (let ((props '())
+;;         (children '())
+;;         (seen-children-p nil))
+;;     (loop for (item . rest) on args do
+;;       (if (keywordp item)
+;;           (progn
+;;             (unless (null seen-children-p)
+;;               (error "Keyword argument ~S found after children." item))
+;;             (push item props)
+;;             (push (car rest) props)
+;;             (setf args (cdr rest)))
+;;           (progn
+;;             (setf seen-children-p t)
+;;             (push item children))))
+;;     (setf props (nreverse props))
+;;     (setf children (nreverse children))
+;;     (let ((explicit-children (getf props :children)))
+;;       (if explicit-children
+;;           (values (alexandria:remove-from-plist props :children) explicit-children)
+;;           (values props children)))))
 
-  ;; (let* ((pl )
-  ;;        ;; (props (first pl))
-  ;;       ;; (children (second pl))
-  ;;        )
-  ;; (loop for arg in args
-  ;;       do (if (keywordp arg)
-  ;;              (progn
-  ;;                (push (next arg) props)  ; Collect the value after the keyword
-  ;;                (push arg props))         ; Collect the keyword itself
-  ;;              (push arg children)))
-  (let ((children nil)
-        (props nil))
-    (loop
-      with current-args = args
-      while (and (keywordp (first current-args)) (rest current-args))
-      do (progn
-           (if (eq (first current-args) :children)
-               (setf children
-                     (append children (second current-args)))  ; Stop if we hit :children)
-               (progn
-                 (push (second current-args) props)
-                 (push (first current-args) props)))
-           (setf current-args (cddr current-args)))
-      finally (progn
-                ;; (setf props (nreverse props))
-                                        ; Reverse to maintain original order
-                (setf children (append children
-                                       (nreverse current-args))))) ; Remaining args are children
-
-    ;; Reverse to maintain original order
-    ;; (setf props (nreverse props))
-    ;; (setf children (nreverse children))
-    ;; ;; (if (getf props :children)
-    ;; ;;     (setf children (append children (getf props :children))  ; If :children is in props, move it to children
-    ;; ;;           props (remove :children
-    ;; ;;                         (remove (second (member :children props)) props))))
-    ;;                                     ; Remove :children from props
-    ;; ;; If children is empty, return nil instead of an empty list
-    (if (null children)
-        (values props nil)
-        (values props children))))
 
 ;; (split-props/children '(:width 100 :height 200 :children (:child1 :child2)
 ;;                         '(:c3) '(:c4)))

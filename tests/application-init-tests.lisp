@@ -85,7 +85,10 @@
 (elmtui.app:defapplication test-init-app
   :initial-state-plist `(:counter 0
                          :text "hello")
-  :root-component-dsl '(:viewport :id :main-column
+  :root-component-dsl '(;; :root-viewport :id :main-column passes
+                        :viewport :id :main-column ;; fails
+                        :initial-terminal-dimensions (1 1)
+                        :initial-cursor-pos (1 1)
                         :children
                         ((:test-component :id :comp1 :initial-state "comp1 state")
                          (:test-parent-component :id :parent1 :child-initial-state "child state")))
@@ -94,6 +97,20 @@
   :root-viewport-id :rv
   :subscriptions-fn test-init-app-subscriptions)
 
+(elmtui.app:defapplication test-init-app-2
+  :initial-state-plist `(:counter 0
+                         :text "hello")
+  :root-component-dsl '(:root-viewport :id :main-column
+                        ;;:viewport :id :main-column ;; fails
+                        :initial-terminal-dimensions (1 1)
+                        :initial-cursor-pos (1 1)
+                        :children
+                        ((:test-component :id :comp1 :initial-state "comp1 state")
+                         (:test-parent-component :id :parent1 :child-initial-state "child state")))
+  :view-fn test-init-app-view
+  :update-fn test-init-app-update
+  :root-viewport-id :rv
+  :subscriptions-fn test-init-app-subscriptions)
 ;; (let ((app-state (initialize-app-state-test-init-app)))
 ;;   ;; (is (= (elmtui.ui.api:get-path '(:counter) app-state) 0))
 ;;   ;; (is (string= (elmtui.ui.api:get-path '(:text) app-state) "hello"))
@@ -111,11 +128,20 @@
 ;;     ))
 ;; (elmtui.ui.api:component-state-path)
 ;; (elmtui.ui.api:component-state-map-path)
+
+(test basic-application-initialization-2
+  (multiple-value-bind (app-state commands)
+      (initialize-app-state-test-init-app-2)
+    (declare (ignore commands))
+    (let ((app-data (elmtui.tea-state.state::application-state-data app-state)))
+      (is (= (gethash :counter app-data) 0))
+      (is (string= (gethash :text app-data) "hello")))))
+
 (test basic-application-initialization
   (multiple-value-bind (app-state commands)
       (initialize-app-state-test-init-app)
     (declare (ignore commands))
-    (print app-state)
+    ;; (print app-state)
     (let ((app-data (elmtui.tea-state.state::application-state-data app-state)))
 
       ;;                               (print (elmtui.state.api:pprinc-application-state app-state))
