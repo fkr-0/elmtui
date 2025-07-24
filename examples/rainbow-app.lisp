@@ -158,7 +158,12 @@ Any key event or :app-quit-requested sets :should-quit to t."
   :initial-state-plist (list :current-stylesheet rainbow-stylesheet
                              :should-quit nil)
   ;; :root-component-dsl `(:column)
-  :root-component-dsl '(:container :id :rainbow-main-container :children ((:column :id :main)))
+  :root-component-dsl
+  '(:container :id :rainbow-main-container
+
+    :initial-terminal-dimensions (1 1)
+    :initial-cursor-pos (1 1)
+    :children ((:column :id :main)))
                                         ; or make nil and let view return full tree
 
   :update-fn 'app-update

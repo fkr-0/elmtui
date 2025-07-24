@@ -229,6 +229,8 @@
    This function computes and sets the :LAYOUT-RECT property (absolute coordinates)
    on the NODE and all its descendants.
    Returns the modified NODE."
+  (log-info "Running layout-node for node ~A with parent-absolute-content-rect: ~S"
+            node parent-absolute-content-rect)
   (unless (typep node 'styled-ui-node)
     (log-warn "LAYOUT: Attempting to lay out a non-styled-ui-node: ~A" node)
     (return-from layout-node node))
@@ -310,30 +312,32 @@
          ;; If :auto, it will be determined by content or flex/grid algorithm.
          ;; If a number, it's used directly (clamped by available space for non-scrolling).
          ;; Percentages need to be resolved against available_outer_w/h.
-         (eff-w (cond ((numberp requested-w) (min requested-w available-outer-w))
-                      ((stringp requested-w) ; Percentage string e.g. "50%"
-                       (if (and (alexandria:ends-with-subseq "%" requested-w) (> (length requested-w) 1))
-                           (let* ((percentage-val (parse-integer (subseq requested-w 0 (1- (length requested-w)))))
-                                  (parent-dim-for-percentage (w parent-absolute-content-rect)))
-                             (max 0 (min available-outer-w ; Clamp to available space
-                                         (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
-                           (progn (log-warn "LAYOUT: Invalid percentage width string: ~S for node ~A. Using available." requested-w node-id)
-                                  available-outer-w)))
-                      ((eq requested-w :auto) available-outer-w) ; Placeholder, flex/grid/block will determine
-                      ;; (t available-outer-w)
-                      ))
-         (eff-h (cond ((numberp requested-h) (min requested-h available-outer-h))
-                      ((stringp requested-h) ; Percentage string e.g. "50%"
-                       (if (and (alexandria:ends-with-subseq "%" requested-h) (> (length requested-h) 1))
-                           (let* ((percentage-val (parse-integer (subseq requested-h 0 (1- (length requested-h)))))
-                                  (parent-dim-for-percentage (h parent-absolute-content-rect)))
-                             (max 0 (min available-outer-h ; Clamp to available space
-                                         (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
-                           (progn (log-warn "LAYOUT: Invalid percentage height string: ~S for node ~A. Using available." requested-h node-id)
-                                  available-outer-h)))
-                      ((eq requested-h :auto) available-outer-h) ; Placeholder, flex/grid/block will determine
-                      ;; (t available-outer-h)
-                      ))
+         (eff-w (or (cond ((numberp requested-w) (min requested-w available-outer-w))
+                          ((stringp requested-w) ; Percentage string e.g. "50%"
+                           (if (and (alexandria:ends-with-subseq "%" requested-w) (> (length requested-w) 1))
+                               (let* ((percentage-val (parse-integer (subseq requested-w 0 (1- (length requested-w)))))
+                                      (parent-dim-for-percentage (w parent-absolute-content-rect)))
+                                 (max 0 (min available-outer-w ; Clamp to available space
+                                             (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
+                               (progn (log-warn "LAYOUT: Invalid percentage width string: ~S for node ~A. Using available." requested-w node-id)
+                                      available-outer-w)))
+                          ((eq requested-w :auto) available-outer-w) ; Placeholder, flex/grid/block will determine
+                                        ; (t available-outer-w)
+                          )
+                    available-outer-w)) ; Fallback to available space if no effective width found
+         (eff-h (or (cond ((numberp requested-h) (min requested-h available-outer-h))
+                          ((stringp requested-h) ; Percentage string e.g. "50%"
+                           (if (and (alexandria:ends-with-subseq "%" requested-h) (> (length requested-h) 1))
+                               (let* ((percentage-val (parse-integer (subseq requested-h 0 (1- (length requested-h)))))
+                                      (parent-dim-for-percentage (h parent-absolute-content-rect)))
+                                 (max 0 (min available-outer-h ; Clamp to available space
+                                             (floor (* parent-dim-for-percentage (/ percentage-val 100.0))))))
+                               (progn (log-warn "LAYOUT: Invalid percentage height string: ~S for node ~A. Using available." requested-h node-id)
+                                      available-outer-h)))
+                          ((eq requested-h :auto) available-outer-h) ; Placeholder, flex/grid/block will determine
+                          ;; (t available-outer-h)
+                          )
+                    available-outer-h)) ; Fallback to available space if no effective height found
 
          ;; This is the initial estimate for the node's own border-box rectangle.
          ;; Flex/Grid might adjust eff-w and eff-h if they were :auto.
@@ -445,6 +449,8 @@
                    (loop for child-node in (ui-node-children node)
                          collect (layout-node child-node self-content-rect node-styles)))))
 
+          (log-info "LAYOUT: ~A (~A) final layout-rect after children: ~S"
+                    (ui-node-type node) node-id final-node-rect)
           (setf (ui-node-children node) laid-out-children)))
 
     (log-debug "LAYOUT: Final computed rect for ~A (~A): ~S" (ui-node-type node) node-id (getf (ui-node-props node) :layout-rect))

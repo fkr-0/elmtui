@@ -54,6 +54,15 @@
                        classes-prop (getf (ui-node-props node) :id))
              nil))))
 
+                                        ; (defmethod styles ((node styled-ui-node))
+;;   "Returns the styles of the styled node from its style-map.
+;;    If no styles are set, returns an empty style-set."
+;;   (let ((style-map (styled-ui-node-style-map node)))
+;;     (if (and style-map (listp style-map))
+;;         (elmtui.style-lib.api:make-style-set :styles style-map)
+;;         *default-style-set*)))
+                                        ; Return default if no styles are set
+
 ;; parents-of, styles, dirty/dirty-p would be handled by stylesheet system if needed
 
 ;;;-----------------------------------------------------------------------------
@@ -197,8 +206,17 @@
 ;;;-----------------------------------------------------------------------------
 ;;; Style Value Access Helper
 ;;;-----------------------------------------------------------------------------
+(defmethod style-value ((l list) property &optional default)
+  "Get the style value of PROPERTY from a raw DSL list.
+   Returns DEFAULT if PROPERTY is not found in the list."
+  (let ((value (or (getf l property)
+                   (getf (getf l :style)
+                         property))))
+    (if value
+        value
+        default)))
 
-(defun style-value (node property &optional default)
+(defmethod style-value ((node styled-ui-node) property &optional default)
   "Get the computed style value of PROPERTY for NODE.
    Returns DEFAULT if NODE is not a styled-ui-node, not styled, or property not found.
    Looks up in style-map (computed/cascaded), then falls back to inline :style in props, then DEFAULT."
@@ -209,8 +227,14 @@
        (cond
          ((and style-map (listp style-map) (getf style-map property))
           (getf style-map property))
+         ((and style-map (typep style-map 'elmtui.style-lib.api:style-set)
+               (gethash property (styles.properties:get-style-set-properties style-map)))
+          (gethash property (styles.properties:get-style-set-properties style-map)))
+         ((and style-map (hash-table-p style-map) (gethash property style-map))
+          (gethash property style-map))
          ((and inline-style (listp inline-style) (getf inline-style property))
           (getf inline-style property))
+
          (t default))))
     (t default)))
 
