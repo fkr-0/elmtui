@@ -36,15 +36,19 @@
          (list* ,dsl-type :id id args))
        (export ',helper-fn-name))))
 
+(defun proper-plist-p (tail)
+  "True when TAIL is a well-formed property list (even length and all
+   keyword keys).  Fast, non-allocating test."
+  (and (evenp (length tail))
+       (loop for (k v . rest) on tail by #'cddr
+             always (keywordp k))))
 
 ;;; --- DSL Rendering ---
 (defun render-dsl-to-resolved-tree (dsl-spec app-state)
   "Walks DSL-SPEC and returns a resolved DSL tree.
 
-In short, let components own :resolved-view, let layout tags own :children, and you’ll
-keep both your update loop and your mental model simple.
-
-### Should your framework **let callers inject arbitrary children into a component?**
+   In short, let components own :resolved-view, let layout tags own :children, and
+   you’ll keep both your update loop and your mental model simple.
 
   • A: No injection at all**<br>*(component’s subtree is 100 % private)*
     • Components stay flack-box → strong encapsulation.
@@ -107,7 +111,16 @@ keep both your update loop and your mental model simple.
   predictable, and lets application code stay pleasant to read—without opening the door
   to the chaos of completely free positional children."
 
-  (labels ((process-stateful-component (tag id path children)
+  (labels ((normalise-shorthand (type tail)
+             ;; ( :TEXT "bye" )      → (:TEXT :content "bye")
+             ;; ( :ROW a b c )       → (:ROW  :children (a b c))
+             (if (= 1 (length tail))
+                 `(,type :content ,(first tail))
+                 `(,type :children ,tail)))
+
+           (process-stateful-component (tag id path children)
+             (unless id
+               (error "Stateful component ~S requires an :id." tag))
              ;; ── STATEFUL COMPONENT ──────────────────────────────────────
              (let* ;; (props     (extract-props rest))        ; everything except :children
                  ;; (raw-slot  (getf rest :children))       ; may be NIL
@@ -120,35 +133,59 @@ keep both your update loop and your mental model simple.
                ;; wrap it
                `(,tag :id ,id :resolved-view ,view-dsl)))
            (process-node (spec path)
-             (log-info "Processing DSL node: ~S at path: ~S" spec path)
              (cond
-               ;; --- Leaf node (string, number, etc.) ---
+               ;; --------------- raw leaf ---------------------------
                ((not (and (listp spec) (keywordp (first spec))))
                 spec)
 
-               ;; --- Element node ---
+               ;; --------------- element ----------------------------
                (t
-                (let* ((type (first spec))
-                       (id (getf (rest spec) :id))
-                       (new-path (if id (append path (list id)) path))
-                       (props (rest spec)))
+                (destructuring-bind (type &rest tail) spec
+                  (if (proper-plist-p tail)
+                      ;; ----- full plist element --------------------
+                      (let* ((id       (getf tail :id))
+                             (new-path (if id (append path (list id)) path)))
+                        (when (and id (member id path :test #'equal))
+                          (error "Circular dependency detected for ID ~S" id))
+                        (multiple-value-bind (props children)
+                            (split-props/children tail)
+                          (if (registered-dsl-component-p type)
+                              (process-stateful-component type id new-path children)
+                              ;; layout element
+                              (let ((resolved-children
+                                      (mapcar (lambda (ch) (process-node ch new-path))
+                                              children)))
+                                (if  (< 0 (length resolved-children))
+                                     `(,type ,@props :children ,resolved-children)
+                                     `(,type ,@props))))))
+                      ;; ----- shorthand element ----------------------
+                      (process-node (normalise-shorthand type tail) path)))))))
+    ;; (process-node (spec path)
+    ;;   (log-info "Processing DSL node: ~S at path: ~S" spec path)
+    ;;   (cond
+    ;;     ;; --- Leaf node (string, number, etc.) ---
+    ;;     ((not (and (listp spec) (keywordp (first spec))))
+    ;;      spec)
 
-                  ;; --- Cycle detection ---
-                  (when (and id (member id path :test #'equal))
-                    (error "Circular dependency detected: component ID ~S is already in the rendering path ~S" id path))
+    ;;     ;; --- Element node ---
+    ;;     (t
+    ;;      (let* ((type (first spec))
+    ;;             (id (getf (rest spec) :id))
+    ;;             (new-path (if id (append path (list id)) path))
+    ;;             (props (rest spec)))
 
-                  (multiple-value-bind (properties children) (split-props/children props)
-                    (log-info "Properties: ~S, Children: ~S" properties children)
-                    (if (registered-dsl-component-p type)
-                        ;; --- Stateful Component ---
-                        (process-stateful-component type id new-path children)
-                        ;; --- Layout Element ---
-                        (let ((resolved-children (mapcar (lambda (child) (process-node child new-path)) children)))
-                          ;; (progn
-                          ;;   (log-info "Resolving layout ~S at ~S" type new-path)
-                          ;;   ;; (list* type (append properties (list :children resolved-children)))
-                          ;;   )
-                          `(,type ,@properties :children ,resolved-children)))))))))
+    ;;        ;; --- Cycle detection ---
+    ;;        (when (and id (member id path :test #'equal))
+    ;;          (error "Circular dependency detected: component ID ~S is already in the rendering path ~S" id path))
+
+    ;;        (multiple-value-bind (properties children) (split-props/children props)
+    ;;          (log-info "Properties: ~S, Children: ~S" properties children)
+    ;;          (if (registered-dsl-component-p type)
+    ;;              ;; --- Stateful Component ---
+    ;;              (process-stateful-component type id new-path children)
+    ;;              ;; --- Layout Element ---
+    ;;              (let ((resolved-children (mapcar (lambda (child) (process-node child new-path)) children)))
+    ;;                `(,type ,@properties :children ,resolved-children))))))))
     (process-node dsl-spec nil)))
 
 ;;; --- DSL to UI-Node Conversion Utility ---
