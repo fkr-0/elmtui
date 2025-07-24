@@ -87,7 +87,7 @@
       (make-raw-tree
        :root
        (dsl->ui-node (expand-components dsl nil)
-                     (ctx-state state))))))
+                     state)))))
 
 
 (deftransformer raw->styled (raw-tree) (styled-tree)
@@ -133,7 +133,9 @@
   (let* ((atomic (root atomic-tree))
          (rect viewport-rect)
          ;; (stylesheet (ctx-state *ctx*))
-         (laid-out (layout-view (list atomic) rect stylesheet)))
+         (laid-out (layout-view (list atomic)
+                                :available-rect rect
+                                :stylesheet stylesheet)))
     (make-laid-out-tree :root (first laid-out))))
 
 ;;; STAGE 5: Render the laid-out tree to a virtual buffer (back buffer)

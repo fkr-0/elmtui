@@ -33,8 +33,9 @@
                               :grid-column-gap :grid-row-gap :grid-gap
                       :grid-column-start :grid-column-end :grid-row-start :grid-row-end
                       :grid-column :grid-row :grid-area
-                              :*inheritable-style-properties* ; Export the new global
-                              ))
+                              :get-style-set-properties
+                      :*inheritable-style-properties* ; Export the new global
+                      ))
 (in-package :elmtui.style-lib.properties)
 
 (defun valid-color-value-p (v)
@@ -701,6 +702,44 @@ Possible values are :none, :solid, :dashed, :dotted.")
 (defstruct style-set "Represents a collection of style properties and their values."
            (properties (make-hash-table :test 'eq) :type hash-table)
            (parent nil :type (or null style-set)))
+
+(defmethod %get-style-set-parents-properties ((style-set style-set) &optional (inkl-actual nil))
+  "Returns the properties hash-table of a style-set, including parent properties."
+  (let ((pts (when inkl-actual
+               (list (style-set-properties style-set))))
+        (piv (style-set-parent style-set)))
+    (loop while (not (null piv))
+          do (progn (push (style-set-properties piv) pts)
+                    (setf piv (style-set-parent piv))))
+    pts))
+;; (let ((mh (make-hash-table)))
+;;   (setf (gethash 'style-set-properties mh) #'style-set-properties)
+;;   (%get-style-set-parents-properties
+;;  (make-style-set)))
+                                        ; :parent (make-style-set :parent (make-style-set
+                                        ;                                 :properties mh)))))
+
+(defmethod get-style-set-properties ((style-set style-set) &optional (parents nil))
+  "Returns the properties hash-table of a style-set.
+This is primarily for internal use, to access the properties directly, also,
+recurse for parent style-sets if needed, with the children style-sets overriding
+the parent properties.
+
+If PARENTS is true, it will include properties from parent style-sets.
+Arguments:
+STYLE-SET: The style-set to retrieve properties from.
+PARENTS: If true, include properties from parent style-sets.
+
+Returns:
+A hash-table containing the properties of the style-set, optionally including parent properties."
+  (let ((properties (style-set-properties style-set)))
+    (when parents
+      (let ((parent (%get-style-set-parents-properties style-set t)))
+        (dolist (p parent)
+          (maphash (lambda (key value)
+                     (setf (gethash key properties) value))
+                   p))))
+    properties))
 
 ;; (defun make-style-set (&key parent)
 ;;   "Creates a new style-set, optionally inheriting from a parent style-set."

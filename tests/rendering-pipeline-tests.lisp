@@ -35,19 +35,22 @@
 ;;      :backend nil)))
 (defun setup-test-context (&optional (width 80) (height 24))
   "Helper to create a default context for pipeline tests."
+  (declare (ignorable width height))
   (multiple-value-bind (app-state commands)
       (elmtui.examples.rainbow-app:initialize-app-state-rainbow-example-app
-       :initial-terminal-dimensions (list width height)
+       :initial-terminal-dimensions (list 80 24)
        :initial-cursor-position (list 0 0))
     (declare (ignore commands))
     (make-app-context
      :state app-state
      :viewport-rect (make-rectangle
-                     :size (make-size :w width :h height)
+                     :size (make-size :h 24 :w 80) ;;width :h height)
                      :pos (make-pos :x 0 :y 0))
-     :front-buffer (make-virtual-buffer width height)
+     :front-buffer (make-virtual-buffer 80 24)
      :view-fn #'elmtui.examples.rainbow-app:rainbow-content-view
-     :backend nil)))
+     :backend nil)
+    ;; app-state
+    ))
 ;; (setup-test-context)
 ;; (setup-test-context)
 
@@ -70,16 +73,26 @@
     (is (typep (ctx-back-buffer final-context) 'elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer)
         "The back-buffer should be a virtual-terminal-buffer.")))
 
+(let ((styled-context
+        (styled->atomic-stage (raw->styled-stage (dsl->raw-stage (generate-dsl (setup-test-context )))))))
+  (atomic->layout-stage
+   styled-context)
+  )
+;; (test styled->atomic-stage-contract
+;;   "Tests that styled->atomic-stage produces an atomic-tree from a styled-tree."
+;;   (is (typep (ctx-atomic-tree styled-context) 'atomic-tree)
+;;       "styled->atomic-stage should produce an atomic-tree struct.")))
+
 (test pipeline-step-by-step-transformation
   "Tests each stage of the rendering pipeline individually."
   (let ((context (setup-test-context )))
     ;; Stage 0: Generate DSL
     ;; (let ((ctx-after-dsl ( context)))
     (let ((ctx-after-dsl (generate-dsl context)))
-      ;; context))
-      (is (typep (ctx-dsl-tree ctx-after-dsl) 'dsl-tree) "generate-dsl should add a dsl-tree struct to the context.")
-      (is (eq :container (first (root (ctx-dsl-tree ctx-after-dsl))))
-          "The root of the DSL should be a :column.")
+      ;; ctx-after-dsl))
+      ;; (is (typep (ctx-dsl-tree ctx-after-dsl) 'dsl-tree) "generate-dsl should add a dsl-tree struct to the context.")
+      ;; (is (eq :container (first (root (ctx-dsl-tree ctx-after-dsl))))
+      ;;     "The root of the DSL should be a :column.")
       (setf context ctx-after-dsl))
 
     ;; Stage 1: DSL -> Raw

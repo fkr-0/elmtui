@@ -3,9 +3,10 @@
 ;;; Flexbox Layout Engine (Ported/Refactored from uncharming-tui.flex)
 ;;; ===============================================================
 (uiop:define-package :elmtui.view.layout.flex
-  (:use :cl)
+  (:use :cl #:log4cl)
   (:nicknames :et.flex)
   ;; Import from the refactored geo package
+  (:import-from :elmtui.style-lib.api #:stylesheet #:style-rule #:make-style-set)
   (:import-from :elmtui.view.geo
                 #:rectangle #:pos #:size #:h #:w #:x #:y #:make-rectangle #:make-pos #:make-size
                 #:pos-x #:pos-y #:size-w #:size-h #:rectangle-pos #:rectangle-size
@@ -893,6 +894,18 @@
    Supports flex-direction, justify-content, align-items, align-self,
    flex-grow, flex-shrink, flex-basis, and min/max sizes.
 
+   A flex-container-node is a styled-ui-node that represents a flex container. It is assumed to provide
+   methods to set/access:
+    - `flex-direction`: The main axis direction (row/column).
+    - `flex-wrap`: Whether items should wrap (nowrap/wrap/wrap-reverse)
+    - `justify-content`: How to distribute items along the main axis.
+    - `align-items`: How to align items along the cross axis.
+    - `align-content`: How to distribute space between/around lines (not used in single line).
+    - `flex-grow`, `flex-shrink`, `flex-basis`: Flex properties for items.
+    - `min-width`, `max-width`, `min-height`, `max-height`: Size constraints for items.
+    The function returns the flex container node after layout is applied.
+
+
    LIMITATIONS & TODOs:
    - Flex Wrapping (`flex-wrap`): Currently only processes items as a single flex line.
      TODO: Implement line breaking logic. This involves:
@@ -930,12 +943,15 @@
 
   (declare (ignore parent-style-set)) ; Placeholder
 
-  (log:debug "FLEX-LAYOUT: Computing layout for ~S in available rect ~S"
-             (getf (ui-node-props flex-container-node) :id "N/A")
-             parent-absolute-content-rect)
+  (log4cl:log-info "FLEX-LAYOUT: Computing layout for ~S in available rect ~S"
+                   (getf (ui-node-props flex-container-node) :id "N/A")
+                   parent-absolute-content-rect)
 
   ;; 1. Extract Flex Container Properties & Determine Axes
-  (let* ((container-styles (styles flex-container-node))
+  (let* ((container-styles ;; (or (styled-ui-node- flex-container-node)
+           ;;     (elmtui.style-lib.api:make-style-set))
+           flex-container-node
+           )
          (flex-direction (style-value container-styles :flex-direction :row))
          (justify-content (style-value container-styles :justify-content :flex-start))
          (align-items (style-value container-styles :align-items :stretch))
@@ -1104,6 +1120,8 @@
                (final-main (getf item :final-main-size))
                (final-cross (getf item :final-cross-size))
                (child-x 0) (child-y 0) (child-w 0) (child-h 0))
+          (log4cl:log-info "FLEX-LAYOUT: Processing child ~S with main-pos: ~A, cross-pos: ~A, final-main: ~A, final-cross: ~A"
+                           (getf (ui-node-props child-node) :id "N/A") main-pos cross-pos final-main final-cross)
 
           (if is-row
               (setf child-x (+ container-content-x

@@ -14,6 +14,7 @@
 
 (uiop:define-package #:elmtui.view.api
   (:use #:cl)
+  (:import-from #:elmtui.style-lib.api :styles)
   (:export
    ;; Transformation generics
    #:render-view
@@ -38,10 +39,23 @@
 (in-package #:elmtui.view.api)
 
 (defgeneric ui-node-p (object)
-  (:method ((object t))
-    (typep object 'ui-node))
   (:documentation
-   "Predicate to check if OBJECT is a UI-NODE instance."))
+   "Predicate to check if OBJECT is a UI-NODE instance.
+
+   Arguments:
+     OBJECT -- (any) The object to test.
+
+   Returns:
+     T if OBJECT is a UI-NODE instance, NIL otherwise.
+
+   Example:
+     (ui-node-p (make-instance 'ui-node ...)) ; => T
+
+   (any) => boolean (pure, no side-effects)
+  ")
+  (:method ((object t))
+    ;; Use typep to check for ui-node class membership
+    (typep object 'ui-node)))
 ;;; ===================================================================
 ;;; INTERFACE SECTION - Public API declarations
 ;;; ===================================================================
@@ -111,79 +125,168 @@
 ;;; =======================================================================
 
 (defgeneric render-view (app-state)
-;;; ===================================================================
-;;; IMPLEMENTATION SECTION
-;;; ===================================================================
-  (:method ((app-state t))
-    (error "RENDER-VIEW not implemented for ~S" (type-of app-state)))
-  (:documentation
-   "High-level entry point of the View-pipeline.
+  (:documentation "High-level entry point of the View-pipeline.
 
-APP-STATE  – Any object representing the current model.
-RESULT     – Tree of UI-NODE instances in their *rich* form (labels, list-boxes, …).
-The result *must* be a pure value; no side-effects allowed."))
+   Arguments:
+     APP-STATE -- (object) The current application state/model.
+
+   Returns:
+     A tree of UI-NODE instances in their rich form (labels, list-boxes, etc).
+
+   Example:
+     (render-view my-app-state)
+     ;; => (UI-NODE ...)
+
+   (object) => list[ui-node] (pure, no side-effects)
+
+   Side-effects: none (must be pure)
+  ")
+  (:method ((app-state t))
+    (error "RENDER-VIEW not implemented for ~S" (type-of app-state))))
 
 (defgeneric apply-style (rich-tree)
-  (:method ((rich-tree list))
-    (error "APPLY-STYLE not implemented for ~S" (type-of rich-tree)))
   (:documentation
-   "Normalise and merge style information.
+   "Normalise and merge style information for a tree of UI nodes.
 
-RICH-TREE  – Tree produced by RENDER-VIEW.
-RESULT     – Tree of STYLED-UI-NODE objects whose STYLE-MAP slot is *complete*.
-Must not change tree topology."))
+   Arguments:
+     RICH-TREE -- (list) Tree produced by RENDER-VIEW.
+
+   Returns:
+     Tree of STYLED-UI-NODE objects whose STYLE-MAP slot is complete.
+     Must not change tree topology.
+
+   Example:
+     (apply-style rich-tree)
+     ;; => (STYLED-UI-NODE ...)
+
+   (list) => list[styled-ui-node] (pure, no side-effects)
+
+   Side-effects: none (must be pure)
+  ")
+  (:method ((rich-tree list))
+    (error "APPLY-STYLE not implemented for ~S" (type-of rich-tree))))
 
 ;; (defgeneric resolve-view (styled-tree app-state)
-;;   (:documentation
-;;    "Lower complex widgets to a minimal atomic vocabulary.
+;;   (:documentation "Lower complex widgets to a minimal atomic vocabulary.
 
-;; STYLED-TREE – Output of APPLY-STYLE.
-;; RESULT       – Tree of ATOMIC-UI-NODE objects (:drawable-content, :layout, …)."))
+;;    Arguments:
+;;      STYLED-TREE -- (list) Output of APPLY-STYLE, a tree of STYLED-UI-NODEs.
+;;      APP-STATE   -- (object) The current application state/model.
+
+;;    Returns:
+;;      A tree of ATOMIC-UI-NODE objects (:drawable-content, :layout, ...).
+
+;;    Example:
+;;      (resolve-view styled-tree app-state)
+;;      ;; => (ATOMIC-UI-NODE ...)
+
+;;    (list, object) => list[atomic-ui-node] (pure, no side-effects)
+
+;;    Side-effects: none (must be pure)
+;;   ")
+;;   (:method ((styled-tree list) (app-state t))
+;;     ;; This method must be specialized by backends to lower styled nodes to atomic nodes.
+;;     (error "RESOLVE-VIEW not implemented for ~S and ~S"
+;;            (type-of styled-tree) (type-of app-state))))
 
 ;; (defgeneric layout-view (atomic-tree available-rect stylesheet)
+;;   (:documentation "Compute absolute geometry for every node in the atomic tree.
+
+;;    Arguments:
+;;      ATOMIC-TREE     -- (list) Result of RESOLVE-VIEW, tree of ATOMIC-UI-NODEs.
+;;      AVAILABLE-RECT  -- (list) Rect structure (x y w h) representing constraints.
+;;      STYLESHEET      -- (object) The stylesheet to use for layout calculations.
+
+;;    Returns:
+;;      Tree of LAID-OUT-UI-NODE objects with LAYOUT-RECT populated.
+
+;;    Example:
+;;      (layout-view atomic-tree '(0 0 80 24) my-stylesheet)
+;;      ;; => (LAID-OUT-UI-NODE ...)
+
+;;    (list, list, object) => list[laid-out-ui-node] (pure, no side-effects)
+
+;;    Side-effects: none (must be pure)
+;;   ")
 ;;   (:method ((atomic-tree list) (available-rect list) (stylesheet t))
-;;     (error "LAYOUT-VIEW not implemented for ~S, ~S and ~S" (type-of atomic-tree) (type-of available-rect) (type-of stylesheet)))
-;;   (:documentation
-;;    "Compute absolute geometry for every node.
-
-;; ATOMIC-TREE     – Result of RESOLVE-VIEW.
-;; AVAILABLE-RECT  – Rect structure (x y w h) representing constraints.
-;; STYLESHEET      – The stylesheet to use for layout calculations.
-;; RESULT          – Tree of LAID-OUT-UI-NODE objects with LAYOUT-RECT populated."))
-
+;;     ;; This method must be specialized by backends to assign geometry to atomic nodes.
+;;     (error "LAYOUT-VIEW not implemented for ~S, ~S and ~S"
+;;            (type-of atomic-tree) (type-of available-rect) (type-of stylesheet))))
 (defgeneric render-to-buffer (laid-out-tree backbuffer)
-  (:method ((laid-out-tree list) (backbuffer t))
-    (error "RENDER-TO-BUFFER not implemented for ~S and ~S" (type-of laid-out-tree) (type-of backbuffer)))
-  (:documentation
-   "Emit drawing commands into BACKBUFFER.
+  (:documentation "Emit drawing commands into BACKBUFFER from a fully laid-out UI tree.
 
-LAID-OUT-TREE – Fully laid-out tree from LAYOUT-VIEW.
-BACKBUFFER    – Mutable device-buffer object.
-Side-effects  – BACKBUFFER contents are updated in-place.
-Return value  – Implementation-defined (usually BACKBUFFER or NIL)."))
+   Arguments:
+     LAID-OUT-TREE -- (list) Fully laid-out tree from LAYOUT-VIEW.
+     BACKBUFFER    -- (object) Mutable device-buffer object.
+
+   Returns:
+     Implementation-defined (usually BACKBUFFER or NIL).
+
+   Example:
+     (render-to-buffer laid-out-tree my-backbuffer)
+     ;; => my-backbuffer
+
+   (list, object) => object (side-effect: modifies BACKBUFFER)
+
+   Side-effects:
+     - BACKBUFFER contents are updated in-place.
+
+   Purity: impure (mutates BACKBUFFER)
+  ")
+  (:method ((laid-out-tree list) (backbuffer t))
+    (error "RENDER-TO-BUFFER not implemented for ~S and ~S" (type-of laid-out-tree) (type-of backbuffer))))
 
 ;;; -----------------------------------------------------------------------
 ;;; 2. Diff/patch helpers  (optional but recommended)
 ;;; -----------------------------------------------------------------------
 
 (defgeneric diff-buffer (prev-buffer curr-buffer)
-  (:method ((prev-buffer t) (curr-buffer t))
-    (error "DIFF-BUFFER not implemented for ~S and ~S" (type-of prev-buffer) (type-of curr-buffer)))
-  (:documentation
-   "Compute *minimal* diff operations to transform PREV-BUFFER into CURR-BUFFER.
+  (:documentation "Compute minimal diff operations to transform PREV-BUFFER into CURR-BUFFER.
 
-Return value – A list/stream of diff operations understood by APPLY-DIFF."))
+   Arguments:
+     PREV-BUFFER -- (object) Previous back-buffer state.
+     CURR-BUFFER -- (object) Current back-buffer state.
+
+   Returns:
+     A list or stream of diff operations understood by APPLY-DIFF.
+
+   Example:
+     (diff-buffer prev curr)
+     ;; => ((:replace ...))
+
+   (object, object) => list[diff-op] (pure, no side-effects)
+
+   Side-effects: none (must be pure)
+  ")
+  (:method ((prev-buffer t) (curr-buffer t))
+    ;; Must be specialized to compute minimal terminal update operations.
+    (error "DIFF-BUFFER not implemented for ~S and ~S" (type-of prev-buffer) (type-of curr-buffer))))
 
 (defgeneric apply-diff (backend diff-ops terminal-origin)
-  (:method ((backend t) (diff-ops list) (terminal-origin list))
-    (error "APPLY-DIFF not implemented for ~S, ~S and ~S" (type-of backend) (type-of diff-ops) (type-of terminal-origin)))
-  (:documentation
-   "Apply DIFF-OPS to the physical terminal via BACKEND.
+  (:documentation "Apply DIFF-OPS to the physical terminal via BACKEND.
 
-BACKEND          – Backend instance responsible for IO.
-DIFF-OPS         – Result of DIFF-BUFFER.
-TERMINAL-ORIGIN  – (x . y) top-left corner offset when drawing.
-Return value     – Implementation-defined (often NIL)."))
+   Arguments:
+     BACKEND         -- (object) Backend instance responsible for IO.
+     DIFF-OPS        -- (list) Result of DIFF-BUFFER.
+     TERMINAL-ORIGIN -- (list) (x y) top-left corner offset when drawing.
+
+   Returns:
+     Implementation-defined (often NIL).
+
+   Example:
+     (apply-diff backend diff-ops '(0 0))
+     ;; => NIL
+
+   (object, list, list) => any (side-effect: terminal IO)
+
+   Side-effects:
+     - May write to terminal or device.
+
+   Purity: impure (performs IO)
+  ")
+  (:method ((backend t) (diff-ops list) (terminal-origin list))
+    ;; Must be specialized to perform terminal updates.
+    (error "APPLY-DIFF not implemented for ~S, ~S and ~S" (type-of backend) (type-of diff-ops) (type-of terminal-origin))))
 
 ;;; =======================================================================
 ;;; 3. Class hierarchy for UI-nodes
@@ -222,6 +325,14 @@ These nodes may still be declarative/high-level."))
     :documentation "Fully-resolved style plist after APPLY-STYLE."))
   (:documentation
    "UI node after stylesheet cascade expansion and normalisation."))
+(defmethod styles ((styled-ui-node styled-ui-node))
+  "Return the style-map of a STYLED-UI-NODE."
+  (styled-ui-node-style-map styled-ui-node))
+;; (defmethod style-set-to-style-map ((node styled-ui-node) (style-set style-set))
+;;   "Convert a STYLE-SET to a STYLE-MAP plist."
+;;   (styles.properties:get-style-set-properties style-set))
+
+
 ;; (defclass styled-ui-node (ui-node stylable)
 ;;   ;; stylable mixin provides: sid, classes, parents-of, styles, dirty
 ;;   ()

@@ -4,7 +4,7 @@
 
 (uiop:define-package
     #:elmtui.app
-  (:use #:cl)
+  (:use #:cl #:log4cl)
   (:import-from #:elmtui.core.globals          :*applications*)
   (:import-from #:elmtui.utils                 #:ensure-keyword
                 #:coerce-fn)
@@ -39,19 +39,18 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun maybe-wrap-with-root-viewport
       (dsl
-       &optional (term-size (list 0 0))
-                                        ;(et.geo:make-size))
-         (cursor-pos (list 0 0)))
-                                        ; (et.geo:make-pos)))
-    (if (and (consp dsl) (keywordp (first dsl))
-             (not (eq (first dsl) :root-viewport)))
-        `(:root-viewport :id :root-viewport
-          ;; :initial-terminal-dimensions ,term-size
-          ;; :initial-cursor-pos ,cursor-pos
-                         :initial-terminal-dimensions (1 1)
-                         :initial-cursor-pos (1 1)
-
-                         :children ,dsl)
+       &optional (term-size '(1 1)) (cursor-pos '(1 1)))
+    (if (and (consp dsl) (keywordp (first dsl)))
+        (let ((type (first dsl))
+              (props (rest dsl)))
+          (cond ((eq type :root-viewport) dsl)
+                ((eq type :viewport)
+                 `(:root-viewport ,@props))
+                (t
+                 `(:root-viewport :id :root-viewport
+                                  :initial-terminal-dimensions ,term-size
+                                  :initial-cursor-pos ,cursor-pos
+                                  :initial-child-spec ,dsl))))
         dsl))
   ;; Coerce X → keyword, return NIL on NIL.
   (defun %kw (x)
@@ -178,6 +177,8 @@
            ;; --------------------------------------------------------------
            ;; Register config object
            ;; --------------------------------------------------------------
+           (log-info "Initializing application: ~A" ',name)
+           (log-info "Initial-state-plist: ~A" ,state)
            (setf (gethash ',name *applications*)
                  (make-app-config
                   :name ',name
@@ -446,3 +447,8 @@
 ;;                  :root-component-dsl *dummy-root-dsl*))))
 
 ;;   (defun run-tests () (run! 'sanity)))
+;; (multiple-value-bind (app-state commands)
+;;                     (initialize-app-state-my-test-app
+;;                      :initial-terminal-dimensions '(80 24)
+;;                      :initial-cursor-position '(0 0))
+;;                     app-state)

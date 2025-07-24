@@ -148,8 +148,8 @@
   Returns a laid-out atomic UI-Node tree (list containing one root node).
   Each node in the returned tree will have a :layout-rect (its border-box) and a :box-model property."
   ;; (declare (ignore stylesheet))
-  (log:debug "TREE-TRANSFORMS: layout-view - Processing ~D atomic top-level node(s). Available-rect: ~S"
-             (length atomic-tree) available-rect)
+  (log-info "TREE-TRANSFORMS: layout-view - Processing ~D atomic top-level node(s). Available-rect: ~S"
+            (length atomic-tree) available-rect)
 
   (if (and atomic-tree (= 1 (length atomic-tree)) (typep (first atomic-tree) 'styled-ui-node))
       (let ((root-node (first atomic-tree)))
