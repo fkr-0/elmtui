@@ -134,6 +134,7 @@
       (initialize-app-state-test-init-app-2)
     (declare (ignore commands))
     (let ((app-data (elmtui.tea-state.state::application-state-data app-state)))
+      ;; app-data))
       (is (= (gethash :counter app-data) 0))
       (is (string= (gethash :text app-data) "hello")))))
 
@@ -144,7 +145,8 @@
     ;; (print app-state)
     (let ((app-data (elmtui.tea-state.state::application-state-data app-state)))
 
-      ;;                               (print (elmtui.state.api:pprinc-application-state app-state))
+      (print (elmtui.state.api:pprinc-application-state app-state))
+      ;; app-state))
       ;; app-state))
       ;; (elmtui.app:get-component-instance '(:main-column :comp1) app-state)))
       ;; (state-ref app-state (list :components :components :main-column )) app-state))

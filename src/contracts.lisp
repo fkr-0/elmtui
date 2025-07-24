@@ -66,7 +66,28 @@
                                               view-fn
                                               atomic-tree laid-out-tree
                                               front-buffer backend)))
-  "Global application context for the pipeline. Holds all tree stages and frame state."
+  "Global application context for the pipeline.
+
+   Arguments:
+     STATE          -- (plist) Application model.
+     VIEWPORT-RECT  -- (object) Geometry rectangle.
+     DSL-TREE       -- (dsl-tree) DSL tree struct.
+     RAW-TREE       -- (raw-tree) Raw tree struct.
+     STYLED-TREE    -- (styled-tree) Styled tree struct.
+     VIEW-FN        -- (function) View function.
+     ATOMIC-TREE    -- (atomic-tree) Atomic tree struct.
+     LAID-OUT-TREE  -- (laid-out-tree) Laid-out tree struct.
+     FRONT-BUFFER   -- (object) Front buffer.
+     BACKEND        -- (object) Backend instance.
+
+   Returns:
+     An APP-CONTEXT struct holding all pipeline stages and frame state.
+
+   Example:
+     (make-app-context :state '(:foo 1) :dsl-tree (make-dsl-tree :root ...))
+
+   (plist, ...) => app-context (pure, no side-effects)
+  "
   view-fn
   state            ; original :app-model plist
   stylesheet
@@ -81,11 +102,35 @@
   backend)
 
 (defstruct (dsl-tree (:conc-name dsl-))
-  "DSL tree: holds the nested DSL list."
+  "DSL tree: holds the nested DSL list.
+
+   Arguments:
+     ROOT -- (list) The nested DSL list.
+
+   Returns:
+     A DSL-TREE struct.
+
+   Example:
+     (make-dsl-tree :root '(:container ...))
+
+   (list) => dsl-tree (pure, no side-effects)
+  "
   root)
 
 (defstruct (raw-tree (:conc-name raw-))
-  "Raw tree: UI-node tree before styling."
+  "Raw tree: UI-node tree before styling.
+
+   Arguments:
+     ROOT -- (object) The root UI-node.
+
+   Returns:
+     A RAW-TREE struct.
+
+   Example:
+     (make-raw-tree :root ...)
+
+   (object) => raw-tree (pure, no side-effects)
+  "
   root)
 
 (defstruct (styled-tree (:conc-name sty-))
@@ -569,16 +614,33 @@
 (defmacro defview (name (model-param) &body body)
   "Defines a view function with strict contract enforcement.
 
-   Contract: view(model) => dsl-tree
-   - model: Current application state (read-only)
-   - Returns: Valid DSL tree structure"
+   Arguments:
+     NAME        -- (symbol) Name of the view function.
+     MODEL-PARAM -- (symbol) Model parameter name.
+     BODY        -- (forms) Body of the view function.
 
+   Returns:
+     Defines a function that validates input, executes BODY, and validates output as a DSL tree.
+
+   Example:
+     (defview my-view (model)
+       (list :container :children ...))
+
+   (symbol, symbol, forms) => macro-expansion (side-effect: defines function)
+
+   Side-effects:
+     - Defines a function.
+     - Signals errors on contract violation.
+     - May log execution if debugging enabled.
+
+   Purity: impure (macro, global definition, error signaling)
+  "
   (let ((doc-string (when (stringp (first body)) (first body)))
         (actual-body (if (stringp (first body)) (rest body) body)))
     `(defun ,name (,model-param)
        ,@(when doc-string (list doc-string))
 
-       ;; Input validation
+       ;; Input validation: ensure model is valid before rendering
        (handler-case (validate-model ,model-param "view function input")
          (contract-violation (c)
            (error 'view-contract-violation
@@ -589,14 +651,14 @@
 
        ;; Execute view logic with contract enforcement
        (let ((result (handler-case (progn ,@actual-body)
-                       (error (e)
-                         (error 'view-contract-violation
-                                :function-name ',name
-                                :expected-type "successful view generation"
-                                :actual-value e
-                                :context (format nil "rendering model ~S" ,model-param))))))
+                           (error (e)
+                             (error 'view-contract-violation
+                                    :function-name ',name
+                                    :expected-type "successful view generation"
+                                    :actual-value e
+                                    :context (format nil "rendering model ~S" ,model-param))))))
 
-         ;; Output validation
+         ;; Output validation: ensure result is a valid DSL tree
          (validate-dsl result ',name ,model-param)
 
          ;; Contract debugging if enabled
@@ -606,7 +668,26 @@
          result))))
 
 (defun validate-dsl (dsl function-name model)
-  "Validates DSL structure"
+  "Validates that DSL is a valid DSL structure.
+
+   Arguments:
+     DSL           -- (any) The DSL value to validate.
+     FUNCTION-NAME -- (symbol) Name of the calling function.
+     MODEL         -- (any) The model used for rendering.
+
+   Returns:
+     DSL if valid, otherwise signals a view-contract-violation error.
+
+   Example:
+     (validate-dsl '(:container :children ...) 'my-view '(:foo 1))
+
+   (any, symbol, any) => any (side-effect: error signaling)
+
+   Side-effects:
+     - Signals error if DSL is invalid.
+
+   Purity: impure (error signaling)
+  "
   (unless (valid-dsl-p dsl)
     (error 'view-contract-violation
            :function-name function-name
@@ -616,7 +697,21 @@
   dsl)
 
 (defun valid-dsl-p (dsl)
-  "Checks if DSL structure is valid"
+  "Checks if DSL is a valid DSL structure.
+
+   Arguments:
+     DSL -- (any) The DSL value to check.
+
+   Returns:
+     T if DSL is a valid DSL structure, NIL otherwise.
+
+   Example:
+     (valid-dsl-p '(:container :children ...)) ; => T
+     (valid-dsl-p 42)                         ; => T
+     (valid-dsl-p '(:foo :bar :baz))          ; => NIL
+
+   (any) => boolean (pure, no side-effects)
+  "
   (or (stringp dsl)
       (numberp dsl)
       (and (listp dsl)
