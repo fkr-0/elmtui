@@ -140,7 +140,7 @@ Any key event or :app-quit-requested sets :should-quit to t."
                      `(:container
                        :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
                        :classes (,class-name)
-                       :style (:width 12
+                       :style (:width 1
                                :height :fill
                                :bg-color ,(rgb rgb-val))
                        :children nil))))

@@ -265,36 +265,67 @@
 ;;     (log-info "patches: ~A: " patches)
 ;;     (values patches commands)))
 (defun initialize-components-from-dsl (dsl)
-  "Traverse DSL tree, instantiate components, and return patches and commands."
+  "Recursively traverses a component DSL, instantiates components,
+   and returns the accumulated patches and commands."
   (let ((patches nil)
         (commands nil))
-    (labels ((process-node (node parent-id-path)
+    (labels ((process-node (node parent-path)
                (when (and (consp node) (keywordp (car node)))
                  (destructuring-bind (component-type &rest component-props) node
                    (declare (ignore component-type))
                    (let ((component-id (getf component-props :id)))
                      (when component-id
-                       (let* ((current-id-path (if (equal (car parent-id-path) :components)
-                                                   (append parent-id-path (list component-id))
-                                                   (append '(:components) parent-id-path (list component-id))))
-                              (component-class (instantiate-component-from-dsl node current-id-path)))
-                         (when component-class
+                       (let* ((current-path (append parent-path (list component-id)))
+                              (full-id-path (cons :components current-path))
+                              (component-instance (instantiate-component-from-dsl node full-id-path)))
+                         (when component-instance
                            (multiple-value-bind (instance init-patches init-commands)
-                               (apply #'init component-class :id-path current-id-path component-props)
+                               (apply #'init component-instance :id-path full-id-path component-props)
                              (declare (ignore instance))
                              (setf patches (nconc patches init-patches))
                              (setf commands (nconc commands init-commands))))
                          ;; Recurse into children
-                         (let ((children (getf component-props :children)))
-                           (when children
-                             (dolist (child children)
-                               (process-node child current-id-path)))))))))))
-      (if (and (consp dsl) (keywordp (car dsl)))
-          (process-node dsl '())
-          (mapc (lambda (child) (process-node child '())) dsl)))
-    (log-info "Initialized components from DSL: ~A" dsl)
-    (log-info "patches: ~A" patches)
-    (values patches commands)))
+                         (flet ((process-children (child-list)
+                                  (when child-list
+                                    (if (and (listp child-list) (keywordp (first child-list)))
+                                        (process-node child-list current-path)
+                                        (dolist (child child-list)
+                                          (process-node child current-path))))))
+                           (process-children (getf component-props :children))
+                           (process-children (getf component-props :initial-child-spec))))))))))
+      (process-node dsl '())
+      (values patches commands))))
+
+;; (defun initialize-components-from-dsl (dsl)
+;;   "Recursively traverses a component DSL, instantiates components,
+;;    and returns the accumulated patches and commands."
+;;   (let ((patches nil)
+;;         (commands nil))
+;;     (labels ((process-node (node parent-path)
+;;                (when (and (consp node) (keywordp (car node)))
+;;                  (destructuring-bind (component-type &rest component-props) node
+;;                    (declare (ignore component-type))
+;;                    (let ((component-id (getf component-props :id)))
+;;                      (when component-id
+;;                        (let* ((current-path (append parent-path (list component-id)))
+;;                               (full-id-path (cons :components current-path))
+;;                               (component-instance (instantiate-component-from-dsl node full-id-path)))
+;;                          (when component-instance
+;;                            (multiple-value-bind (instance init-patches init-commands)
+;;                                (apply #'init component-instance :id-path full-id-path component-props)
+;;                              (declare (ignore instance))
+;;                              (setf patches (nconc patches init-patches))
+;;                              (setf commands (nconc commands init-commands))))
+;;                          ;; Recurse into children
+;;                          (let ((children (getf component-props :children))
+;;                                (child-spec (getf component-props :initial-child-spec)))
+;;                            (when children
+;;                              (dolist (child children)
+;;                                (process-node child current-path)))
+;;                            (when child-spec
+;;                              (process-node child-spec current-path))))))))))
+;;       (process-node dsl '()))
+;;     (values patches commands)))
 
 
 ;;;---------------------------------------------------------------
@@ -352,11 +383,6 @@
                         (append component-base-path
                                 (list (ensure-keyword key))) value)
                        patches))
-        (when (getf dsl :children)
-          (multiple-value-bind (child-patches child-commands)
-              (initialize-components-from-dsl (getf dsl :children))
-            (setf patches (nconc patches child-patches))
-            (setf commands (nconc commands child-commands))))
         (values component (nreverse patches) (nreverse commands))))))
 
 ;; (declaim (ftype (function (component &key (:id-path list)) (values list list)) destroy))
