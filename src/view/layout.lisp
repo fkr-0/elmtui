@@ -97,7 +97,10 @@
    :LAYOUT-RECT, then recurse into its children."
   (declare (type styled-ui-node node)
            (type rectangle parent-absolute-content-rect)
-           (ignore parent-style-set))           ; <— context not yet used
+           (ignore parent-style-set))
+  (log-info "LAYOUT: Measuring intrinsic size for node ~A with parent-absolute-content-rect: ~S"
+            node parent-absolute-content-rect)
+                                        ; <— context not yet used
   (let* (;; ------------------------------------------------------------
          ;; Style & margin extraction
          ;; ------------------------------------------------------------
@@ -238,7 +241,7 @@
   (log-debug "LAYOUT: Starting layout for node ~A with parent-absolute-content-rect: ~S"
              (getf (ui-node-props node) :id (gensym "ANON-NODE-")) parent-absolute-content-rect)
   (let* ((node-id (getf (ui-node-props node) :id (gensym "ANON-NODE-")))
-         (display (style-value node :display :flex)) ; Default to block display
+         (display (style-value node :display :block)) ; Default to block display
          ;; Canonical: use style-map slot if present, else inline :style from props, else nil
          (node-styles (cond
                         ((and (typep node 'styled-ui-node)
@@ -250,13 +253,14 @@
          (requested-w (style-value node :width :auto))
          (requested-h (style-value node :height :auto))
          (is-root (null parent-absolute-content-rect)) ; If parent rect is NIL, treat as root
-         (available-outer-w (if is-root
-                                ;; Defensive: try to get from node's props, else fallback to 80
-                                (let ((screen-w (getf (ui-node-props node) :screen-width)))
-                                  (or (and screen-w (numberp screen-w) screen-w) 80))
-                                (max 0 (- (w parent-absolute-content-rect)
-                                          (style-value node :margin-left 0)
-                                          (style-value node :margin-right 0)))))
+         (available-outer-w
+           (if is-root
+               ;; Defensive: try to get from node's props, else fallback to 80
+               (let ((screen-w (getf (ui-node-props node) :screen-width)))
+                 (or (and screen-w (numberp screen-w) screen-w) 80))
+               (max 0 (- (w parent-absolute-content-rect)
+                         (style-value node :margin-left 0)
+                         (style-value node :margin-right 0)))))
          (available-outer-h (if is-root
                                 (let ((screen-h (getf (ui-node-props node) :screen-height)))
                                   (or (and screen-h (numberp screen-h) screen-h) 24))
@@ -264,7 +268,8 @@
                                           (style-value node :margin-top 0)
                                           (style-value node :margin-bottom 0)))))
          (eff-w (cond ((numberp requested-w) (min requested-w available-outer-w))
-                      ((or (eq requested-w :auto) (eq requested-w :fill) (null requested-w)) available-outer-w)
+                      ((or (eq requested-w :auto) (eq requested-w :fill) (null requested-w))
+                       available-outer-w)
                       ((stringp requested-w)
                        (if (and (alexandria:ends-with-subseq "%" requested-w) (> (length requested-w) 1))
                            (let* ((percentage-val (parse-integer (subseq requested-w 0 (1- (length requested-w)))))
@@ -377,9 +382,12 @@
                                              flex-container))))
                ;; Recurse for every UI child with its absolute rectangle
                (setf laid-out-children
-                     (loop for child in (ui-node-children node)
-                           for rect  in item-rects
-                           collect (layout-node child rect node-styles)))
+                     (loop for i below (length (ui-node-children node))
+                           ;; child in (ui-node-children node)
+                           ;; for rect  in item-rects
+                           collect (let ((child (nth i (ui-node-children node)))
+                                         (rect  (nth i item-rects)))
+                                     (layout-node child rect node-styles))))
 
                (setf final-node-rect (getf (ui-node-props node) :layout-rect))))
             ;; (:flex
@@ -442,45 +450,54 @@
                                               (getf (ui-node-props child) :layout-rect)
                                               node-styles))))
             (:block
-                (log-info "LAYOUT: ~A (~A) dispatching to BLOCK layout in ~S" (ui-node-type node) node-id self-content-rect)
-              (let ((current-child-y-offset 0)
-                    (max-child-width 0)
-                    (previous-child-margin-bottom 0)) ; For margin collapsing (simplified)
-                (setf laid-out-children
-                      (loop for child-node in (ui-node-children node)
-                            collect (let* ((child-margin-top (style-value child-node :margin-top 0))
-                                           (child-margin-bottom (style-value child-node :margin-bottom 0))
-                                           ;; Simplified margin collapsing: take max of prev bottom and current top
-                                           (effective-margin-top (max previous-child-margin-bottom child-margin-top))
-                                           (child-available-parent-rect
-                                             (make-rectangle
-                                              :pos (make-pos :x (x self-content-rect) ; Child x is relative to parent content-box x
-                                                             :y (+ (y self-content-rect) current-child-y-offset effective-margin-top))
-                                              :size (make-size :w (w self-content-rect)
-                                                               :h (max 0 (- (h self-content-rect) current-child-y-offset effective-margin-top)))))
-                                           (laid-out-child (layout-node child-node child-available-parent-rect node-styles)))
-                                      ;; Y offset for next child is current offset + this child's margin-top + this child's height + this child's border-box
-                                      ;; However, layout-node already placed the child considering its own margins relative to child-available-parent-rect.
-                                      ;; So, the height of its layout-rect IS its border-box height.
-                                      ;; The current-child-y-offset should advance by the space taken by the child, including its top margin (already handled by effective-margin-top)
-                                      ;; and its entire height (border-box).
-                                      (incf current-child-y-offset (+ effective-margin-top (h (getf (ui-node-props laid-out-child) :layout-rect))))
-                                      (setf max-child-width (max max-child-width (w (getf (ui-node-props laid-out-child) :layout-rect))))
-                                      (setf previous-child-margin-bottom child-margin-bottom) ; Store for next iteration
-                                      laid-out-child)))
-                ;; If container height is auto, adjust it based on children
-                (when (eq requested-h :auto)
-                  (let* ((total-padding-border-h (- (h node-layout-rect) (h self-content-rect)))
-                         ;; Add the last child's bottom margin if it wasn't collapsed with a subsequent non-existent child
-                         (final-content-height (+ current-child-y-offset previous-child-margin-bottom)))
-                    (setf (h final-node-rect) (+ final-content-height total-padding-border-h))))
-                ;; If container width is auto, adjust it based on children's max width + padding/border
-                (when (eq requested-w :auto)
-                  (let* ((total-padding-border-w (- (w node-layout-rect) (w self-content-rect))))
-                    ;; max-child-width is the border-box width of the widest child.
-                    ;; The container's content width needs to accommodate this.
-                    (setf (w final-node-rect) (+ max-child-width total-padding-border-w))))
-                (setf (getf (ui-node-props node) :layout-rect) final-node-rect)))
+
+                (let ((current-child-y-offset 0)
+                      (max-child-width 0)
+                      (previous-child-margin-bottom 0)) ; For margin collapsing (simplified)
+                  (log-info "LAYOUT: ~A (~A) dispatching to BLOCK layout in ~S children: ~A" (ui-node-type node) node-id self-content-rect (ui-node-children node))
+                  (setf laid-out-children
+                        (loop for child-node in (if  (keywordp (car (ui-node-children node)))
+                                                     (list (ui-node-children node))
+                                                     (ui-node-children node))
+                              collect (let* ((child-margin-top (style-value child-node :margin-top 0))
+                                             (child-margin-bottom (style-value child-node :margin-bottom 0))
+                                             ;; Simplified margin collapsing: take max of prev bottom and current top
+                                             (effective-margin-top (max previous-child-margin-bottom child-margin-top))
+                                             (child-available-parent-rect
+                                               (make-rectangle
+                                                :pos (make-pos :x (x self-content-rect) ; Child x is relative to parent content-box x
+                                                               :y (+ (y self-content-rect) current-child-y-offset effective-margin-top))
+                                                :size (make-size :w (w self-content-rect)
+                                                                 :h (max 0 (- (h self-content-rect) current-child-y-offset effective-margin-top)))))
+                                             (laid-out-child (layout-node child-node child-available-parent-rect node-styles)))
+                                        ;; Y offset for next child is current offset + this child's margin-top + this child's height + this child's border-box
+                                        ;; However, layout-node already placed the child considering its own margins relative to child-available-parent-rect.
+                                        ;; So, the height of its layout-rect IS its border-box height.
+                                        ;; The current-child-y-offset should advance by the space taken by the child, including its top margin (already handled by effective-margin-top)
+                                        ;; and its entire height (border-box).
+                                        (incf current-child-y-offset
+                                              (+ effective-margin-top
+                                                 (h (getf
+                                                     (ui-node-props laid-out-child)
+                                                     :layout-rect))))
+                                        (setf max-child-width
+                                              (max max-child-width
+                                                   (w (getf (ui-node-props laid-out-child) :layout-rect))))
+                                        (setf previous-child-margin-bottom child-margin-bottom) ; Store for next iteration
+                                        laid-out-child)))
+                  ;; If container height is auto, adjust it based on children
+                  (when (eq requested-h :auto)
+                    (let* ((total-padding-border-h (- (h node-layout-rect) (h self-content-rect)))
+                           ;; Add the last child's bottom margin if it wasn't collapsed with a subsequent non-existent child
+                           (final-content-height (+ current-child-y-offset previous-child-margin-bottom)))
+                      (setf (h final-node-rect) (+ final-content-height total-padding-border-h))))
+                  ;; If container width is auto, adjust it based on children's max width + padding/border
+                  (when (eq requested-w :auto)
+                    (let* ((total-padding-border-w (- (w node-layout-rect) (w self-content-rect))))
+                      ;; max-child-width is the border-box width of the widest child.
+                      ;; The container's content width needs to accommodate this.
+                      (setf (w final-node-rect) (+ max-child-width total-padding-border-w))))
+                  (setf (getf (ui-node-props node) :layout-rect) final-node-rect)))
             (:inline
              (log-warn "LAYOUT: Inline layout not yet implemented for ~A (~S). Treating as block for children." (ui-node-type node) node-id)
              ;; Fallback to block-like layout for children for now
@@ -491,7 +508,8 @@
              (log-warn "LAYOUT: ~A (~A) unknown display type ~S, treating as :block for children" (ui-node-type node) node-id display)
              (setf laid-out-children
                    (loop for child-node in (ui-node-children node)
-                         collect (layout-node child-node self-content-rect node-styles)))))
+                         collect (layout-node child-node
+                                              self-content-rect node-styles)))))
 
           (log-info "LAYOUT: ~A (~A) final layout-rect after children: ~S"
                     (ui-node-type node) node-id final-node-rect)
