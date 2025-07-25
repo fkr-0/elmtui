@@ -53,7 +53,7 @@
 (declaim (type (or null function) *stop-input-fn*))
 (declaim (type boolean *driver-initiated-shutdown-p*))
 (declaim (type (or null elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer) *previous-frame-buffer*))
-(declaim (type list *current-app-model*)) ; Plist-based state
+(declaim (type t *current-app-model*)) ; Holds the application state object
 (declaim (type list *root-viewport-id-path*)) ; e.g., '(:components :my-root-vp)
 
 ;; In src/platform/driver.lisp
@@ -140,7 +140,8 @@ Args:
     (log:info "DRIVER: Initializing application model for ~A... Root Viewport ID: ~A"
               (getf app-spec :name) root-viewport-id)
     (multiple-value-bind (initial-model initial-cmds) (funcall init-fn)
-      (declare (type list initial-model initial-cmds))
+      (declare (type t initial-model)
+               (type list initial-cmds))
       (setf *current-app-model* initial-model)
       (values initial-model initial-cmds))))
 
@@ -268,7 +269,8 @@ Args:
           (t ; Process regular app message
            (multiple-value-bind (next-model commands)
                (funcall update-fn *current-app-model* msg)
-             (declare (type list next-model commands))
+             (declare (type t next-model)
+                      (type list commands))
              (log:debug "DRIVER: After update-fn, next-model :should-quit = ~A" (elmtui.state:get-path '(:should-quit)  next-model))
              (setf *current-app-model* next-model)
              (when cmd-proc-fn

@@ -21,7 +21,8 @@
   (:import-from :elmtui.view.layout.flex #:compute-flex-layout)
 
   (:export :layout-tree :layout-node #:dispatch-layout #:layout-grid-container-impl
-           #:box-model #:content-box #:padding-box #:border-box))
+           #:box-model #:content-box #:padding-box #:border-box
+           #:dump-rect-tree))
 
 (in-package :elmtui.view.layout)
 
@@ -365,24 +366,67 @@
 
           (case display
             (:flex
-             (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S" (ui-node-type node) node-id self-content-rect)
-             ;; compute-flex-layout is expected to:
-             ;; 1. Calculate the layout for children within self-content-rect.
-             ;; 2. Set :layout-rect on each child.
-             ;; 3. Return the final rectangle for the flex container itself (node-layout-rect might be updated).
-             (setf final-node-rect (compute-flex-layout
-                                    node
-                                    self-content-rect
-                                    parent-style-set
-                                    ))
-             (setf (getf (ui-node-props node) :layout-rect) final-node-rect)
-             ;; Children of the flex container now have their :layout-rects set by compute-flex-layout.
-             ;; We must recurse into them to lay out *their* children.
-             (setf laid-out-children
-                   (loop for child in (ui-node-children node)
-                         collect (layout-node child
-                                              (getf (ui-node-props child) :layout-rect) ; Child's border-box is parent_abs_content_rect for its children
-                                              node-styles))))
+             (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S"
+                       (ui-node-type node) node-id self-content-rect)
+
+             ;; Run flex layout: returns the flex‑container object
+             (let* ((flex-container (elmtui.view.layout.flex:compute-flex-layout
+                                     node self-content-rect parent-style-set))
+                    (item-rects     (mapcar #'elmtui.view.layout.flex::rectangle
+                                            (elmtui.view.layout.flex:flex-item-children
+                                             flex-container))))
+               ;; Recurse for every UI child with its absolute rectangle
+               (setf laid-out-children
+                     (loop for child in (ui-node-children node)
+                           for rect  in item-rects
+                           collect (layout-node child rect node-styles)))
+
+               (setf final-node-rect (getf (ui-node-props node) :layout-rect))))
+            ;; (:flex
+            ;;  (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S"
+            ;;            (ui-node-type node) node-id self-content-rect)
+
+            ;;  ;; 1. Run flex layout – returns the *container* object, not a rectangle
+            ;;  (let* ((flex-container (elmtui.view.layout.flex:compute-flex-layout
+            ;;                          node self-content-rect parent-style-set))
+            ;;         ;; We need the list of flex‑items to fetch the child rectangles.
+            ;;         (item-rects (mapcar #'elmtui.view.layout.flex::rectangle
+            ;;                             (elmtui.view.layout.flex:flex-item-children flex-container))))
+
+            ;;    ;; 2. Recurse into the UI‑children, handing each its OWN absolute rect
+            ;;    (setf laid-out-children
+            ;;          (loop for child   in (ui-node-children node)
+            ;;                for rect    in item-rects
+            ;;                collect (layout-node child rect node-styles)))
+
+            ;;    ;; 3. The container’s own :layout-rect has already been set by flex.
+            ;;    (setf final-node-rect (getf (ui-node-props node) :layout-rect))))
+            ;; (:flex
+            ;;  (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S" (ui-node-type node) node-id self-content-rect)
+            ;;  ;; compute-flex-layout is expected to:
+            ;;  ;; 1. Calculate the layout for children within self-content-rect.
+            ;;  ;; 2. Set :layout-rect on each child.
+            ;;  ;; 3. Return the final rectangle for the flex container itself (node-layout-rect might be updated).
+            ;;  (setf final-node-rect (elmtui.view.layout.flex:compute-flex-layout
+            ;;                         node
+            ;;                         self-content-rect
+            ;;                         parent-style-set
+            ;;                         ))
+            ;;  (setf (getf (ui-node-props node) :layout-rect) final-node-rect)
+            ;;  ;; Children of the flex container now have their :layout-rects set by compute-flex-layout.
+            ;;  ;; We must recurse into them to lay out *their* children.
+            ;;  (setf laid-out-children
+            ;;        (loop for i below (length (ui-node-children node))
+            ;;              ;; child in (ui-node-children node)
+            ;;              ;; for child-flex = (et.flex:flex-item-children final-node-rect)
+            ;;              collect (let
+            ;;                          ((child (nth i (ui-node-children node)))
+            ;;                           (rect (nth i (elmtui.view.layout.flex:flex-item-children final-node-rect))))
+            ;;                        (layout-node child
+            ;;                                     ;; (getf (ui-node-props child) :layout-rect)
+            ;;                             ; Child's border-box is parent_abs_content_rect for its children
+            ;;                                     rect
+            ;;                                     node-styles)))))
             (:grid
              (log-info "LAYOUT: ~A (~A) dispatching to GRID layout in ~S" (ui-node-type node) node-id self-content-rect)
              ;; layout-grid-container-impl is expected to:
@@ -530,3 +574,12 @@
 ;;   (declare (ignore nodes rows cols container-rect gap))
 ;;   (log-warn "layout-grid is deprecated. Use display:grid style.")
 ;;   nil)
+
+(defun dump-rect-tree (node &optional (depth 0))
+  "Print the layout tree with absolute rectangles for quick inspection."
+  (format t "~&~v@T~A: ~S~%"
+          (* 2 depth)
+          (or (getf (ui-node-props node) :id) (ui-node-type node))
+          (getf (ui-node-props node) :layout-rect))
+  (dolist (child (ui-node-children node))
+    (dump-rect-tree child (1+ depth))))

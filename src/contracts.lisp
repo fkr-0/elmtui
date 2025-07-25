@@ -241,11 +241,13 @@
 (define-condition pipeline-contract-violation (error)
   ((stage         :initarg :stage :reader violation-stage)
    (expected-type :initarg :expected-type :reader violation-expected)
-   (got-object    :initarg :got-object :reader violation-got))
+   (got-object    :initarg :got-object :reader violation-got)
+   (stack-trace :initarg :stack-trace :reader violation-stack-trace :initform nil))
   (:report (lambda (c s)
-             (with-slots (stage expected-type got-object) c
-               (format s "~a expected ~s but got ~s (~s)."
-                       stage expected-type got-object (type-of got-object))))))
+             (with-slots (stage expected-type got-object stack-trace) c
+               (format s "~a expected ~s but got ~s (~s).(~s)"
+                       stage expected-type got-object (type-of got-object)
+                       stack-trace)))))
 
 (define-condition undefined-layout (pipeline-contract-violation) ())
 
@@ -651,12 +653,12 @@
 
        ;; Execute view logic with contract enforcement
        (let ((result (handler-case (progn ,@actual-body)
-                           (error (e)
-                             (error 'view-contract-violation
-                                    :function-name ',name
-                                    :expected-type "successful view generation"
-                                    :actual-value e
-                                    :context (format nil "rendering model ~S" ,model-param))))))
+                       (error (e)
+                         (error 'view-contract-violation
+                                :function-name ',name
+                                :expected-type "successful view generation"
+                                :actual-value e
+                                :context (format nil "rendering model ~S" ,model-param))))))
 
          ;; Output validation: ensure result is a valid DSL tree
          (validate-dsl result ',name ,model-param)
@@ -998,10 +1000,15 @@
                               name in-type))
          (handler-bind
              ((error (lambda (e)
+                       ;; (error e)
                        (error 'pipeline-contract-violation
                               :stage ',name
                               :expected-type ',in-type
-                              :got-object e))))
+                              :got-object e
+                              :stack-trace (with-output-to-string
+                                               (dud)
+                                             (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud))))))
+
            (let ((,result-sym (progn ,@body)))
              ;; --- post-condition -------------------------------------------
              (unless (typep ,result-sym ',out-type)
@@ -1009,7 +1016,10 @@
                    (error 'pipeline-contract-violation
                           :stage ',name
                           :expected-type ',out-type
-                          :got-object ,result-sym)
+                          :got-object ,result-sym
+                          :stack-trace (with-output-to-string
+                                           (dud)
+                                         (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud)))
                  (coerce-result (new)
                    :report "Provide replacement value and continue."
                    :interactive (lambda ()

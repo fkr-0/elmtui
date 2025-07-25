@@ -86,7 +86,7 @@
   :initial-state-plist `(:counter 0
                          :text "hello")
   :root-component-dsl '(;; :root-viewport :id :main-column passes
-                        :viewport :id :main-column ;; fails
+                        :root-viewport :id :main-column ;; fails
                         :initial-terminal-dimensions (1 1)
                         :initial-cursor-pos (1 1)
                         :children
@@ -97,13 +97,47 @@
   :root-viewport-id :rv
   :subscriptions-fn test-init-app-subscriptions)
 
+(elmtui.ui.api:initialize-components-from-dsl
+ '(:root-viewport :id :main-column :initial-terminal-dimensions (1 1)
+   :initial-cursor-pos (1 1) :children
+   ((:test-component :id :comp1 :initial-state "comp1 state")
+    (:test-parent-component :id :parent1 :child-initial-state
+     "child state"))))
+;; (elmtui.ui.api:initialize-components-from-dsl
+;;  '(:root-viewport :id :rv :initial-terminal-dimensions (1 1)
+;;    :initial-cursor-pos (1 1) :children
+;;    (:container :id :main-column :initial-terminal-dimensions (1 1)
+;;                :initial-cursor-pos (1 1) :initial-child-spec
+;;     ((:test-component :id :comp1 :initial-state "comp1 state")
+;;      (:test-parent-component :id :parent1 :child-initial-state
+;;       "child state"))
+;;     :children
+;;     ((:test-component :id :comp1 :initial-state "comp1 state")
+;;      (:test-parent-component :id :parent1 :child-initial-state
+;;       "child state")))))
+;; (elmtui.ui.api:initialize-components-from-dsl
+;;  '(:root-viewport :id :rv :initial-terminal-dimensions (1 1)
+;;    :initial-cursor-pos (1 1) :children
+;;    (:container :id :main-column :initial-terminal-dimensions (1 1)
+;;                :initial-cursor-pos (1 1) :initial-child-spec
+;;     ((:test-component :id :comp1 :initial-state "comp1 state")
+;;      (:test-parent-component :id :parent1 :child-initial-state
+;;       "child state"))
+;;     :children
+;;     ((:test-component :id :comp1 :initial-state "comp1 state")
+;;      (:test-parent-component :id :parent1 :child-initial-state
+;;       "child state")))))
 (elmtui.app:defapplication test-init-app-2
   :initial-state-plist `(:counter 0
                          :text "hello")
-  :root-component-dsl '(:root-viewport :id :main-column
-                        ;;:viewport :id :main-column ;; fails
+  :root-component-dsl '(;;:root-viewport :id :main-column
+                        ;; :viewport :id :main-column ;; fails
+                        :container :id :main-column ;; fails
                         :initial-terminal-dimensions (1 1)
                         :initial-cursor-pos (1 1)
+                        :initial-child-spec
+                        ((:test-component :id :comp1 :initial-state "comp1 state")
+                         (:test-parent-component :id :parent1 :child-initial-state "child state"))
                         :children
                         ((:test-component :id :comp1 :initial-state "comp1 state")
                          (:test-parent-component :id :parent1 :child-initial-state "child state")))
@@ -144,8 +178,8 @@
     (declare (ignore commands))
     ;; (print app-state)
     (let ((app-data (elmtui.tea-state.state::application-state-data app-state)))
-
-      (print (elmtui.state.api:pprinc-application-state app-state))
+      ;; app-data))
+      ;; (print (elmtui.state.api:pprinc-application-state app-state))))
       ;; app-state))
       ;; app-state))
       ;; (elmtui.app:get-component-instance '(:main-column :comp1) app-state)))
@@ -170,6 +204,7 @@
           (is (equal (gethash :state child1-map) "child state"))
           (is (typep (elmtui.app:get-component-instance (list child1-id) app-state) 'test-component)))))))
 
+
 (test view-resolution-with-initialized-state
   (multiple-value-bind (app-state commands) (initialize-app-state-test-init-app)
     (declare (ignore commands))
@@ -179,3 +214,34 @@
                     :children
                     ((:test-component :id :comp1 :initial-state "comp1 state")
                      (:test-parent-component :id :parent1 :child-initial-state "child state"))))))))
+
+(elmtui.app:defapplication my-test-app
+  :root-component-dsl '(elmtui.ui.widgets.label:label :id :root-label :text "Hello")
+  :root-viewport-id   :rv)
+(test my-test-app-initialization
+  (is (fboundp 'initialize-app-state-my-test-app))
+  (is (fboundp 'process-message-my-test-app))
+  (is (fboundp 'run-my-test-app)))
+
+;; (test missing-arg
+;;   (signals error
+;;     (macroexpand
+;;      (elmtui.app:defapplication bad-app
+;;        :root-component-dsl
+;;        '(elmtui.ui.widgets.label:label
+;;          :id :root-label :text "Hello")))))
+
+(elmtui.app:defapplication my-state-test-app
+  :root-component-dsl '(:container :id :main)
+  :root-viewport-id :my-root
+  :initial-state-plist '(:foo "bar"))
+(test state-initialization
+
+  (multiple-value-bind (state commands)
+      (initialize-app-state-my-state-test-app)
+    (declare (ignore commands))
+    (is (typep state 'elmtui.tea-state.state:application-state))
+    (is (string= "bar" (elmtui.state:get-path '(:foo) state)))
+    (is (not (null (elmtui.state:get-path '(:components :my-root) state))))
+    (is (eq :container (elmtui.state:get-path '(:components :my-root :main :type) state)))
+    (is (eq :main (elmtui.state:get-path '(:components :my-root :main :id) state)))))
