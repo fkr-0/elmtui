@@ -34,6 +34,7 @@
 ;;;--------------------------------------------------------------
 
 (def-suite contract-tests
+  :in elmtui.tests:elmtui-test
   :description "Comprehensive test suite for Elmtui contract system")
 
 (in-suite contract-tests)

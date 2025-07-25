@@ -14,6 +14,7 @@
   ;; Import styling support
   (:import-from :elmtui.view.styled
                 #:styled-ui-node #:style-value
+                #:ui-node #:styles
                 #:ui-node-props
                 #:ui-node-children)
   (:export
@@ -56,17 +57,74 @@
    #:axis->direction))
 (in-package :elmtui.view.layout.flex)
 
+(defun propagate-offset! (item dx dy)
+  "Shift ITEM’s rectangle by DX/DY **and** do the same for the whole subtree."
+  (dx! (rectangle item) dx)
+  (dy! (rectangle item) dy)
+  (when (typep item 'flex-container)
+    (dolist (child (flex-item-children item))
+      (propagate-offset! child dx dy))))
 ;;; ----------------------------------------------------------------------------
 ;;; HELPERS & UTILITIES
 ;;; ----------------------------------------------------------------------------
 (defun clamp (value min max)
-  "Clamp VALUE between MIN and MAX."
+  "Clamp VALUE between MIN and MAX.
+
+Arguments:
+  VALUE -- The value to clamp (number).
+  MIN   -- The minimum allowed value (number).
+  MAX   -- The maximum allowed value (number).
+
+Returns:
+  (number) -- VALUE, but not less than MIN and not greater than MAX.
+
+Example:
+  (clamp 5 1 10) ; => 5
+  (clamp -2 0 8) ; => 0
+
+Type:
+  (number, number, number) => number
+
+Purity:
+  Pure (no side effects).
+  "
+  ;; Clamp VALUE to the [MIN, MAX] range.
   (max min (min value max)))
 
 ;;; Generic definitions for properties with defaults.
 (defgeneric child-container (object)
-  (:documentation "Return the child flex-container of OBJECT, if any."))
-(defmethod child-container ((object t)) nil)
+  (:documentation
+   "Return the child flex-container of OBJECT, if any.
+
+Arguments:
+  OBJECT -- The object to query (any type).
+
+Returns:
+  (flex-container or nil) -- The child flex-container if present, else NIL.
+
+Type:
+  (t) => flex-container | nil
+
+Purity:
+  Pure (no side effects).
+  "))
+
+(defmethod child-container ((object t))
+  "Default method for child-container. Returns NIL for objects with no child flex-container.
+
+Arguments:
+  OBJECT -- Any object.
+
+Returns:
+  NIL -- Always returns NIL.
+
+Type:
+  (t) => nil
+
+Purity:
+  Pure (no side effects).
+  "
+  nil)
 
 ;;; Style value access
 (defgeneric extract-style-value (object property &optional default)
@@ -214,6 +272,17 @@
     :initform 0
     :accessor margin-left)))
 
+(defmethod elmtui.view.geo:rectangle ((item flex-item))
+  "Return the rectangle representing the flex-item's border-box."
+  (slot-value item 'rectangle))
+
+(defmethod (setf elmtui.view.geo:rectangle) (new-value (item flex-item))
+  "Set the rectangle representing the flex-item's border-box."
+  (setf (slot-value item 'rectangle) new-value))
+
+;; (defmethod elmtui.view.geo:rectangle ((n styled-ui-node))
+;;   "Return the rectangle representing the styled-ui-node's border-box."
+
 ;; Geometric accessors for flex-item, delegating to its rectangle slot
 (defmethod elmtui.view.geo:x ((item flex-item))
   (elmtui.view.geo:x (rectangle item)))
@@ -308,29 +377,37 @@
     :accessor %align-content)))
 
 (defmethod main-axis ((container flex-container))
-  (if (typep container 'styled-ui-node) ; Should not happen, flex-container is not a styled-ui-node
-      (extract-style-value container :flex-direction (%main-axis container))
-      (%main-axis container)))
-
+  "Return the main axis of the flex container, which is determined by its flex-direction."
+  (let ((direction (%main-axis container)))
+    (case direction
+      (:row :row)
+      (:row-reverse :row-reverse)
+      (:column :column)
+      (:column-reverse :column-reverse)
+      (otherwise (error "Unsupported flex direction: ~a" direction)))))
+(defmethod main-axis ((container styled-ui-node))
+  (extract-style-value container :flex-direction (%main-axis container)))
 (defmethod flex-wrap ((container flex-container))
-  (if (typep container 'styled-ui-node)
-      (extract-style-value container :flex-wrap (%flex-wrap container))
-      (%flex-wrap container)))
+  (%flex-wrap container))
+(defmethod flex-wrap ((container styled-ui-node))
+  (extract-style-value container :flex-wrap (%flex-wrap container)))
 
 (defmethod justify-content ((container flex-container))
-  (if (typep container 'styled-ui-node)
-      (extract-style-value container :justify-content (%justify-content container))
-      (%justify-content container)))
+  (%justify-content container))
+(defmethod justify-content ((container styled-ui-node))
+  (extract-style-value container :justify-content (%justify-content container)))
 
 (defmethod align-items ((container flex-container))
-  (if (typep container 'styled-ui-node)
-      (extract-style-value container :align-items (%align-items container))
-      (%align-items container)))
+  (%align-items container))
+
+(defmethod align-items ((container styled-ui-node))
+  (extract-style-value container :align-items (%align-items container)))
 
 (defmethod align-content ((container flex-container))
-  (if (typep container 'styled-ui-node)
-      (extract-style-value container :align-content (%align-content container))
-      (%align-content container)))
+  (%align-content container))
+
+(defmethod align-content ((container styled-ui-node))
+  (extract-style-value container :align-content (%align-content container)))
 
 ;;; ----------------------------------------------------------------------------
 ;;; FLEX LINE CLASS (Internal Helper for Layout)
@@ -743,7 +820,7 @@
           (:center
            (setf item-final-cross-pos (+ line-cross-pos (/ available-space-in-line 2.0))))
           (otherwise (warn "Unsupported align-items/align-self: ~A" effective-align)))
-        
+
         (set-flex-item-cross-position item item-final-cross-pos main-axis)))))
 
 (defun align-cross-axis (lines container available-cross-size main-axis)
@@ -806,370 +883,167 @@
 ;;; ----------------------------------------------------------------------------
 ;;; HIGH-LEVEL LAYOUT FUNCTION
 ;;; ----------------------------------------------------------------------------
-(defun layout-flex-container (container)
-  "Layout the flex CONTAINER and its children. Returns the container."
-  (let* ((main-axis (main-axis container))
-         (available-main-size (derive-available-main-size container))
+;; (defun layout-flex-container (maybe-node-container &optional self-content-rect parent-style-set)
+;;   "Layout the flex CONTAINER and its children. Returns the container."
+
+;;   (let* ((container (if (typep maybe-node-container 'styled-ui-node)
+;;                         (node->flex-item maybe-node-container)
+;;                         maybe-node-container))
+;;          (main-axis (main-axis container))
+;;          (available-main-size (derive-available-main-size container))
+;;          (available-cross-size (derive-available-cross-size container))
+;;          (items (flex-item-children container)))
+
+;;     (unless (and (rectangle container) (valid-p (rectangle container)))
+;;       (error "Flex container requires a valid rectangle for layout: ~A" container))
+
+;;     (resolve-flexible-lengths items available-main-size main-axis)
+
+;;     (let ((lines (collect-flex-lines container available-main-size main-axis)))
+;;       (dolist (line lines)
+;;         (justify-content-alignment line container available-main-size main-axis))
+;;       (align-cross-axis lines container available-cross-size main-axis)
+;;       (layout-nested-containers container)
+;;       (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
+;;         (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
+;;           (declare (ignore total-lines-cross-size))
+;;           ))
+;;       (let ((offset-x (x container))
+;;             (offset-y (y container)))
+;;         (dolist (item items)
+;;           (dx! (rectangle item) offset-x)
+;;           (dy! (rectangle item) offset-y)))
+;;       container)))
+;;; Patch #1 – shift children BEFORE recursing  ────────────────────────────────
+;; ➊ the algorithm that resolves lengths, lines, justify‑content, align‑items
+(defun layout-flex-container (maybe-node-container
+                              &optional self-content-rect parent-style-set)
+  "Lay out a flex container and all its descendants and return the container
+   (with every item's rectangle in ABSOLUTE coordinates)."
+
+  ;; ────────────────── wrap the old body in a LET* so we can re‑order things
+  (let* ((container (if (typep maybe-node-container 'styled-ui-node)
+                        (node->flex-item maybe-node-container self-content-rect)
+                        maybe-node-container))
+         (main-axis           (main-axis container))
+         (available-main-size  (derive-available-main-size  container))
          (available-cross-size (derive-available-cross-size container))
-         (items (flex-item-children container)))
+         (items               (flex-item-children container)))
 
     (unless (and (rectangle container) (valid-p (rectangle container)))
       (error "Flex container requires a valid rectangle for layout: ~A" container))
 
     (resolve-flexible-lengths items available-main-size main-axis)
-
     (let ((lines (collect-flex-lines container available-main-size main-axis)))
       (dolist (line lines)
         (justify-content-alignment line container available-main-size main-axis))
       (align-cross-axis lines container available-cross-size main-axis)
+
+      ;; ➋ recurse into nested flex containers **before** we add any offset
       (layout-nested-containers container)
-      (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
-        (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
-          (declare (ignore total-lines-cross-size))
-          ))
-      (let ((offset-x (x container))
-            (offset-y (y container)))
-        (dolist (item items)
-          (dx! (rectangle item) offset-x)
-          (dy! (rectangle item) offset-y)))
+
+      ;; ➌ now shift the *entire* subtree exactly once
+      (propagate-offset! container (x container) (y container))
+      ;; 1. Resolve flexible lengths & collect lines (unchanged)
+      ;; (resolve-flexible-lengths items available-main-size main-axis)
+      ;; (let ((lines (collect-flex-lines container available-main-size main-axis)))
+      ;;   (dolist (line lines)
+      ;;     (justify-content-alignment line container available-main-size main-axis))
+      ;;   (align-cross-axis lines container available-cross-size main-axis)
+
+      ;;   ;; 2. *** NEW ORDER: apply the container’s offset to EVERY direct child
+      ;;   ;;    BEFORE we recurse so grandchildren inherit it naturally. ***
+      ;;   (let ((dx (x container))
+      ;;         (dy (y container)))
+      ;;     (dolist (item items)
+      ;;       (dx! (rectangle item) dx)
+      ;;       (dy! (rectangle item) dy)))
+
+      ;;   ;; 3. Now descend into nested flex containers (they now start at abs coords)
+      ;;   (layout-nested-containers container)
+
+      ;;   ;; 4. (Optional bookkeeping for wrap height – unchanged)
+      ;;   (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
+      ;;     (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
+      ;;       (declare (ignore total-lines-cross-size))))
+
       container)))
 
-(uiop:define-package :elmtui.view.layout.flex-layout
-  (:use :cl)
-  (:nicknames :et.flex-layout)
-  ;; Import from the refactored geo package
-  (:import-from :elmtui.view.geo
-                #:rectangle #:pos #:size #:h #:w #:x #:y #:make-rectangle #:make-pos #:make-size
-                #:pos-x #:pos-y #:size-w #:size-h #:rectangle-pos #:rectangle-size
-                #:dx! #:dy! #:valid-p)
-  ;; Import styling support
-  (:import-from :elmtui.view.styled
-                #:styled-ui-node #:style-value
-                #:ui-node #:styles
-                #:ui-node-props
-                #:ui-node-children)
-  (:import-from :elmtui.view.layout.flex
-                #:main-axis
-                #:flex-container
-                #:compute-flex-layout
-                #:flex-item
-                #:layout-flex-container
-                #:flex-item-children
-                #:flex-direction
-                #:min-width
-                #:max-width
-                #:min-height
-                #:max-height
-                #:order
-                #:child-container
-                #:clamp
-                #:flex-grow
-                #:flex-shrink
-                #:flex-basis
-                #:align-self
-                #:align-items
-                #:align-content
-                #:flex-wrap
-                #:justify-content
-                #:flex-line
-                #:items
-                #:main-size  ; Represents border-box size for flex-item, margin-box sum for flex-line
-                #:cross-size ; Represents border-box size for flex-item, max margin-box for flex-line
-                #:collect-flex-lines
-                #:get-flex-item-margin-box-main-size
-                #:get-flex-item-margin-box-cross-size
-                #:get-flex-item-border-box-main-size
-                #:get-flex-item-border-box-cross-size
-                #:set-flex-item-main-position
-                #:set-flex-item-cross-position
-                #:set-flex-item-main-size    ; Sets border-box size
-                #:set-flex-item-cross-size   ; Sets border-box size
-                #:derive-available-main-size
-                #:axis->direction))
+;;; Patch #1b – keep the old public name alive for callers
+(defun compute-flex-layout (container &rest args)
+  "Compatibility shim – just forwards to LAYOUT-FLEX-CONTAINER."
+  (apply #'layout-flex-container container args))
+(defun node->flex-item (node &optional (rect nil))
+  "Convert a styled-ui-node to a flex-item or flex-container instance."
+  (let* ((is-flex-container (eq (style-value node :display) :flex))
+         (final-rect (or rect
+                         (getf (ui-node-props node) :layout-rect)
+                         (make-rectangle
+                          :pos (make-pos :x 0 :y 0) :size (make-size :w 0 :h 0))))
+         (common-args (list :rectangle final-rect
+                            :flex-basis (style-value node :flex-basis nil)
+                            :min-width (style-value node :min-width 0)
+                            :max-width (style-value node :max-width most-positive-fixnum)
+                            :min-height (style-value node :min-height 0)
+                            :max-height (style-value node :max-height most-positive-fixnum)
+                            :order (style-value node :order 0)
+                            :flex-grow (style-value node :flex-grow 0)
+                            :flex-shrink (style-value node :flex-shrink 1)
+                            :align-self (style-value node :align-self nil)))
+         (container-args (when is-flex-container
+                           (list :main-axis (style-value node :flex-direction :row)
+                                 :flex-wrap (style-value node :flex-wrap :nowrap)
+                                 :justify-content (style-value node :justify-content :flex-start)
+                                 :align-items (style-value node :align-items :stretch)
+                                 :align-content (style-value node :align-content :stretch)
+                                 :children
+                                 (mapcar #'node->flex-item
+                                         (ui-node-children node))))))
+    (apply #'make-instance (if is-flex-container 'flex-container 'flex-item)
+           (append common-args container-args))))
 
-(in-package :elmtui.view.layout.flex-layout)
-(defun compute-flex-layout (flex-container-node parent-absolute-content-rect parent-style-set)
-  "Computes the layout for a flex container and its children using a simplified Flexbox model.
-   Handles a single flex line (no wrapping).
-   Supports flex-direction, justify-content, align-items, align-self,
-   flex-grow, flex-shrink, flex-basis, and min/max sizes.
+;; (defun compute-flex-layout (container-node &optional self-content-rect parent-style-set)
+;;   "Layout the flex CONTAINER-NODE and its children. Returns the container.
 
-   A flex-container-node is a styled-ui-node that represents a flex container. It is assumed to provide
-   methods to set/access:
-    - `flex-direction`: The main axis direction (row/column).
-    - `flex-wrap`: Whether items should wrap (nowrap/wrap/wrap-reverse)
-    - `justify-content`: How to distribute items along the main axis.
-    - `align-items`: How to align items along the cross axis.
-    - `align-content`: How to distribute space between/around lines (not used in single line).
-    - `flex-grow`, `flex-shrink`, `flex-basis`: Flex properties for items.
-    - `min-width`, `max-width`, `min-height`, `max-height`: Size constraints for items.
-    The function returns the flex container node after layout is applied.
+;;    SELF-CONTENT-RECT is the rectangle for self-content, if provided.
+;;    PARENT-STYLE-SET is ignored in this context.
+;;    This function assumes the container-node is a flex container with children that may also be flex containers.
 
+;;    It computes the layout based on flexbox rules, including resolving flexible lengths,
+;;    collecting flex lines, justifying content, and aligning items in the cross axis.
 
-   LIMITATIONS & TODOs:
-   - Flex Wrapping (`flex-wrap`): Currently only processes items as a single flex line.
-     TODO: Implement line breaking logic. This involves:
-       - Iteratively adding items to a line until available main space is exceeded.
-       - If `flex-wrap` is `wrap` or `wrap-reverse`, start a new line.
-       - Each line will then independently undergo main axis distribution and cross axis alignment.
-       - The container's cross size might need to adjust based on the sum of line cross sizes.
-   - `align-content`: This property (for distributing space between/around lines) is not used.
-     TODO: Implement `align-content` after multi-line support is added.
-   - `order` Property: Items are laid out in their source order.
-     TODO: Implement sorting of flex items based on the `order` style property before layout.
-   - `flex-basis` Keywords: Only numeric values and `:auto` are meaningfully handled.
-     TODO: Implement support for `flex-basis: :content`, which requires pre-calculating
-           the content-based size of an item. This might involve a preliminary layout pass
-           for such items or a callback to the item to report its content size.
-     TODO: Consider support for percentage-based `flex-basis` (relative to flex container main size).
-   - Baseline Alignment (`align-items: :baseline`, `align-self: :baseline`):
-     TODO: Implement baseline alignment. This requires items to report their baseline position.
-           For text-based elements, this is the baseline of the first line of text.
-           This can be complex in a TUI context if not all elements have clear text baselines.
-   - Intrinsic Aspect Ratios: Not considered.
-   - Margin/Padding/Border on Flex Items: The current algorithm calculates positions and sizes
-     that are assumed to be for the border-box of the flex items. The `layout-view` function
-     (which calls this) is responsible for calculating the container's content-box (passed as
-     `parent-absolute-content-rect`) and for interpreting the item's own margin, border, and padding
-     to adjust the final `layout-rect` or the space used by the item.
-     This function focuses on distributing the container's content space among items.
-     CONFIRMATION: This is more of a note on responsibility. The main `layout-view` should handle this.
-   - Floating Point Precision: Calculations use floating point numbers. Final rects are rounded.
-     NOTE: This is generally acceptable but be aware of potential minor rounding differences.
-   - Performance for Very Large Number of Items: The current implementation involves multiple loops.
-     NOTE: For typical TUI use cases, this should be acceptable. If performance issues arise with
-           extremely large flex containers, profiling and optimization might be needed.
-  "
+;;    The function modifies the rectangles of flex items in place, setting their positions and sizes.
+;;    For nested flex containers, it recursively calls compute-flex-layout on each child flex container.
+;; "
+;;   (declare (ignore parent-style-set))
+;;   (let* ((container (node->flex-item container-node self-content-rect))
+;;          (main-axis (main-axis container))
+;;          (available-main-size (derive-available-main-size container))
+;;          (available-cross-size (derive-available-cross-size container))
+;;          (items (flex-item-children container)))
 
-  (declare (ignore parent-style-set)) ; Placeholder
+;;     (unless (and (rectangle container) (valid-p (rectangle container)))
+;;       (error "Flex container requires a valid rectangle for layout: ~A" container))
 
-  (log4cl:log-info "FLEX-LAYOUT: Computing layout for ~S in available rect ~S"
-                   (getf (ui-node-props flex-container-node) :id "N/A")
-                   parent-absolute-content-rect)
+;;     (resolve-flexible-lengths items available-main-size main-axis)
 
-  ;; 1. Extract Flex Container Properties & Determine Axes
-  (let* ((container-styles ;; (or (styled-ui-node- flex-container-node)
-           ;;     (elmtui.style-lib.api:make-style-set))
-           flex-container-node
-           )
-         (flex-direction (style-value container-styles :flex-direction :row))
-         (justify-content (style-value container-styles :justify-content :flex-start))
-         (align-items (style-value container-styles :align-items :stretch))
-         ;; Container's explicit size from styles
-         (styled-container-width (style-value container-styles :width))
-         (styled-container-height (style-value container-styles :height))
-
-         ;; Available space for the flex container's content box
-         (container-content-x (x parent-absolute-content-rect))
-         (container-content-y (y parent-absolute-content-rect))
-         (available-width (if (numberp styled-container-width) styled-container-width (w parent-absolute-content-rect)))
-         (available-height (if (numberp styled-container-height) styled-container-height (h parent-absolute-content-rect)))
-
-         (is-row (member flex-direction '(:row :row-reverse)))
-         (is-column (member flex-direction '(:column :column-reverse)))
-         (is-main-axis-reverse (member flex-direction '(:row-reverse :column-reverse)))
-
-         (main-axis-size (if is-row available-width available-height))
-         (cross-axis-size (if is-row available-height available-width))
-
-         (children (ui-node-children flex-container-node))
-         (flex-items-data '()))
-
-    (log:trace "FLEX-LAYOUT: Dir: ~A, Container Avail W: ~A, H: ~A, MainSize: ~A, CrossSize: ~A"
-               flex-direction available-width available-height main-axis-size cross-axis-size)
-
-    ;; 2. Collect Flex Items and their Initial (Hypothetical) Main Sizes
-    (loop for child in children do
-      (when (typep child 'styled-ui-node)
-        (let* ((child-styles (styles child))
-               (child-props (ui-node-props child))
-               (flex-basis (style-value child-styles :flex-basis :auto))
-               (flex-grow (style-value child-styles :flex-grow 0))
-               (flex-shrink (style-value child-styles :flex-shrink 1))
-               (align-self (style-value child-styles :align-self :auto))
-
-               (styled-main-dim (if is-row (style-value child-styles :width) (style-value child-styles :height)))
-               (styled-cross-dim (if is-row (style-value child-styles :height) (style-value child-styles :width)))
-
-               (min-main-dim (if is-row (style-value child-styles :min-width 0) (style-value child-styles :min-height 0)))
-               (max-main-dim (if is-row (style-value child-styles :max-width most-positive-fixnum) (style-value child-styles :max-height most-positive-fixnum)))
-               (min-cross-dim (if is-row (style-value child-styles :min-height 0) (style-value child-styles :min-width 0)))
-               (max-cross-dim (if is-row (style-value child-styles :max-height most-positive-fixnum) (style-value child-styles :max-width most-positive-fixnum)))
-
-               (hypothetical-main-size 0))
-
-          ;; Determine hypothetical main size based on flex-basis, then styled main dimension
-          (cond
-            ((numberp flex-basis) (setf hypothetical-main-size flex-basis))
-            ((eq flex-basis :auto)
-             (if (numberp styled-main-dim)
-                 (setf hypothetical-main-size styled-main-dim)
-                 (setf hypothetical-main-size (if is-row 5 3)))) ; Default if auto and no styled dim
-            ;; TODO: Handle :content, other flex-basis keywords
-            (t (setf hypothetical-main-size (if is-row 5 3)))) ; Default for unhandled basis
-
-          ;; Clamp by min/max
-          (setf hypothetical-main-size (max min-main-dim (min hypothetical-main-size max-main-dim)))
-
-          (push (list :node child :props child-props :styles child-styles
-                      :hypothetical-main-size hypothetical-main-size
-                      :final-main-size hypothetical-main-size ; Initialize final with hypothetical
-                      :flex-grow flex-grow :flex-shrink flex-shrink
-                      :align-self align-self
-                      :styled-cross-dim styled-cross-dim
-                      :min-main min-main-dim :max-main max-main-dim
-                      :min-cross min-cross-dim :max-cross max-cross-dim)
-                flex-items-data))))
-    (setf flex-items-data (nreverse flex-items-data)) ; Preserve original child order
-
-    ;; 3. Resolve Flexible Lengths (Main Axis)
-    (let* ((total-hypothetical-main-size (loop for item in flex-items-data sum (getf item :hypothetical-main-size)))
-           (remaining-space (- main-axis-size total-hypothetical-main-size))
-           (total-flex-grow (loop for item in flex-items-data when (> (getf item :flex-grow 0) 0) sum (getf item :flex-grow)))
-           (total-flex-shrink-weighted (loop for item in flex-items-data when (> (getf item :flex-shrink 0) 0) sum (* (getf item :flex-shrink) (getf item :hypothetical-main-size)))))
-
-      (cond
-        ;; Distribute positive remaining space (Growing)
-        ((and (> remaining-space 0) (> total-flex-grow 0))
-         (loop for item in flex-items-data
-               when (> (getf item :flex-grow 0) 0) do
-                 (let* ((grow-share (/ (getf item :flex-grow) total-flex-grow))
-                        (space-to-add (* remaining-space grow-share))
-                        (new-size (+ (getf item :final-main-size) space-to-add)))
-                   (setf (getf item :final-main-size) (max (getf item :min-main) (min new-size (getf item :max-main)))))))
-        ;; Distribute negative remaining space (Shrinking)
-        ((and (< remaining-space 0) (> total-flex-shrink-weighted 0))
-         (let ((space-to-remove (abs remaining-space)))
-           (loop for item in flex-items-data
-                 when (> (getf item :flex-shrink 0) 0) do
-                   (let* ((shrink-share (/ (* (getf item :flex-shrink) (getf item :hypothetical-main-size)) total-flex-shrink-weighted))
-                          (reduction (* space-to-remove shrink-share))
-                          (new-size (- (getf item :final-main-size) reduction)))
-                     (setf (getf item :final-main-size) (max (getf item :min-main) (min new-size (getf item :max-main)))))))))
-      ;; Re-calculate total final main size after grow/shrink for justify-content
-      (let ((total-final-main-size (loop for item in flex-items-data sum (getf item :final-main-size))))
-        (setf remaining-space (- main-axis-size total-final-main-size))))
-
-
-    ;; 4. Main Axis Alignment (justify-content)
-    (let* ((num-items (length flex-items-data))
-           (total-final-main-size (loop for item in flex-items-data sum (getf item :final-main-size)))
-           (current-remaining-space (- main-axis-size total-final-main-size))
-           (main-offset 0.0))
-
-      (cond
-        ((eq justify-content :flex-end) (setf main-offset current-remaining-space))
-        ((eq justify-content :center) (setf main-offset (/ current-remaining-space 2)))
-        ((eq justify-content :space-between)
-         (when (> num-items 1) (setf main-offset 0))) ; First item at start
-        ((eq justify-content :space-around)
-         (if (> num-items 0) (setf main-offset (/ current-remaining-space (* 2 num-items)))))
-        ((eq justify-content :space-evenly)
-         (if (> num-items 0) (setf main-offset (/ current-remaining-space (+ 1 num-items)))))
-        (t (setf main-offset 0))) ; :flex-start or default
-
-      (when is-main-axis-reverse (setf flex-items-data (reverse flex-items-data)))
-
-      (loop for item in flex-items-data do
-        (setf (getf item :main-pos) main-offset)
-        (incf main-offset (getf item :final-main-size))
-        (cond
-          ((and (eq justify-content :space-between) (> num-items 1))
-           (when (< (position item flex-items-data :test #'eq) (1- num-items)) ; Not the last item
-             (incf main-offset (/ current-remaining-space (1- num-items)))))
-          ((eq justify-content :space-around)
-           (incf main-offset (/ current-remaining-space num-items))) ; Space after item
-          ((eq justify-content :space-evenly)
-           (incf main-offset (/ current-remaining-space (+ 1 num-items))))))) ; Space after item
-
-    ;; 5. Cross Axis Sizing and Alignment
-    (loop for item in flex-items-data do
-      (let* ((item-styles (getf item :styles))
-             (item-align-self (getf item :align-self))
-             (effective-align (if (eq item-align-self :auto) align-items item-align-self))
-             (styled-cross-dim (getf item :styled-cross-dim))
-             (final-cross-size 0)
-             (cross-pos 0))
-
-        ;; Determine final cross size
-        (cond
-          ((and (eq effective-align :stretch) (eq styled-cross-dim :auto)) ; Stretch if auto
-           (setf final-cross-size cross-axis-size))
-          ((numberp styled-cross-dim)
-           (setf final-cross-size styled-cross-dim))
-          (t (setf final-cross-size (if is-row 3 5)))) ; Default cross size
-
-        (setf final-cross-size (max (getf item :min-cross) (min final-cross-size (getf item :max-cross))))
-        (setf (getf item :final-cross-size) final-cross-size)
-
-        ;; Determine cross position
-        (cond
-          ((eq effective-align :flex-end) (setf cross-pos (- cross-axis-size final-cross-size)))
-          ((eq effective-align :center) (setf cross-pos (/ (- cross-axis-size final-cross-size) 2)))
-          ;; :flex-start, :stretch (position at start for stretch)
-          (t (setf cross-pos 0)))
-        (setf (getf item :cross-pos) cross-pos)))
-
-    ;; 6. Set Layout Rects for Children
-    (let ((actual-content-main-end 0)
-          (actual-content-cross-end 0))
-      (loop for item in flex-items-data do
-        (let* ((child-node (getf item :node))
-               (main-pos (getf item :main-pos))
-               (cross-pos (getf item :cross-pos))
-               (final-main (getf item :final-main-size))
-               (final-cross (getf item :final-cross-size))
-               (child-x 0) (child-y 0) (child-w 0) (child-h 0))
-          (log4cl:log-info "FLEX-LAYOUT: Processing child ~S with main-pos: ~A, cross-pos: ~A, final-main: ~A, final-cross: ~A"
-                           (getf (ui-node-props child-node) :id "N/A") main-pos cross-pos final-main final-cross)
-
-          (if is-row
-              (setf child-x (+ container-content-x
-                               (if is-main-axis-reverse
-                                   main-pos
-                                   (- main-axis-size main-pos final-main)))
-                    child-y (+ container-content-y cross-pos)
-                    child-w final-main
-                    child-h final-cross)
-              (setf child-x (+ container-content-x cross-pos)
-                    child-y (+ container-content-y
-                               (if is-main-axis-reverse (- main-axis-size main-pos final-main) main-pos))
-                    child-w final-cross
-                    child-h final-main))
-
-          (let ((child-rect (make-rectangle :pos (make-pos
-                                                  :x (round child-x)
-                                                  :y (round child-y))
-                                            :size (make-size
-                                                   :w (round child-w)
-                                                   :h (round child-h)))))
-            (setf (getf (ui-node-props child-node) :layout-rect) child-rect)
-            (log:debug "FLEX-LAYOUT: Child ~S (main:~A crs:~A) at rect ~S"
-                       (getf (ui-node-props child-node) :id "N/A") final-main final-cross child-rect)
-            (setf actual-content-main-end (max actual-content-main-end (+ main-pos final-main)))
-            (setf actual-content-cross-end (max actual-content-cross-end (+ cross-pos final-cross))))))
-
-      ;; 7. Determine Final Container Rectangle
-      (let ((final-container-w available-width)
-            (final-container-h available-height))
-        (if is-row
-            (progn
-              (when (eq styled-container-width :auto) (setf final-container-w actual-content-main-end))
-              (when (eq styled-container-height :auto) (setf final-container-h actual-content-cross-end)))
-            (progn
-              (when (eq styled-container-width :auto) (setf final-container-w actual-content-cross-end))
-              (when (eq styled-container-height :auto) (setf final-container-h actual-content-main-end))))
-
-        ;; Ensure container respects its own min/max if styled-size was auto
-        (when (eq styled-container-width :auto)
-          (setf final-container-w (max (style-value container-styles :min-width 0)
-                                       (min final-container-w (style-value container-styles :max-width most-positive-fixnum)))))
-        (when (eq styled-container-height :auto)
-          (setf final-container-h (max (style-value container-styles :min-height 0)
-                                       (min final-container-h (style-value container-styles :max-height most-positive-fixnum)))))
-
-        (make-rectangle :pos (make-pos :x container-content-x
-                                       :y container-content-y)
-                        :size (make-size
-                               :w (round final-container-w)
-                               :h (round final-container-h)))))))
+;;     (let ((lines (collect-flex-lines container available-main-size main-axis)))
+;;       (dolist (line lines)
+;;         (justify-content-alignment line container available-main-size main-axis))
+;;       (align-cross-axis lines container available-cross-size main-axis)
+;;       (dolist (item items)
+;;         (when (typep item 'flex-container)
+;;           (compute-flex-layout item nil nil)))
+;;       (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
+;;         (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
+;;           (declare (ignore total-lines-cross-size))
+;;           ))
+;;       (let ((offset-x (x container))
+;;             (offset-y (y container)))
+;;         (dolist (item items)
+;;           (let* ((rect (rectangle item))
+;;                  (s (format nil "~A->" rect)))
+;;             (setf (x rect) (+ (x rect) offset-x))
+;;             (setf (y rect) (+ (y rect) offset-y))
+;;             (log-info "Item ~A positioned: ~A~A" item s (rectangle item)))))
+;;       container)))

@@ -37,21 +37,102 @@
 ;;; ---------------------------------------------------------------------------
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun maybe-wrap-with-root-viewport
-      (dsl
-       &optional (term-size '(1 1)) (cursor-pos '(1 1)))
-    (if (and (consp dsl) (keywordp (first dsl)))
-        (let ((type (first dsl))
-              (props (rest dsl)))
-          (cond ((eq type :root-viewport) dsl)
-                ((eq type :viewport)
-                 `(:root-viewport ,@props))
-                (t
-                 `(:root-viewport :id :root-viewport
-                                  :initial-terminal-dimensions ,term-size
-                                  :initial-cursor-pos ,cursor-pos
-                                  :initial-child-spec ,dsl))))
-        dsl))
+  (defun maybe-wrap-with-root-viewport (dsl
+                                        &key (root-id :root-viewport)
+                                          (term-size  '(1 1))
+                                          (cursor-pos '(1 1)))
+    "Return DSL guaranteed to contain a :ROOT-VIEWPORT node even if DSL
+   arrives quoted (i.e. (QUOTE …) or '…).
+
+DSL cases handled:
+
+  ┌───────────────────────────┬────────────────────────────┐
+  │ Input (car DSL)           │ Result                     │
+  ├───────────────────────────┼────────────────────────────┤
+  │ :ROOT-VIEWPORT            │ DSL (unchanged)            │
+  │ :VIEWPORT                 │ tag promoted to root       │
+  │ any other keyword         │ wrapped in root viewport   │
+  │ QUOTE                     │ quote preserved, inner DSL │
+  │                           │ processed as above         │
+  │ not a keyword list        │ DSL (unchanged)            │
+  └───────────────────────────┴────────────────────────────┘"
+    ;; Local helper that builds a fresh :root-viewport node
+    (labels ((%wrap (inner)
+               `(:root-viewport
+                 :id ,root-id
+                 :initial-terminal-dimensions ,term-size
+                 :initial-cursor-pos          ,cursor-pos
+                 :children                    ,inner)))
+      (cond
+        ;; ───────────────────────────────────────────────────────────────
+        ;; ❶  Quoted input – unwrap, process, then re‑quote
+        ;; ───────────────────────────────────────────────────────────────
+        ((and (consp dsl) (eq (first dsl) 'quote))
+         (let* ((inner   (second dsl))
+                (rewrote (maybe-wrap-with-root-viewport inner
+                                                        :root-id root-id
+                                                        :term-size term-size
+                                                        :cursor-pos cursor-pos)))
+           `(quote ,rewrote)))
+
+        ;; ───────────────────────────────────────────────────────────────
+        ;; ❷  Non‑component data – leave untouched
+        ;; ───────────────────────────────────────────────────────────────
+        ((not (and (consp dsl) (keywordp (first dsl))))
+         dsl)
+
+        ;; ───────────────────────────────────────────────────────────────
+        ;; ❸  Already a root viewport
+        ;; ───────────────────────────────────────────────────────────────
+        ((eq (first dsl) :root-viewport)
+         dsl)
+
+        ;; ───────────────────────────────────────────────────────────────
+        ;; ❹  Plain viewport – promote to root
+        ;; ───────────────────────────────────────────────────────────────
+        ((eq (first dsl) :viewport)
+         (cons :root-viewport (rest dsl)))
+
+        ;; ───────────────────────────────────────────────────────────────
+        ;; ❺  Any other component – wrap
+        ;; ───────────────────────────────────────────────────────────────
+        (t (%wrap dsl)))))
+  ;; (defun maybe-wrap-with-root-viewport (dsl &key (root-id :root-viewport)
+  ;;                                             (term-size '(1 1))
+  ;;                                             (cursor-pos '(1 1)))
+  ;;   (log-info "maybe-wrap-with-root-viewport called with term-size: ~A, cursor-pos: ~A if? ~A 2 ~A 3 ~A 4 ~A"
+  ;;             dsl root-id
+  ;;             (consp dsl)
+  ;;             `(first ,dsl)
+  ;;             (keywordp `(first ,dsl))
+  ;;             (and (consp dsl) (keywordp (first dsl))))
+  ;;   (let ((w `(list :root-viewport :id ,root-id
+  ;;                                  :initial-terminal-dimensions ,'term-size
+  ;;                                  :initial-cursor-pos ,'cursor-pos
+  ;;                                  :children ,dsl))
+  ;;         (type `(first ,dsl))
+  ;;         (props `(rest ,dsl)))
+  ;;     (log-info "Type ~A Props ~A"
+  ;;               type props)
+  ;;     (if (and (consp dsl) (keywordp (first dsl)))
+
+  ;;         (cond ((eq type :root-viewport) dsl)
+  ;;               ((eq type :viewport)
+  ;;                `(:root-viewport ,@props))
+  ;;               (t
+  ;;                w
+  ;;                ;; `(list :root-viewport :id ,root-id
+  ;;                ;;                       :initial-terminal-dimensions ,,'term-size
+  ;;                ;;                       :initial-cursor-pos ,,'cursor-pos
+  ;;                ;;                       :children ,dsl)
+  ;;                ))
+  ;;         dsl)))
+  ;;dsl
+  ;; `(list :root-viewport :id ,root-id
+  ;;                       :initial-terminal-dimensions ',term-size
+  ;;                       :initial-cursor-pos ',cursor-pos
+  ;;                       :children ,dsl)))
+  ;; dsl))
   ;; Coerce X → keyword, return NIL on NIL.
   (defun %kw (x)
     (etypecase x
@@ -139,8 +220,11 @@
                  :subscriptions-fn :root-viewport-id :platform-options)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
-             (root-dsl   (%required kw-plist :root-component-dsl name)) ; Should be the DSL form itself
+                                        ; Should be the DSL form itself
              (root-vp-id (%kw (%required kw-plist :root-viewport-id name)))
+             (root-dsl   `,(maybe-wrap-with-root-viewport
+                            (%required kw-plist :root-component-dsl name)
+                            :root-id root-vp-id))
              ;; Optional
              (initial-state-plist (getf kw-plist :initial-state-plist '()))
              (initial-state-fn (getf kw-plist :initial-state-fn nil))
@@ -203,7 +287,12 @@
              (declare (ignorable initial-terminal-dimensions initial-cursor-position))
              (let* ((app-state (elmtui.tea-state.api:make-state (alexandria:plist-hash-table ,initial-state-plist))))
                (multiple-value-bind (patches commands)
-                   (initialize-components-from-dsl (maybe-wrap-with-root-viewport ,root-dsl ))
+                   (initialize-components-from-dsl
+                    ;; (maybe-wrap-with-root-viewport
+                    ,root-dsl)
+                 ;; :root-id ,root-vp-id
+                 ;; :term-size initial-terminal-dimensions
+                 ;; :cursor-pos initial-cursor-position))
                  (format t "~A ~A~%" app-state patches)
                  (elmtui.tea-state.api:apply-patches app-state patches)
                  (values app-state commands))))
@@ -303,6 +392,9 @@
                       (format t "Subs called~%")
                       nil)
   :root-viewport-id :rv-myid)
+;; (initialize-app-state-my-test-app
+;;   :initial-terminal-dimensions (list 80 24)
+;;   :initial-cursor-position (list 0 0))
 
 (defvar *application-modules* (make-hash-table :test 'eq)
   "A registry for application modules defined with defmodule.")
@@ -429,10 +521,8 @@
 ;;   (defpackage #:elmtui.test.defapplication
 ;;     (:use #:cl #:fiveam #:elmtui.app))
 ;;   (in-package #:elmtui.test.defapplication)
-
 ;;   (def-suite sanity)
 ;;   (in-suite sanity)
-
 ;;   (test expansion
 ;;     (eval '(defapplication my-test-app
 ;;             :root-component-dsl *dummy-root-dsl*
@@ -440,15 +530,21 @@
 ;;     (is (fboundp 'initialize-app-state-my-test-app))
 ;;     (is (fboundp 'process-message-my-test-app))
 ;;     (is (fboundp 'run-my-test-app)))
-
 ;;   (test missing-arg
 ;;     (is-error (macroexpand
 ;;                '(defapplication bad-app
 ;;                  :root-component-dsl *dummy-root-dsl*))))
-
+;;   (test state-initialization
+;;     (eval '(defapplication my-state-test-app
+;;              :root-component-dsl `(:container :id :main)
+;;              :root-viewport-id :my-root
+;;              :initial-state-plist '(:foo "bar")))
+;;     (multiple-value-bind (state commands)
+;;         (initialize-app-state-my-state-test-app)
+;;       (declare (ignore commands))
+;;       (is (typep state 'elmtui.tea-state.state:application-state))
+;;       (is (string= "bar" (elmtui.state:get-path '(:foo) state)))
+;;       (is (not (null (elmtui.state:get-path '(:components :my-root) state))))
+;;       (is (eq :container (elmtui.state:get-path '(:components :my-root :main :type) state)))
+;;       (is (eq :main (elmtui.state:get-path '(:components :my-root :main :id) state)))))
 ;;   (defun run-tests () (run! 'sanity)))
-;; (multiple-value-bind (app-state commands)
-;;                     (initialize-app-state-my-test-app
-;;                      :initial-terminal-dimensions '(80 24)
-;;                      :initial-cursor-position '(0 0))
-;;                     app-state)

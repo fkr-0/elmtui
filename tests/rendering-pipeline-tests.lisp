@@ -73,11 +73,11 @@
     (is (typep (ctx-back-buffer final-context) 'elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer)
         "The back-buffer should be a virtual-terminal-buffer.")))
 
-(let ((styled-context
-        (styled->atomic-stage (raw->styled-stage (dsl->raw-stage (generate-dsl (setup-test-context )))))))
-  (atomic->layout-stage
-   styled-context)
-  )
+;; (let ((styled-context
+;;         (styled->atomic-stage (raw->styled-stage (dsl->raw-stage (generate-dsl (setup-test-context )))))))
+;;   (atomic->layout-stage
+;;    styled-context)
+;;   )
 ;; (test styled->atomic-stage-contract
 ;;   "Tests that styled->atomic-stage produces an atomic-tree from a styled-tree."
 ;;   (is (typep (ctx-atomic-tree styled-context) 'atomic-tree)
@@ -90,9 +90,9 @@
     ;; (let ((ctx-after-dsl ( context)))
     (let ((ctx-after-dsl (generate-dsl context)))
       ;; ctx-after-dsl))
-      ;; (is (typep (ctx-dsl-tree ctx-after-dsl) 'dsl-tree) "generate-dsl should add a dsl-tree struct to the context.")
-      ;; (is (eq :container (first (root (ctx-dsl-tree ctx-after-dsl))))
-      ;;     "The root of the DSL should be a :column.")
+      (is (typep (ctx-dsl-tree ctx-after-dsl) 'dsl-tree) "generate-dsl should add a dsl-tree struct to the context.")
+      (is (eq :container (first (root (ctx-dsl-tree ctx-after-dsl))))
+          "The root of the DSL should be a :column.")
       (setf context ctx-after-dsl))
 
     ;; Stage 1: DSL -> Raw
