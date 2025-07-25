@@ -1,8 +1,8 @@
 (uiop:define-package
     :elmtui.ui.widgets.root-viewport
-  (:use :cl
-   :elmtui.ui.api
-        :elmtui.ui.widgets.viewport)
+  (:use :cl #:log4cl
+        :elmtui.ui.api
+   :elmtui.ui.widgets.viewport)
   (:import-from :elmtui.utils :ensure-list)
   (:import-from :elmtui.app.api
                 #:get-component-instance)
@@ -123,72 +123,54 @@ in the external application state as *patches* rather than CLOS slots."))
                                &key id-path
                                  initial-terminal-dimensions
                                  initial-cursor-pos
-                                 initial-child-spec ; This is the DSL for the child content
-                                 dsl) ; The dsl for the root-viewport itself
-  "Return a *patch list* describing the component’s initial state.
-Initial child spec is stored in state for the view method to use."
+                                 initial-child-spec
+                                 dsl)
+  "Return a *patch list* describing the component’s initial state."
   (declare (type list id-path initial-terminal-dimensions initial-cursor-pos)
-           (type (or null list) initial-child-spec dsl) ; child-spec and dsl can be complex forms
-           ) ; dsl for root-viewport itself might not be needed if all info comes from direct args
+           (type (or null list) initial-child-spec dsl))
   (check-type id-path list)
   (check-type initial-terminal-dimensions (cons (integer 0 *) (cons (integer 0 *) null)))
   (check-type initial-cursor-pos (cons (integer 0 *) (cons (integer 0 *) null)))
-  ;; initial-child-spec can be any valid DSL, so not strictly checking its structure here beyond list/null
-  ;; dsl for root-viewport itself also not strictly checked beyond list/null
-  (let* ((anchor (or (getf (getf dsl :props) :anchor) ; Get anchor from the root-viewport's own DSL if provided
-                     :below-cursor))
-         (term-rows (second initial-terminal-dimensions))
+
+  (let* ((anchor (or (getf (getf dsl :props) :anchor) :below-cursor))
          (term-cols (first initial-terminal-dimensions))
-         (cursor-r (second initial-cursor-pos))
+         (term-rows (second initial-terminal-dimensions))
          (cursor-c (first initial-cursor-pos))
+         (cursor-r (second initial-cursor-pos))
+         (size-uninitialized (or (zerop term-cols) (zerop term-rows)))
          (patches nil)
          (commands nil))
 
-    (log4cl:log-debug "Initializing root-viewport with ID ~A, anchor ~A, cursor position ~A"
-                      (first id-path) anchor initial-cursor-pos)
-    ;; Calculate viewport size and offset based on anchor and terminal dimensions
+    (log4cl:log-debug "Initializing root-viewport with ID ~A, anchor ~A, term-size ~Ax~A, cursor ~A"
+                      (car id-path) anchor term-cols term-rows initial-cursor-pos)
+
     (multiple-value-bind (computed-width computed-height computed-offset-y computed-offset-x)
-        (if (member anchor '(:above-cursor :below-cursor))
-            (multiple-value-bind (w h oy) (compute-view-size anchor term-cols term-rows cursor-r)
-              (values w h oy cursor-c)) ; x-offset for these is cursor-c or derived
-            (multiple-value-bind (offset-y offset-x)
-                (compute-anchor-offset anchor term-cols term-rows term-cols term-rows cursor-r cursor-c) ; placeholder vp-w/h
-              (values term-cols term-rows offset-y offset-x))) ; For non-cursor anchors, assume full size for now
+        (if size-uninitialized
+            (values 1 1 0 0) ; Default to 1x1 if terminal size is unknown
+            (if (member anchor '(:above-cursor :below-cursor))
+                (multiple-value-bind (w h oy) (compute-view-size anchor term-cols term-rows cursor-r)
+                  (values w h oy cursor-c))
+                (multiple-value-bind (offset-y offset-x)
+                    (compute-anchor-offset anchor term-cols term-rows term-cols term-rows cursor-r cursor-c)
+                  (values term-cols term-rows offset-y offset-x))))
 
-      (progn
-        (log4cl:log-debug "Computed viewport size: width ~A, height ~A, offset-x ~A, offset-y ~A"
-                          computed-width computed-height computed-offset-x computed-offset-y)
-        ;; (log4cl:log-debug "Setting patches: ~A%"
-        ;;                   (list
-        ;;                    (list (append id-path '(:state :width)) computed-width)
-        ;;                    (list (append id-path '(:state :height)) computed-height)
-        ;;                    (list (append id-path '(:state :offset-x)) computed-offset-x)
-        ;;                    (list (append id-path '(:state :offset-y)) computed-offset-y)
-        ;;                    (list (append id-path '(:state :anchor)) anchor)
-        ;;                    (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
-        ;;                    ;; Store the initial-child-spec (which is a DSL tree) in the state.
-        ;;                    ;; The `view` method of root-viewport will use this.
-        ;;                    (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
-        ;;                    ;; Store the original DSL of the root-viewport itself for completeness
-        ;;                    (list (append id-path '(:state :dsl)) dsl)))
-        (setf patches
-              (list
-               (list (append id-path '(:state :width)) computed-width)
-               (list (append id-path '(:state :height)) computed-height)
-               (list (append id-path '(:state :offset-x)) computed-offset-x)
-               (list (append id-path '(:state :offset-y)) computed-offset-y)
-               (list (append id-path '(:state :anchor)) anchor)
-               (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
-               ;; Store the initial-child-spec (which is a DSL tree) in the state.
-               ;; The `view` method of root-viewport will use this.
-               (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
-               ;; Store the original DSL of the root-viewport itself for completeness
-               (list (append id-path '(:state :dsl)) dsl)))))
+      (log4cl:log-debug "Computed viewport size: width ~A, height ~A, offset-x ~A, offset-y ~A"
+                        computed-width computed-height computed-offset-x computed-offset-y)
+      (setf patches
+            (list
+             (list (append id-path '(:type)) :root-viewport)
+             (list (append id-path '(:state :width)) computed-width)
+             (list (append id-path '(:state :height)) computed-height)
+             (list (append id-path '(:state :offset-x)) computed-offset-x)
+             (list (append id-path '(:state :offset-y)) computed-offset-y)
+             (list (append id-path '(:state :anchor)) anchor)
+             (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
+             (list (append id-path '(:state :terminal-size)) initial-terminal-dimensions)
+             (list (append id-path '(:state :size-uninitialized)) size-uninitialized)
+             (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
+             (list (append id-path '(:state :dsl)) dsl))))
 
-    ;; No direct child component instantiation or init here.
-    ;; The `view` method will use the :child-dsl-spec.
-
-    (values patches commands)))
+    (values component patches commands)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; API – UPDATE
@@ -198,39 +180,42 @@ Initial child spec is stored in state for the view method to use."
                                  state message
                                  &key id-path)
   "Handle :terminal-resized plus delegate all other messages downward."
-  (declare (type list id-path) (type t state message)) ; state and message can be complex
+  (declare (type list id-path) (type t state message))
   (check-type id-path list)
+  (log-info "Called Update of ROOT-VIEWPORT: ~A ~A" state message)
   (flet ((patch (subkey value)
            `(,(append id-path subkey) ,value)))
-    (case (ensure-list message)
-      ;; ── Terminal resize ────────────────────────────────────────────────────
-      ((:terminal-resized)
-       (destructuring-bind (&key new-dimensions) (cdr message)
-         (let* ((term-cols (car new-dimensions))
-                (term-rows (cdr new-dimensions))
-                (anchor    (get-path (append id-path '(:state :anchor)) state ))
-                (cursor-row (get-path (append id-path '(:state :initial-cursor-row)) state ))
-                (cursor-col (get-path (append id-path '(:state :initial-cursor-col)) state ))
-                (new-width  term-cols) ; root-viewport width is usually term-cols
-                (new-height (nth-value 1 (compute-view-size anchor
-                                                            term-cols
-                                                            term-rows
-                                                            cursor-row)))
-                (offsets (multiple-value-list
-                          (compute-anchor-offset anchor new-width new-height
-                                                 term-cols term-rows
-                                                 cursor-row cursor-col))))
-           (list (patch '(:state :width)  new-width)
-                 (patch '(:state :height) new-height)
-                 (patch '(:state :offset-y) (first offsets))
-                 (patch '(:state :offset-x) (second offsets))))))
-      ;; ── Pass-through: send to child, keep accumulated patches ─────────────
-      (t
-       (let ((child (child-instance state id-path)))
-         (when child
-           (elmtui.ui.api:update child state message
-                                 :id-path (append id-path
-                                                  (list (slot-value child 'id))))))))))
+    (let ((msg-list (ensure-list message)))
+      (case (car msg-list)
+        ;; ── Terminal resize ────────────────────────────────────────────────────
+        (:terminal-resized
+         (log-info "RESIZED!!!!!")
+         (destructuring-bind (&key new-dimensions) (cdr msg-list)
+           (let* ((term-cols (car new-dimensions))
+                  (term-rows (cdr new-dimensions))
+                  (anchor (get-path (append id-path '(:state :anchor)) state))
+                  (initial-cursor-pos (get-path (append id-path '(:state :initial-cursor-pos)) state))
+                  (cursor-c (first initial-cursor-pos))
+                  (cursor-r (second initial-cursor-pos))
+                  (new-width term-cols)
+                  (new-height (nth-value 1 (compute-view-size anchor term-cols term-rows cursor-r)))
+                  (offsets (multiple-value-list
+                            (compute-anchor-offset anchor new-width new-height
+                                                   term-cols term-rows
+                                                   cursor-r cursor-c))))
+             (list (patch '(:state :width) new-width)
+                   (patch '(:state :height) new-height)
+                   (patch '(:state :offset-y) (first offsets))
+                   (patch '(:state :offset-x) (second offsets))
+                   (patch '(:state :terminal-size) new-dimensions)
+                   (patch '(:state :size-uninitialized) nil))))) ; Size is now known
+        ;; ── Pass-through: send to child, keep accumulated patches ─────────────
+        (t
+         (let ((child (child-instance state id-path)))
+           (when child
+             (elmtui.ui.api:update child state message
+                                   :id-path (append id-path
+                                                    (list (slot-value child 'id)))))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; API – VIEW
@@ -238,33 +223,35 @@ Initial child spec is stored in state for the view method to use."
 
 (defmethod elmtui.ui.api:view ((component root-viewport) state
                                &key id-path)
-  (declare (type list id-path) (type t state)) ; state can be complex
+  (declare (type list id-path) (type t state))
   (check-type id-path list)
-  (let* ((vp-state (get-path (append id-path '(:state)) state ))
-         (child-dsl-spec (getf vp-state :child-dsl-spec)) ; Get the child's DSL
-         (width (getf vp-state :width))
-         (height (getf vp-state :height))
-         (offset-x (getf vp-state :offset-x 0))
-         (offset-y (getf vp-state :offset-y 0))
-         (scroll-x (getf vp-state :scroll-x 0))
-         (scroll-y (getf vp-state :scroll-y 0))
-         (effective-id (getf vp-state :id (first id-path)))) ; Fallback for id
+  (let* ((vp-state (get-path (append id-path '(:state)) state))
+         (effective-id (getf vp-state :id (first id-path)))
+         (size-uninitialized (getf vp-state :size-uninitialized)))
 
-    (unless child-dsl-spec
-      (log4cl:log-warn "Root-viewport ~A has no child-dsl-spec in its state." effective-id)
-      ;; Return a minimal viewport DSL if no child is specified
+    (when size-uninitialized
+      (log4cl:log-debug "Root-viewport ~A size is uninitialized. Skipping child view." effective-id)
       (return-from elmtui.ui.api:view
-        `(:viewport :id ,effective-id
-                    :width ,width :height ,height
-                    :offset-x ,offset-x :offset-y ,offset-y
-                    :children nil)))
+        `(:viewport :id ,effective-id :width 1 :height 1 :children nil)))
 
-    ;; Construct the viewport DSL, embedding the child-dsl-spec as its content.
-    ;; The actual rendering of child-dsl-spec happens when this whole view tree is processed.
-    `(:viewport :id ,effective-id
-                :width ,width :height ,height
-                :offset-x ,offset-x :offset-y ,offset-y
-                :scroll-x ,scroll-x :scroll-y ,scroll-y
-                ;; The child-dsl-spec is typically a single DSL form.
-                ;; The :children of a :viewport expects a list of DSL forms.
-                :children (list child-dsl-spec))))
+    (let* ((child-dsl-spec (getf vp-state :child-dsl-spec))
+           (width (getf vp-state :width))
+           (height (getf vp-state :height))
+           (offset-x (getf vp-state :offset-x 0))
+           (offset-y (getf vp-state :offset-y 0))
+           (scroll-x (getf vp-state :scroll-x 0))
+           (scroll-y (getf vp-state :scroll-y 0)))
+
+      (unless child-dsl-spec
+        (log4cl:log-warn "Root-viewport ~A has no child-dsl-spec in its state." effective-id)
+        (return-from elmtui.ui.api:view
+          `(:viewport :id ,effective-id
+                      :width ,width :height ,height
+                      :offset-x ,offset-x :offset-y ,offset-y
+                      :children nil)))
+
+      `(:viewport :id ,effective-id
+                  :width ,width :height ,height
+                  :offset-x ,offset-x :offset-y ,offset-y
+                  :scroll-x ,scroll-x :scroll-y ,scroll-y
+                  :children (list child-dsl-spec)))))

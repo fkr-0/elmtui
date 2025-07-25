@@ -66,12 +66,16 @@
   ;; Set the global *app-sender* to this system's publish function
   (setf elmtui.core.globals:*app-sender* #'publish)
   (log-info "LOOP: *app-sender* set to #'elmtui.core.loop:publish (channel system)")
-  (when (and (null *consumer-thread*) (not *shutdown-requested*))
+  (when (or (and (null *consumer-thread*) (not *shutdown-requested*))
+            (not (sb-thread:thread-alive-p *consumer-thread*)))
     (setf *shutdown-requested* nil)
     (setf *consumer-thread*
           (bt:make-thread #'event-consumer-loop :name "elmtui-event-consumer"))
     (log-info "LOOP: Started event consumer thread for channel system."))
   t)
+
+
+;; (defun force-restart-loop )
 
 (defun event-consumer-loop ()
   "Consumer loop for processing events from *active-event-channels*."
@@ -108,7 +112,7 @@
                                      (elmtui.core.event-channels:name originating-event-channel-object)
                                      "unknown"))
                        (setf *shutdown-requested* t))
-                      (originating-event-channel-object
+                      ((not (null originating-event-channel-object))
                        (process-channel-event event originating-event-channel-object))
                       (t ; Should not happen if wait-for-event returns a valid channel object with an event
                        (log-warn "EVENT-CONSUMER: Received event ~S but no originating channel object." event))))
@@ -121,9 +125,10 @@
           (format *error-output* "~%EVENT-CONSUMER: Error in background thread: ~A~%Backtrace:~%~A~%" err bt)
           (finish-output *error-output*)
           ;; For development, break. For production, this might be removed or made conditional.
-          (break "EVENT-CONSUMER: Unhandled error in background thread. See log and *error-output* for details.")
+          ;; (break "EVENT-CONSUMER: Unhandled error in background thread. See log and *error-output* for details.")
           )
-        (setf *shutdown-requested* t) ; Ensure loop terminates on error
+        ;; (setf *shutdown-requested* t)
+                                        ; Ensure loop terminates on error
         (return))))
   (log-info "EVENT-CONSUMER: Event consumer loop terminated"))
 
@@ -136,11 +141,13 @@
 (defun process-channel-event (event source-event-channel-object)
   "Process an event received from an event-channel. Invokes handlers registered on the
 source-event-channel-object, then processes the event further."
+  (log-info "PROCESS-CHANNEL-EVENT: Called with event ~S from channel ~S"
+            event (elmtui.core.event-channels:name source-event-channel-object))
   (let ((start-time (get-internal-real-time))
         (event-to-process event)
         (channel-name (elmtui.core.event-channels:name source-event-channel-object)))
-    (log-debug "EVENT-CONSUMER: Processing event ~S from channel ~S"
-               event-to-process channel-name)
+    (log-info "EVENT-CONSUMER: Processing event ~S from channel ~S"
+              event-to-process channel-name)
 
     (dolist (handler (elmtui.core.event-channels:handlers source-event-channel-object))
       (handler-case
@@ -174,12 +181,11 @@ source-event-channel-object, then processes the event further."
          (case tag
            (:app-message
             (let ((msg (first payload)))
-              (log-debug "PROCESS-CHANNEL-EVENT: Dispatching :app-message ~S to *app-message-processor* (~A)"
-                         msg elmtui.core.globals:*app-message-processor*)
+              (log-info "PROCESS-CHANNEL-EVENT: Dispatching :app-message ~S to *app-message-processor* (~A)"
+                        msg elmtui.core.globals:*app-message-processor*)
               (if elmtui.core.globals:*app-message-processor*
                   (funcall elmtui.core.globals:*app-message-processor*
-                           msg
-                           elmtui.core.globals:*app-state*)
+                           msg)
                   (log-error "PROCESS-CHANNEL-EVENT: *app-message-processor* is not set—cannot process: ~S"
                              msg))))
            ((:async :async-task :cmd-async :recurring-task)
@@ -230,7 +236,7 @@ source-event-channel-object, then processes the event further."
 
 (defun publish (event &key target-channel-name)
   "Publish an event to a specified or default event channel."
-  (log-debug "PUBLISH: Called for event ~S. Target: ~A." event target-channel-name)
+  (log-info "PUBLISH: Called for event ~S. Target: ~A." event target-channel-name)
 
   (let ((channel-obj nil)
         (effective-target-name
@@ -243,15 +249,17 @@ source-event-channel-object, then processes the event further."
                     :key #'elmtui.core.event-channels:name
                     :test #'eq))
         ;; If no target-channel-name, fallback to :message, then :system-channel, then first available
-        (setf channel-obj (or (find :message *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eq)
-                              (find :system-channel *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eq)
+        (setf channel-obj (or (find :message *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eql)
+                              (find :system-channel *active-event-channels* :key #'elmtui.core.event-channels:name :test #'eql)
                               (first *active-event-channels*))))
 
+    (log-info "PUBLISH: Effective target channel name: ~S ~A ~A Closed? ~A" effective-target-name channel-obj (elmtui.core.event-channels:channel-of channel-obj)
+              (cleve-elm.channel:channel-closed (elmtui.core.event-channels:channel-of channel-obj)))
     (if channel-obj
-        (log-debug "PUBLISH: Found target channel-obj: ~A. Original target: ~S, Effective target: ~S"
-                   (elmtui.core.event-channels:name channel-obj)
-                   target-channel-name
-                   effective-target-name)
+        (log-info "PUBLISH: Found target channel-obj: ~A. Original target: ~S, Effective target: ~S"
+                  (elmtui.core.event-channels:name channel-obj)
+                  target-channel-name
+                  effective-target-name)
         (log-warn "PUBLISH: Could not find channel-obj. Original target: ~S, Effective target: ~S."
                   target-channel-name effective-target-name))
 
@@ -261,15 +269,20 @@ source-event-channel-object, then processes the event further."
         (let ((event-to-send event)
               (ch-name (elmtui.core.event-channels:name channel-obj)))
           ;; Wrap event as :app-message if it's not a known system/command type
+          (log-info "PUBLISH: Preparing to enqueue event ~S to channel ~S" event-to-send ch-name)
           (unless (or (eq event-to-send :shutdown-command)
                       (and (listp event-to-send) (eq (first event-to-send) :app-message))
                       (and (listp event-to-send) (member (first event-to-send)
                                                          '(:async :async-task :cmd-async :recurring-task))))
             (setf event-to-send (list :app-message event-to-send)))
 
-          (log-debug "PUBLISH: Enqueuing to channel ~S: ~S" ch-name event-to-send)
+          (log-info "PUBLISH: Enqueuing to channel ~S: ~S" ch-name event-to-send)
+          (log-info "Channel-States: ~S"
+                    (get-event-loop-status))
           (handler-case
-              (cleve-elm.channel:-> (elmtui.core.event-channels:channel-of channel-obj) event-to-send)
+              (progn (cleve-elm.channel:-> (elmtui.core.event-channels:channel-of channel-obj) event-to-send)
+                     (log-info "PUBLISH: Successfully enqueued event ~S to channel ~S"
+                               event-to-send ch-name))
             (error (e)
               (log-error "PUBLISH: Failed to enqueue to channel ~S: ~A. Event: ~S"
                          ch-name e event-to-send))))
@@ -277,7 +290,8 @@ source-event-channel-object, then processes the event further."
                   target-channel-name
                   effective-target-name
                   event))))
-
+;; (setf *SHUTDOWN-REQUESTED* nil)
+                                        ; Reset shutdown flag on publish
 ;; Status and metrics functions
 (defun get-event-loop-status ()
   "Get the current status of the event loop."
@@ -287,6 +301,24 @@ source-event-channel-object, then processes the event further."
         :active-channels
         (if *active-event-channels*
             (mapcar #'elmtui.core.event-channels:name *active-event-channels*)
+            nil)
+        :channels
+        (if *active-event-channels*
+            (mapcar
+             (lambda (x)
+               ;; get enqueued, dequeued, closed, name, and queue length
+               (let ((clevelib-channel (elmtui.core.event-channels:channel-of x)))
+                 (list :name (elmtui.core.event-channels:name x)
+                       :enqueued (cleve-elm.channel:channel-length clevelib-channel)
+                       :closed (cleve-elm.channel:channel-closed clevelib-channel)
+                       :queue-length
+                       (if (fboundp 'cleve-elm.queue:queue-length)
+                           (ignore-errors
+                            (cleve-elm.queue:queue-length
+                             (cleve-elm.channel:channel-queue clevelib-channel)))
+                           0) ; If queue-length function is not available, return 0
+                       )))
+             *active-event-channels*)
             nil)
         :shutdown-requested *shutdown-requested*
         :last-event-time (gethash :last-event-time *event-loop-metrics* 0)

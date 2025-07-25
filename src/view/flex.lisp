@@ -271,7 +271,9 @@ Purity:
     :initarg :margin-left
     :initform 0
     :accessor margin-left)))
-
+;; (defmethod children ((item flex-item))
+;;   "Return the children of the flex-item, if any."
+;;   (flex-item-children item))
 (defmethod elmtui.view.geo:rectangle ((item flex-item))
   "Return the rectangle representing the flex-item's border-box."
   (slot-value item 'rectangle))
@@ -375,6 +377,10 @@ Purity:
     :initform :stretch
     :type (member :stretch :flex-start :flex-end :center :space-between :space-around)
     :accessor %align-content)))
+
+(defmethod flex-item-children ((flex-item flex-item))
+  "Return the children of a flex-item, which may be a flex-container."
+  nil)
 
 (defmethod main-axis ((container flex-container))
   "Return the main axis of the flex container, which is determined by its flex-direction."

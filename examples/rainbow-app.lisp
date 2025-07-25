@@ -118,14 +118,20 @@
 ;;;--------------------------------------------------------------
 ;;; Application Update Function
 ;;;--------------------------------------------------------------
-(defun app-update (app-state message)
+(defun app-update (message app-state)
   "Handles updates to the application state based on messages.
 Any key event or :app-quit-requested sets :should-quit to t."
   (declare (ignore app-state)) ; app-state not used for this logic
+  (log-info "RECEIVED MESSAGE: ~S" message)
   (cond
     ((or (typep message 'key-event)
          (and (listp message) (eq (first message) :app-quit-requested)))
      (make-update-result :patches (list (list '(:should-quit) t))))
+    ((eql (car message) :terminal-resized)
+     (progn (log-info "Terminal resized to: ~A" (cdr message))
+            (make-update-result :patches (list
+                                          (list '(:components :rainbow-root-vp :state :width) (car (cdr message)))
+                                          (list '(:components :rainbow-root-vp :state :height) (second (cdr message)))))))
     (t
      (make-update-result))))
 
@@ -134,16 +140,16 @@ Any key event or :app-quit-requested sets :should-quit to t."
   (declare (ignore app-state))
   `(:container
     :id :rainbow-main-container
-    :style (:display :flex :flex-direction :row :height :fill :width :fill :bg-color ,(rgb '(10 10 10)))
+    :style (:display :flex :flex-direction :row :height :fill :width :fill :bg-color ,(rgb '(100 100 00)))
     :children ,(loop for (color-name class-name rgb-val) in rainbow-colors-with-names
                      collect
                      `(:container
                        :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
                        :classes (,class-name)
-                       :style (:width 1
+                       :style (:width :fill
                                :height :fill
                                :bg-color ,(rgb rgb-val))
-                       :children nil))))
+                       :children ,(list :text :content "abcdefgh123456")))))
 
 (defun rainbow-app-subscriptions (model)
   (declare (ignore model))
@@ -159,11 +165,12 @@ Any key event or :app-quit-requested sets :should-quit to t."
                              :should-quit nil)
   ;; :root-component-dsl `(:column)
   :root-component-dsl
-  '(:container :id :rainbow-main-container
+  '(:layout :id :rainbow-main-container
 
     :initial-terminal-dimensions (1 1)
     :initial-cursor-pos (1 1)
-    :children ((:column :id :main)))
+    :children ((:viewport ;; column
+                :id :main)))
                                         ; or make nil and let view return full tree
 
   :update-fn 'app-update
@@ -180,3 +187,21 @@ Any key event or :app-quit-requested sets :should-quit to t."
 
 ;; To run from REPL:
 ;; (elmtui.examples.rainbow-app:run-rainbow-example-app)
+;; (initialize-app-state-rainbow-example-app)
+;; (elmtui.ui.api:initialize-components-from-dsl
+;;           '(:root-viewport :id :rainbow-root-vp :initial-terminal-dimensions
+;;             (1 1) :initial-cursor-pos (1 1) :children
+;;             (:layout :id :rainbow-main-container :initial-terminal-dimensions
+;;              (1 1) :initial-cursor-pos (1 1) :children nil)))
+;; (elmtui.ui.api:initialize-components-from-dsl
+;;           '(:root-viewport :id :rainbow-root-vp :initial-terminal-dimensions
+;;             (1 1) :initial-cursor-pos (1 1) :children
+;;             (:layout :id :rainbow-main-container :initial-terminal-dimensions
+;;              (1 1) :initial-cursor-pos (1 1) :children
+;;              ((:viewport :id :main)))))
+;; (elmtui.ui.api:initialize-components-from-dsl
+;;  '(:root-viewport :id :rainbow-root-vp :initial-terminal-dimensions
+;;    (1 1) :initial-cursor-pos (1 1) :children
+;;    (:container :id :rainbow-main-container :initial-terminal-dimensions
+;;     (1 1) :initial-cursor-pos (1 1) :children
+;;     ((:viewport :id :main)))))

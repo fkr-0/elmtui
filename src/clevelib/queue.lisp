@@ -46,7 +46,8 @@
 ;; This is a generic function with a specific method for priority-queue
 ;; Removed FTYPE declaration to avoid clobbering warning
 (defgeneric counter (queue)
-  (:documentation "Get the counter value of a queue.")
+  (:documentation "Get the counter value of a queue.
+The counter indicates the number of items in the queue.")
   (:method ((queue priority-queue))
     (bt:with-lock-held ((queue-lock queue))
       (let ((c (%counter queue)))
