@@ -8,6 +8,8 @@
   (:use :cl :alexandria :log4cl)
   (:import-from :log4cl #:log-info #:log-debug)
   (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.app.api #:get-component-instance)
+  (:import-from :elmtui.ui.api #:update)
   (:import-from :elmtui.style-lib.rule #:defrule)
   (:import-from :elmtui.style-lib.sheet #:defstylesheet)
   (:import-from :elmtui.style-lib.styles #:rgb)
@@ -57,58 +59,58 @@
       :BG-COLOR
       (list 255 0 0)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     (DEFRULE (CLS> "pink-stripe")
       :BG-COLOR
       (list 255 192 203)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     (DEFRULE (CLS> "orange-stripe")
       :BG-COLOR
       (list 255 165 0)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     (DEFRULE (CLS> "yellow-stripe")
       :BG-COLOR
       (list 255 255 0)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     (DEFRULE (CLS> "green-stripe")
       :BG-COLOR
       (list 0 255 0)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     (DEFRULE (CLS> "blue-stripe")
       :BG-COLOR
       (list 0 0 255)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     (DEFRULE (CLS> "indigo-stripe")
       :BG-COLOR
       (list 75 0 130)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     (DEFRULE (CLS> "violet-stripe")
       :BG-COLOR
       (list 238 130 238)
       :WIDTH
-      12
+      1
       :HEIGHT
-      :FILL)
+      1)
     ;; Generate individual stripe rules
     ;; (generate-stripe-rules-forms)
     )
@@ -121,17 +123,18 @@
 (defun app-update (message app-state)
   "Handles updates to the application state based on messages.
 Any key event or :app-quit-requested sets :should-quit to t."
-  (declare (ignore app-state)) ; app-state not used for this logic
   (log-info "RECEIVED MESSAGE: ~S" message)
   (cond
     ((or (typep message 'key-event)
          (and (listp message) (eq (first message) :app-quit-requested)))
      (make-update-result :patches (list (list '(:should-quit) t))))
-    ((eql (car message) :terminal-resized)
-     (progn (log-info "Terminal resized to: ~A" (cdr message))
-            (make-update-result :patches (list
-                                          (list '(:components :rainbow-root-vp :state :width) (car (cdr message)))
-                                          (list '(:components :rainbow-root-vp :state :height) (second (cdr message)))))))
+    ((and (listp message) (eq (car message) :terminal-resized))
+     (let* ((root-vp-path '(:components :rainbow-root-vp))
+            (root-vp-instance (get-component-instance root-vp-path app-state)))
+       (if root-vp-instance
+           (let ((patches (update root-vp-instance app-state message :id-path root-vp-path)))
+             (make-update-result :patches patches))
+           (make-update-result))))
     (t
      (make-update-result))))
 
@@ -148,8 +151,9 @@ Any key event or :app-quit-requested sets :should-quit to t."
                        :classes (,class-name)
                        :style (:width :fill
                                :height :fill
+                               :min-width 1
                                :bg-color ,(rgb rgb-val))
-                       :children ,(list :text :content "abcdefgh123456")))))
+                       :children nil)))) ;;,(list :text :content "abcdefgh123456")))))
 
 (defun rainbow-app-subscriptions (model)
   (declare (ignore model))

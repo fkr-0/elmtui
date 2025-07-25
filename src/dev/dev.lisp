@@ -144,11 +144,11 @@
 ;;               (log:debug "DRIVER: Processing message in app-message-processor: ~S" msg)
 ;;               (apply ufn (list elmtui.platform.driver::*current-app-model* msg)))))
 ;; enqueue term size update
-(funcall (elmtui.platform.backend.terminal::terminal-instance-publish-fn
-          elmtui.platform.driver::*backend*) (list :terminal-resized 22 22))
+;; (funcall (elmtui.platform.backend.terminal::terminal-instance-publish-fn
+;;           elmtui.platform.driver::*backend*) (list :terminal-resized :new-dimensions (list 40 40)))
 ;; (elmtui.core.loop:start-loop )
-(elmtui.platform.driver::render-frame
- elmtui.platform.driver::*app-spec*
- elmtui.platform.driver::*current-app-model*
- elmtui.platform.driver::*backend*)
-elmtui.platform.driver::*last-ctx*
+;; (elmtui.platform.driver::render-frame
+;;  elmtui.platform.driver::*app-spec*
+;;  elmtui.platform.driver::*current-app-model*
+;;  elmtui.platform.driver::*backend*)
+;; elmtui.platform.driver::*last-ctx*
