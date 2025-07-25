@@ -238,7 +238,7 @@
   (log-debug "LAYOUT: Starting layout for node ~A with parent-absolute-content-rect: ~S"
              (getf (ui-node-props node) :id (gensym "ANON-NODE-")) parent-absolute-content-rect)
   (let* ((node-id (getf (ui-node-props node) :id (gensym "ANON-NODE-")))
-         (display (style-value node :display :block)) ; Default to block display
+         (display (style-value node :display :flex)) ; Default to block display
          ;; Canonical: use style-map slot if present, else inline :style from props, else nil
          (node-styles (cond
                         ((and (typep node 'styled-ui-node)

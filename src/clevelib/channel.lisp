@@ -4,6 +4,7 @@
    #:no-wait
    :channel-add-filter :channel-remove-filter :filter-channel :filtered-channel :make-filtered-channel
    :channel-take! :channel-put!
+   :channel-length :channel-empty-p :channel-full-p
    :apply-filter :pass-through-p)
   (:use :cl :bt :cleve-elm.queue :log4cl))
 (in-package :cleve-elm.channel)
@@ -319,6 +320,20 @@ Buffered channels have a capacity.  CLOSED is t if the channel is closed,"
                  :lock-r (bt:make-lock)
                  :lock-s (bt:make-lock)
                  :condition (bt:make-condition-variable)))
+
+(defun channel-length (channel)
+  "Return the length of the channel's queue."
+  (cleve-elm.queue:counter (channel-queue channel)))
+
+(defun channel-empty-p (channel)
+  "Return t if the channel's queue is empty."
+  (cleve-elm.queue:queue-empty-p (channel-queue channel)))
+
+(defun channel-full-p (channel)
+  "Return t if the channel's queue is full."
+  (let ((capacity (channel-capacity channel)))
+    (and (> capacity 0) (>= (cleve-elm.queue:counter (channel-queue channel)) capacity))))
+
 
 
 (defmethod channel-lock ((channel channel))

@@ -218,6 +218,12 @@
       (multiple-value-bind (w h) (get-screen-dimensions instance)
         (setf (terminal-instance-width instance) w
               (terminal-instance-height instance) h)
+        (when publish-fn
+          (log:info "TERMINAL: Publishing initial dimensions W:~A H:~A" w h)
+
+
+
+          (funcall publish-fn (list :terminal-resized w h)))
         (let ((front (make-virtual-buffer w h))
               (back (make-virtual-buffer w h)))
           (setf (terminal-instance-front-buffer instance) front

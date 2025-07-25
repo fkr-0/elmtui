@@ -1,5 +1,5 @@
 (uiop:define-package :elmtui.tea-state.transactions
-  (:use :cl)
+  (:use :cl #:log4cl)
   (:import-from :elmtui.tea-state.state
                 #:state-set
                 #:application-state
@@ -45,7 +45,12 @@
 
 ;;;── Transaction Macro ────────────────────────────────────────
 (defmacro with-transaction ((app &key name) &body body)
-  "Wrap changes in a transaction named NAME."
+  "Wrap changes in a transaction named NAME.
+
+  Arguments:
+  - APP: The application state object.
+  - NAME: A keyword or symbol to name the transaction.
+  - BODY: The body of code that performs changes to the application state."
   `(let* ((app# ,app)
           (start-log-len# (length (application-state-log app#)))
           (successp nil))
@@ -95,7 +100,7 @@
       (state-set app (first p) (second p)))
     t)
 
-  ;; (format t "PPPPPPPP~&~% ~A~%" (list
+  ;; (log-info "PPPPPPPP~&~% ~A~%" (list
   ;;                                :app
   ;;                                (elmtui.state.api:pprinc-application-state
   ;;                                 app)
