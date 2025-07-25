@@ -189,10 +189,10 @@ in the external application state as *patches* rather than CLOS slots."))
       (case (car msg-list)
         ;; ── Terminal resize ────────────────────────────────────────────────────
         (:terminal-resized
-         (log-info "RESIZED!!!!!")
+         (log-info "RESIZED!!!!! ~A" (cdr msg-list))
          (destructuring-bind (&key new-dimensions) (cdr msg-list)
            (let* ((term-cols (car new-dimensions))
-                  (term-rows (cdr new-dimensions))
+                  (term-rows (second new-dimensions))
                   (anchor (get-path (append id-path '(:state :anchor)) state))
                   (initial-cursor-pos (get-path (append id-path '(:state :initial-cursor-pos)) state))
                   (cursor-c (first initial-cursor-pos))

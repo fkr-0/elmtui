@@ -250,15 +250,45 @@
       (progn
         ;; Log conversion for debugging
         (log-info "dsl->ui: Converting raw DSL to styled node directly: ~S" dsl-spec)
-        (convert-raw-dsl-to-styled-node dsl-spec))
+        (convert-raw-dsl-to-ui-node dsl-spec))
       ;; Handle component-based DSL
       (let ((resolved (render-dsl-to-resolved-tree dsl-spec app-state)))
         (unless resolved
           (error "dsl->ui-node: Conversion returned NIL for ~S" dsl-spec))
-        resolved)))
+        (convert-raw-dsl-to-ui-node resolved))))
 ;; (dsl->ui-node '(:container :id :main :style (:bg-color :red) :children ((:text :id :child1 :content "Hello")))
 ;; (elmtui.tea-state.state:make-state nil))
-(defun convert-raw-dsl-to-styled-node (dsl-spec)
+(defun convert-ui-tree-to-styled-node (dsl-spec)
+  "Converts a DSL-SPEC to a styled-ui-node, handling both raw and component-based DSL.
+
+     Arguments:
+         DSL-SPEC -- (list) The DSL specification (raw or component-based).
+
+     Returns:
+         A styled-ui-node object representing the DSL node and its children.
+
+     Example:
+         (convert-ui-tree-to-styled-node
+         '(:container :id :main :style (:bg-color red)
+                        :children ((:text :content \"hi\"))))
+         ;; => styled-ui-node
+
+     (list) => styled-ui-node (side-effect: logs info, error on invalid input)
+
+     Side-effects:
+         - Logs info messages.
+         - Signals error if conversion fails.
+
+     Purity: impure (logging, error signaling)
+    "
+  ;; Validate DSL-SPEC format
+  (unless (and (listp dsl-spec) (keywordp (first dsl-spec)))
+    (error "Invalid DSL spec: ~S" dsl-spec))
+
+  ;; Convert raw DSL to styled node
+  (convert-raw-dsl-to-ui-node dsl-spec))
+
+(defun convert-raw-dsl-to-ui-node (dsl-spec)
   "Converts a raw DSL-SPEC (property list format) directly to a styled-ui-node.
 
    Arguments:
@@ -292,13 +322,20 @@
          (id (getf props :id))
          (style (getf props :style))
          (classes (getf props :classes))
+         (content (getf props :content))
          (children-specs (getf props :children))
          (text (getf props :text)))
 
     ;; Recursively convert children if present
     (let ((converted-children
             (when children-specs
-              (mapcar #'convert-raw-dsl-to-styled-node children-specs))))
+              ;; malformed one-child-childrenlist))
+              (mapcar
+               #'convert-raw-dsl-to-ui-node
+               (if (and  (< 0 (length children-specs))
+                         (not (listp (car children-specs))))
+                   (list children-specs)
+                   children-specs)))))
 
       ;; Log and create the styled node
       (log-info "Converting raw DSL to styled node: ~S"
@@ -309,11 +346,12 @@
                                 (when text (list :text text))
                                 (when style (list :style style)))
                  :children converted-children))
-      (make-styled-node
+      (elmtui.view.core:make-ui-node
        :type node-type
        :props (append (when id (list :id id))
                       (when classes (list :classes classes))
                       (when text (list :text text))
+                      (when content (list :content content))
                       (when style (list :style style)))
        :children converted-children))))
 ;; Example Usage (conceptual - actual components need to be defined and registered)

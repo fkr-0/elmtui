@@ -3,7 +3,7 @@
 ;;; UI Node Style Integration with elmtui.style-lib
 ;;;===============================================================
 (uiop:define-package :elmtui.view.styled
-  (:use :cl)
+  (:use :cl :log4cl)
   (:import-from :log4cl #:log-debug #:log-warn) ; Added log-warn
   (:import-from :elmtui.view.api :styled-ui-node :styled-ui-node-style-map)
   (:import-from :elmtui.view.core
@@ -209,9 +209,12 @@
 (defmethod style-value ((l list) property &optional default)
   "Get the style value of PROPERTY from a raw DSL list.
    Returns DEFAULT if PROPERTY is not found in the list."
-  (let ((value (or (getf l property)
-                   (getf (getf l :style)
-                         property))))
+  (log-info "STYLED: style-value called on list ~S for property ~S with default ~S"
+            l property default)
+  (let* ((l (if (= 1 (mod (length l) 2)) (cdr l) l))
+         (value (or (getf l property)
+                    (getf (getf l :style)
+                          property))))
     (if value
         value
         default)))
