@@ -21,8 +21,8 @@
 
 (in-package :elmtui.ui.widgets.layout)
 
-(defcomponent layout ()
-  () ;; No direct CLOS slots
+(defcomponent layout (elmtui.ui.api:component)
+                                        ; () ;; No direct CLOS slots
   (:state
    ;; Core layout control
    (display :flex :type keyword :documentation "Display mode: :flex, :grid, :block, :none. Default :flex."
@@ -62,7 +62,7 @@
                             :initarg :justify-items)
 
    ;; Common container properties
-   (children-ids nil :type list :documentation "List of keyword IDs for child components.")
+   (children-ids nil :type (or null list) :documentation "List of keyword IDs for child components.")
    (width nil :type (or null integer string) :documentation "Width of the layout container." :initarg :width)
    (height nil :type (or null integer string) :documentation "Height of the layout container." :initarg :height)
    (min-width nil :type (or null integer string) :documentation "Min-width of the layout." :initarg :min-width)
@@ -76,7 +76,7 @@
    (border nil :type (or null string) :documentation "Border style." :initarg :border)
    (border-radius nil :type (or null string integer) :documentation "Border radius." :initarg :border-radius)
    (overflow nil :type (or null keyword) :documentation "Overflow behavior." :initarg :overflow)
-   (other-style-props nil :type list :documentation "Plist of other style properties passed during init."))
+   (other-style-props nil :type (or null list) :documentation "Plist of other style properties passed during init."))
 
 
 

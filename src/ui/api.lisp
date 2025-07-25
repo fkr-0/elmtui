@@ -365,8 +365,8 @@
     (let* ((state-props (copy-list initargs))
            (local-remove-fn (lambda (plist key) (remf plist key) plist)))
       ;; Ensure keys are keywords for remf
-      (format t "~&Component ~A init with id-path: ~A and dsl: ~A~%"
-              (component-id component) id-path dsl)
+      ;; (format t "~&Component ~A init with id-path: ~A and dsl: ~A~%"
+      ;;         component id-path dsl)
       (funcall local-remove-fn state-props :id)
       (funcall local-remove-fn state-props :id-path)
       (funcall local-remove-fn state-props :allow-other-keys)
@@ -378,6 +378,8 @@
                               component-base-path (list :dsl))
                              dsl)))
              (commands nil))
+        (log-debug "Component ~A init patches: ~A" component patches)
+        (log-debug "Component ~A init state-props: ~A" component state-props)
         (loop for (key value) on state-props by #'cddr
               do (push (make-state-patch
                         (append component-base-path
