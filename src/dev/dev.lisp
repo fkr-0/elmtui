@@ -7,17 +7,17 @@
 
 (in-package :cl)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (uiop:define-package :elmtui.dev
-    (:use :cl :elmtui.core.events :elmtui.core.conditions :elmtui.view.core
-          :elmtui.view.layout :elmtui.view.styled :elmtui.view.layout.grid
-     :elmtui.view.geo) ; Added :elmtui.view.geo
-    (:export :example-flexbox-layout
-     :example-grid-layout
-             :send-foo-message
-     :dev-main
-             :run-faulty-async
-     :demo-event-loop)))
+                                        ;(eval-when (:compile-toplevel :load-toplevel :execute)
+(uiop:define-package :elmtui.dev
+  (:use :cl :elmtui.core.events :elmtui.core.conditions :elmtui.view.core
+        :elmtui.view.layout :elmtui.view.styled :elmtui.view.layout.grid
+   :elmtui.view.geo) ; Added :elmtui.view.geo
+  (:export :example-flexbox-layout
+   :example-grid-layout
+           :send-foo-message
+   :dev-main
+           :run-faulty-async
+   :demo-event-loop));)
 
 (in-package :elmtui.dev)
 
