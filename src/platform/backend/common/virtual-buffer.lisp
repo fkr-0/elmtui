@@ -7,7 +7,7 @@
                 #:style-to-terminal-style
                 #:terminal-style-fg-color-val
                 #:terminal-style-bg-color-val
-                #:copy-terminal-style
+                #:copy-term-style
                 #:copy-term-color
                 #:terminal-color-simple
                 #:terminal-style
@@ -202,12 +202,12 @@ that is: at this point already a character with a style."
 (defmethod deep-copy-style ((style terminal-style))
   "Creates a deep copy of a style plist, including any nested lists like RGB values.
    Returns a new plist with the same keys but new list instances for any list values."
-  (let ((ts (copy-terminal-style style)))
+  (let ((ts (copy-term-style style)))
     (setf
      (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color ts)
      (copy-term-color (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color style)))
     (setf (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color ts)
-          (copy-term-color (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color style)))
+          (copy-term-color (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color style)))
     ts))
 (defmethod deep-copy-style ((style list))
   "Creates a deep copy of a style plist, including any nested lists like RGB values.
@@ -350,10 +350,15 @@ Returns the modified BUFFER."
   (check-type row (integer 0 *))
   (check-type col (integer 0 *))
   (check-type char character)
-  ;; Handle different style types properly
+  ;; Handle different style types properly - always copy terminal-style to avoid reference sharing
   (let ((processed-style (cond
                            ((null style) nil)
-                           ((typep style 'terminal-style) style)
+                           ((typep style 'terminal-style)
+                            (format t "SET-BUFFER-CELL-AT: Copying terminal-style: ~S~%" style)
+                            (let ((copied (copy-term-style style)))
+                              (format t "SET-BUFFER-CELL-AT: Copy result: ~S~%" copied)
+                              (format t "SET-BUFFER-CELL-AT: Copy result type: ~S~%" (type-of copied))
+                              copied))
                            ((listp style) (as-plist style))
                            (t (error "Unsupported style type: ~A" (type-of style))))))
     (with-virtual-buffer-lock (buffer)

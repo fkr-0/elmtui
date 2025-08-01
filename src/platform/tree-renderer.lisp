@@ -6,8 +6,9 @@
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.contracts #:define-stage)
   (:import-from :elmtui.view.core #:ui-node #:ui-node-p #:ui-node-type #:ui-node-props #:ui-node-children)
+  (:import-from :elmtui.view.api #:ui-node-p #:styled-ui-node)
   (:import-from :elmtui.view.geo #:rectangle #:pos #:size #:x #:y #:w #:h)
-  (:import-from :elmtui.view.styled #:styled-ui-node #:style-value)
+  (:import-from :elmtui.view.styled #:styled-ui-node #:style-value #:styled-ui-node-style-map)
   (:import-from :elmtui.style-lib.api #:styles #:style-set)
 
 
@@ -23,6 +24,7 @@
                 #:default-buffer-cell) ; For clearing/filling
 
   (:import-from :elmtui.platform.backend.common.ansi-styling
+                #:copy-term-style
                 #:make-terminal-style
                 #:copy-terminal-style
                 #:make-termcolor
@@ -35,7 +37,9 @@
                 #:terminal-style-italic #:terminal-style-underline #:terminal-style-inverse
                 #:terminal-style-faint #:terminal-style-blink #:terminal-style-strike #:terminal-style-invisible
                 #:style-to-terminal-style) ; Utility if still relevant, or re-implement conversion
-  (:export #:render-laid-out-tree-to-buffer))
+  (:export
+   #:convert-abstract-style-to-terminal-style
+   #:render-laid-out-tree-to-buffer))
 
 (in-package :elmtui.platform.tree-renderer)
 
@@ -48,62 +52,104 @@
     (:double (list :h #\═ :v #\║ :tl #\╔ :tr #\╗ :bl #\╚ :br #\╝))
     (t        (progn
                 (unless (or (null style) (eq style :none) (eq style :solid)) ; don't warn for common/default cases
-                  (log-warn "TREE-RENDERER: Unknown border style '~A', defaulting to :solid." style))
+                  (format t "TREE-RENDERER: Unknown border style '~A', defaulting to :solid." style))
                 (list :h #\─ :v #\│ :tl #\┌ :tr #\┐ :bl #\└ :br #\┘)))))
+(defun color-or-nil (raw &optional (bgp nil))
+  "Like FUZZ-COLOR but returns NIL instead of signalling."
+  (when raw
+    (handler-case (fuzz-color raw bgp)
+      (error () nil))))
 
 (defun convert-abstract-style-to-terminal-style (node)
   "Extracts relevant style properties from a styled-ui-node and translates
    them into a concrete terminal-style struct.
-   Returns NIL if node is not styled or has no relevant styles."
-  (when (typep node 'styled-ui-node)
-    (let* ((node-id (getf (ui-node-props node) :id "N/A"))
-           (style-set-obj (styles node))) ; Use the imported 'styles'
-      (unless (typep style-set-obj 'style-set) ; Use imported 'style-set'
-        (log-warn "TREE-RENDERER: Node ID: ~S - (styles node) did not return a style-set. Type: ~A. Using no styles."
-                  node-id (type-of style-set-obj))
-        (return-from convert-abstract-style-to-terminal-style nil))
+   Always returns a terminal-style object, even if empty."
+  (let ((result
+          (handler-case
+              (progn
+                (format t "TREE-RENDERER: convert-abstract-style-to-terminal-style ENTRY - node=~S~%" node)
+                (if (typep node 'styled-ui-node)
+                    (let* ((node-id (getf (ui-node-props node) :id "N/A"))
+                           (style-map (styled-ui-node-style-map node)))
 
-      (let* ((raw-fg-val (or (style-value node :fg nil)
-                             (style-value node :fg-color nil)
-                             (style-value node :color nil)
-                             (style-value node :foreground-color nil)))
-             (raw-bg-val (or (style-value node :bg nil)
-                             (style-value node :bg-color nil)
-                             ;; (style-value node :color nil) ; :color should not be a fallback for background
-                             (style-value node :background-color nil)))
-             (attrs-val (style-value node :attributes nil)) ; e.g., '(:bold :underline)
-             (ts (make-terminal-style))) ; Always create a terminal-style instance
+                      (format t "TREE-RENDERER: Node ID: ~S - style-map=~S~%" node-id style-map)
 
-        (when raw-fg-val
-          (setf (terminal-style-fg-color ts) (fuzz-color raw-fg-val nil))) ; Pass nil for bg flag
+                      (if (null style-map)
+                          (progn
+                            (format t "TREE-RENDERER: Node ID: ~S - No style-map found. Using empty terminal-style.~%" node-id)
+                            (make-terminal-style))
+                          (let* ((raw-fg-val (or (getf style-map :fg nil)
+                                                 (getf style-map :fg-color nil)
+                                                 (getf style-map :color nil)
+                                                 (getf style-map :foreground-color nil)))
+                                 (raw-bg-val (or (getf style-map :bg nil)
+                                                 (getf style-map :bg-color nil)
+                                                 (getf style-map :background-color nil)))
+                                 (attrs-val (getf style-map :attributes nil)) ; e.g., '(:bold :underline)
+                                 (ts (make-terminal-style))) ; Always create a terminal-style instance
 
-        (when raw-bg-val
-          (setf (terminal-style-bg-color ts) (fuzz-color raw-bg-val t))) ; Pass t for bg flag
+                            (format t "TREE-RENDERER: Style extraction - fg=~S bg=~S attrs=~S~%" raw-fg-val raw-bg-val attrs-val)
 
-        (when attrs-val
-          (when (member :bold attrs-val) (setf (terminal-style-bold ts) t))
-          (when (member :italic attrs-val) (setf (terminal-style-italic ts) t))
-          (when (member :underline attrs-val) (setf (terminal-style-underline ts) t))
-          (when (member :inverse attrs-val) (setf (terminal-style-inverse ts) t))
-          (when (member :faint attrs-val) (setf (terminal-style-faint ts) t))
-          (when (member :blink attrs-val) (setf (terminal-style-blink ts) t))
-          (when (member :strike attrs-val) (setf (terminal-style-strike ts) t))
-          (when (member :invisible attrs-val) (setf (terminal-style-invisible ts) t)))
-        ts)))) ; Return the terminal-style struct
+                            (when raw-fg-val
+                              (handler-case
+                                  ;; (setf (terminal-style-fg-color ts) (fuzz-color raw-fg-val nil))
+                                        ; Pass nil for bg flag
+                                  (let ((c (color-or-nil raw-fg-val)))
+                                    (when c (setf (terminal-style-fg-color ts) c)))
+
+                                (error (e) (format t "TREE-RENDERER: Error setting fg-color: ~A~%" e))))
+
+                            (when raw-bg-val
+                              (handler-case
+                                  (setf (terminal-style-bg-color ts) (fuzz-color raw-bg-val t)) ; Pass t for bg flag
+                                (error (e) (format t "TREE-RENDERER: Error setting bg-color: ~A~%" e))))
+
+                            (when attrs-val
+                              (handler-case
+                                  (progn
+                                    (when (member :bold attrs-val) (setf (terminal-style-bold ts) t))
+                                    (when (member :italic attrs-val) (setf (terminal-style-italic ts) t))
+                                    (when (member :underline attrs-val) (setf (terminal-style-underline ts) t))
+                                    (when (member :inverse attrs-val) (setf (terminal-style-inverse ts) t))
+                                    (when (member :faint attrs-val) (setf (terminal-style-faint ts) t))
+                                    (when (member :blink attrs-val) (setf (terminal-style-blink ts) t))
+                                    (when (member :strike attrs-val) (setf (terminal-style-strike ts) t))
+                                    (when (member :invisible attrs-val) (setf (terminal-style-invisible ts) t)))
+                                (error (e) (format t "TREE-RENDERER: Error setting attributes: ~A~%" e))))
+
+                            (format t "TREE-RENDERER: Terminal style created successfully: ~S~%" ts)
+                            ts))) ; Return the terminal-style struct
+                    ;; If not a styled-ui-node, return empty terminal-style
+                    (progn
+                      (format t "TREE-RENDERER: Node is not styled-ui-node, returning empty terminal-style~%")
+                      (make-terminal-style))))
+            (error (e)
+              (format t "TREE-RENDERER: CRITICAL ERROR in convert-abstract-style-to-terminal-style: ~A~%" e)
+              (format t "TREE-RENDERER: Returning emergency empty terminal-style~%")
+              (make-terminal-style)))))
+    ;; Extra safety check: ensure we never return NIL
+    (or result ;; (progn
+        ;;   (format t "TREE-RENDERER: EMERGENCY FALLBACK - result was NIL, creating new terminal-style~%")
+        ;;   (make-terminal-style))
+        )))
 
 (defun %render-node (node canvas-buffer parent-abs-x parent-abs-y)
   "Recursively renders a single laid-out UI node and its children to the canvas-buffer.
    NODE: The ui-node to render.
    CANVAS-BUFFER: The virtual-terminal-buffer of the canvas.
    PARENT-ABS-X, PARENT-ABS-Y: Absolute coordinates of the parent, for relative positioning."
-  (when (and node (typep node 'ui-node))
+  ;; (format t "DEBUG: %render-node ENTRY - node=~S~%" node)
+  ;; (format t "DEBUG: Node type check - node exists: ~S, is styled-ui-node: ~S~%"
+  ;;         (not (null node))
+  ;;         (when node (typep node 'styled-ui-node)))
+  (when (and node (typep node 'styled-ui-node))
+    ;; (format t "DEBUG: Type check PASSED - proceeding with render~%")
     (let ((layout-rect (getf (ui-node-props node) :layout-rect)))
-      (log-debug "TREE-RENDERER: render-node - Type: ~S, ID: ~S, LayoutRect: ~S"
-                 (ui-node-type node) (getf (ui-node-props node) :id "N/A") layout-rect)
+      ;; (format t "DEBUG: Layout rect = ~S~%" layout-rect)
+      ;; (format t "DEBUG: Layout rect type check = ~S~%" (typep layout-rect 'rectangle))
 
       (unless (and layout-rect (typep layout-rect 'rectangle))
-        (log-warn "TREE-RENDERER: Skipping node ID ~S, Type ~S due to missing or invalid layout-rect."
-                  (getf (ui-node-props node) :id "N/A") (ui-node-type node))
+        (format t "DEBUG: SKIPPING node - layout-rect invalid~%")
         (return-from %render-node))
 
       ;; Calculate absolute position and size of the current node's border-box
@@ -115,37 +161,61 @@
              (buffer-w (buffer-width canvas-buffer))
              (buffer-h (buffer-height canvas-buffer)))
 
+        ;; (format t "DEBUG: Terminal style created: ~S~%" terminal-style)
+        ;; (when terminal-style
+        ;;   (format t "DEBUG: Terminal style bg-color: ~S~%" (terminal-style-bg-color terminal-style)))
+
         ;; Only proceed if node is visible and has dimensions
+        ;; (format t "DEBUG: Visibility check - border-box-w=~A border-box-h=~A visibility=~S display=~S~%"
+        ;;         border-box-w border-box-h
+        ;;         (getf (styled-ui-node-style-map node) :visibility :visible)
+        ;;         (getf (styled-ui-node-style-map node) :display :block))
         (when (and (> border-box-w 0) (> border-box-h 0)
-                   (not (eq (style-value node :visibility :visible) :hidden))
-                   (not (eq (style-value node :display :block) :none)))
+                   (not (eq (getf (styled-ui-node-style-map node) :visibility :visible) :hidden))
+                   (not (eq (getf (styled-ui-node-style-map node) :display :block) :none)))
+          ;; (format t "DEBUG: Visibility check PASSED - proceeding to background fill~%")
 
           ;; 1. First render Background (fills the border-box)
-          (let ((bg-color-obj (when terminal-style (terminal-style-bg-color terminal-style))))
-            (when bg-color-obj
-
-              (loop for r from 0 below border-box-h
-                    do (loop for c from 0 below border-box-w
-                             do (let ((target-r (+ abs-y r))
-                                      (target-c (+ abs-x c)))
-                                  (when (and (>= target-r 0) (< target-r buffer-h)
-                                             (>= target-c 0) (< target-c buffer-w))
-                                    (let* ((cell-style (make-terminal-style :bg-color bg-color-obj)))
-                                      (set-buffer-cell-at canvas-buffer target-r target-c #\Space cell-style))))))))
+          ;; (format t "DEBUG: Early background fill check - terminal-style=~S bg-color=~S~%"
+          ;;         (not (null terminal-style))
+          ;;         (when terminal-style (terminal-style-bg-color terminal-style)))
+          (when (and terminal-style (terminal-style-bg-color terminal-style))
+            ;; (format t "DEBUG: Early background fill - EXECUTING! Filling border-box ~Ax~A~%"
+            ;;         border-box-w border-box-h)
+            (loop for r from 0 below border-box-h
+                  do (loop for c from 0 below border-box-w
+                           do (let ((target-r (+ abs-y r))
+                                    (target-c (+ abs-x c)))
+                                (when (and (>= target-r 0) (< target-r buffer-h)
+                                           (>= target-c 0) (< target-c buffer-w))
+                                  ;; Use the full style for the background fill
+                                  (set-buffer-cell-at canvas-buffer target-r target-c #\Space terminal-style)
+                                  ;; DEBUG: Check cell immediately after fill
+                                  (when (and (= target-r 0) (= target-c 0))
+                                    (let ((cell (buffer-cell-at canvas-buffer target-r target-c)))
+                                      (format t "DEBUG: Cell (0,0) IMMEDIATELY after background fill: ~S~%" cell)
+                                      (format t "DEBUG: Cell bg-color IMMEDIATELY after fill: ~S~%"
+                                              (when cell (terminal-style-bg-color (buffer-cell-style cell)))))))))))
 
           ;; Calculate effective border widths and padding
-          (let* ((border-style-val (style-value node :border-style :none))
-                 (effective-btw (if (eq border-style-val :none) 0 (style-value node :border-top-width 1)))
-                 (effective-brw (if (eq border-style-val :none) 0 (style-value node :border-right-width 1)))
-                 (effective-bbw (if (eq border-style-val :none) 0 (style-value node :border-bottom-width 1)))
-                 (effective-blw (if (eq border-style-val :none) 0 (style-value node :border-left-width 1)))
-                 (padding-top (style-value node :padding-top 0))
-                 (padding-right (style-value node :padding-right 0))
-                 (padding-bottom (style-value node :padding-bottom 0))
-                 (padding-left (style-value node :padding-left 0)))
+          (let* ((style-map (styled-ui-node-style-map node))
+                 (border-style-val (getf style-map :border-style :none))
+                 (effective-btw (if (eq border-style-val :none) 0 (getf style-map :border-top-width 1)))
+                 (effective-brw (if (eq border-style-val :none) 0 (getf style-map :border-right-width 1)))
+                 (effective-bbw (if (eq border-style-val :none) 0 (getf style-map :border-bottom-width 1)))
+                 (effective-blw (if (eq border-style-val :none) 0 (getf style-map :border-left-width 1)))
+                 ;; (a (format t "DEBUG: Border values - border-style-val=~S effective-btw=~S effective-blw=~S~%"
+                 ;;           border-style-val effective-btw effective-blw))
+                 ;; (b (format t "DEBUG: Border condition check - terminal-style=~S (not (eq border-style-val :none))=~S~%"
+                 ;;            (not (null terminal-style)) (not (eq border-style-val :none))))
+                 (padding-top (getf style-map :padding-top 0))
+                 (padding-right (getf style-map :padding-right 0))
+                 (padding-bottom (getf style-map :padding-bottom 0))
+                 (padding-left (getf style-map :padding-left 0)))
 
             ;; 2. Render Borders
             (when (and terminal-style (not (eq border-style-val :none)))
+              ;; (format t "DEBUG: Border rendering - CONDITION PASSED! border-style=~S~%" border-style-val)
               (let* ((border-chars (get-border-characters border-style-val))
                      (char-h (getf border-chars :h #\?))
                      (char-v (getf border-chars :v #\?))
@@ -153,43 +223,31 @@
                      (char-tr (getf border-chars :tr #\?))
                      (char-bl (getf border-chars :bl #\?))
                      (char-br (getf border-chars :br #\?))
-                     (border-color-val (style-value node :border-color nil))
                      (border-fg-color-obj
-                       (let ((resolved-color-src (or border-color-val (terminal-style-fg-color terminal-style))))
-                         (cond ((listp resolved-color-src)
-                                (make-termcolor :r (first resolved-color-src)
-                                                :g (second resolved-color-src)
-                                                :b (third resolved-color-src)))
-                               ((integerp resolved-color-src)
-                                (make-termcolor :color-256 resolved-color-src))
-                               ((keywordp resolved-color-src)
-                                (make-termcolor :simple resolved-color-src))
-                               ((typep resolved-color-src 'elmtui.platform.backend.common.ansi-styling:terminal-color) resolved-color-src)
-                               (t nil)))))
+                       (color-or-nil (or (getf style-map :border-color)
+                                         (terminal-style-fg-color terminal-style))))
 
+                     ;; (border-color-val (getf style-map :border-color nil))
+                     ;; (border-fg-color-obj (fuzz-color (or border-color-val (terminal-style-fg-color terminal-style))))
+                     )
+
+                ;; (format t "DEBUG: Border chars: tl=~S border-color-val=~S border-fg-color-obj=~S~%"
+                ;;         char-tl border-color-val border-fg-color-obj)
                 (when border-fg-color-obj ; Only draw if border has a color
+                  (format t "DEBUG: Border color check PASSED! Drawing borders...~%")
                   (flet ((draw-border-char (r c char)
                            (when (and (>= r 0) (< r buffer-h) (>= c 0) (< c buffer-w))
-                             (let* ((cell-style
-                                      (elmtui.platform.backend.common.virtual-buffer:buffer-style canvas-buffer r c))
-                                    (existing-bg (when cell-style (terminal-style-bg-color cell-style)))
-                                    (border-style (make-terminal-style
-                                                   :fg-color border-fg-color-obj
-                                                   :bg-color existing-bg)))
+                             (let* ((existing-style (buffer-cell-style (buffer-cell-at canvas-buffer r c)))
+                                    (border-style (if existing-style
+                                                      (copy-term-style existing-style)
+                                                      (copy-term-style terminal-style))))
+                               (setf (terminal-style-fg-color border-style) border-fg-color-obj)
                                (set-buffer-cell-at canvas-buffer r c char border-style)))))
 
                     ;; Draw horizontal borders
-                    ;; (when (> effective-btw 0)
                     (when (> effective-btw 0)
-                      (loop for c-idx
-                              from
-                              (if (> effective-blw 0) 1 0)
-                              below (- border-box-w (if (> effective-brw 0) 0 0))
-                                        ; Removed the subtraction of 1 if the right border exists
+                      (loop for c-idx from (if (> effective-blw 0) 1 0) below (- border-box-w (if (> effective-brw 0) 1 0))
                             do (draw-border-char abs-y (+ abs-x c-idx) char-h)))
-
-                    ;; (loop for c-idx from (if (> effective-blw 0) 1 0) below (- border-box-w (if (> effective-brw 0) 1 0))
-                    ;;       do (draw-border-char abs-y (+ abs-x c-idx) char-h)))
                     (when (> effective-bbw 0)
                       (loop for c-idx from (if (> effective-blw 0) 1 0) below (- border-box-w (if (> effective-brw 0) 1 0))
                             do (draw-border-char (+ abs-y border-box-h -1) (+ abs-x c-idx) char-h)))
@@ -203,33 +261,10 @@
                             do (draw-border-char (+ abs-y r-idx) (+ abs-x border-box-w -1) char-v)))
 
                     ;; Draw Corners
-                    (cond ((and (> effective-btw 0) (> effective-blw 0))
-                           (draw-border-char abs-y abs-x char-tl))
-                          ((> effective-btw 0)
-                           (draw-border-char abs-y abs-x char-h))
-                          ((> effective-blw 0)
-                           (draw-border-char abs-y abs-x char-v)))
-
-                    (cond ((and (> effective-btw 0) (> effective-brw 0))
-                           (draw-border-char abs-y (+ abs-x border-box-w -1) char-tr))
-                          ((> effective-btw 0)
-                           (draw-border-char abs-y (+ abs-x border-box-w -1) char-h))
-                          ((> effective-brw 0)
-                           (draw-border-char abs-y (+ abs-x border-box-w -1) char-v)))
-
-                    (cond ((and (> effective-bbw 0) (> effective-blw 0))
-                           (draw-border-char (+ abs-y border-box-h -1) abs-x char-bl))
-                          ((> effective-bbw 0)
-                           (draw-border-char (+ abs-y border-box-h -1) abs-x char-h))
-                          ((> effective-blw 0)
-                           (draw-border-char (+ abs-y border-box-h -1) abs-x char-v)))
-
-                    (cond ((and (> effective-bbw 0) (> effective-brw 0))
-                           (draw-border-char (+ abs-y border-box-h -1) (+ abs-x border-box-w -1) char-br))
-                          ((> effective-bbw 0)
-                           (draw-border-char (+ abs-y border-box-h -1) (+ abs-x border-box-w -1) char-h))
-                          ((> effective-brw 0)
-                           (draw-border-char (+ abs-y border-box-h -1) (+ abs-x border-box-w -1) char-v)))))))
+                    (when (and (> effective-btw 0) (> effective-blw 0)) (draw-border-char abs-y abs-x char-tl))
+                    (when (and (> effective-btw 0) (> effective-brw 0)) (draw-border-char abs-y (+ abs-x border-box-w -1) char-tr))
+                    (when (and (> effective-bbw 0) (> effective-blw 0)) (draw-border-char (+ abs-y border-box-h -1) abs-x char-bl))
+                    (when (and (> effective-bbw 0) (> effective-brw 0)) (draw-border-char (+ abs-y border-box-h -1) (+ abs-x border-box-w -1) char-br))))))
 
             ;; Calculate Content Box dimensions
             (let* ((content-abs-x (+ abs-x effective-blw padding-left))
@@ -237,85 +272,68 @@
                    (content-w (max 0 (- border-box-w effective-blw effective-brw padding-left padding-right)))
                    (content-h (max 0 (- border-box-h effective-btw effective-bbw padding-top padding-bottom))))
 
-              (log-debug "TREE-RENDERER: Node ID ~S - BorderBox: (~A,~A W:~A H:~A), ContentBox: (~A,~A W:~A H:~A)"
-                         (getf (ui-node-props node) :id "N/A")
-                         abs-x abs-y border-box-w border-box-h
-                         content-abs-x content-abs-y content-w content-h)
+              ;; (format t "TREE-RENDERER: Node ID ~S - BorderBox: (~A,~A W:~A H:~A), ContentBox: (~A,~A W:~A H:~A)"
+              ;;         (getf (ui-node-props node) :id "N/A")
+              ;;         abs-x abs-y border-box-w border-box-h
+              ;;         content-abs-x content-abs-y content-w content-h)
+
+              ;; 2.5. Fill background area with background color
+              ;; (format t "TREE-RENDERER: Background fill condition check - terminal-style=~S bg-color=~S content-w=~A content-h=~A"
+              ;;         (not (null terminal-style))
+              ;;         (when terminal-style (not (null (terminal-style-bg-color terminal-style))))
+              ;;         content-w content-h)
+              ;; (format t "TREE-RENDERER: Terminal style object: ~S" terminal-style)
+              ;; (when terminal-style
+              ;;   (format t "TREE-RENDERER: Terminal style bg-color: ~S" (terminal-style-bg-color terminal-style)))
+              ;; DISABLED: Prevent second background fill from overwriting the first one
+              (when  (and terminal-style (terminal-style-bg-color terminal-style) (> content-w 0) (> content-h 0))
+                ;; (format t "TREE-RENDERER: Background fill - CONDITION PASSED, filling area")
+                ;; (format t "TREE-RENDERER: Background fill area: from (~A,~A) to (~A,~A)"
+                ;;         content-abs-x content-abs-y
+                ;;         (+ content-abs-x content-w -1) (+ content-abs-y content-h -1))
+                (loop for r from content-abs-y below (+ content-abs-y content-h)
+                      do (loop for c from content-abs-x below (+ content-abs-x content-w)
+                               when (and (>= r 0) (< r buffer-h) (>= c 0) (< c buffer-w))
+                                 do (let ((bg-style (copy-term-style terminal-style)))
+                                      (format t "TREE-RENDERER: Filling cell (~A,~A) with bg-color=~S"
+                                              r c (terminal-style-bg-color bg-style))
+                                      ;; Clear foreground for background-only cells
+                                      (setf (terminal-style-fg-color bg-style) nil)
+                                      (set-buffer-cell-at canvas-buffer r c #\Space bg-style)))))
 
               ;; 3. Render Content (e.g., text) within the content-box
               (when (and terminal-style (> content-w 0) (> content-h 0))
                 (case (ui-node-type node)
                   ((:text :drawable-content)
                    (let ((text (getf (ui-node-props node) :text "")))
-                     (loop with current-x = 0 with current-y = 0
-                           for char-index from 0 below
-                                                 (length text)
-                           for char = (aref text char-index)
-                           do (progn (when
-                                         (>= current-x content-w)
-                                       (setf current-x 0)
-                                       (incf current-y))
-                                     (when (>= current-y content-h) (return))
-                                     (let ((target-r (+ content-abs-y current-y))
-                                           (target-c (+ content-abs-x current-x)))
-                                       (when (and (>= target-r 0)
-                                                  (< target-r buffer-h)
-                                                  (>= target-c 0)
-                                                  (< target-c buffer-w))
-                                         (let* ((cell-style (elmtui.platform.backend.common.virtual-buffer:buffer-style canvas-buffer target-r target-c))
-                                                (existing-bg (when cell-style (terminal-style-bg-color cell-style)))
-                                                (fg-color (terminal-style-fg-color terminal-style))
-                                                (text-style (make-terminal-style
-                                                             :fg-color fg-color
-                                                             :bg-color (or (terminal-style-bg-color terminal-style) existing-bg)
-                                                             :bold (when terminal-style (terminal-style-bold terminal-style))
-                                                             :italic (when terminal-style (terminal-style-italic terminal-style))
-                                                             :underline (when terminal-style (terminal-style-underline terminal-style))
-                                                             :inverse (when terminal-style (terminal-style-inverse terminal-style))
-                                                             :faint (when terminal-style (terminal-style-faint terminal-style))
-                                                             :blink (when terminal-style (terminal-style-blink terminal-style))
-                                                             :strike (when terminal-style (terminal-style-strike terminal-style))
-                                                             :invisible (when terminal-style (terminal-style-invisible terminal-style)))))
-                                           (set-buffer-cell-at canvas-buffer target-r target-c char text-style))))
-                                     (incf current-x)
-                                     (when (>= current-x content-w) ; Wrap line
-                                       (setf current-x 0)
-                                       (incf current-y))))
+                     (loop with current-x = 0
+                           with current-y = 0
+                           for char across text
+                           do
+                              (when (>= current-y content-h) (return))
+                              (let ((target-r (+ content-abs-y current-y))
+                                    (target-c (+ content-abs-x current-x)))
+                                (when (and (>= target-r 0) (< target-r buffer-h)
+                                           (>= target-c 0) (< target-c buffer-w))
+                                  (let* ((existing-style (buffer-cell-style (buffer-cell-at canvas-buffer target-r target-c)))
+                                         (text-style (copy-term-style terminal-style)))
+                                    ;; Inherit background if text style doesn't have one
+                                    (unless (terminal-style-bg-color text-style)
+                                      (setf (terminal-style-bg-color text-style)
+                                            (when existing-style (terminal-style-bg-color existing-style))))
+                                    (set-buffer-cell-at canvas-buffer target-r target-c char text-style))))
+                              (incf current-x)
+                              (when (>= current-x content-w) ; Wrap line
+                                (setf current-x 0)
+                                (incf current-y)))))))
+              ;; Add other node types here as needed
+              )))
 
-                     ;; (incf current-x)))
-
-                     ;; (loop with current-x = 0
-                     ;;       with current-y = 0
-                     ;;       for char-index from 0 below (length text)
-                     ;;       for char = (aref text char-index)
-                     ;;       do
-                     ;;          (when (>= current-y content-h) (return)) ; Stop if content height is exceeded
-                     ;;          (let ((target-r (+ content-abs-y current-y))
-                     ;;                (target-c (+ content-abs-x current-x)))
-                     ;;            (when (and (>= target-r 0) (< target-r buffer-h)
-                     ;;                       (>= target-c 0) (< target-c buffer-w))
-                     ;;              (let* ((cell-style (elmtui.platform.backend.common.virtual-buffer:buffer-style canvas-buffer target-r target-c))
-                     ;;                     (existing-bg (when cell-style (terminal-style-bg-color cell-style)))
-                     ;;                     (fg-color (terminal-style-fg-color terminal-style))
-                     ;;                     (text-style (make-terminal-style
-                     ;;                                  :fg-color fg-color
-                     ;;                                  :bg-color (or (terminal-style-bg-color terminal-style) existing-bg)
-                     ;;                                  :bold (when terminal-style (terminal-style-bold terminal-style))
-                     ;;                                  :italic (when terminal-style (terminal-style-italic terminal-style))
-                     ;;                                  :underline (when terminal-style (terminal-style-underline terminal-style))
-                     ;;                                  :inverse (when terminal-style (terminal-style-inverse terminal-style))
-                     ;;                                  :faint (when terminal-style (terminal-style-faint terminal-style))
-                     ;;                                  :blink (when terminal-style (terminal-style-blink terminal-style))
-                     ;;                                  :strike (when terminal-style (terminal-style-strike terminal-style))
-                     ;;                                  :invisible (when terminal-style (terminal-style-invisible terminal-style)))))
-                     ;;                (set-buffer-cell-at canvas-buffer target-r target-c char text-style))))
-                     ;;          (incf current-x)
-                     ;;          (when (>= current-x content-w) ; Wrap line
-                     ;;            (setf current-x 0)
-                     ;;            (incf current-y)))
-                     )))
-                ;; Add other node types here as needed
-                ))))
+        ;; DEBUG: Check cell at end of render
+        ;; (let ((final-cell (buffer-cell-at canvas-buffer 0 0)))
+        ;;   (format t "DEBUG: Cell (0,0) at END of render: ~S~%" final-cell)
+        ;;   (format t "DEBUG: Cell bg-color at END of render: ~S~%"
+        ;;           (when final-cell (terminal-style-bg-color (buffer-cell-style final-cell)))))
 
         ;; Recursively render children
         (dolist (child (ui-node-children node))
@@ -327,10 +345,12 @@
     (laid-out-tree &key buffer)
   "Renders the laid-out UI tree to the virtual buffer (Stage 5)."
   (check-type buffer virtual-terminal-buffer)
-  (log-info "TREE-RENDERER: Starting render to buffer.")
+  (format t "TREE-RENDERER: Starting render to buffer.")
+  (format t "TREE-RENDERER DEBUG: laid-out-tree = ~A" laid-out-tree)
+  (format t "TREE-RENDERER DEBUG: first node = ~A" (first laid-out-tree))
   (clear-buffer buffer) ; Prepare canvas by clearing or resetting to default
   (%render-node (first laid-out-tree) buffer 0 0)
-  (log-info "TREE-RENDERER: Finished render to buffer.")
+  (format t "TREE-RENDERER: Finished render to buffer.")
   buffer)
 
 ;; Ensure all functions are properly closed and the file ends correctly.
@@ -344,7 +364,7 @@
 ;;     (:double (list :h #\═ :v #\║ :tl #\╔ :tr #\╗ :bl #\╚ :br #\╝))
 ;;     (t        (progn
 ;;                 (unless (or (null style) (eq style :none) (eq style :solid)) ; don't warn for common/default cases
-;;                   (log-warn "TREE-RENDERER: Unknown border style '~A', defaulting to :solid." style))
+;;                   (format t "TREE-RENDERER: Unknown border style '~A', defaulting to :solid." style))
 ;;                 (list :h #\─ :v #\│ :tl #\┌ :tr #\┐ :bl #\└ :br #\┘)))))
 
 ;; (defun convert-abstract-style-to-terminal-style (node)

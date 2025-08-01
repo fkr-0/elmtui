@@ -556,19 +556,25 @@ the escape sequence as byte stream."
      :bg (terminal-color-bg color)
      :color-256 (terminal-color-color-256 color))))
 (defun copy-term-style (style)
-  "Creates a deep copy of a terminal-style instance."
-  (when style
-    (make-terminal-style
-     :fg-color (copy-term-color (terminal-style-fg-color style))
-     :bg-color (copy-term-color (terminal-style-bg-color style))
-     :bold (terminal-style-bold style)
-     :italic (terminal-style-italic style)
-     :underline (terminal-style-underline style)
-     :faint (terminal-style-faint style)
-     :blink (terminal-style-blink style)
-     :inverse (terminal-style-inverse style)
-     :strike (terminal-style-strike style)
-     :invisible (terminal-style-invisible style))))
+  "Creates a deep copy of a terminal-style instance.
+   Returns NIL if style is NIL, otherwise always returns a terminal-style."
+  (if (null style)
+      nil
+      (make-terminal-style
+       :fg-color (copy-term-color (terminal-style-fg-color style))
+       :bg-color (copy-term-color (terminal-style-bg-color style))
+       :bold (terminal-style-bold style)
+       :italic (terminal-style-italic style)
+       :underline (terminal-style-underline style)
+       :faint (terminal-style-faint style)
+       :blink (terminal-style-blink style)
+       :inverse (terminal-style-inverse style)
+       :strike (terminal-style-strike style)
+       :invisible (terminal-style-invisible style))))
+
+;; (defun copy-terminal-style (style)
+;;   "Alias for copy-term-style to maintain backward compatibility."
+;;   (copy-term-style style))
 ;; (dotimes (i (length output))
 ;;     (as-utf-8-bytes (char output i) (lambda (x) (write-byte x (fd term)))))
 

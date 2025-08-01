@@ -145,10 +145,31 @@
 ;;               (apply ufn (list elmtui.platform.driver::*current-app-model* msg)))))
 ;; enqueue term size update
 ;; (funcall (elmtui.platform.backend.terminal::terminal-instance-publish-fn
-;;           elmtui.platform.driver::*backend*) (list :terminal-resized :new-dimensions (list 40 40)))
+;;           elmtui.platform.driver::*backend*) (list :terminal-resized :new-dimensions (list 33 33)))
 ;; (elmtui.core.loop:start-loop )
 ;; (elmtui.platform.driver::render-frame
 ;;  elmtui.platform.driver::*app-spec*
 ;;  elmtui.platform.driver::*current-app-model*
 ;;  elmtui.platform.driver::*backend*)
 ;; elmtui.platform.driver::*last-ctx*
+(defun buffer->string (buffer)
+  "Convert a virtual buffer to a string representation."
+  (let ((rows-count (elmtui.platform.backend.common.virtual-buffer:buffer-height buffer))
+        (cols-count (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer)))
+    (with-output-to-string
+        (a)
+      (dotimes (row rows-count)
+        (progn
+          (dotimes (col cols-count)
+            (let ((cell (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at buffer row col)))
+              (format t "~c" (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell))))
+          (format t "~%")))
+      (format t "~%"))))
+
+(defmacro with-buffer-dump ((buffer) &body body)
+  `(handler-bind
+       ((error (lambda (c)
+                 (format *error-output* "~%Buffer state on error:~%~A"
+                         (buffer->string ,buffer))
+                 (invoke-debugger c))))
+     ,@body))

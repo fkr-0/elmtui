@@ -29,7 +29,9 @@
     (push child-a (flex-item-children root))
 
     (layout-flex-container root)
-
+    ;; (dump-rect-tree
+    ;; root)
+    ;; (list grand child-a root)
     (is (= 10 (elmtui.view.geo:x (et.geo:rectangle child-a))))
     (is (= 5  (elmtui.view.geo:y (et.geo:rectangle child-a))))
     (is (= 10 (elmtui.view.geo:x (et.geo:rectangle grand))) "grandchild got X offset")

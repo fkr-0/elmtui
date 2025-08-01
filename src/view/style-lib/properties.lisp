@@ -902,3 +902,12 @@ against the property's type definition."
 ;; Add other common styles as needed, e.g., for flexbox, grid, text alignment, etc.
 ;; (defstyle :width '(or integer keyword list) :default :auto) ; :fill, :auto, (percent 50)
 ;; (defstyle :height '(or integer keyword list) :default :auto)
+
+;; err?
+;; ;; create a stye-set using e.g.
+;; (defstylegroup :my-style
+;;   (:padding 10)
+;;   (:margin 5)
+;;   (:border-color :red)
+;;   (:border-style :solid)
+;;   (:display :block))

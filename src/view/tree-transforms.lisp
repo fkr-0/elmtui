@@ -34,12 +34,12 @@
   APP-STATE is the global application state, potentially needed by component view methods.
   Returns an atomic UI-Node tree (list containing one root atomic node)."
   ;; (declare (ignore app-state))
-  (log:debug "TREE-TRANSFORMS: resolve-view - Processing ~D styled top-level node(s)."
-             (length styled-tree))
+  (log-info "TREE-TRANSFORMS: resolve-view - Processing ~D styled top-level node(s)."
+            (length styled-tree))
   (labels ((resolve-node (item parent-id-path)
              (cond
                ((typep item 'component)
-                (log:debug "TREE-TRANSFORMS: resolve-view - Resolving component ID: ~S" (id item))
+                (log-info "TREE-TRANSFORMS: resolve-view - Resolving component ID: ~S" (id item))
                 ;; If it's a component instance, call its view method,
                 ;; then recursively resolve the resulting UI-node tree.
                 ;; The view returns a raw ui-node, which then needs styling and further resolution.
@@ -51,12 +51,12 @@
                 ;; If 'item' is a component here, it means it wasn't resolved by render-view, which is unlikely.
                 ;; This path should ideally not be hit if render-view fully resolves components to ui-nodes.
                 ;; For now, let's assume 'styled-tree' contains only styled-ui-nodes.
-                (log:warn "TREE-TRANSFORMS: resolve-view - Encountered a component ~S directly in styled-tree. This might indicate an issue in prior pipeline stages." (id item))
+                (log-info "TREE-TRANSFORMS: resolve-view - Encountered a component ~S directly in styled-tree. This might indicate an issue in prior pipeline stages." (id item))
                 item) ; Pass through if this unexpected case occurs
 
                ((typep item 'styled-ui-node)
-                (log:debug "TREE-TRANSFORMS: resolve-view - Resolving styled-ui-node ID: ~S, Type: ~S"
-                           (getf (ui-node-props item) :id) (ui-node-type item))
+                (log-info "TREE-TRANSFORMS: resolve-view - Resolving styled-ui-node ID: ~S, Type: ~S"
+                          (getf (ui-node-props item) :id) (ui-node-type item))
                 (let* ((node-type (ui-node-type item))
                        (props (ui-node-props item))
                        (children (ui-node-children item))
@@ -68,7 +68,7 @@
                   ;; 1. Handle :overflow style for scrollable content
                   (when (or (member overflow-x '(:scroll :auto :hidden))
                             (member overflow-y '(:scroll :auto :hidden)))
-                    (log:debug "TREE-TRANSFORMS: resolve-view - Applying :overflow transformation for node ID: ~S" (getf props :id))
+                    (log-info "TREE-TRANSFORMS: resolve-view - Applying :overflow transformation for node ID: ~S" (getf props :id))
                     ;; Wrap children in a :viewport node.
                     ;; The original node becomes the container for this viewport.
                     (let* ((viewport-id (gensym "VIEWPORT-"))
@@ -91,7 +91,7 @@
                   ;; 2. Handle :display style (structural implications)
                   (cond
                     ((eq display-style :none)
-                     (log:debug "TREE-TRANSFORMS: resolve-view - Node ID: ~S has display:none. Returning NIL." (getf props :id))
+                     (log-info "TREE-TRANSFORMS: resolve-view - Node ID: ~S has display:none. Returning NIL." (getf props :id))
                      (return-from resolve-node nil)) ; Node and its children are not rendered
 
                     ((member display-style '(:flex :grid))
@@ -100,7 +100,7 @@
                      ;; If the node is not already :layout, we could wrap its children or change its type.
                      ;; Let's assume layout-view will correctly interpret display:flex/grid on any styled-node.
                      ;; No structural change here, but layout-view will use this display property.
-                     (log:debug "TREE-TRANSFORMS: resolve-view - Node ID: ~S has display:~A. No structural change, layout will handle." (getf props :id) display-style))
+                     (log-info "TREE-TRANSFORMS: resolve-view - Node ID: ~S has display:~A. No structural change, layout will handle." (getf props :id) display-style))
 
                     ((eq node-type :text-input) ; Example of resolving a complex component to simpler ones
                      ;; A text-input might resolve to a :drawable-content for text and a :cursor node
@@ -119,7 +119,7 @@
                         (copy-styled-node resolved-item :children resolved-children))))) ; Return copy with new children
 
                ((ui-node-p item) ; Plain ui-node, should ideally not happen after 'apply-style'
-                (log:warn "TREE-TRANSFORMS: resolve-view - Encountered plain ui-node ~S. Should be styled-ui-node." item)
+                (log-info "TREE-TRANSFORMS: resolve-view - Encountered plain ui-node ~S. Should be styled-ui-node." item)
                 ;; Fallback: try to resolve its children
                 (let ((resolved-children (mapcar (lambda (c) (resolve-node c parent-id-path)) (ui-node-children item))))
                   (if (eq (ui-node-children item) resolved-children)
