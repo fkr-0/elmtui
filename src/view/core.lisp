@@ -11,7 +11,7 @@
   (:export
    ;; Core Types
    :ui-node :ui-node-p :make-ui-node :copy-ui-node
-
+   :ui-node-type :ui-node-props :ui-node-children
    ;; View Definition
    :defview :with-view-context
    ;; Node Creation DSL

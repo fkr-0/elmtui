@@ -26,6 +26,7 @@
    #:ui-node-children
    #:ui-node-props
    #:styled-ui-node
+   #:styled-ui-node-style-map
    :make-styled-node       ; Constructor
    :copy-styled-node       ; Copier
    :apply-stylesheet-to-tree ; Main styling function
@@ -69,7 +70,7 @@
 ;;; Node Creation / Copying
 ;;;-----------------------------------------------------------------------------
 
-(defun make-styled-node (&key type props children (parent nil))
+(defun make-styled-node (&key type props children (styles nil) (parent nil))
   "Create a new styled UI node.
    Props should include :id and :classes for styling selectors.
    PARENT is the direct parent styled-ui-node (used for :parents initarg of stylable)."
@@ -90,9 +91,27 @@
     (setf (ui-node-children node) children)
 
     ;; Initialize style-map: convert inline styles from :style prop to a plist
-    (let ((inline-style-data (getf props :style)))
-      (when (and inline-style-data (listp inline-style-data))
-        (setf (styled-ui-node-style-map node) inline-style-data)))
+    (let ((inline-style-data (or styles (getf props :style))))
+      (cond
+        ((listp inline-style-data)
+         ;; Direct plist - use as-is
+         (setf (styled-ui-node-style-map node) inline-style-data))
+        ((typep inline-style-data 'elmtui.style-lib.api:style-set)
+         ;; Convert style-set to plist with raw values
+         (let ((plist nil))
+           (maphash (lambda (key value)
+                      ;; Extract raw value from style object
+                      (let ((raw-value (if (typep value 'elmtui.style-lib.api:style)
+                                          (elmtui.style-lib.api:style-property-value-raw-value
+                                           (elmtui.style-lib.api:style-value value))
+                                          value)))
+                        (setf plist (append plist (list key raw-value)))))
+                    (elmtui.style-lib.api:style-set-styles inline-style-data))
+           (setf (styled-ui-node-style-map node) plist)))
+        (t
+         ;; Other types - ignore or log warning
+         (when inline-style-data
+           (log-warn "STYLED: Unsupported style data type: ~A" (type-of inline-style-data))))))
     node))
 
 (defun copy-styled-node (node &key type props children parent)

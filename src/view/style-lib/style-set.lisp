@@ -15,10 +15,9 @@
                 #:hash-table-keys #:hash-table-values #:apply-after) ; Added apply-after
   (:export :style-of :value-of :set-style :merge-sets! :copy-set
    :parse-styles
-           :new
-   :*default-style-set*
-           :default-styles
-   :around-styles :ordered-around-styles))
+           :*default-style-set*
+   :default-styles
+           :around-styles :ordered-around-styles))
 
 (in-package :elmtui.style-lib.style-set)
 
@@ -56,6 +55,9 @@
 (defun copy-set (set) (merge-sets! (make-style-set) set))
 
 (defun parse-styles (&rest raw)
+  "Parse a list of raw styles into a list of style objects.
+   Each style is expected to be a cons cell (property . value-spec).
+   Returns a list of style objects."
   (loop for (k v) on raw by #'cddr collect (make-style k v)))
 
 ;; (defun styles-list (set)
@@ -129,6 +131,7 @@
                 (when (and sub-style (typep sub-style 'style))
                   (setf (gethash (style-property-of sub-style) hash) sub-style)))))))
     hash))
+
 ;; (defun styles-list (set)
 ;;   (loop for k in (sort (hash-table-keys (style-set-styles set))
 ;;                    (lambda (a b) (string< (symbol-name a) (symbol-name b))))
@@ -151,6 +154,7 @@
           (if (listp styles) (style-list-to-hash styles)
               styles))
     (when (style-set-valid set) set)))
+
 ;; (make-style :padding '(2))
 ;; (defvar *default-styles*
 ;;   (default-style-set)

@@ -152,6 +152,7 @@ Any key event or :app-quit-requested sets :should-quit to t."
                        :style (:width :fill
                                :height :fill
                                :min-width 1
+                               :fg-color ,(rgb rgb-val)
                                :bg-color ,(rgb rgb-val))
                        :children nil)))) ;;,(list :text :content "abcdefgh123456")))))
 
