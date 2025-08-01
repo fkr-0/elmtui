@@ -354,10 +354,10 @@ Returns the modified BUFFER."
   (let ((processed-style (cond
                            ((null style) nil)
                            ((typep style 'terminal-style)
-                            (format t "SET-BUFFER-CELL-AT: Copying terminal-style: ~S~%" style)
+                            ;; (format t "SET-BUFFER-CELL-AT: Copying terminal-style: ~S~%" style)
                             (let ((copied (copy-term-style style)))
-                              (format t "SET-BUFFER-CELL-AT: Copy result: ~S~%" copied)
-                              (format t "SET-BUFFER-CELL-AT: Copy result type: ~S~%" (type-of copied))
+                              ;; (format t "SET-BUFFER-CELL-AT: Copy result: ~S~%" copied)
+                              ;; (format t "SET-BUFFER-CELL-AT: Copy result type: ~S~%" (type-of copied))
                               copied))
                            ((listp style) (as-plist style))
                            (t (error "Unsupported style type: ~A" (type-of style))))))

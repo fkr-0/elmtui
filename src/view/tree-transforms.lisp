@@ -33,6 +33,7 @@
   STYLED-TREE is a list containing one styled root node.
   APP-STATE is the global application state, potentially needed by component view methods.
   Returns an atomic UI-Node tree (list containing one root atomic node)."
+                                        ; Ignore app-state for now, as it's not used in this stage
   ;; (declare (ignore app-state))
   (log-info "TREE-TRANSFORMS: resolve-view - Processing ~D styled top-level node(s)."
             (length styled-tree))

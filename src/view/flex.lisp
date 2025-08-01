@@ -79,6 +79,7 @@ ACC‑X/ACC‑Y is the accumulated offset from all ancestors *so far*."
 
 (defun propagate-offset! (item dx dy)
   "Shift ITEM’s rectangle by DX/DY **and** do the same for the whole subtree."
+  ;; (format t "Propagating offset ~A, ~A for item: ~A" dx dy item)
   (dx! (rectangle item) dx)
   (dy! (rectangle item) dy)
   (when (typep item 'flex-container)
@@ -909,97 +910,66 @@ Purity:
 ;;; ----------------------------------------------------------------------------
 ;;; HIGH-LEVEL LAYOUT FUNCTION
 ;;; ----------------------------------------------------------------------------
-;; (defun layout-flex-container (maybe-node-container &optional self-content-rect parent-style-set)
-;;   "Layout the flex CONTAINER and its children. Returns the container."
+;; ➊ the algorithm that resolves lengths, lines, justify‑content, align‑items
+;; (defun layout-flex-container (maybe-node-container
+;;                               &optional self-content-rect parent-style-set)
+;;   "Lay out a flex container and all its descendants and return the container
+;;    (with every item's rectangle in ABSOLUTE coordinates)."
 
+;;   ;; ────────────────── wrap the old body in a LET* so we can re‑order things
 ;;   (let* ((container (if (typep maybe-node-container 'styled-ui-node)
-;;                         (node->flex-item maybe-node-container)
+;;                         (node->flex-item maybe-node-container self-content-rect)
 ;;                         maybe-node-container))
-;;          (main-axis (main-axis container))
-;;          (available-main-size (derive-available-main-size container))
+;;          (main-axis           (main-axis container))
+;;          (available-main-size  (derive-available-main-size  container))
 ;;          (available-cross-size (derive-available-cross-size container))
-;;          (items (flex-item-children container)))
+;;          (items               (flex-item-children container)))
 
 ;;     (unless (and (rectangle container) (valid-p (rectangle container)))
 ;;       (error "Flex container requires a valid rectangle for layout: ~A" container))
 
 ;;     (resolve-flexible-lengths items available-main-size main-axis)
-
 ;;     (let ((lines (collect-flex-lines container available-main-size main-axis)))
 ;;       (dolist (line lines)
 ;;         (justify-content-alignment line container available-main-size main-axis))
 ;;       (align-cross-axis lines container available-cross-size main-axis)
+
+;;       ;; ➋ recurse into nested flex containers **before** we add any offset
 ;;       (layout-nested-containers container)
-;;       (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
-;;         (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
-;;           (declare (ignore total-lines-cross-size))
-;;           ))
-;;       (let ((offset-x (x container))
-;;             (offset-y (y container)))
-;;         (dolist (item items)
-;;           (dx! (rectangle item) offset-x)
-;;           (dy! (rectangle item) offset-y)))
-;;       container)))
-;;; Patch #1 – shift children BEFORE recursing  ────────────────────────────────
-;; ➊ the algorithm that resolves lengths, lines, justify‑content, align‑items
-(defun layout-flex-container (maybe-node-container
-                              &optional self-content-rect parent-style-set)
-  "Lay out a flex container and all its descendants and return the container
-   (with every item's rectangle in ABSOLUTE coordinates)."
 
-  ;; ────────────────── wrap the old body in a LET* so we can re‑order things
-  (let* ((container (if (typep maybe-node-container 'styled-ui-node)
-                        (node->flex-item maybe-node-container self-content-rect)
-                        maybe-node-container))
-         (main-axis           (main-axis container))
-         (available-main-size  (derive-available-main-size  container))
-         (available-cross-size (derive-available-cross-size container))
-         (items               (flex-item-children container)))
+;;       ;; ➌ now shift the *entire* subtree exactly once
+;;       ;; (propagate-offset! container (x container) (y container))
+;;       (%propagate-absolute! container 0 0)
+;;       ;; 1. Resolve flexible lengths & collect lines (unchanged)
+;;       (resolve-flexible-lengths items available-main-size main-axis)
+;;       (let ((lines (collect-flex-lines container available-main-size main-axis)))
+;;         (dolist (line lines)
+;;           (justify-content-alignment line container available-main-size main-axis))
+;;         (align-cross-axis lines container available-cross-size main-axis)
 
-    (unless (and (rectangle container) (valid-p (rectangle container)))
-      (error "Flex container requires a valid rectangle for layout: ~A" container))
+;;         ;;   ;; 2. *** NEW ORDER: apply the container’s offset to EVERY direct child
+;;         ;;   ;;    BEFORE we recurse so grandchildren inherit it naturally. ***
+;;         (let ((dx (x container))
+;;               (dy (y container)))
+;;           (dolist (item items)
+;;             (dx! (rectangle item) dx)
+;;             (dy! (rectangle item) dy)))
 
-    (resolve-flexible-lengths items available-main-size main-axis)
-    (let ((lines (collect-flex-lines container available-main-size main-axis)))
-      (dolist (line lines)
-        (justify-content-alignment line container available-main-size main-axis))
-      (align-cross-axis lines container available-cross-size main-axis)
+;;         ;;   ;; 3. Now descend into nested flex containers (they now start at abs coords)
+;;         (layout-nested-containers container)
 
-      ;; ➋ recurse into nested flex containers **before** we add any offset
-      (layout-nested-containers container)
+;;         ;;   ;; 4. (Optional bookkeeping for wrap height – unchanged)
+;;         (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
+;;           (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
+;;             (declare (ignore total-lines-cross-size))))
 
-      ;; ➌ now shift the *entire* subtree exactly once
-      ;; (propagate-offset! container (x container) (y container))
-      (%propagate-absolute! container 0 0)
-      ;; 1. Resolve flexible lengths & collect lines (unchanged)
-      ;; (resolve-flexible-lengths items available-main-size main-axis)
-      ;; (let ((lines (collect-flex-lines container available-main-size main-axis)))
-      ;;   (dolist (line lines)
-      ;;     (justify-content-alignment line container available-main-size main-axis))
-      ;;   (align-cross-axis lines container available-cross-size main-axis)
-
-      ;;   ;; 2. *** NEW ORDER: apply the container’s offset to EVERY direct child
-      ;;   ;;    BEFORE we recurse so grandchildren inherit it naturally. ***
-      ;;   (let ((dx (x container))
-      ;;         (dy (y container)))
-      ;;     (dolist (item items)
-      ;;       (dx! (rectangle item) dx)
-      ;;       (dy! (rectangle item) dy)))
-
-      ;;   ;; 3. Now descend into nested flex containers (they now start at abs coords)
-      ;;   (layout-nested-containers container)
-
-      ;;   ;; 4. (Optional bookkeeping for wrap height – unchanged)
-      ;;   (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
-      ;;     (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
-      ;;       (declare (ignore total-lines-cross-size))))
-
-      container)))
+;;         container))))
 
 ;;; Patch #1b – keep the old public name alive for callers
 (defun compute-flex-layout (container &rest args)
   "Compatibility shim – just forwards to LAYOUT-FLEX-CONTAINER."
   (apply #'layout-flex-container container args))
+
 (defun node->flex-item (node &optional (rect nil))
   "Convert a styled-ui-node to a flex-item or flex-container instance."
   (let* ((is-flex-container (eq (style-value node :display) :flex))
@@ -1029,48 +999,59 @@ Purity:
     (apply #'make-instance (if is-flex-container 'flex-container 'flex-item)
            (append common-args container-args))))
 
-;; (defun compute-flex-layout (container-node &optional self-content-rect parent-style-set)
-;;   "Layout the flex CONTAINER-NODE and its children. Returns the container.
+(defun layout-flex-container (container-node &optional self-content-rect parent-style-set)
+  "Layout the flex CONTAINER-NODE and its children. Returns the container.
 
-;;    SELF-CONTENT-RECT is the rectangle for self-content, if provided.
-;;    PARENT-STYLE-SET is ignored in this context.
-;;    This function assumes the container-node is a flex container with children that may also be flex containers.
+   SELF-CONTENT-RECT is the rectangle for self-content, if provided.
+   PARENT-STYLE-SET is ignored in this context.
+   This function assumes the container-node is a flex container with children that may also be flex containers.
 
-;;    It computes the layout based on flexbox rules, including resolving flexible lengths,
-;;    collecting flex lines, justifying content, and aligning items in the cross axis.
+   It computes the layout based on flexbox rules, including resolving flexible lengths,
+   collecting flex lines, justifying content, and aligning items in the cross axis.
 
-;;    The function modifies the rectangles of flex items in place, setting their positions and sizes.
-;;    For nested flex containers, it recursively calls compute-flex-layout on each child flex container.
-;; "
-;;   (declare (ignore parent-style-set))
-;;   (let* ((container (node->flex-item container-node self-content-rect))
-;;          (main-axis (main-axis container))
-;;          (available-main-size (derive-available-main-size container))
-;;          (available-cross-size (derive-available-cross-size container))
-;;          (items (flex-item-children container)))
+   The function modifies the rectangles of flex items in place, setting their positions and sizes.
+   For nested flex containers, it recursively calls compute-flex-layout on each child flex container.
+"
+  (declare (ignore parent-style-set))
+  (let* ((container
+           (if (typep container-node 'styled-ui-node)
+               (node->flex-item container-node self-content-rect)
+               container-node))
+         (main-axis (main-axis container))
+         (available-main-size (derive-available-main-size container))
+         (available-cross-size (derive-available-cross-size container))
+         (items (flex-item-children container)))
 
-;;     (unless (and (rectangle container) (valid-p (rectangle container)))
-;;       (error "Flex container requires a valid rectangle for layout: ~A" container))
+    (unless (and (rectangle container) (valid-p (rectangle container)))
+      (error "Flex container requires a valid rectangle for layout: ~A" container))
 
-;;     (resolve-flexible-lengths items available-main-size main-axis)
+    (resolve-flexible-lengths items available-main-size main-axis)
 
-;;     (let ((lines (collect-flex-lines container available-main-size main-axis)))
-;;       (dolist (line lines)
-;;         (justify-content-alignment line container available-main-size main-axis))
-;;       (align-cross-axis lines container available-cross-size main-axis)
-;;       (dolist (item items)
-;;         (when (typep item 'flex-container)
-;;           (compute-flex-layout item nil nil)))
-;;       (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
-;;         (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
-;;           (declare (ignore total-lines-cross-size))
-;;           ))
-;;       (let ((offset-x (x container))
-;;             (offset-y (y container)))
-;;         (dolist (item items)
-;;           (let* ((rect (rectangle item))
-;;                  (s (format nil "~A->" rect)))
-;;             (setf (x rect) (+ (x rect) offset-x))
-;;             (setf (y rect) (+ (y rect) offset-y))
-;;             (log-info "Item ~A positioned: ~A~A" item s (rectangle item)))))
-;;       container)))
+    (let ((lines (collect-flex-lines container available-main-size main-axis)))
+      (dolist (line lines)
+        (justify-content-alignment line container available-main-size main-axis))
+      (align-cross-axis lines container available-cross-size main-axis)
+      (dolist (item items)
+                                        ;(when (typep item 'flex-container)
+        (compute-flex-layout item nil nil));)
+
+                                        ; <-- the crucial change
+      (let ((dx (x container))
+            (dy (y container)))
+        (when (or (/= dx 0) (/= dy 0))
+          (dolist (item items)
+            (propagate-offset! item dx dy))))
+      (when (and (member (flex-wrap container) '(:wrap :wrap-reverse)) lines)
+        (let ((total-lines-cross-size (reduce #'+ lines :key #'cross-size :initial-value 0)))
+          (declare (ignore total-lines-cross-size))
+          ))
+      ;; (let ((offset-x (x container))
+      ;;       (offset-y (y container)))
+      ;;   (dolist (item items)
+      ;;     (let* ((rect (rectangle item))
+      ;;            (s (format nil "~A->" rect)))
+      ;;       (setf (x rect) (+ (x rect) offset-x))
+      ;;       (setf (y rect) (+ (y rect) offset-y))
+      ;;       (log-info "Item ~A positioned: ~A~A" item s (rectangle item)))))
+
+      container)))
