@@ -173,6 +173,7 @@ defining models and messages, and creating update functions, following Elm Archi
    #:update-result #:make-update-result #:ur-patches #:ur-commands
    #:ur-add-command
    #:ur-commands
+   #:ur-handled
    #:ur-has-command-p
    #:ur-patches
    #:with-model-access
@@ -255,7 +256,11 @@ defining models and messages, and creating update functions, following Elm Archi
   "Represents the result of an update operation, containing patches to apply to the state
 and commands to be executed."
   (patches nil :type list)
-  (commands nil :type list))
+  (commands nil :type list)
+  (handled nil :type (or boolean null))) ; Indicates if the result has been handled
+;; (:constructor make-update-result (patches commands &optional handled))
+;; (:copier nil) ; Prevent copying to avoid unintended side effects
+;; (:predicate ur-p))
 
 ;; (defgeneric app-state-p (state))
 ;; (defmethod app-state-p ((state t))

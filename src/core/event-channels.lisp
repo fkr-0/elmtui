@@ -209,7 +209,11 @@ Returns the message, or NIL on timeout / no data."
   "Block until the **first ready event** arrives on one of EVENT-CHANNELS.
    Channels are probed in priority order.
    Returns two values: *EVENT* and the originating *EVENT-CHANNEL* object,
-   or NIL if TIMEOUT (seconds) expires."
+   or NIL if TIMEOUT (seconds) expires.
+
+   Use timeout to limit the wait duration in case you want to realize some
+   responsiveness in your application. If TIMEOUT is NIL or not positive,
+    the function will block indefinitely until an event is received."
   (let* ((sorted-event-channels (stable-sort (copy-seq event-channels) ; Sort the wrapper objects
                                              #'<
                                              :key (lambda (ec) ; ec is an event-channel object

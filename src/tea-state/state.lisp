@@ -1,27 +1,28 @@
 (uiop:define-package :elmtui.tea-state.state
   (:use :cl)
   (:import-from :elmtui.utils #:get-path #:set-path #:as
-                #:copy-hash-table)
+    #:copy-hash-table)
   (:export #:application-state
-           #:make-application-state
-           #:application-state-p
-           #:application-state-data
-           #:application-state-lock
-           #:application-state-log
-           #:application-state-history
-           #:application-state-undone
-           #:application-state-version
-           #:application-state-observers
-           #:application-state-p
-           #:tx
-           #:make-tx
-           #:tx-p
-           #:tx-id
-           #:state-ref
-           #:tx-name
-           #:tx-changes
-           #:make-state
-           #:get-state))
+    #:make-application-state
+    #:application-state-p
+    #:application-state-data
+    #:application-state-lock
+    #:application-state-log
+    #:application-state-history
+    #:application-state-undone
+    #:application-state-version
+    #:application-state-observers
+    #:application-state-p
+    #:tx
+    #:make-tx
+    #:tx-p
+    #:tx-id
+    #:state-ref
+    #:state-set
+    #:tx-name
+    #:tx-changes
+    #:make-state
+    #:get-state))
 
 (in-package :elmtui.tea-state.state)
 
@@ -36,12 +37,12 @@
 ;; Deep copy helper (unchanged)
 (defun deep-copy-application-state (app)
   (make-application-state
-   :data (copy-hash-table (application-state-data app))
-   :lock (sb-thread:make-mutex)
-   :log (copy-list (application-state-log app))
-   :history (copy-list (application-state-history app))
-   :undone (copy-list (application-state-undone app))
-   :observers (copy-list (application-state-observers app))))
+    :data (copy-hash-table (application-state-data app))
+    :lock (sb-thread:make-mutex)
+    :log (copy-list (application-state-log app))
+    :history (copy-list (application-state-history app))
+    :undone (copy-list (application-state-undone app))
+    :observers (copy-list (application-state-observers app))))
 
 ;; (defmethod state-ref :before (app  key  &optional default)
 ;;   (format t "State-ref called with app: ~A, key: ~A, default: ~A~%" app key default))
@@ -125,8 +126,8 @@
 
   (sb-thread:with-mutex ((application-state-lock state))
     (let* ((data   (application-state-data state))
-           (old    (get-path key data :not-present))
-           (data*  (set-path data key value)))
+            (old    (get-path key data :not-present))
+            (data*  (set-path data key value)))
       (setf (application-state-data state) data*)
       (push (list key old value) (application-state-log state))
       (incf (application-state-version state))
@@ -134,15 +135,15 @@
 
 (defmethod get-path (path (data application-state) &optional default)
   (or (if (null path)
-          (application-state-data data)
-          (get-path path (application-state-data data) default)
-          ;; (let ((next
-          ;;         (get-path path (application-state-data data) default)))
-          ;;   (if (eq next default)
-          ;;       default
-          ;;       (get-path (cdr path) next default)))
-          )
-      default))
+        (application-state-data data)
+        (get-path path (application-state-data data) default)
+        ;; (let ((next
+        ;;         (get-path path (application-state-data data) default)))
+        ;;   (if (eq next default)
+        ;;       default
+        ;;       (get-path (cdr path) next default)))
+        )
+    default))
 ;; (defmethod get-path (path (state application-state) &optional default)
 ;;   "Gets value at PATH from application-state."
 ;;   (let ((data (application-state-data state)))
@@ -198,16 +199,17 @@
   (let ((app (make-application-state)))
     (when initial
       (loop for k being the hash-keys of initial using (hash-value v)
-            do (setf (gethash k (application-state-data app)) v)))
+        do (setf (gethash k (application-state-data app)) v)))
     app))
 (defmethod make-state ((initial null))
   (make-application-state
-   :data
-   (make-hash-table :test 'equal)))
+    :data
+    (make-hash-table :test 'equal)))
 
 (defmethod make-state ((initial list))
   (make-application-state :data
-                          (as :hash-table initial :test 'equal)))
+    (as :hash-table initial :test 'equal)))
+
 ;; (defmethod get-path (path (state application-state) &optional default)
 ;;   "Gets value at PATH from application-state."
 ;;   (let ((data (application-state-data state)))
