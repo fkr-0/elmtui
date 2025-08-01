@@ -346,8 +346,10 @@
 (defgeneric dy! (obj delta)
   (:documentation "Shift the object vertically by delta (mutating)."))
 
-(defmethod dx! ((p pos) delta) (incf (pos-x p)) p)
-(defmethod dy! ((p pos) delta) (incf (pos-y p)) p)
+(defmethod dx! ((p pos) delta)
+  (setf (pos-x p) (+ (pos-x p) delta)) p)
+(defmethod dy! ((p pos) delta)
+  (setf (pos-y p) (+ (pos-y p) delta)) p)
 (defmethod dx! ((r rectangle) delta) (dx! (pos r) delta) r)
 (defmethod dy! ((r rectangle) delta) (dy! (pos r) delta) r)
 

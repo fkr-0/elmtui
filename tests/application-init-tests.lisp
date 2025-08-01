@@ -232,7 +232,7 @@
 ;;          :id :root-label :text "Hello")))))
 
 (elmtui.app:defapplication my-state-test-app
-  :root-component-dsl '(:container :id :main)
+  :root-component-dsl '(:layout :id :main)
   :root-viewport-id :my-root
   :initial-state-plist '(:foo "bar"))
 (test state-initialization
@@ -243,5 +243,7 @@
     (is (typep state 'elmtui.tea-state.state:application-state))
     (is (string= "bar" (elmtui.state:get-path '(:foo) state)))
     (is (not (null (elmtui.state:get-path '(:components :my-root) state))))
-    (is (eq :container (elmtui.state:get-path '(:components :my-root :main :type) state)))
+    (is (eq :layout (elmtui.state:get-path '(:components :my-root :main :type) state)))
     (is (eq :main (elmtui.state:get-path '(:components :my-root :main :id) state)))))
+
+;; TODO test non-component

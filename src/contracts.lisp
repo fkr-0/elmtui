@@ -994,6 +994,7 @@
        ;;                            ,(format nil "~a input violated contract (expected ~a)."
        ;;                                     name in-type)))
        (defun ,name ,arglist
+         ;; (declare (ignorable ,arglist))
          ;; --- pre-condition -------------------------------------------------
          (check-type ,input-sym ,in-type
                      ,(format nil "~a input violated contract (expected ~a)."

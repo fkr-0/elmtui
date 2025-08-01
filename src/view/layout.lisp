@@ -594,10 +594,34 @@
 ;;   nil)
 
 (defun dump-rect-tree (node &optional (depth 0))
-  "Print the layout tree with absolute rectangles for quick inspection."
-  (format t "~&~v@T~A: ~S~%"
-          (* 2 depth)
-          (or (getf (ui-node-props node) :id) (ui-node-type node))
-          (getf (ui-node-props node) :layout-rect))
-  (dolist (child (ui-node-children node))
-    (dump-rect-tree child (1+ depth))))
+  "Print the layout tree with absolute rectangles for quick inspection.
+   NODE is the root of the tree, and DEPTH is used for indentation."
+  (etypecase node
+    (styled-ui-node
+     (format t "~&~v@T~A: ~S~%"
+             (* 2 depth)
+             (or (getf (ui-node-props node) :id) (ui-node-type node))
+             (getf (ui-node-props node) :layout-rect)))
+    (ui-node
+     (format t "~&~v@T~A: ~S~%"
+             (* 2 depth)
+             (or (getf (ui-node-props node) :id) (ui-node-type node))
+             (getf (ui-node-props node) :layout-rect)))
+    (elmtui.view.layout.flex:flex-container
+     (format t "~&~v@T~A: ~S~%"
+             (* 2 depth)
+             "hmf"
+             (rectangle node))) ;; Assuming `rectangle` accessor for flex-container
+    ;; (grid-container
+    ;;  (format t "~&~v@T~A: ~S~%"
+    ;;          (* 2 depth)
+    ;;          (or (getf (ui-node-props node) :id) (ui-node-type node))
+    ;;          (rectangle node))) ;; Assuming `rectangle` accessor for grid-container
+    (rectangle
+     (format t "~&~v@TRectangle: ~S~%" (* 2 depth) node)))
+
+  ;; Recursively dump children if the node has any
+  (when (and (typep node 'ui-node)
+             (slot-boundp node 'ui-node-children)) ;; Ensure the slot exists
+    (dolist (child (ui-node-children node))
+      (dump-rect-tree child (1+ depth)))))
