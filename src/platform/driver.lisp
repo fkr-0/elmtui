@@ -194,7 +194,6 @@ Args:
 ;;; ---------------------------------------------------------------------------
 ;;; Rendering Frame Logic
 ;;; ---------------------------------------------------------------------------
-
 (defun render-frame (app-spec current-model backend-instance)
   ;; (declare (type list app-spec current-model)
   ;;          (type t backend-instance))
@@ -216,7 +215,8 @@ Args:
                  (numberp viewport-width) (plusp viewport-width)
                  (numberp viewport-height) (plusp viewport-height)
                  (> viewport-width 1) (> viewport-height 1))
-      (log:error "DRIVER: Invalid parameters for render-frame.")
+      (log:error "DRIVER: Invalid parameters for render-frame. ~A ~A ~A"
+                 (typep view-fn 'function) viewport-width viewport-height)
       (return-from render-frame))
 
     (let* ((initial-context
@@ -240,6 +240,7 @@ Args:
 
 
   (log:debug "DRIVER: --- Finished Render Frame ---"))
+
 
 ;;; ---------------------------------------------------------------------------
 ;;; Main Application Loop & Lifecycle

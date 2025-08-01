@@ -39,7 +39,8 @@
     (is (= 10 (elmtui.view.geo:x (et.geo:rectangle grand)))
         (format nil "grandchild got X ~A offset" (elmtui.view.geo:x (et.geo:rectangle grand))))
     (is (= 5  (elmtui.view.geo:y (et.geo:rectangle grand)))
-        (format nil "grandchild got Y ~A offset" (elmtui.view.geo:y (et.geo:rectangle grand))))))
+        (format nil "grandchild got Y ~A offset" (elmtui.view.geo:y (et.geo:rectangle grand))))
+    ))
 
 ;; == end/flex-offset-test.lisp ==
 ;; (let ((r (et.geo:make-rectangle

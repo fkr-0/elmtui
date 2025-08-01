@@ -3,30 +3,32 @@
 ;;;; Place this file somewhere ASDF can find it (e.g. src/app/).
 
 (uiop:define-package
-    #:elmtui.app
+  #:elmtui.app
   (:use #:cl #:log4cl)
   (:import-from #:elmtui.core.globals          :*applications*)
   (:import-from #:elmtui.utils                 #:ensure-keyword
-                #:coerce-fn)
+    #:coerce-fn)
   (:import-from #:cleve-elm.channel #:make-channel )
   (:import-from #:cleve-elm.core.event-channels #:make-message-channel )
+  (:import-from #:elmtui.core.event-types #:key-event #:key-event-key #:key-event-char)
   (:import-from #:elmtui.app.api
-                #:app-config
-                #:make-app-config
-                #:app-config-name
-                #:app-config-message-queue
-                #:app-config-command-processor-fn
-                #:app-config-update-fn-sym
-                #:app-config-view-fn-sym
-                #:app-config-renderer-fn
-                #:app-config-subscriptions-fn-form     ; <— newly imported
-                #:get-component-instance)
+    #:app-config
+    #:make-app-config
+    #:app-config-name
+    #:app-config-message-queue
+    #:app-config-command-processor-fn
+    #:app-config-update-fn-sym
+    #:app-config-view-fn-sym
+    #:app-config-renderer-fn
+    #:app-config-subscriptions-fn-form     ; <— newly imported
+    #:get-component-instance)
   (:import-from #:elmtui.state.api                 #:merge-patches
-                #:update-result
-                #:ur-patches
-                #:ur-commands)
+    #:update-result
+    #:ur-handled
+    #:ur-patches
+    #:ur-commands)
   (:import-from #:elmtui.ui.api                #:init #:view #:initialize-components-from-dsl
-                #:instantiate-component-from-dsl)
+    #:instantiate-component-from-dsl)
   (:import-from #:elmtui.ui.widgets.root-viewport #:root-viewport)
   (:export #:defapplication #:make-app-config #:get-component-instance))
 
@@ -37,10 +39,28 @@
 ;;; ---------------------------------------------------------------------------
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun dispatch-to-root (msg state root-id)
+    "Deliver MSG to the component tree rooted at ROOT-ID.
+   Returns two values: PATCHES and COMMANDS."
+
+    (let* ((id-path (list :components root-id))
+            (root    (elmtui.app.api:get-component-instance id-path state)))
+      (log-info "Dispatching message ~S to root component ~A with id-path ~S"
+        msg root-id id-path)
+      (if (null root)
+        (progn
+          (log-warn "Root component ~A not found – message dropped: ~S"
+            root-id msg)
+          (values nil nil))
+        (elmtui.ui.api:update root msg state :id-path id-path))))
+
+
+
+
   (defun maybe-wrap-with-root-viewport (dsl
-                                        &key (root-id :root-viewport)
-                                          (term-size  '(1 1))
-                                          (cursor-pos '(1 1)))
+                                         &key (root-id :root-viewport)
+                                         (term-size  '(1 1))
+                                         (cursor-pos '(1 1)))
     "Return DSL guaranteed to contain a :ROOT-VIEWPORT node even if DSL
    arrives quoted (i.e. (QUOTE …) or '…).
 
@@ -59,39 +79,39 @@ DSL cases handled:
     ;; Local helper that builds a fresh :root-viewport node
     (labels ((%wrap (inner)
                `(:root-viewport
-                 :id ,root-id
-                 :initial-terminal-dimensions ,term-size
-                 :initial-cursor-pos          ,cursor-pos
-                 :children                    ,inner)))
+                  :id ,root-id
+                  :initial-terminal-dimensions ,term-size
+                  :initial-cursor-pos          ,cursor-pos
+                  :children                    ,inner)))
       (cond
         ;; ───────────────────────────────────────────────────────────────
         ;; ❶  Quoted input – unwrap, process, then re‑quote
         ;; ───────────────────────────────────────────────────────────────
         ((and (consp dsl) (eq (first dsl) 'quote))
-         (let* ((inner   (second dsl))
-                (rewrote (maybe-wrap-with-root-viewport inner
-                                                        :root-id root-id
-                                                        :term-size term-size
-                                                        :cursor-pos cursor-pos)))
-           `(quote ,rewrote)))
+          (let* ((inner   (second dsl))
+                  (rewrote (maybe-wrap-with-root-viewport inner
+                             :root-id root-id
+                             :term-size term-size
+                             :cursor-pos cursor-pos)))
+            `(quote ,rewrote)))
 
         ;; ───────────────────────────────────────────────────────────────
         ;; ❷  Non‑component data – leave untouched
         ;; ───────────────────────────────────────────────────────────────
         ((not (and (consp dsl) (keywordp (first dsl))))
-         dsl)
+          dsl)
 
         ;; ───────────────────────────────────────────────────────────────
         ;; ❸  Already a root viewport
         ;; ───────────────────────────────────────────────────────────────
         ((eq (first dsl) :root-viewport)
-         dsl)
+          dsl)
 
         ;; ───────────────────────────────────────────────────────────────
         ;; ❹  Plain viewport – promote to root
         ;; ───────────────────────────────────────────────────────────────
         ((eq (first dsl) :viewport)
-         (cons :root-viewport (rest dsl)))
+          (cons :root-viewport (rest dsl)))
 
         ;; ───────────────────────────────────────────────────────────────
         ;; ❺  Any other component – wrap
@@ -144,16 +164,16 @@ DSL cases handled:
   ;; Mandatory keyword fetch w/ compile-time error.
   (defun %required (plist key &optional (who 'defapplication))
     (or (getf plist key)
-        (error (format nil "~A – missing required keyword argument ~S." who key))))
+      (error (format nil "~A – missing required keyword argument ~S." who key))))
 
   ;; Split PLIST into KNOWN/REST portions.
   (defun %split-known-keys (plist known)
     (let ((kplist '())
-          (rplist '()))
+           (rplist '()))
       (loop for (k v) on plist by #'cddr do
         (if (member k known)
-            (progn (push k kplist) (push v kplist))
-            (progn (push k rplist) (push v rplist))))
+          (progn (push k kplist) (push v kplist))
+          (progn (push k rplist) (push v rplist))))
       (values (nreverse kplist) (nreverse rplist))))
 
   ;; Normalize function designators for macro keyword args.
@@ -162,17 +182,17 @@ DSL cases handled:
   Returns a function object or lambda as-is. For a symbol/quoted symbol, returns the symbol for later resolution."
     (cond
       ((and (consp val) (eq (car val) 'lambda))
-       val)
+        val)
       ((functionp val)
-       val)
+        val)
       ((symbolp val)
-       val)
+        val)
       ((and (consp val) (eq (car val) 'quote) (symbolp (cadr val)))
-       (cadr val))
+        (cadr val))
       ((and (consp val) (eq (car val) 'function) (symbolp (cadr val)))
-       (cadr val))
+        (cadr val))
       (t (error "DEFAPPLICATION ~S: ~A must be a symbol, quoted symbol, FUNCTION form, lambda, or function object – got: ~S"
-                app what val)))))
+           app what val)))))
 
                                         ; Default lambda if NIL is allowed
 
@@ -216,47 +236,47 @@ DSL cases handled:
 (defmacro defapplication (name &rest args)
   "Define an ElmTUI application called NAME."
   (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
-                 :update-fn :view-fn :command-processor-fn
-                 :subscriptions-fn :root-viewport-id :platform-options)))
+                  :update-fn :view-fn :command-processor-fn
+                  :subscriptions-fn :root-viewport-id :platform-options)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
                                         ; Should be the DSL form itself
-             (root-vp-id (%kw (%required kw-plist :root-viewport-id name)))
-             (root-dsl   `,(maybe-wrap-with-root-viewport
-                            (%required kw-plist :root-component-dsl name)
-                            :root-id root-vp-id))
-             ;; Optional
-             (initial-state-plist (getf kw-plist :initial-state-plist '()))
-             (initial-state-fn (getf kw-plist :initial-state-fn nil))
-             ;; Normalise FN designators to symbols
-             (state (if initial-state-fn
-                        `(funcall ,initial-state-fn)
-                        initial-state-plist))
-             (update-fn* (%normalize-fn (getf kw-plist :update-fn)
-                                        ":update-fn" name))
-             (view-fn*   (%normalize-fn (getf kw-plist :view-fn)
-                                        ":view-fn" name))
-             (cmd-proc-fn (%normalize-fn (coerce-fn (getf kw-plist :command-processor-fn))
-                                         ":command-processor-fn" name))
-             ;; Subscriptions: keep symbol | lambda | NIL, but handle lambda evaluation properly
-             (subs-fn-form
-               (let ((v (getf kw-plist :subscriptions-fn)))
-                 (cond ((symbolp v) `',v) ; Quote symbol for later evaluation
-                       ((and (consp v) (eq (car v) 'lambda)) `',v) ; Quote lambda form to store as cons
-                       ;; ((null v)
-                       ;;  ''(lambda (model) (declare (ignore model)) nil))
-                       (t (error "DEFAPPLICATION ~S: :subscriptions-fn must be symbol or lambda – got: ~S"
-                                 name v)))))
-             ;; Auto-generated helper names
-             (init-fn-sym (intern (format nil "INITIALIZE-APP-STATE-~A" name)))
-             (proc-fn-sym (intern (format nil "PROCESS-MESSAGE-~A" name)))
-             (run-fn-sym  (intern (format nil "RUN-~A" name)))
-             ;; Warn about stray keywords
-             (warn-list (loop for (k) on other-keys by #'cddr collect k)))
+              (root-vp-id (%kw (%required kw-plist :root-viewport-id name)))
+              (root-dsl   `,(maybe-wrap-with-root-viewport
+                              (%required kw-plist :root-component-dsl name)
+                              :root-id root-vp-id))
+              ;; Optional
+              (initial-state-plist (getf kw-plist :initial-state-plist '()))
+              (initial-state-fn (getf kw-plist :initial-state-fn nil))
+              ;; Normalise FN designators to symbols
+              (state (if initial-state-fn
+                       `(funcall ,initial-state-fn)
+                       initial-state-plist))
+              (update-fn* (%normalize-fn (getf kw-plist :update-fn)
+                            ":update-fn" name))
+              (view-fn*   (%normalize-fn (getf kw-plist :view-fn)
+                            ":view-fn" name))
+              (cmd-proc-fn (%normalize-fn (coerce-fn (getf kw-plist :command-processor-fn))
+                             ":command-processor-fn" name))
+              ;; Subscriptions: keep symbol | lambda | NIL, but handle lambda evaluation properly
+              (subs-fn-form
+                (let ((v (getf kw-plist :subscriptions-fn)))
+                  (cond ((symbolp v) `',v) ; Quote symbol for later evaluation
+                    ((and (consp v) (eq (car v) 'lambda)) `',v) ; Quote lambda form to store as cons
+                    ;; ((null v)
+                    ;;  ''(lambda (model) (declare (ignore model)) nil))
+                    (t (error "DEFAPPLICATION ~S: :subscriptions-fn must be symbol or lambda – got: ~S"
+                         name v)))))
+              ;; Auto-generated helper names
+              (init-fn-sym (intern (format nil "INITIALIZE-APP-STATE-~A" name)))
+              (proc-fn-sym (intern (format nil "PROCESS-MESSAGE-~A" name)))
+              (run-fn-sym  (intern (format nil "RUN-~A" name)))
+              ;; Warn about stray keywords
+              (warn-list (loop for (k) on other-keys by #'cddr collect k)))
         `(progn
            ,@(when warn-list
                `((warn "DEFAPPLICATION ~S – unknown keyword(s): ~{~S~^, ~}"
-                  ',name ',warn-list)))
+                   ',name ',warn-list)))
 
            ;; --------------------------------------------------------------
            ;; Register config object
@@ -264,16 +284,16 @@ DSL cases handled:
            (log-info "Initializing application: ~A" ',name)
            (log-info "Initial-state-plist: ~A" ,state)
            (setf (gethash ',name *applications*)
-                 (make-app-config
-                  :name ',name
-                  :root-component-dsl ,root-dsl
-                  :initial-state-plist ,state
-                  :update-fn-sym ',update-fn*
-                  :view-fn-sym   ',view-fn*
-                  :command-processor-fn ,cmd-proc-fn
-                  :subscriptions-fn-form ,subs-fn-form
-                  :message-queue (make-message-channel :capacity 20) ; Create proper event-channel
-                  ))
+             (make-app-config
+               :name ',name
+               :root-component-dsl ,root-dsl
+               :initial-state-plist ,state
+               :update-fn-sym ',update-fn*
+               :view-fn-sym   ',view-fn*
+               :command-processor-fn ,cmd-proc-fn
+               :subscriptions-fn-form ,subs-fn-form
+               :message-queue (make-message-channel :capacity 20) ; Create proper event-channel
+               ))
 
 
            ;; --------------------------------------------------------------
@@ -282,14 +302,14 @@ DSL cases handled:
            ;; Args: &key initial-terminal-dimensions initial-cursor-position &allow-other-keys
            ;; --------------------------------------------------------------
            (defun ,init-fn-sym (&key (initial-terminal-dimensions '(80 24))
-                                  (initial-cursor-position '(0 0))
-                                &allow-other-keys) ; Allow other platform-options
+                                 (initial-cursor-position '(0 0))
+                                 &allow-other-keys) ; Allow other platform-options
              (declare (ignorable initial-terminal-dimensions initial-cursor-position))
              (let* ((app-state (elmtui.tea-state.api:make-state (alexandria:plist-hash-table ,initial-state-plist))))
                (multiple-value-bind (patches commands)
-                   (initialize-components-from-dsl
-                    ;; (maybe-wrap-with-root-viewport
-                    ,root-dsl)
+                 (initialize-components-from-dsl
+                   ;; (maybe-wrap-with-root-viewport
+                   ,root-dsl)
                  ;; :root-id ,root-vp-id
                  ;; :term-size initial-terminal-dimensions
                  ;; :cursor-pos initial-cursor-position))
@@ -302,56 +322,107 @@ DSL cases handled:
            ;; ❸ Generated MESSAGE PROCESSOR
            ;; Name: PROCESS-MESSAGE-<app-name>
            ;; --------------------------------------------------------------
+           ;; (defun ,proc-fn-sym (state msg)
+           ;;   (let* ((update-result
+           ;;            (funcall (symbol-function ',update-fn*) msg state)))
+           ;;     (unless (typep update-result 'update-result)
+           ;;       (error "~A update function (~S) must return UPDATE-RESULT, got: ~S"
+           ;;              ',name ',update-fn* update-result))
+           ;;     (unless (ur-handled update-result)
+           ;;       (let* ((root-component
+           ;;               (instantiate-component-from-dsl
+           ;;              ,root-dsl
+           ;;              :id-path '(:components ,(elmtui.ui.api:root-viewport-id ,root-vp-id))))
+           ;;              (root-component-response ())
+           ;;         (log-info "Root component response: ~S" root-component-response)
+           ;;               (merge-patches (ur-patches update-result)
+           ;;                               (dispatch-to-root msg (merge-patches model app-patches)))
+           ;;       )
+           ;;     (elmtui.tea-state.api:apply-patches state (ur-patches update-result))
+           ;;     (values state (ur-commands update-result))))
            (defun ,proc-fn-sym (state msg)
-             (let* ((update-result
-                      (funcall (symbol-function ',update-fn*) msg state)))
-               (unless (typep update-result 'update-result)
+             ;; ① run the user-supplied update
+             (let* ((ur (funcall (symbol-function ',update-fn*) msg state)))
+               (unless (typep ur 'update-result)
                  (error "~A update function (~S) must return UPDATE-RESULT, got: ~S"
-                        ',name ',update-fn* update-result))
-               (elmtui.tea-state.api:apply-patches state (ur-patches update-result))
-               (values state (ur-commands update-result))))
+                   ',name ',update-fn* ur))
 
+               (log-info "Update, calling dispatch-msg")
+               ;; ② cascade to the component tree *only* when the message was not handled
+               (multiple-value-bind (comp-patches comp-cmds)
+                 (if (ur-handled ur)
+                   (values nil nil)
+                   (let ((dispatch-msg
+                           (cond
+                             ;; Resize events
+                             ((and (consp msg) (eq (car msg) :backend-resize-request))
+                               (list :resize
+                                 (getf (cdr msg) :width)
+                                 (getf (cdr msg) :height)))
+                             ;; Key events
+                             ((typep msg 'key-event)
+                               ;; Convert key-event struct to a plist that components can handle
+                               (list :key-event
+                                 :key (key-event-key msg)
+                                 :char (key-event-char msg)))
+                             ;; Default
+                             (t msg))))
+                     (dispatch-to-root dispatch-msg state ',root-vp-id)))
+
+                 ;; ③ combine everything
+                 (let* ((all-patches (nconc (ur-patches ur) comp-patches))
+                         (all-cmds    (nconc (ur-commands ur) comp-cmds))
+
+                         ;; (new-state   (elmtui.tea-state.api:apply-patches
+                         ;;                state
+                         ;;                all-patches))
+                         )
+                   ;;(merge-patches state all-patches))) ; single merge
+                   (elmtui.tea-state.api:apply-patches
+                     state
+                     all-patches)
+                   (values state all-cmds)))))
            ;; --------------------------------------------------------------
            ;; RUN-<app>
            ;; --------------------------------------------------------------
            (defun ,run-fn-sym (&key (platform :terminal) platform-options
-                               &allow-other-keys)
+                                &allow-other-keys)
              (let* ((cfg           (gethash ',name *applications*))
-                    (state-cell    (list nil)) ; Holds the current state
-                    (msg-queue     (app-config-message-queue cfg)) ; Get the mailbox from app-config
-                    (init-fn       #',init-fn-sym)
-                    (proc-fn       #',proc-fn-sym)
-                    (app-view-fn   (symbol-function
-                                    (app-config-view-fn-sym cfg)))
-                    (cmd-proc-fn   (app-config-command-processor-fn cfg))
-                    (app-subs-form (app-config-subscriptions-fn-form cfg)))
+                     (state-cell    (list nil)) ; Holds the current state
+                     (msg-queue     (app-config-message-queue cfg)) ; Get the mailbox from app-config
+                     (init-fn       #',init-fn-sym)
+                     (proc-fn       #',proc-fn-sym)
+                     (app-view-fn   (symbol-function
+                                      (app-config-view-fn-sym cfg)))
+                     (cmd-proc-fn   (app-config-command-processor-fn cfg))
+                     (app-subs-form (app-config-subscriptions-fn-form cfg)))
                (declare (ignorable proc-fn))
                (labels
-                   ((pinit ()
-                      ;; Validate platform-options before initialization
-                      (elmtui.app.api:validate-platform-options platform platform-options)
-                      (multiple-value-bind (st init-cmds)
-                          ;; Apply platform-options plist as keyword args to init-fn
-                          (apply init-fn platform-options)
-                        (setf (car state-cell) st)
-                        (when cmd-proc-fn
-                          (dolist (c init-cmds)
-                            (funcall cmd-proc-fn c msg-queue st cfg)))
-                        st)))
+                 ((pinit ()
+                    ;; Validate platform-options before initialization
+                    (elmtui.app.api:validate-platform-options platform platform-options)
+                    (multiple-value-bind (st init-cmds)
+                      ;; Apply platform-options plist as keyword args to init-fn
+                      (apply init-fn platform-options)
+                      (setf (car state-cell) st)
+                      (when cmd-proc-fn
+                        (dolist (c init-cmds)
+                          (funcall cmd-proc-fn c msg-queue st cfg)))
+                      st)))
                  (pinit)
                  (let ((app-spec-for-driver
                          (list :name ',name
-                               :init-fn #',init-fn-sym ; Pass the actual function
-                               :update-fn #',proc-fn-sym ; Pass the actual function
-                               :view-fn app-view-fn ; Pass the actual function
-                               :subscriptions-fn app-subs-form ; Pass the form/lambda/symbol
-                               :command-processor-fn cmd-proc-fn ; Pass the function/symbol
-                               :message-queue msg-queue
-                               :root-viewport-id ,root-vp-id)))
+                           :init-fn #',init-fn-sym ; Pass the actual function
+                           :update-fn #',proc-fn-sym ; Pass the actual function
+                           :view-fn app-view-fn ; Pass the actual function
+                           :subscriptions-fn app-subs-form ; Pass the form/lambda/symbol
+                           :command-processor-fn cmd-proc-fn ; Pass the function/symbol
+                           :message-queue msg-queue
+                           :root-viewport-id ,root-vp-id)))
                    (elmtui.app.api:run-application
-                    app-spec-for-driver ; 1st arg: the app configuration plist
-                    :backend-type platform ; keyword arg
-                    :platform-options platform-options))))) ; keyword arg
+                     app-spec-for-driver ; 1st arg: the app configuration plist
+                     :backend-type platform ; keyword arg
+                     :platform-options platform-options))))) ; keyword arg
            ',name)))))
 ;;; ---------------------------------------------------------------------------
 ;;; Quick manual demo & FiveAM tests unchanged … (omitted for brevity)
@@ -377,10 +448,10 @@ DSL cases handled:
 (defun my-view-fn (state)
   (declare (ignore state))
   (list :components
-        (list :root-viewport :id :rv
-                             :initial-terminal-dimensions (list 80 24)
-                             :initial-cursor-position (list 0 0)
-                             :initial-child-spec *dummy-root-dsl*)))
+    (list :root-viewport :id :rv
+      :initial-terminal-dimensions (list 80 24)
+      :initial-cursor-position (list 0 0)
+      :initial-child-spec *dummy-root-dsl*)))
 
 (defapplication my-test-app
   :root-component-dsl *dummy-root-dsl*
@@ -400,82 +471,82 @@ DSL cases handled:
   "A registry for application modules defined with defmodule.")
 
 (defmacro defmodule (name &key state messages update view subscriptions
-                            components dependencies exports)
+                      components dependencies exports)
   "Defines a reusable application module."
   `(progn
      ;; Define module messages
      ,@(when messages
          `((defmsg ,(intern (format nil "~A-MSG" name))
-               (:docstring ,(format nil "Messages for ~A module" name))
-               ,@messages)))
+             (:docstring ,(format nil "Messages for ~A module" name))
+             ,@messages)))
 
      ;; Register module
      (setf (gethash ',name *application-modules*)
-           (list :state-schema ',state
-                 :messages ',messages
-                 :update ',update
-                 :view ',view
-                 :subscriptions ',subscriptions
-                 :components ',components
-                 :dependencies ',dependencies
-                 :exports ',exports))
+       (list :state-schema ',state
+         :messages ',messages
+         :update ',update
+         :view ',view
+         :subscriptions ',subscriptions
+         :components ',components
+         :dependencies ',dependencies
+         :exports ',exports))
 
      ',name))
 
 (defmacro defapplication-contracted (name &key root-dsl initial-state
-                                            update view subscriptions
-                                            message-schema validation-mode
-                                            modules platform-options)
+                                      update view subscriptions
+                                      message-schema validation-mode
+                                      modules platform-options)
   "Enhanced defapplication with contract enforcement and modular architecture."
   (let ((app-msg-type (or message-schema
-                          (intern (format nil "~A-MSG" name))))
-        (update-fn-name (intern (format nil "~A-UPDATE" name)))
-        (view-fn-name (intern (format nil "~A-VIEW" name)))
-        (subs-fn-name (intern (format nil "~A-SUBSCRIPTIONS" name))))
+                        (intern (format nil "~A-MSG" name))))
+         (update-fn-name (intern (format nil "~A-UPDATE" name)))
+         (view-fn-name (intern (format nil "~A-VIEW" name)))
+         (subs-fn-name (intern (format nil "~A-SUBSCRIPTIONS" name))))
 
     `(progn
        ;; Define application message schema
        ,@(when message-schema
            `((defmsg ,app-msg-type
-                 (:docstring ,(format nil "Messages for ~A application" name))
-                 ;; Include common application messages
-                 AppInitialized
-                 AppShutdown
-                 (ModuleMessage :module keyword :message t)
-                 (ComponentMessage :component keyword :message t)
-                 ;; Custom messages from modules
-                 ,@(mapcan (lambda (module)
-                             (getf module :messages))
-                           modules))))
+               (:docstring ,(format nil "Messages for ~A application" name))
+               ;; Include common application messages
+               AppInitialized
+               AppShutdown
+               (ModuleMessage :module keyword :message t)
+               (ComponentMessage :component keyword :message t)
+               ;; Custom messages from modules
+               ,@(mapcan (lambda (module)
+                           (getf module :messages))
+                   modules))))
 
        ;; Contract-enforced update function
        ,(ecase (or validation-mode :hybrid)
           (:flexible
-           `(elmtui.contracts:defupdate-flexible ,update-fn-name (model message)
-              ,@(if update (list update)
-                    `((declare (ignore model message))
+            `(elmtui.contracts:defupdate-flexible ,update-fn-name (model message)
+               ,@(if update (list update)
+                   `((declare (ignore model message))
                       (values nil nil)))))
           (:typed
-           `(elmtui.contracts:defupdate-typed ,update-fn-name (model message) ,app-msg-type
-              ,@(if update (list update)
-                    `((declare (ignore model message))
+            `(elmtui.contracts:defupdate-typed ,update-fn-name (model message) ,app-msg-type
+               ,@(if update (list update)
+                   `((declare (ignore model message))
                       (values nil nil)))))
           (:hybrid
-           `(elmtui.contracts:defupdate-hybrid ,update-fn-name (model message)
-             :message-type ,app-msg-type
-             ,@(if update (list update)
+            `(elmtui.contracts:defupdate-hybrid ,update-fn-name (model message)
+               :message-type ,app-msg-type
+               ,@(if update (list update)
                    `((declare (ignore model message))
-                     (values nil nil))))))
+                      (values nil nil))))))
 
        ;; Contract-enforced view function
        (elmtui.contracts:defview ,view-fn-name (model)
          ,@(if view (list view)
-               `(,root-dsl)))
+             `(,root-dsl)))
 
        ;; Contract-enforced subscriptions
        (elmtui.contracts:defsubscriptions ,subs-fn-name (model)
          ,@(if subscriptions (list subscriptions)
-               `((declare (ignore model)) nil)))
+             `((declare (ignore model)) nil)))
 
        ;; Standard defapplication with contract functions
        (defapplication ,name
@@ -490,7 +561,7 @@ DSL cases handled:
        ;; Module integration
        ,@(mapcar (lambda (module)
                    `(integrate-module ',name ,module))
-                 modules)
+           modules)
 
        ',name)))
 

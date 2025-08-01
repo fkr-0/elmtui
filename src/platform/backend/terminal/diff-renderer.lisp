@@ -352,6 +352,7 @@ This method should be implemented by subclasses of low-level-terminal."
   ;; (exec-sequence term :cursor-set-position y x)
   (dotimes (i (length output))
     (as-utf-8-bytes (char output i) (lambda (x) (write-byte x stream)))))
+
 ;; == elmtui/renderer/apply-diff.lisp ==
 (defun apply-diff-to-backend (diff-ops backend-instance
                               terminal-offset-row terminal-offset-col)
