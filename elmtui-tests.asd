@@ -14,6 +14,7 @@
                              (:file "application-init-tests")
                              (:file "component-init-tests")
                              (:file "rendering-pipeline-tests")
+                             (:file "rendering-tests")
                              (:file "pipeline-contract-tests")
                              (:file "contracts-tests")
                              (:file "path-tests")

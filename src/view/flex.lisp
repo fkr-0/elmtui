@@ -57,6 +57,26 @@
    #:axis->direction))
 (in-package :elmtui.view.layout.flex)
 
+(defun %propagate-absolute! (item acc-x acc-y)
+  "Shift ITEM (and its whole subtree) from *local* to *absolute* coordinates.
+ACC‑X/ACC‑Y is the accumulated offset from all ancestors *so far*."
+  (let* ((rect     (rectangle item))
+         ;; Save LOCAL position *before* we change anything.
+         (local-x  (x rect))
+         (local-y  (y rect)))
+    ;; ① move THIS rectangle to absolute space
+    (when (or (/= acc-x 0) (/= acc-y 0))
+      (dx! rect acc-x)
+      (dy! rect acc-y))
+    ;; ② recurse: children need the NEW accumulated offset
+    (when (typep item 'flex-container)
+      (dolist (child (flex-item-children item))
+        (%propagate-absolute!
+         child                         ; descendant
+         (+ acc-x local-x)             ; new acc‑x
+         (+ acc-y local-y))))))        ; new acc‑y
+
+
 (defun propagate-offset! (item dx dy)
   "Shift ITEM’s rectangle by DX/DY **and** do the same for the whole subtree."
   (dx! (rectangle item) dx)
@@ -949,7 +969,8 @@ Purity:
       (layout-nested-containers container)
 
       ;; ➌ now shift the *entire* subtree exactly once
-      (propagate-offset! container (x container) (y container))
+      ;; (propagate-offset! container (x container) (y container))
+      (%propagate-absolute! container 0 0)
       ;; 1. Resolve flexible lengths & collect lines (unchanged)
       ;; (resolve-flexible-lengths items available-main-size main-axis)
       ;; (let ((lines (collect-flex-lines container available-main-size main-axis)))

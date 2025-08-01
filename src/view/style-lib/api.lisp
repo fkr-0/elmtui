@@ -121,7 +121,7 @@
    :apply-style :get-style :set-style :merge-styles :selects :apply-stylesheet
    :styles :make-style :from-style-set :group-styles
    :ordered-styles
-   :default-styling :make-style-set
+   :default-styling :make-style-set :style-set-styles
 
    :property :value :style :style-group
    ;; Generics & Accessors
@@ -131,6 +131,7 @@
    :valid-value-p ; Validation generic
    :dirty :dirty-p ; Export dirty accessor and predicate
    :sid
+   #:new
    :styles-list
    ;; Value related functions
    :style-property-definition-default-value
@@ -194,9 +195,25 @@
              :documentation "Optional metadata about the style's category and relationships"))
   (:documentation "A style is a property-value pair with optional metadata."))
 
-(defstruct (style-set (:constructor make-style-set))
+(defstruct (style-set (:constructor %make-style-set))
   (styles (make-hash-table :test #'equal) :type hash-table ) ; :documentation "Hash table mapping property symbols to style instances.")
   (order nil :type list)) ; :documentation "Optional list specifying the order of styles application."))
+
+(defun make-style-set (&key styles)
+  "Creates a new style-set with the given styles.
+   STYLES can be a plist, hash-table, or nil."
+  (let ((style-set (%make-style-set)))
+    (when styles
+      (cond
+        ((listp styles)
+         ;; Convert plist to hash-table
+         (loop for (key value) on styles by #'cddr
+               do (setf (gethash key (style-set-styles style-set)) value)))
+        ((hash-table-p styles)
+         (setf (style-set-styles style-set) (alexandria:copy-hash-table styles)))
+        (t
+         (error "Unsupported styles type: ~A" (type-of styles)))))
+    style-set))
 
 (defclass stylable ()
   ((sid :initarg :id
@@ -337,6 +354,10 @@ it carries an optional NAME:string and RULES:list."))
 
 (defgeneric new (class &key)
   (:documentation "Create a new instance of the given class."))
+
+(defmethod new ((class (eql 'style-set)) &key styles)
+  "Create a new style-set with the given styles."
+  (make-style-set :styles styles))
 
 (defgeneric implement-style (stylable style value)
   (:method ((stylable t) (style t) (value t))
