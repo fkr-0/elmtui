@@ -65,7 +65,7 @@
   (let* ((root (make-mixed-container)))
     ;; remove with prune‑empty NIL  → keeps empty hash‑table
     (multiple-value-bind (new removedp)
-        (remove-path root '(:a :c :value) :prune-empty t)
+        (remove-path root '(:a :c :value) :prune-empty nil)
       (is-true removedp)
       (is (typep (get-path '(:a) new) 'hash-table)))
     ;; prune‑empty T  → branch disappears

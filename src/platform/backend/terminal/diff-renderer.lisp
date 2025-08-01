@@ -281,11 +281,17 @@ Optimizes by batching contiguous character updates with the same style."
 
       (log-info "ROW ~A COMPARISON: Front style: ~S Stl ~A Col ~A, Back style: ~S Stl ~A Col ~A, Equal: ~A"
                 r first-front-style
-                (sb-kernel:get-lisp-obj-address first-front-style)
-                (sb-kernel:get-lisp-obj-address (getf first-front-style :BG-COLOR))
+                (if first-front-style
+                    (sb-kernel:get-lisp-obj-address first-front-style) "err")
+                (if (getf first-front-style :BG-COLOR)
+                    (sb-kernel:get-lisp-obj-address (getf first-front-style :BG-COLOR))
+                    "err")
                 first-back-style
-                (sb-kernel:get-lisp-obj-address first-back-style)
-                (sb-kernel:get-lisp-obj-address (getf first-back-style :BG-COLOR))
+                (if first-back-style (sb-kernel:get-lisp-obj-address first-back-style)
+                    "err")
+                (if (getf first-back-style :BG-COLOR)
+                    (sb-kernel:get-lisp-obj-address (getf first-back-style :BG-COLOR))
+                    "err")
                 (equalp first-front-style first-back-style))
 
       ;; If they're claimed to be equal but look different, investigate further
