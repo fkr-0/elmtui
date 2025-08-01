@@ -73,17 +73,17 @@
 
 (test nested-components
   "Entering a child component resets local tracking."
-  (multiple-value-bind (a patches b)
-
+  (multiple-value-bind (st patches cmds)
     (with-cycle (ctx (make-empty-state))
       (setf (state> :root) 1)
       (<< '(:child))
       (setf (cstate> :leaf) :x)
-      (>>))
-    (declare (ignore a b))
-    (is (= 1 (length patches)))
-    (is (equal '(:child :leaf)
-          (elmtui.update-dsl.api::patch-path (first patches))))))
+      (multiple-value-bind (p c) (>>)
+        (is (= 1 (length p)))
+        (is (null c))
+        (is (equal '(:child :leaf) (elmtui.update-dsl.api::patch-path (first p))))))
+    (declare (ignore st cmds))
+    (is (= 2 (length patches)))))
 
 ;;;; ---------------------------
 ;;;;  FiveAM Test for merge-patch
