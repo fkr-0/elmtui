@@ -126,13 +126,14 @@ Any key event or :app-quit-requested sets :should-quit to t."
   (log-info "Rainbow: RECEIVED MESSAGE: ~S" message)
   (cond
     ((or (typep message 'key-event)
-       (and (listp message) (eq (first message) :app-quit-requested)))
+         (and (listp message) (eq (car message) :key-event))
+         (and (listp message) (eq (first message) :app-quit-requested)))
       (make-update-result :patches (list (list '(:should-quit) t))))
     ((and (listp message) (eq (car message) :terminal-resized))
       (let* ((root-vp-path '(:components :rainbow-root-vp))
               (root-vp-instance (get-component-instance root-vp-path app-state)))
         (if root-vp-instance
-          (let ((patches (update root-vp-instance app-state message :id-path root-vp-path)))
+          (let ((patches (update root-vp-instance message app-state :id-path root-vp-path)))
             (make-update-result :patches patches))
           (make-update-result))))
     (t

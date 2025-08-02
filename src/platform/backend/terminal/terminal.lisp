@@ -218,12 +218,11 @@
       (multiple-value-bind (w h) (get-screen-dimensions instance)
         (setf (terminal-instance-width instance) w
               (terminal-instance-height instance) h)
-        (when publish-fn
-          (log:info "TERMINAL: Publishing initial dimensions W:~A H:~A" w h)
-
-
-
-          (funcall publish-fn (list :terminal-resized w h)))
+        ;; The initial resize event is now sent by the driver after the app
+        ;; model and message processor are fully initialized.
+        ;; (when publish-fn
+        ;;   (log:info "TERMINAL: Publishing initial dimensions W:~A H:~A" w h)
+        ;;   (funcall publish-fn `(:terminal-resized :new-dimensions (,w . ,h))))
         (let ((front (make-virtual-buffer w h))
               (back (make-virtual-buffer w h)))
           (setf (terminal-instance-front-buffer instance) front
@@ -243,7 +242,9 @@
         (send-sequence instance :reset) ; SGR 0
         ;; Restore normal screen buffer if alt screen was used
         ;; (send-sequence instance :normal-screen-buffer)
-        (write-output  (format nil "~c[?25h~c[0m~c[J~c[H" #\Escape #\Escape #\Escape #\Escape) (term-stream instance)) ; Show cursor, reset, clear, home
+        (write-output  (format nil "~c[?25h~c[0m~c[J~c[H"
+                               #\Escape #\Escape #\Escape #\Escape)
+                       (term-stream instance)) ; Show cursor, reset, clear, home
         (flush-output instance)
         (disable-raw-mode (terminal-instance-fd instance)
                           (terminal-instance-original-termios instance))
