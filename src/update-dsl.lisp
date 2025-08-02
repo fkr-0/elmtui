@@ -282,10 +282,10 @@ Side-effects: None (pure data struct).
     (error "Path cannot be nil in context-path-sanitizer."))
   (when (not (listp path))
     (setf path (list path)))  ; ensure path is a list
-  (let* ((sanitized (remove nil path )))
+  (let* ((sanitized (remove nil path)))
     (if component
-      (cons (cycle-context-component-path ctx) sanitized)
-      sanitized)))
+        (append (cycle-context-component-path ctx) sanitized)
+        sanitized)))
 
 ;;;; ---------------------------
 ;;;;  Helper Macros

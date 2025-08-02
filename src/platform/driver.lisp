@@ -7,10 +7,9 @@
         :elmtui.platform.input) ; For start-reader
   (:import-from :log4cl
                 #:log-debug #:log-info #:log-warn #:log-error)
-  (:import-from :elmtui.pipeline
-                #:full-view-pipeline)
   (:import-from :elmtui.core.event-types
                 #:key-event #:resize-event #:resize-event-width #:resize-event-height)
+  (:import-from :elmtui.pipeline #:render-frame)
   (:import-from :elmtui.core.globals
                 #:*app-sender* #:*app-message-processor*)
   (:import-from :elmtui.core.focus
@@ -20,19 +19,12 @@
                 #:key-event->normalized-key
                 #:lookup-keymap)
   (:import-from :elmtui.state #:get-path)
-  (:import-from :elmtui.tea-state.api #:state-ref)
-  (:import-from :elmtui.view.geo
-                #:make-instance
-                #:make-rectangle #:make-pos #:make-size)
   (:import-from :elmtui.platform.api
-                #:initialize-backend #:shutdown-backend
+                #:initialize-backend #:shutdown-backend #:render-and-present
                 #:term-w #:term-h #:handle-backend-resize
                 #:flush-output #:get-cursor-position #:set-cursor-position #:clear-lines #:scroll-up #:scroll-down)
   (:import-from :elmtui.platform.backend.terminal.diff-renderer
                 #:*compute-buffer-diff-first-call*)
-  (:import-from :elmtui.platform.backend.common.virtual-buffer
-                #:virtual-buffer #:copy-virtual-buffer #:make-virtual-buffer
-                #:buffer-width #:buffer-height)
   (:import-from :elmtui.app.api #:run-application #:get-component-instance #:app-config-message-queue)
   (:import-from :elmtui.core.loop
                 #:publish #:start-loop #:elm-stop-loop #:event-loop)
@@ -42,6 +34,8 @@
                 #:root-viewport)
   (:import-from :elmtui.style-lib.api #:stylesheet)
   (:import-from :bordeaux-threads #:mailbox)
+  (:import-from :cleve-elm.channel #:->)
+  (:import-from :elmtui.core.event-channels #:channel-of)
   (:export #:run-app-platform)) ; Ensure this is exported if called directly elsewhere
 
 (in-package #:elmtui.platform.driver)
@@ -149,9 +143,45 @@ Args:
       (setf *current-app-model* initial-model)
       (setf elmtui.core.globals:*app-message-processor*
             (lambda (msg)
-              ;; (declare (type list msg))
-              (log:debug "DRIVER: Processing message in app-message-processor: ~S" msg)
-              (funcall update-fn *current-app-model* msg)))
+              (let ((update-fn (getf app-spec :update-fn))
+                    (cmd-proc-fn (getf app-spec :command-processor-fn))
+                    (message-queue (getf app-spec :message-queue))
+                    (app-cfg-for-cmd (gethash (getf app-spec :name) elmtui.core.globals:*applications*)))
+                (log:debug "DRIVER: *app-message-processor* received ~S" msg)
+                (cond
+                  ((and (listp msg) (eq (car msg) :terminal-resized))
+                   (destructuring-bind (&key new-dimensions) (cdr msg)
+                     (let ((w (car new-dimensions))
+                           (h (cdr new-dimensions)))
+                       (handle-backend-resize *backend* w h)))
+                   ;; Also pass the event to the app's update function
+                   (funcall (getf app-spec :update-fn) *current-app-model* msg))
+                  ((and (listp msg) (eq (car msg) :app-quit-requested))
+                   (setf *driver-initiated-shutdown-p* t))
+                  (t
+                   (multiple-value-bind (next-model commands)
+                       (funcall update-fn *current-app-model* msg)
+                     (setf *current-app-model* next-model)
+                     (when (elmtui.state:get-path '(:should-quit) next-model)
+                       (setf *driver-initiated-shutdown-p* t))
+                     (when cmd-proc-fn
+                       (dolist (c commands)
+                         (funcall cmd-proc-fn c message-queue next-model app-cfg-for-cmd)))
+                     (unless *driver-initiated-shutdown-p*
+                       (let* ((root-viewport-state (get-path (append *root-viewport-id-path* '(:state)) next-model))
+                              (viewport-width (elmtui.tea-state.api:state-ref root-viewport-state :width 1))
+                              (viewport-height (elmtui.tea-state.api:state-ref root-viewport-state :height 1))
+                              (initial-context
+                                (elmtui.contracts:make-app-context
+                                 :state next-model
+                                 :viewport-rect (et.geo:make-rectangle :pos (et.geo:make-pos :x 0 :y 0)
+                                                                       :size (et.geo:make-size :w viewport-width :h viewport-height))
+                                 :backend *backend*
+                                 :front-buffer (or *previous-frame-buffer*
+                                                   (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer viewport-width viewport-height))
+                                 :view-fn (getf app-spec :view-fn))))
+                         (let ((final-context (elmtui.pipeline:full-view-pipeline initial-context)))
+                           (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer final-context)))))))))))
       (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
       (values initial-model initial-cmds))))
 
@@ -172,78 +202,20 @@ Args:
 ;;; Previous Buffer Initialization:
 ;;;
 ;;; ---------------------------------------------------------------------------
-(defun setup-initial-previous-buffer (current-model)
-  ;; (declare (type list current-model))
-  (unless *root-viewport-id-path*
-    (log-warn "Root viewport ID path not set before previous buffer initialization."))
-  (let* ((rv-state-path (append *root-viewport-id-path* '(:state)))
-         (root-viewport-behavioral-state (elmtui.state:get-path rv-state-path current-model)))
-    (unless root-viewport-behavioral-state
-      (log-warn (format nil "Root viewport behavioral state not found at ~S in model ~S" rv-state-path current-model)))
-    (let ((buffer-width (gethash  :width root-viewport-behavioral-state))
-          (buffer-height (gethash  :height root-viewport-behavioral-state)))
-      (unless (and (numberp buffer-width) (plusp buffer-width)
-                   (numberp buffer-height) (plusp buffer-height))
-        (log-warn (format nil "Invalid root viewport dimensions for buffer: width=~S, height=~S. From state: ~S"
-                          buffer-width buffer-height root-viewport-behavioral-state)))
-      (when (not (or (< buffer-width 1) (< buffer-height 1)))
-        (log:debug "DRIVER: Initializing previous frame buffer with dimensions ~Ax~A." buffer-width buffer-height)
-        (setf *previous-frame-buffer* (make-virtual-buffer buffer-width buffer-height))
-        (log:debug "DRIVER: Initialized previous frame buffer with dimensions ~Ax~A." buffer-width buffer-height)))))
+(defun send-initial-resize-message (backend-instance publish-fn)
+  "Sends the initial resize event after the application is set up."
+  (multiple-value-bind (w h) (elmtui.platform.api:get-screen-dimensions backend-instance)
+    (log:info "DRIVER: Publishing initial terminal dimensions W:~A H:~A" w h)
+    (funcall publish-fn `(:terminal-resized :new-dimensions (,w . ,h)))))
 
 ;;; ---------------------------------------------------------------------------
-;;; Rendering Frame Logic
+;;; Rendering Frame Logic (MOVED)
 ;;; ---------------------------------------------------------------------------
-(defun render-frame (app-spec current-model backend-instance)
-  ;; (declare (type list app-spec current-model)
-  ;;          (type t backend-instance))
-  (log:debug "DRIVER: --- Starting Render Frame ---")
-  (unless *root-viewport-id-path*
-    (log:error "DRIVER: Root viewport ID path not set.")
-    (return-from render-frame))
-
-  (let* ((view-fn (getf app-spec :view-fn))
-         (root-viewport-state (elmtui.state:get-path (append *root-viewport-id-path* '(:state)) current-model ))
-         (viewport-width (state-ref root-viewport-state :width 1))
-         (viewport-height (state-ref root-viewport-state :height 1))
-         ;; (viewport-offset-x (state-ref root-viewport-state :offset-x 0))
-         ;; (viewport-offset-y (state-ref root-viewport-state :offset-y 0))
-         ;; (stylesheet (elmtui.state:get-path '(:current-stylesheet) current-model ))
-         )
-
-    (unless (and (typep view-fn 'function)
-                 (numberp viewport-width) (plusp viewport-width)
-                 (numberp viewport-height) (plusp viewport-height)
-                 (> viewport-width 1) (> viewport-height 1))
-      (log:error "DRIVER: Invalid parameters for render-frame. ~A ~A ~A"
-                 (typep view-fn 'function) viewport-width viewport-height)
-      (return-from render-frame))
-
-    (let* ((initial-context
-             (elmtui.contracts:make-app-context
-              :state current-model
-              :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
-                                             :size (make-size :w viewport-width :h viewport-height))
-              :backend backend-instance
-              :front-buffer
-              (if (and *previous-frame-buffer*
-                       (= (elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer-width *previous-frame-buffer*) viewport-width)
-                       (= (elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer-height *previous-frame-buffer*) viewport-height))
-                  *previous-frame-buffer*
-                  (make-virtual-buffer viewport-width viewport-height))
-              :view-fn (getf app-spec :view-fn)
-              :backend nil))
-           (final-context (full-view-pipeline initial-context)))
-      (setf *last-ctx* final-context) ;; Store last context for potential future use
-      (setf *previous-frame-buffer* nil) ;; (elmtui.contracts:ctx-front-buffer final-context))
-      (flush-output backend-instance)))
+;;; The render-frame function has been moved into the `render-and-present`
+;;; method of each backend. The driver now calls `(render-and-present *backend* ...)`
+;;; which is dispatched to the appropriate backend implementation.
 
 
-  (log:debug "DRIVER: --- Finished Render Frame ---"))
-
-
-;;; ---------------------------------------------------------------------------
-;;; Main Application Loop & Lifecycle
 ;;; ---------------------------------------------------------------------------
 (defun app-loop (app-spec backend-instance)
   (declare (type list app-spec)
@@ -270,7 +242,8 @@ Args:
                (when cmd-proc-fn
                  (dolist (c commands)
                    (funcall cmd-proc-fn c message-queue next-model app-cfg-for-cmd)))
-               (render-frame app-spec next-model backend-instance))))
+               (elmtui.pipeline:full-view-pipeline app-spec ;; next-model backend-instance
+                                                   ))))
 
       (setf *driver-initiated-shutdown-p* nil)
       (log:info "DRIVER: Starting application loop for ~A." app-name)
@@ -306,7 +279,10 @@ Args:
     (funcall *stop-input-fn*)
     (setf *stop-input-fn* nil))
   (when (and *input-thread* (bt:thread-alive-p *input-thread*))
-    ;; (bt:join-thread *input-thread*) ; Consider timeout or if join is always safe
+    (log:info "DRIVER: Waiting for input thread to terminate...")
+    (unless (bt:join-thread *input-thread*)
+      (log:warn "DRIVER: Input thread failed to terminate in time. Forcing termination.")
+      (bt:destroy-thread *input-thread*))
     (setf *input-thread* nil))
 
   (when (and *root-viewport-id-path* *current-app-model* *backend*)
@@ -346,7 +322,8 @@ Args:
             *backend* *input-thread* *stop-input-fn* *driver-initiated-shutdown-p* *previous-frame-buffer* *current-app-model* *root-viewport-id-path*)
   (start-loop)
   (let (;(event-loop ) ; Start the main event loop
-        (initial-model nil)
+        (initial-model nil) ;; gets
+        ;; initialized in initialize-app-model
         (initial-commands nil))
     ;; (declare (type list initial-commands))
     (unwind-protect
@@ -371,10 +348,10 @@ Args:
              (setf initial-commands ic))
            (when initial-commands
              (process-initial-commands initial-commands (lambda (ev) (publish ev)) app-spec))
-           (setup-initial-previous-buffer initial-model)
+           (send-initial-resize-message *backend* (lambda (ev) (publish ev)))
 
-           ;; Initial render
-           (render-frame app-spec initial-model *backend*)
+           ;; Initial render is now handled by the first :terminal-resized event
+           ;; (render-frame app-spec initial-model *backend*)
            ;; Start the application message processing loop
            (app-loop app-spec *backend*))
       ;; Cleanup

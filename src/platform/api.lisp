@@ -45,8 +45,6 @@
    :clear-area
 
    ;; Rendering
-   :render-and-present ; New
-
    ;; Color and Style Management
    :make-color
    :make-style
@@ -94,6 +92,7 @@
   (unless (keywordp backend-type)
     (log4cl:log-error "initialize-backend: backend-type is not a keyword! Type: ~A, Value: ~S" (type-of backend-type) backend-type)
     (error "initialize-backend: backend-type must be a keyword, got: ~S (type: ~A)" backend-type (type-of backend-type))))
+
 ;; (declaim (ftype (function (t) null) shutdown-backend))
 ;; (declaim (ftype (function (t) string) backend-name backend-version))
 ;; (declaim (ftype (function (t) (values integer integer)) get-screen-dimensions))

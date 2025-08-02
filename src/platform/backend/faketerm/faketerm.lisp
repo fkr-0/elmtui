@@ -133,9 +133,25 @@
 (defmethod show-cursor ((instance faketerm-instance))
   (set-cursor-visibility instance t))
 
+(defmethod handle-backend-resize ((instance faketerm-instance) width height)
+  (setf (faketerm-instance-width instance) width)
+  (setf (faketerm-instance-height instance) height)
+  (setf (faketerm-instance-screen-buffer instance)
+        (make-array (list height width)
+                    :element-type 'faketerm-cell
+                    :initial-element (make-faketerm-cell)))
+  (format (faketerm-instance-stream instance) "; HANDLE_BACKEND_RESIZE Width: ~D Height: ~D~%" width height)
+  (finish-output (faketerm-instance-stream instance))
+  t)
+
 ;;;---------------------------------------------------------------
 ;;; Drawing Primitives
 ;;;---------------------------------------------------------------
+(defmethod render-and-present ((instance faketerm-instance) model app-spec)
+ (let ((stream (faketerm-instance-stream instance)))
+   (format stream "; RENDER_AND_PRESENT App: ~S~%" (getf app-spec :name))
+   (finish-output stream))
+ t)
 
 (defmethod draw-text-at ((instance faketerm-instance) target-buffer row col text &key style)
   (let ((stream (faketerm-instance-stream instance))
@@ -346,3 +362,18 @@
 
 (defmethod get-native-handle ((instance faketerm-instance))
   nil) ; No native handle for faketerm
+
+(defmethod scroll-up ((instance faketerm-instance) &optional (lines 1))
+  (format (faketerm-instance-stream instance) "; SCROLL_UP Lines: ~D~%" lines)
+  (finish-output (faketerm-instance-stream instance))
+  t)
+
+(defmethod scroll-down ((instance faketerm-instance) &optional (lines 1))
+  (format (faketerm-instance-stream instance) "; SCROLL_DOWN Lines: ~D~%" lines)
+  (finish-output (faketerm-instance-stream instance))
+  t)
+
+(defmethod clear-lines ((instance faketerm-instance) &optional (n 1))
+  (format (faketerm-instance-stream instance) "; CLEAR_LINES N: ~D~%" n)
+  (finish-output (faketerm-instance-stream instance))
+  t)

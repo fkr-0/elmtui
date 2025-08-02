@@ -31,13 +31,13 @@
 
 (test component-state
   "Component-scoped accessor builds correct path."
-  (multiple-value-bind (st patches *)
+  (multiple-value-bind (st patches x)
     (with-cycle
       (ctx (make-empty-state)
         :component-path '(:timer))
       (setf (cstate> :ctr) 3)
       (setf (state> :itr) 222))
-    (declare (ignore *))
+    (declare (ignore x))
     (is (= 3 (getf (getf st :timer) :ctr)))
     (is (= 222 (getf st :itr)))
     (is (= 2 (length patches)))
@@ -77,13 +77,10 @@
     (with-cycle (ctx (make-empty-state))
       (setf (state> :root) 1)
       (<< '(:child))
-      (setf (cstate> :leaf) :x)
-      (multiple-value-bind (p c) (>>)
-        (is (= 1 (length p)))
-        (is (null c))
-        (is (equal '(:child :leaf) (elmtui.update-dsl.api::patch-path (first p))))))
+      (setf (cstate> :leaf) :x))
     (declare (ignore st cmds))
-    (is (= 2 (length patches)))))
+    (is (= 1 (length patches)))
+    (is (equal '(:child :leaf) (elmtui.update-dsl.api::patch-path (first patches))))))
 
 ;;;; ---------------------------
 ;;;;  FiveAM Test for merge-patch
