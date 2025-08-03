@@ -182,15 +182,15 @@
     
     (loop for (handler avg-time max-time) in slow-handlers
           when (> avg-time *bottleneck-threshold-ms*)
-          do (push (make-event-bottleneck 
-                    :handler handler
-                    :event-type (handler-event-type handler)
-                    :avg-time avg-time
-                    :impact-percentage (calculate-impact-percentage avg-time)
-                    :occurrences (handler-occurrence-count handler)
-                    :recommendation (generate-optimization-recommendation 
-                                     handler avg-time max-time))
-                   bottlenecks))
+            do (push (make-event-bottleneck
+                      :handler handler
+                      :event-type (handler-event-type handler)
+                      :avg-time avg-time
+                      :impact-percentage (calculate-impact-percentage avg-time)
+                      :occurrences (handler-occurrence-count handler)
+                      :recommendation (generate-optimization-recommendation
+                                       handler avg-time max-time))
+                     bottlenecks))
     
     (nreverse bottlenecks)))
 
@@ -234,20 +234,20 @@
   (loop for (key label) on *dashboard-metrics* by #'cddr
         for value = (getf metrics key)
         when value
-        do (format stream "~30A: ~A~%" label 
-                   (cond
-                     ((eq value :unknown) "Unknown")
-                     ((and (numberp value) (member key '(:avg-latency :max-latency)))
-                      (format nil "~,2F ms" value))
-                     ((and (numberp value) (eq key :processing-rate))
-                      (format nil "~,2F" value))
-                     ((and (numberp value) (member key '(:cpu-usage :event-drop-rate)))
-                      (format nil "~,1F%" value))
-                     ((and (numberp value) (eq key :ui-frame-rate))
-                      (format nil "~,1F" value))
-                     ((and (numberp value) (eq key :memory-usage))
-                      (format nil "~,1F MB" value))
-                     (t value)))))
+          do (format stream "~30A: ~A~%" label
+                     (cond
+                       ((eq value :unknown) "Unknown")
+                       ((and (numberp value) (member key '(:avg-latency :max-latency)))
+                        (format nil "~,2F ms" value))
+                       ((and (numberp value) (eq key :processing-rate))
+                        (format nil "~,2F" value))
+                       ((and (numberp value) (member key '(:cpu-usage :event-drop-rate)))
+                        (format nil "~,1F%" value))
+                       ((and (numberp value) (eq key :ui-frame-rate))
+                        (format nil "~,1F" value))
+                       ((and (numberp value) (eq key :memory-usage))
+                        (format nil "~,1F MB" value))
+                       (t value)))))
 
 (defun render-top-events-section (top-events stream)
   "Render the top events section of the dashboard."
@@ -352,7 +352,7 @@
 (defun generate-event-flow-diagram (&optional (output-file "event-flow.dot"))
   "Generate a Graphviz DOT file visualizing the event flow."
   (with-open-file (stream output-file :direction :output 
-                          :if-exists :supersede :if-does-not-exist :create)
+                                      :if-exists :supersede :if-does-not-exist :create)
     (format stream "digraph EventFlow {~%")
     (format stream "  rankdir=LR;~%")
     (format stream "  node [shape=box, style=filled, fillcolor=lightblue];~%")
@@ -366,12 +366,12 @@
       (loop for i from 0 below (length *event-history*)
             for event = (aref *event-history* i)
             when event
-            do (let ((source (event-source event))
-                     (target (event-target event)))
-                 (incf (gethash source sources 0))
-                 (incf (gethash target targets 0))
-                 (incf (gethash (cons source target) edges 0))))
-      
+              do (let ((source (event-source event))
+                       (target (event-target event)))
+                   (incf (gethash source sources 0))
+                   (incf (gethash target targets 0))
+                   (incf (gethash (cons source target) edges 0))))
+
       ;; Output nodes
       (maphash (lambda (source count)
                  (format stream "  \"~A\" [label=\"~A\\n(~D events)\"];~%"
@@ -508,7 +508,7 @@
   "Stop the continuously updating event dashboard."
   (when *dashboard-thread*
     (setf *stop-dashboard* t)
-    (bt:join-thread *dashboard-thread* :timeout 2)
+    (bt:join-thread *dashboard-thread*) ;:timeout 2)
     (setf *dashboard-thread* nil)
     t))
 

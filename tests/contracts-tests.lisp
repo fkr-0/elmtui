@@ -45,9 +45,9 @@
 
 ;; Define a test message schema isolated from real application
 (defmsg TestMsg (:docstring "Test message schema for contract testing")
-        SimpleMessage
-        (ParameterizedMessage :value integer)
-        (ComplexMessage :name string :count integer :flags list))
+        simple-message
+        (parameterized-message :value integer)
+        (complex-message :name string :count integer :flags list))
 
 ;;;--------------------------------------------------------------
 ;;; Model Validation Tests
@@ -173,16 +173,16 @@
 (test contracts-typed-message-validation-valid
   "Test typed message validation with valid TestMsg variants"
   ;; Simple message
-  (is (equal '(:simple-message)
-             (validate-typed-message '(:simple-message) 'TestMsg)))
+  (is (equalp '(:simple-message)
+              (validate-typed-message (make-simple-message-testmsg) 'TestMsg)))
 
   ;; Parameterized message
-  (is (equal '(:parameterized-message :value 42)
-             (validate-typed-message '(:parameterized-message :value 42) 'TestMsg)))
+  (is (equalp '(:parameterized-message :value 42)
+              (validate-typed-message (make-parameterized-message-testmsg :value 42) 'TestMsg)))
 
   ;; Complex message
-  (is (equal '(:complex-message :name "test" :count 5 :flags (:flag1 :flag2))
-             (validate-typed-message '(:complex-message :name "test" :count 5 :flags (:flag1 :flag2)) 'TestMsg))))
+  (is (equalp '(:complex-message :name "test" :count 5 :flags (:flag1 :flag2))
+              (validate-typed-message (make-complex-message-testmsg :name "test" :count 5 :flags '(:flag1 :flag2)) 'TestMsg))))
 
 (test contracts-typed-message-validation-invalid
   "Test typed message validation rejects invalid messages"
@@ -201,8 +201,8 @@
 (test contracts-hybrid-message-validation
   "Test hybrid message validation accepts both typed and flexible"
   ;; Valid typed message
-  (is (equal '(:simple-message)
-             (validate-hybrid-message '(:simple-message) 'TestMsg)))
+  (is (equalp '(:simple-message)
+              (validate-hybrid-message (make-simple-message-testmsg) 'TestMsg)))
 
   ;; Flexible keyword message
   (is (eq :flexible-msg
@@ -219,8 +219,8 @@
 (test contracts-strict-message-validation
   "Test strict message validation only accepts typed messages"
   ;; Valid typed message
-  (is (equal '(:simple-message)
-             (validate-strict-message '(:simple-message) 'TestMsg)))
+  (is (equalp '(:simple-message)
+              (validate-strict-message (make-simple-message-testmsg) 'TestMsg)))
 
   ;; No message type - should fail
   (signals message-contract-violation
@@ -244,20 +244,28 @@
 
 (defupdate-typed test-typed-update (model message) TestMsg
   "Test typed update function"
-  (case (first message)
-    (:simple-message (values (list :triggered t) nil))
-    (:parameterized-message
-     (values (list :value (getf (rest message) :value)) nil))
-    (t (values nil nil))))
+  (let ((new-model (copy-list model)))
+    (case (first message)
+      (:simple-message
+       (values (append new-model '(:triggered t)) nil))
+      (:parameterized-message
+       (values (append new-model (list :value (getf (rest message) :value))) nil))
+      (t (values model nil)))))
 
 (defupdate-hybrid test-hybrid-update (model message)
                   :message-type TestMsg :prefer-typed t
                   "Test hybrid update function"
-                  (let ((msg-type (if (listp message) (first message) message)))
+
+                  (let ((msg-type (if (listp message) (first message) message))
+                        (new-model (copy-list model)))
                     (case msg-type
-                      ((:increment :simple-message)
-                       (values (list :count (1+ (getf model :count 0))) nil))
-                      (t (values nil nil)))))
+                      (:increment
+                       (setf (getf new-model :count) (1+ (getf model :count 0)))
+                       (values new-model nil))
+                      (:simple-message
+                       (setf (getf new-model :count) (1+ (getf model :count 0)))
+                       (values new-model nil))
+                      (t (values model nil)))))
 
 (test contracts-flexible-update-contracts
   "Test flexible update function contract enforcement"
@@ -285,14 +293,14 @@
 
     ;; Valid typed message
     (multiple-value-bind (new-model commands)
-        (test-typed-update test-model '(:simple-message))
-      (is (equal '(:triggered t) new-model))
+        (test-typed-update test-model (make-simple-message-testmsg))
+      (is (equalp '(:count 5 :triggered t) new-model))
       (is (null commands)))
 
     ;; Valid parameterized message
     (multiple-value-bind (new-model commands)
-        (test-typed-update test-model '(:parameterized-message :value 42))
-      (is (equal '(:value 42) new-model))
+        (test-typed-update test-model (make-parameterized-message-testmsg :value 42))
+      (is (equalp '(:count 5 :value 42) new-model))
       (is (null commands)))
 
     ;; Invalid message type
@@ -301,7 +309,7 @@
 
     ;; Invalid model input
     (signals update-contract-violation
-      (test-typed-update '(:invalid :model :structure) '(:simple-message)))))
+      (test-typed-update '(:invalid :model :structure) (make-simple-message-testmsg)))))
 
 (test contracts-hybrid-update-contracts
   "Test hybrid update function contract enforcement"
@@ -309,20 +317,20 @@
 
     ;; Typed message
     (multiple-value-bind (new-model commands)
-        (test-hybrid-update test-model '(:simple-message))
-      (is (equal '(:count 11) new-model))
+        (test-hybrid-update test-model (make-simple-message-testmsg))
+      (is (equalp '(:count 11) new-model))
       (is (null commands)))
 
     ;; Flexible message
     (multiple-value-bind (new-model commands)
         (test-hybrid-update test-model :increment)
-      (is (equal '(:count 11) new-model))
+      (is (equalp '(:count 11) new-model))
       (is (null commands)))
 
     ;; Unknown message
     (multiple-value-bind (new-model commands)
         (test-hybrid-update test-model :unknown)
-      (is (null new-model))
+      (is (equalp new-model test-model))
       (is (null commands)))))
 
 ;;;--------------------------------------------------------------
@@ -443,9 +451,9 @@
   ;; Generate some message activity
   (test-flexible-update '(:count 1) :increment)
   (test-flexible-update '(:count 2) :decrement)
-  (test-typed-update '(:value 0) '(:simple-message))
+  (test-typed-update '(:value 0) (make-simple-message-testmsg))
   (test-hybrid-update '(:count 3) :increment)
-  (test-hybrid-update '(:count 4) '(:simple-message))
+  (test-hybrid-update '(:count 4) (make-simple-message-testmsg))
 
   ;; Analyze usage patterns
   (let ((analysis (analyze-message-usage)))
@@ -519,7 +527,7 @@
       (declare (ignore _))
 
       (multiple-value-bind (model2 _)
-          (test-typed-update model1 '(:simple-message))
+          (test-typed-update model1 (make-simple-message-testmsg))
         (declare (ignore _))
 
         (multiple-value-bind (model3 _)
@@ -527,7 +535,7 @@
           (declare (ignore _))
 
           ;; Final model should reflect all changes
-          (is (= 7 (getf model3 :count))))))))
+          (is (equalp '(:count 7 :triggered t) model3)))))))
 
 ;;;--------------------------------------------------------------
 ;;; Performance Tests

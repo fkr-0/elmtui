@@ -668,10 +668,11 @@
   Example:
   (slot-initargs :container) =>
   (:id :children :style :class :layout :padding :margin :gap)"
-  (mapcar
-   (lambda (x) (car (sb-mop:slot-definition-initargs x)))
-   (sb-mop::class-slots
-    (find-class (element-class type-kw)))))
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+    (mapcar
+     (lambda (x) (car (sb-mop:slot-definition-initargs x)))
+     (sb-mop::class-slots
+      (find-class (element-class type-kw))))))
 
 (defmethod base-element-has-initarg ((base-element-kw symbol) (property symbol))
   "Check if BASE-ELEMENT-KW has PROPERTY as an initarg."

@@ -279,21 +279,6 @@ Optimizes by batching contiguous character updates with the same style."
     (let ((first-front-style (buffer-cell-style (buffer-cell-at front-buffer r 0)))
           (first-back-style (buffer-cell-style (buffer-cell-at back-buffer r 0))))
 
-      (log-info "ROW ~A COMPARISON: Front style: ~S Stl ~A Col ~A, Back style: ~S Stl ~A Col ~A, Equal: ~A"
-                r first-front-style
-                (if first-front-style
-                    (sb-kernel:get-lisp-obj-address first-front-style) "err")
-                (if (getf first-front-style :BG-COLOR)
-                    (sb-kernel:get-lisp-obj-address (getf first-front-style :BG-COLOR))
-                    "err")
-                first-back-style
-                (if first-back-style (sb-kernel:get-lisp-obj-address first-back-style)
-                    "err")
-                (if (getf first-back-style :BG-COLOR)
-                    (sb-kernel:get-lisp-obj-address (getf first-back-style :BG-COLOR))
-                    "err")
-                (equalp first-front-style first-back-style))
-
       ;; If they're claimed to be equal but look different, investigate further
       (when (and (equalp first-front-style first-back-style)
                  (not (equal first-front-style first-back-style)))
@@ -302,11 +287,13 @@ Optimizes by batching contiguous character updates with the same style."
                   (type-of first-front-style) (type-of first-back-style))
 
         ;; Check each key-value pair
-        (loop for (k v) on first-front-style by #'cddr do
-          (let ((back-v (getf first-back-style k 'not-found)))
-            (log-info "Key ~S: Front=~S, Back=~S, Equal=~A, Type equal=~A"
-                      k v back-v (equal v back-v)
-                      (eq (type-of v) (type-of back-v)))))))))
+        (loop for slot-def in (sb-mop:class-slots (class-of first-front-style))
+              do (let* ((slot-name (sb-mop:slot-definition-name slot-def))
+                        (front-v (slot-value first-front-style slot-name))
+                        (back-v (slot-value first-back-style slot-name)))
+                   (log-info "Slot ~S: Front=~S, Back=~S, Equal=~A, Type equal=~A"
+                             slot-name front-v back-v (equal front-v back-v)
+                             (eq (type-of front-v) (type-of back-v)))))))))
 
 ;; Add helper function to modify the apply-terminal-diff function for better debugging
 (defun safe-equalp (a b)

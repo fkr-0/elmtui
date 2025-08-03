@@ -50,6 +50,7 @@
                 #:get-sequence #:render-seq
                 #:ansi-fg-color-seq #:ansi-bg-color-seq
                 #:ansi-attr-seq)
+  (:import-from :elmtui.app.system-events #:make-terminalresized-systemevent)
   ;; (:import-from #:elmtui.platform.canvas
   ;;               #:canvas
   ;;               #:make-terminal-canvas
@@ -152,6 +153,7 @@
         (with-virtual-buffer-lock (back-buffer)
           (clear-buffer back-buffer))))
     (setf (terminal-instance-current-style instance) (make-terminal-style))
+    (flush-output instance)
     (finish-output (terminal-instance-stream instance)))
   t)
 
@@ -166,14 +168,21 @@
                                (declare (ignore signal code scp))
                                (multiple-value-bind (w h)
                                    (get-screen-dimensions instance) ; Use backend's method
-                                 (log:info "TERMINAL: SIGWINCH detected. Publishing :backend-resize-request W:~A H:~A" w h)
-                                 (funcall publish-fn (list :backend-resize-request :width w :height h)))))
+                                 (log:info "TERMINAL: SIGWINCH detected. Publishing TerminalResized event W:~A H:~A" w h)
+                                 (funcall publish-fn (make-terminalresized-systemevent :width w :height h)))))
     ;; SIGINT - Interrupt (Ctrl+C)
     (sb-sys:enable-interrupt sb-unix:sigint
                              (lambda (signal code scp)
                                (declare (ignore signal code scp))
                                (log:info "TERMINAL: SIGINT detected. Publishing :app-quit-requested")
                                (funcall publish-fn '(:app-quit-requested (:source :sigint)))))))
+
+(defun teardown-terminal-signal-handlers ()
+  (log:info "TERMINAL: Disabling signal handlers for terminal")
+  ;; Disable SIGWINCH handler
+  (sb-sys:enable-interrupt sb-unix:sigwinch nil)
+  (sb-sys:enable-interrupt sb-unix:sigint nil))
+
 
 ;;;---------------------------------------------------------------
 ;;; Terminal Raw Mode Control
@@ -193,7 +202,8 @@
       (setf (aref (sb-posix:termios-cc new) sb-posix:vmin)  0
             (aref (sb-posix:termios-cc new) sb-posix:vtime) 1)
       (sb-posix:tcsetattr fd sb-posix:tcsaflush new)
-      orig)))
+      orig
+      new)))
 
 ;;;---------------------------------------------------------------
 ;;; Backend Lifecycle
@@ -240,14 +250,20 @@
       (with-terminal-lock (instance)
         (send-sequence instance :cursor-show)
         (send-sequence instance :reset) ; SGR 0
+        (%force-clear-terminal-and-reset-buffers instance)
         ;; Restore normal screen buffer if alt screen was used
         ;; (send-sequence instance :normal-screen-buffer)
-        (write-output  (format nil "~c[?25h~c[0m~c[J~c[H"
-                               #\Escape #\Escape #\Escape #\Escape)
-                       (term-stream instance)) ; Show cursor, reset, clear, home
+        ;; (write-output  (format nil "~c[?25h~c[0m~c[J~c[H"
+        ;;                        #\Escape #\Escape #\Escape #\Escape)
+        ;;                (term-stream instance)) ; Show cursor, reset, clear, home
         (flush-output instance)
+        (log-info "TERMINAL> Resetting terminal")
+        (disable-raw-mode (terminal-instance-fd instance)
+                          (terminal-instance-current-termios instance))
         (disable-raw-mode (terminal-instance-fd instance)
                           (terminal-instance-original-termios instance))
+        (log-info "TERMINAL> Resetting terminal done")
+        (flush-output instance)
         (when (terminal-instance-stream instance)
           (close (terminal-instance-stream instance))
           (setf (terminal-instance-stream instance) nil))
@@ -256,10 +272,14 @@
           (setf (terminal-instance-fd instance) -1))
         (setf (terminal-instance-front-buffer instance) nil
               (terminal-instance-back-buffer instance) nil))
-    (error (e) (log:error "TERMINAL: Error during primary shutdown: ~A" e)))
+    (error (e)
+      (log-info "TERMINAL: Shutdown Error: " e )
+      (log:error "TERMINAL: Error during primary shutdown: ~A" e)))
 
   (handler-case (sb-ext:run-program "/bin/stty" '("sane") :search t :input nil :output nil :error :output)
-    (error (e) (log:error "TERMINAL: stty sane failed: ~A" e)))
+    (error (e)
+      (log-info "TERMINAL: stty sane Error: " e )
+      (log:error "TERMINAL: stty sane failed: ~A" e)))
   (log-info "TERMINAL: Backend shutdown complete.")
   t)
 
@@ -640,7 +660,7 @@ This method should be implemented by subclasses of low-level-terminal."
           (declare (ignore val)) ; We don't need the value, just the attribute
           (let ((seqs (elmtui.platform.backend.common.ansi-styling:ansi-seqs current-style attr)))
             (dolist (seq seqs)
-              (log:debug "APPLY-STYLE-DIFF: Writing ANSI sequence for ~S: ~S" attr seq)
+              ;; (log:debug "APPLY-STYLE-DIFF: Writing ANSI sequence for ~S: ~S" attr seq)
               (exec-sequence (terminal-instance-lock instance)
                              (terminal-instance-stream instance)
                              seq)))))

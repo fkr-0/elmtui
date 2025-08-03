@@ -3,10 +3,11 @@
 ;;; Geometric Primitives (Ported/Refactored from uncharming-tui.geo)
 ;;; ===============================================================
 (uiop:define-package :elmtui.view.geo
-  (:use :cl :log4cl)
+  (:use #:cl)
   (:nicknames :et.geo)
-  ;; Removed :ut.config import, defining =? locally
-  (:import-from :cl :make-instance)
+
+  (:import-from :log4cl
+                #:log-info #:log-warn)
   (:import-from :sb-pcl
                 #:make-instance)
   (:export #:=? #:area #:area< #:contains-p #:normalize!
@@ -16,8 +17,8 @@
            #:move! #:overlap #:polygon #:pos #:rect-diff #:rectangle
            #:make-instance
            #:pos-x #:pos-y #:rectangle-size #:rectangle-pos
-           #:clamp ; Added clamp
-           #:rectangle-pos #:rectangle-union-list
+           #:clamp
+           #:rectangle-union-list
            #:resize-dimension! #:rotate #:scale #:shrink-view!
            #:size #:translate #:triangle #:valid-p #:w #:x #:x2 #:y
            #:y2))
@@ -42,24 +43,45 @@
   "Check if two lists are equal by comparing lengths and elements recursively using =?."
   (and (= (length a) (length b))
        (every #'=? a b)))
-;; (let ((l '(:column :id :main-column
-;;               :children
-;;               ((:test-component :id :comp1 :initial-state "comp1 state")
-;;                (:test-parent-component :id :parent1 :child-initial-state "child state")))))
-;;   (=? l l))
 ;;;-----------------------------------------------------------------------------
-;;; Struct Definitions
+;;; STRUCT DEFINITIONS
 ;;;-----------------------------------------------------------------------------
+;; These structs represent the core geometric primitives used throughout the
+;; geometry module. All coordinates and dimensions are non-negative integers.
 
 (defstruct (size (:conc-name size-))
+  "A SIZE struct represents a 2D width and height.
+Arguments: W, H
+Fields:
+  W -- Width (integer >= 0)
+  H -- Height (integer >= 0)
+Example: (make-size :w 10 :h 5)
+Type: (size)
+Side-effects: None"
   (w 0 :type (integer 0 *))
   (h 0 :type (integer 0 *)))
 
 (defstruct (pos (:conc-name pos-))
+  "A POS struct represents a 2D position.
+Arguments: X, Y
+Fields:
+  X -- X coordinate (integer >= 0)
+  Y -- Y coordinate (integer >= 0)
+Example: (make-pos :x 3 :y 7)
+Type: (pos)
+Side-effects: None"
   (x 0 :type (integer 0 *))
   (y 0 :type (integer 0 *)))
 
 (defstruct (rectangle (:conc-name rectangle-))
+  "A RECTANGLE struct represents a rectangle in 2D space.
+Arguments: SIZE, POS
+Fields:
+  SIZE -- A size struct (width/height)
+  POS -- A pos struct (x/y)
+Example: (make-rectangle :pos (make-pos :x 1 :y 2) :size (make-size :w 3 :h 4))
+Type: (rectangle)
+Side-effects: None"
   (size (make-size) :type size)
   (pos (make-pos) :type pos))
 
@@ -82,65 +104,163 @@
 
 
 ;;;-----------------------------------------------------------------------------
-;;; Generic Accessors/Methods
+;;; GENERIC ACCESSORS AND MUTATORS
 ;;;-----------------------------------------------------------------------------
+;; These generics provide a uniform interface for accessing and mutating
+;; geometric properties of size, pos, and rectangle objects.
 
 (defgeneric area (obj)
-  (:documentation "Calculate the area of the object (size or rectangle)."))
+  (:documentation "AREA (OBJ)
+Arguments: OBJ -- a size or rectangle
+Returns: Area as integer
+Example: (area (make-size :w 3 :h 4)) ; => 12
+Type: (size|rectangle) => integer
+Side-effects: None
+Calculate the area of the object (size or rectangle)."))
 
 (defgeneric size (obj)
-  (:documentation "Get the size struct of the object (rectangle)."))
+  (:documentation "SIZE (OBJ)
+Arguments: OBJ -- a rectangle
+Returns: The size struct of the rectangle
+Type: (rectangle) => size
+Side-effects: None
+Get the size struct of the object (rectangle)."))
 
 (defgeneric pos (obj)
-  (:documentation "Get the pos struct of the object (rectangle)."))
+  (:documentation "POS (OBJ)
+Arguments: OBJ -- a rectangle
+Returns: The pos struct of the rectangle
+Type: (rectangle) => pos
+Side-effects: None
+Get the pos struct of the object (rectangle)."))
 
 (defgeneric w (obj)
-  (:documentation "Get the width of the object (size or rectangle)."))
+  (:documentation "W (OBJ)
+Arguments: OBJ -- a size or rectangle
+Returns: Width as integer
+Type: (size|rectangle) => integer
+Side-effects: None
+Get the width of the object (size or rectangle)."))
 
 (defgeneric h (obj)
-  (:documentation "Get the height of the object (size or rectangle)."))
+  (:documentation "H (OBJ)
+Arguments: OBJ -- a size or rectangle
+Returns: Height as integer
+Type: (size|rectangle) => integer
+Side-effects: None
+Get the height of the object (size or rectangle)."))
 
 (defgeneric x (obj)
-  (:documentation "Get the x-coordinate of the object (pos or rectangle)."))
+  (:documentation "X (OBJ)
+Arguments: OBJ -- a pos or rectangle
+Returns: X coordinate as integer
+Type: (pos|rectangle) => integer
+Side-effects: None
+Get the x-coordinate of the object (pos or rectangle)."))
 
 (defgeneric y (obj)
-  (:documentation "Get the y-coordinate of the object (pos or rectangle)."))
+  (:documentation "Y (OBJ)
+Arguments: OBJ -- a pos or rectangle
+Returns: Y coordinate as integer
+Type: (pos|rectangle) => integer
+Side-effects: None
+Get the y-coordinate of the object (pos or rectangle)."))
 
 (defgeneric (setf w) (new-value obj)
-  (:documentation "Set the width of the object (size or rectangle)."))
+  (:documentation "SETF W (NEW-VALUE OBJ)
+Arguments: NEW-VALUE -- integer, OBJ -- size or rectangle
+Returns: NEW-VALUE
+Type: (integer, size|rectangle) => integer
+Side-effects: Mutates OBJ
+Set the width of the object (size or rectangle)."))
 
 (defgeneric (setf h) (new-value obj)
-  (:documentation "Set the height of the object (size or rectangle)."))
+  (:documentation "SETF H (NEW-VALUE OBJ)
+Arguments: NEW-VALUE -- integer, OBJ -- size or rectangle
+Returns: NEW-VALUE
+Type: (integer, size|rectangle) => integer
+Side-effects: Mutates OBJ
+Set the height of the object (size or rectangle)."))
 
 (defgeneric (setf x) (new-value obj)
-  (:documentation "Set the x-coordinate of the object (pos or rectangle)."))
+  (:documentation "SETF X (NEW-VALUE OBJ)
+Arguments: NEW-VALUE -- integer, OBJ -- pos or rectangle
+Returns: NEW-VALUE
+Type: (integer, pos|rectangle) => integer
+Side-effects: Mutates OBJ
+Set the x-coordinate of the object (pos or rectangle)."))
 
 (defgeneric (setf y) (new-value obj)
-  (:documentation "Set the y-coordinate of the object (pos or rectangle)."))
+  (:documentation "SETF Y (NEW-VALUE OBJ)
+Arguments: NEW-VALUE -- integer, OBJ -- pos or rectangle
+Returns: NEW-VALUE
+Type: (integer, pos|rectangle) => integer
+Side-effects: Mutates OBJ
+Set the y-coordinate of the object (pos or rectangle)."))
 
 (defgeneric x2 (rectangle)
-  (:documentation "Get the x2 coordinate (x + width) of the rectangle."))
+  (:documentation "X2 (RECTANGLE)
+Arguments: RECTANGLE -- rectangle
+Returns: X2 coordinate (x + width)
+Type: (rectangle) => integer
+Side-effects: None
+Get the x2 coordinate (x + width) of the rectangle."))
 
 (defgeneric y2 (rectangle)
-  (:documentation "Get the y2 coordinate (y + height) of the rectangle."))
+  (:documentation "Y2 (RECTANGLE)
+Arguments: RECTANGLE -- rectangle
+Returns: Y2 coordinate (y + height)
+Type: (rectangle) => integer
+Side-effects: None
+Get the y2 coordinate (y + height) of the rectangle."))
 
 (defgeneric dim (obj dimension)
-  (:documentation "Get the value of a specific dimension (:x, :y, :w, :h, 0, 1) for pos, size, or rectangle."))
+  (:documentation "DIM (OBJ DIMENSION)
+Arguments: OBJ -- pos, size, or rectangle; DIMENSION -- :x, :y, :w, :h, 0, or 1
+Returns: Value of the specified dimension
+Type: (pos|size|rectangle, keyword|integer) => integer
+Side-effects: None
+Get the value of a specific dimension for pos, size, or rectangle."))
 
 (defgeneric (setf dim) (new-value obj dimension)
-  (:documentation "Set the value of a specific dimension for pos, size, or rectangle."))
+  (:documentation "SETF DIM (NEW-VALUE OBJ DIMENSION)
+Arguments: NEW-VALUE -- integer, OBJ -- pos, size, or rectangle; DIMENSION -- :x, :y, :w, :h, 0, or 1
+Returns: NEW-VALUE
+Type: (integer, pos|size|rectangle, keyword|integer) => integer
+Side-effects: Mutates OBJ
+Set the value of a specific dimension for pos, size, or rectangle."))
 
 (defgeneric dim-pos (rectangle dimension)
-  (:documentation "Get the position component (:x or :y) of a rectangle's dimension."))
+  (:documentation "DIM-POS (RECTANGLE DIMENSION)
+Arguments: RECTANGLE -- rectangle, DIMENSION -- :x or :y
+Returns: Value of the position component
+Type: (rectangle, keyword|integer) => integer
+Side-effects: None
+Get the position component (:x or :y) of a rectangle's dimension."))
 
 (defgeneric (setf dim-pos) (new-value rectangle dimension)
-  (:documentation "Set the position component (:x or :y) of a rectangle's dimension."))
+  (:documentation "SETF DIM-POS (NEW-VALUE RECTANGLE DIMENSION)
+Arguments: NEW-VALUE -- integer, RECTANGLE -- rectangle, DIMENSION -- :x or :y
+Returns: NEW-VALUE
+Type: (integer, rectangle, keyword|integer) => integer
+Side-effects: Mutates RECTANGLE
+Set the position component (:x or :y) of a rectangle's dimension."))
 
 (defgeneric dim-length (rectangle dimension)
-  (:documentation "Get the length component (:w or :h) of a rectangle's dimension."))
+  (:documentation "DIM-LENGTH (RECTANGLE DIMENSION)
+Arguments: RECTANGLE -- rectangle, DIMENSION -- :w or :h
+Returns: Value of the length component
+Type: (rectangle, keyword|integer) => integer
+Side-effects: None
+Get the length component (:w or :h) of a rectangle's dimension."))
 
 (defgeneric (setf dim-length) (new-value rectangle dimension)
-  (:documentation "Set the length component (:w or :h) of a rectangle's dimension."))
+  (:documentation "SETF DIM-LENGTH (NEW-VALUE RECTANGLE DIMENSION)
+Arguments: NEW-VALUE -- integer, RECTANGLE -- rectangle, DIMENSION -- :w or :h
+Returns: NEW-VALUE
+Type: (integer, rectangle, keyword|integer) => integer
+Side-effects: Mutates RECTANGLE
+Set the length component (:w or :h) of a rectangle's dimension."))
 
 ;;;-----------------------------------------------------------------------------
 ;;; MAKE-INSTANCE Methods
@@ -553,17 +673,3 @@
 (defmethod print-object ((r rectangle) stream)
   (print-unreadable-object (r stream :type t)
     (format stream "Pos:~A Size:~A" (rectangle-pos r) (rectangle-size r))))
-
-;;;-----------------------------------------------------------------------------
-;;; Deprecated/Commented Out Methods (from original) - Review if needed
-;;;-----------------------------------------------------------------------------
-;; (defmethod set-width ((rectangle rectangle) width) ...) ; Use (setf w)
-;; (defmethod set-height ((rectangle rectangle) height) ...) ; Use (setf h)
-;; (defmethod move-to! ...) ; Use move! with :x, :y
-;; (defmethod move-diff! ...) ; Use move! with :dx, :dy
-;; (defmethod rect-size ...) ; Use size accessor
-;; (defmethod pos ...) ; Use pos accessor
-;; (defmethod xor-intersect ...) ; Complex, maybe rect-diff is sufficient?
-;; (defmethod fill-rect ...) ; Belongs in rendering/platform layer
-;; Style/Layout/Scene classes/macros ; Belongs in higher-level view/ui/style layers
-;; DSL macros (defscene, with-scene, defrect, etc.) ; Belongs in higher-level view/ui layers
