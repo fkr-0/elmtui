@@ -220,8 +220,8 @@ Stub for richer contract registration and enforcement."
                  :message msg
                  :reason (format nil "Explicit contract validation failed for message type ~S." m-type-name)))
        t)
-      ((gethash m-type-name elmtui.state.msg:*message-schemas*)
-       (validate-message-via-schema msg m-type-name (gethash m-type-name elmtui.state.msg:*message-schemas*)))
+      ((gethash m-type-name et.glob:*message-schemas*)
+       (validate-message-via-schema msg m-type-name (gethash m-type-name et.glob:*message-schemas*)))
       (t
        ;; No explicit contract and no schema found, consider it valid or warn.
        ;; For now, let's assume it's valid if no contract/schema is defined.

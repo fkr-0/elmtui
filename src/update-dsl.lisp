@@ -100,22 +100,22 @@
   (:use #:cl)
   (:import-from :elmtui.utils #:as)
   (:export
-    #:state-get
-    #:state-set
-    #:state-observe
-    #:state-patch
-    #:patch
-    #:command
-    #:cycle-context
-    #:with-cycle
-    #:state>
-    #:as
-    #:setfn
-    #:cstate>
-    #:cmd>
-    #:msg>
-    #:>>
-    #:<<))
+   #:state-get
+   #:state-set
+   #:state-observe
+   #:state-patch
+   #:patch
+   #:command
+   #:cycle-context
+   #:with-cycle
+   #:state>
+   #:as
+   #:setfn
+   #:cstate>
+   #:cmd>
+   #:msg>
+   #:>>
+   #:<<))
 
 (in-package #:elmtui.update-dsl.api)
 
@@ -137,7 +137,7 @@ Side-effects: None (pure data struct).
 
 (defgeneric state-observe (state key fn)
   (:documentation
-    "Generic function to observe changes in STATE at KEY.
+   "Generic function to observe changes in STATE at KEY.
    Calls FN with old and new values when KEY changes.
    STATE can be an application-state or a plist.")
 
@@ -146,30 +146,30 @@ Side-effects: None (pure data struct).
     (error "state-observe not implemented for application-state ~A: ~A yet." (type-of state) state)))
 (defgeneric state-get (state path &optional default)
   (:documentation
-    "Generic function to get a value from STATE at PATH.
+   "Generic function to get a value from STATE at PATH.
    If PATH is not found, returns DEFAULT if provided, otherwise NIL.
    STATE can be an application-state or a plist.")
   (:method ((state list) (path list) &optional default)
     "Get value from a plist STATE at PATH, returning DEFAULT if not found."
     (let ((value (getf state (car path) default)))
       (if (null path)
-        value
-        (if (= 1 (length path ))
-          (or value default)
-          (state-get value (cdr path) default))))
+          value
+          (if (= 1 (length path ))
+              (or value default)
+              (state-get value (cdr path) default))))
     )
   (:method ((state list) path &optional default)
     (state-get state (list path) default))
   (:method ((state t) path &optional default)
     (declare (ignore default))
     (error (format nil
-             "state-get not implemented for application-state ~A: ~A yet."
-             (type-of state) state))))
+                   "state-get not implemented for application-state ~A: ~A yet."
+                   (type-of state) state))))
 
 ;; == elmtui.state/setf-plist-path.lisp ==
 (defgeneric state-set (state path value)
   (:documentation
-    "Functional update: returns a new plist with VALUE set at PATH in STATE.
+   "Functional update: returns a new plist with VALUE set at PATH in STATE.
     PATH is a list of keys; intermediate nodes are plists as well.")
 
   ;; Recursive path-based update
@@ -291,7 +291,7 @@ Side-effects: None (pure data struct).
 ;;;;  Helper Macros
 ;;;; ---------------------------
 (defmacro with-cycle ((ctx-sym initial-app-state &key component-path)
-                       &body body)
+                      &body body)
   "Evaluate BODY with a fresh CYCLE-CONTEXT threaded through.
    Returns 3 values: new-state, patches, commands.
 
@@ -312,19 +312,19 @@ Side-effects: None (pure data struct).
    same by reference as the one passed in INITIAL-APP-STATE."
   (let ((ctx-var (gensym "CTX")))              ; one real lexical var
     `(let ((,ctx-var (make-cycle-context
-                       :app-state      ,initial-app-state
-                       :component-path (if (listp ,component-path)
-                                         ,component-path
-                                         (list ,component-path)))))
+                      :app-state      ,initial-app-state
+                      :component-path (if (listp ,component-path)
+                                          ,component-path
+                                          (list ,component-path)))))
        (format t "Cycle context: ~A" ,ctx-var)
        ;; Alias BOTH symbols to that one var
        (symbol-macrolet ((,ctx-sym ,ctx-var)   ; pleasant short name for caller
-                          (elmtui.update-dsl.api::ctx ,ctx-var))
+                         (elmtui.update-dsl.api::ctx ,ctx-var))
          (values
-           (progn ,@body
-             (cycle-context-app-state ,ctx-var))
-           (nreverse (cycle-context-patches  ,ctx-var))
-           (nreverse (cycle-context-commands ,ctx-var)))))))
+          (progn ,@body
+                 (cycle-context-app-state ,ctx-var))
+          (nreverse (cycle-context-patches  ,ctx-var))
+          (nreverse (cycle-context-commands ,ctx-var)))))))
 
 
 (defmethod state-patch ((state list) patches)
@@ -333,6 +333,13 @@ Side-effects: None (pure data struct).
   (reduce (lambda (s p) (state-set s (patch-path p) (patch-value p)))
           patches
           :initial-value state))
+
+
+(defmethod state-patch ((state t) patches)
+  "Apply a list of PATCH objects to STATE using state-patch generic.
+   Returns the updated state. PATCHES may be PATCH structs or (path value) pairs."
+  (declare (ignore patches))
+  (error "state-patch not implemented for application-state ~A: ~A yet." (type-of state) state))
 
 ;; (defmacro with-cycle ((ctx-sym initial-app-state &key component-path)
 ;;                        &body body)
@@ -372,7 +379,7 @@ Side-effects: None (pure data struct).
 (defmacro state> (path &optional default)
   "Access global app state at PATH, optionally providing DEFAULT."
   `(state-get (cycle-context-app-state ctx)
-     (context-path-sanitizer ctx ,path nil) ,default))
+    (context-path-sanitizer ctx ,path nil) ,default))
 
 (defmacro cstate> (slot &optional default)
   "Access component-scoped state at SLOT, optionally providing DEFAULT."
@@ -388,11 +395,11 @@ Side-effects: None (pure data struct).
   `(let ((val ,(or newval default)))
      ;; record the mutation for diffing -- adjust helper name if needed
      (push (make-patch :path (context-path-sanitizer ctx ,path nil) :value val)
-       (cycle-context-patches ctx))
+           (cycle-context-patches ctx))
      (setf
-       (cycle-context-app-state ctx)
-       (state-set (cycle-context-app-state ctx)
-         (context-path-sanitizer ctx ,path nil) val))))
+      (cycle-context-app-state ctx)
+      (state-set (cycle-context-app-state ctx)
+                 (context-path-sanitizer ctx ,path nil) val))))
 
 ;;; ===============================================================
 
@@ -426,7 +433,7 @@ Side-effects: None (pure accessor).
 "
   ;; Returns value at PATH in app-state, or DEFAULT if not present.
   (state-get (cycle-context-app-state ctx)
-    (context-path-sanitizer ctx path t) default))
+             (context-path-sanitizer ctx path t) default))
 
 (defun set-component-state (ctx path value)
   "Function: SET-COMPONENT-STATE
@@ -441,9 +448,9 @@ Side-effects: Mutates app state and pushes PATCH to context.
   ;; Pushes a PATCH struct and sets value at PATH in app-state.
   (let ((full-path (context-path-sanitizer ctx path t)))
     (push (make-patch :path full-path :value value)
-      (cycle-context-patches ctx))
+          (cycle-context-patches ctx))
     (setf (cycle-context-app-state ctx)
-      (state-set (cycle-context-app-state ctx) full-path value))))
+          (state-set (cycle-context-app-state ctx) full-path value))))
 
 ;;;; ---------------------------
 ;;;;  Command Helpers
@@ -452,8 +459,8 @@ Side-effects: Mutates app state and pushes PATCH to context.
 (defmacro cmd> (thunk &key then err)
   "Register a command thunk with optional continuations."
   `(push (make-command :thunk ,thunk :then ,then :err ,err
-           :who  (cycle-context-component-path ctx))
-     (cycle-context-commands ctx)))
+                       :who  (cycle-context-component-path ctx))
+         (cycle-context-commands ctx)))
 
 (defmacro msg> (msg)
   "Register a pure message command."
@@ -466,17 +473,17 @@ Side-effects: Mutates app state and pushes PATCH to context.
 (defmacro >> ()
   "Return & clear patches/commands *without* ending the update."
   `(prog1
-     (values (nreverse (cycle-context-patches  ctx))
-       (nreverse (cycle-context-commands ctx)))
+       (values (nreverse (cycle-context-patches  ctx))
+               (nreverse (cycle-context-commands ctx)))
      (setf (cycle-context-patches  ctx) '()
-       (cycle-context-commands ctx) '())))
+           (cycle-context-commands ctx) '())))
 
 (defmacro << (&optional (component-path '()))
   "Enter a (sub-)component context; clears accumulators."
   `(progn
      (setf (cycle-context-component-path ctx) ,component-path
-       (cycle-context-patches  ctx) '()
-       (cycle-context-commands ctx) '())
+           (cycle-context-patches  ctx) '()
+           (cycle-context-commands ctx) '())
      ctx))
 
 ;;;; ---------------------------
@@ -486,9 +493,9 @@ Side-effects: Mutates app state and pushes PATCH to context.
 (defun struct->plist (s)
   "Convert a struct to a plist for test comparison."
   (loop for slot in (mapcar #'sb-mop:slot-definition-name
-                      (sb-mop:class-slots (class-of s)))
-    collect slot
-    collect (slot-value s slot)))
+                            (sb-mop:class-slots (class-of s)))
+        collect slot
+        collect (slot-value s slot)))
 
 ;; (defun patch-path (patch)
 ;;   "Return the path of a PATCH struct."
@@ -518,18 +525,18 @@ Side-effects: Mutates app state and pushes PATCH to context.
    If an error occurs, calls :err continuation and tags error with :who.
    Returns a list of results or error objects."
   (mapcar
-    (lambda (cmd)
-      (handler-case
-        (let ((result (funcall (command-thunk cmd))))
-          (if (command-then cmd)
-            (funcall (command-then cmd) result)
-            result))
-        (error (e)
-          (let ((err-fn (command-err cmd)))
-            (if err-fn
-              (funcall err-fn (list :error e :who (command-who cmd)))
-              (list :error e :who (command-who cmd)))))))
-    commands))
+   (lambda (cmd)
+     (handler-case
+         (let ((result (funcall (command-thunk cmd))))
+           (if (command-then cmd)
+               (funcall (command-then cmd) result)
+               result))
+       (error (e)
+         (let ((err-fn (command-err cmd)))
+           (if err-fn
+               (funcall err-fn (list :error e :who (command-who cmd)))
+               (list :error e :who (command-who cmd)))))))
+   commands))
 ;;; ---------------------------------------------------------------------------
 ;;;  Linter Macro: check-state-access
 ;;; ---------------------------------------------------------------------------
@@ -559,10 +566,10 @@ Side-effects: Mutates app state and pushes PATCH to context.
   "Apply FN to PLACE, storing the result back into PLACE.
    Works with any SETF-able place."
   (multiple-value-bind (temps vals store-vars store-form access-form)
-    (get-setf-expansion place)
+      (get-setf-expansion place)
     (let ((old (gensym "OLD")))
       `(let* (,@(mapcar #'list temps vals)
-               (,old ,access-form))
+              (,old ,access-form))
          ;; `store-form` is the form that actually performs the setf.
          (let ((,(first store-vars) (funcall ,fn ,old)))
            ,store-form)))))
@@ -613,28 +620,28 @@ Side-effects: Mutates app state and pushes PATCH to context.
 
 (uiop:define-package #:elmtui.update-dsl
   (:use #:cl #:sb-mop #:sb-thread #:elmtui.tea-state.api #:elmtui.update-dsl.api)
-  (:import-from #:elmtui.tea-state.state
-    #:application-state
-    #:application-state-p
-    #:application-state-data
-    #:application-state-lock
-    #:application-state-log
-    #:application-state-history
-    #:application-state-undone
-    #:application-state-observers
-    #:state-ref)
+  (:import-from #:elmtui.tea-state.api
+                #:application-state
+                #:application-state-p
+                #:application-state-data
+                #:application-state-lock
+                #:application-state-log
+                #:application-state-history
+                #:application-state-undone
+                #:application-state-observers
+                #:state-ref)
   (:import-from #:elmtui.tea-state.transactions
-    #:with-transaction
-    #:apply-patches
-    #:undo
-    #:redo)
+                #:with-transaction
+                #:apply-patches
+                #:undo
+                #:redo)
   (:import-from #:elmtui.tea-state.observers
-    #:add-observer
-    #:remove-observer)
+                #:add-observer
+                #:remove-observer)
   (:import-from #:alexandria
-    #:when-let)
+                #:when-let)
   (:reexport
-    :elmtui.update-dsl.api)
+   :elmtui.update-dsl.api)
   )
 
 ;;;; ---------------------------------------------------------------------------
@@ -660,11 +667,13 @@ Side-effects: Mutates app state and pushes PATCH to context.
 (defmethod elmtui.update-dsl.api:state-patch ((state elmtui.tea-state.state:application-state) patches)
   "Apply PATCHES to application-state using tea-state apply-patches."
   (elmtui.tea-state.api:apply-patches state
-    (mapcar (lambda (patch)
-              (if (typep patch 'patch)
-                (list (elmtui.update-dsl.api::patch-path patch) (elmtui.update-dsl.api::patch-value patch))
-                patch))
-      patches)))
+                                      (mapcar
+                                       (lambda (patch)
+                                         (if (typep patch 'patch)
+                                             (list (elmtui.update-dsl.api::patch-path patch)
+                                                   (elmtui.update-dsl.api::patch-value patch))
+                                             patch))
+                                       patches)))
 
 (defmethod elmtui.update-dsl.api:state-observe ((state elmtui.tea-state.state:application-state) key fn)
   "Register observer FN for KEY in application-state."

@@ -394,13 +394,14 @@ The macro expands to evaluating to the thread object itself."
                   ,return-var)))
          (values ,thread-sym interrupt-fn)))))
 
-;; (let ((thread
-;;         (with-interruptable-signal abort-testfn val
-;;           (format t "Worker starting…~%")
-;;           (dotimes (i 100)
-;;             (setf val i)
-;;             (format t "Worker: i = ~A~%" i)
-;;             (sleep 1)))))
-;;   (format t "Main: worker thread ~A started~%" thread)
+;; (multiple-value-bind (thread abort-testfn)
+;;     (with-interruptable-signal val
+;;       ;; Define the thread body
+;;       (format t "Worker starting…~%")
+;;       (dotimes (i 100)
+;;         (setf val i)
+;;         (format t "Worker: i = ~A~%" i)
+;;         (sleep 1)))
+;;   (format t "Main: worker thread ~A started, abort: ~A ~%" thread abort-testfn)
 ;;   (sleep 5)
-;;   (format t "Main: abort returns ~A~%" (abort-testfn)))
+;;   (format t "Main: abort returns ~A~%" (funcall abort-testfn)))

@@ -53,42 +53,8 @@ Useful for ensuring path segments are keywords."
 
 
 
-;; ;;; 1. Helpers ────────────────────────────────────────────────────────────────
-;; (defun %alist-p (obj)
-;;   "True when OBJ is a proper association list (every element is a dotted pair).
 
-;; Example: ((:a . 1) (:b . 2)) is an alist, but ((:a 1) (:b 2)) is not."
-;;   (and (listp obj)
-;;        (every #'consp obj)))
 
-;; (defun parse-plist-and-children (args)
-;;   "Parses a list of arguments into a property list and a list of children."
-;;   (let ((i (or (loop for i from 0 below (length args) by 2
-;;                      unless (and (< (1+ i) (length args)) (keywordp (nth i args)))
-;;                        return i)
-;;                (length args))))
-;;     (values (subseq args 0 i) (subseq args i))))
-
-;; (defun %empty-container-p (obj)
-;;   "Predicate used by REMOVE-PATH to decide whether to prune a branch."
-;;   (typecase obj
-;;     (hash-table (= (hash-table-count obj) 0))
-;;     (list       (null obj))
-;;     (t          nil)))
-
-;; (defun %get-entry (container key default)
-;;   (cond
-;;     ((hash-table-p container)
-;;      (multiple-value-bind (v foundp) (gethash key container)
-;;        (if foundp v default)))
-
-;;     ((listp container)
-;;      (if (%alist-p container)                  ; alist
-;;          (let ((pair (assoc key container)))
-;;            (if pair (cdr pair) default))
-;;          (getf container key default)))        ; plist
-
-;;     (t default)))
 
 ;; (defun %set-entry (container key value)
 ;;   "Destructively insert KEY ⇒ VALUE in CONTAINER; return (possibly new) container."

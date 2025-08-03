@@ -63,7 +63,7 @@
             (:conc-name ctx-)
             (:constructor make-app-context (&key state viewport-rect
                                               dsl-tree raw-tree styled-tree
-                                              view-fn
+                                              view-fn stylesheet
                                               atomic-tree laid-out-tree
                                               front-buffer backend)))
   "Global application context for the pipeline.
@@ -100,6 +100,22 @@
   front-buffer
   back-buffer
   backend)
+;; (:NAME
+;;   ELMTUI.EXAMPLES.RAINBOW-APP::RAINBOW-EXAMPLE-APP
+;;   :INIT-FN
+;;   #<FUNCTION ELMTUI.EXAMPLES.RAINBOW-APP:INITIALIZE-APP-STATE-RAINBOW-EXAMPLE-APP>
+;;   :UPDATE-FN
+;;   #<FUNCTION ELMTUI.EXAMPLES.RAINBOW-APP::PROCESS-MESSAGE-RAINBOW-EXAMPLE-APP>
+;;   :VIEW-FN
+;;   #<FUNCTION ELMTUI.EXAMPLES.RAINBOW-APP:RAINBOW-CONTENT-VIEW>
+;;   :SUBSCRIPTIONS-FN NIL
+;;   :COMMAND-PROCESSOR-FN NIL
+;;   :MESSAGE-QUEUE
+;;   #<CLEVE-ELM.CORE.EVENT-CHANNELS:MESSAGE-CHANNEL {1200EC1FC3}>
+;;   :ROOT-VIEWPORT-ID
+;;   :RAINBOW-ROOT-VP)
+;; is a typical app-spec
+
 
 (defstruct (dsl-tree (:conc-name dsl-))
   "DSL tree: holds the nested DSL list.

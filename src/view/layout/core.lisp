@@ -4,6 +4,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.view.layout
   (:use :cl :elmtui.view.core)
+  (:nicknames :et.layout)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn #:log-error)
   (:import-from :elmtui.style-lib.style-set #:set-style #:style-set) ; Function to add styles to a set
   (:import-from :elmtui.style-lib.api #:styles)

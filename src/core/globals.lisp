@@ -1,5 +1,6 @@
 (uiop:define-package :elmtui.core.globals
   (:use :cl)
+  (:nicknames :et.glob)
   (:export #:*debug-mode*
            #:*config*
            #:*event-loop*
@@ -17,8 +18,12 @@
            #:*applications*
            #:*stylesheets*
            #:*dsl-type-to-component-class*
+           #:*message-schemas*
            #:*widget-registry*))
 (in-package :elmtui.core.globals)
+
+(defvar *message-schemas* (make-hash-table :test 'eq)
+  "Global registry for message types and their variants defined by defmsg.")
 
 (defvar *debug-mode* nil "Enable extensive debugging output if T.")
 (declaim (type boolean *debug-mode*))
@@ -57,6 +62,8 @@
 ;; Add specific type for *keymap-registry* if known, e.g., (type (or null keymap:registry) *keymap-registry*)
 
 (defvar *theme* (make-hash-table :test 'equal) "Global theme settings.")
+
+
 (declaim (type hash-table *theme*))
 
 (defvar *applications* (make-hash-table :test 'equal)

@@ -4,7 +4,12 @@
 
 (uiop:define-package
     #:elmtui.app
-  (:use #:cl #:log4cl)
+  (:use #:cl)
+  (:import-from #:log4cl
+                #:log-info #:log-warn)
+  (:import-from #:elmtui.app.system-events
+                #:make-app-shutdown-system-event
+                #:make-terminal-resized-system-event)
   (:import-from #:elmtui.core.globals          :*applications*)
   (:import-from #:elmtui.utils                 #:ensure-keyword
                 #:coerce-fn)
@@ -314,7 +319,7 @@ DSL cases handled:
                  ;; :term-size initial-terminal-dimensions
                  ;; :cursor-pos initial-cursor-position))
                  ;; (format t "~A ~A~%" app-state patches)
-                 (elmtui.tea-state.api:apply-patches app-state patches)
+                 (elmtui.tea-state.transactions:apply-patches app-state patches)
                  (values app-state commands))))
 
 
@@ -338,49 +343,31 @@ DSL cases handled:
            ;;               (merge-patches (ur-patches update-result)
            ;;                               (dispatch-to-root msg (merge-patches model app-patches)))
            ;;       )
-           ;;     (elmtui.tea-state.api:apply-patches state (ur-patches update-result))
+           ;;     (elmtui.tea-state.transactions:apply-patches state (ur-patches update-result))
            ;;     (values state (ur-commands update-result))))
            (defun ,proc-fn-sym (state msg)
-             ;; ① run the user-supplied update
              (let* ((ur (funcall (symbol-function ',update-fn*) msg state)))
                (unless (typep ur 'update-result)
                  (error "~A update function (~S) must return UPDATE-RESULT, got: ~S"
                         ',name ',update-fn* ur))
 
-               (log-info "Update, calling dispatch-msg")
-               ;; ② cascade to the component tree *only* when the message was not handled
                (multiple-value-bind (comp-patches comp-cmds)
                    (if (ur-handled ur)
                        (values nil nil)
                        (let ((dispatch-msg
                                (cond
-                                 ;; Resize events
-                                 ((and (consp msg) (eq (car msg) :backend-resize-request))
-                                  (list :resize
-                                        (getf (cdr msg) :width)
-                                        (getf (cdr msg) :height)))
-                                 ;; Key events
+                                 ((and (consp msg) (eq (first msg) :terminal-resized))
+                                  msg)
                                  ((typep msg 'key-event)
-                                  ;; Convert key-event struct to a plist that components can handle
                                   (list :key-event
                                         :key (key-event-key msg)
                                         :char (key-event-char msg)))
-                                 ;; Default
                                  (t msg))))
                          (dispatch-to-root dispatch-msg state ',root-vp-id)))
 
-                 ;; ③ combine everything
                  (let* ((all-patches (nconc (ur-patches ur) comp-patches))
-                        (all-cmds    (nconc (ur-commands ur) comp-cmds))
-
-                        ;; (new-state   (elmtui.tea-state.api:apply-patches
-                        ;;                state
-                        ;;                all-patches))
-                        )
-                   ;;(merge-patches state all-patches))) ; single merge
-                   (elmtui.tea-state.api:apply-patches
-                    state
-                    all-patches)
+                        (all-cmds    (nconc (ur-commands ur) comp-cmds)))
+                   (elmtui.tea-state.api:apply-patches state all-patches)
                    (values state all-cmds)))))
            ;; --------------------------------------------------------------
            ;; RUN-<app>
@@ -441,7 +428,7 @@ DSL cases handled:
   '(elmtui.ui.widgets.label:label :id :root-label :text "Hello"))
 
 (defun my-update-fn (msg state)
-  (declare (ignore state))
+  (declare (ignore state msg))
   ;; (format t "Update called with message: ~A~%" msg)
   (make-instance 'elmtui.state:update-result))
 
@@ -478,7 +465,7 @@ DSL cases handled:
      ,@(when messages
          `((defmsg ,(intern (format nil "~A-MSG" name))
                (:docstring ,(format nil "Messages for ~A module" name))
-             ,@messages)))
+               ,@messages)))
 
      ;; Register module
      (setf (gethash ',name *application-modules*)
@@ -509,15 +496,15 @@ DSL cases handled:
        ,@(when message-schema
            `((defmsg ,app-msg-type
                  (:docstring ,(format nil "Messages for ~A application" name))
-               ;; Include common application messages
-               AppInitialized
-               AppShutdown
-               (ModuleMessage :module keyword :message t)
-               (ComponentMessage :component keyword :message t)
-               ;; Custom messages from modules
-               ,@(mapcan (lambda (module)
-                           (getf module :messages))
-                         modules))))
+                 ;; Include common application messages
+                 AppInitialized
+                 AppShutdown
+                 (ModuleMessage :module keyword :message t)
+                 (ComponentMessage :component keyword :message t)
+                 ;; Custom messages from modules
+                 ,@(mapcan (lambda (module)
+                             (getf module :messages))
+                           modules))))
 
        ;; Contract-enforced update function
        ,(ecase (or validation-mode :hybrid)
@@ -533,10 +520,10 @@ DSL cases handled:
                       (values nil nil)))))
           (:hybrid
            `(elmtui.contracts:defupdate-hybrid ,update-fn-name (model message)
-              :message-type ,app-msg-type
-              ,@(if update (list update)
-                    `((declare (ignore model message))
-                      (values nil nil))))))
+             :message-type ,app-msg-type
+             ,@(if update (list update)
+                   `((declare (ignore model message))
+                     (values nil nil))))))
 
        ;; Contract-enforced view function
        (elmtui.contracts:defview ,view-fn-name (model)

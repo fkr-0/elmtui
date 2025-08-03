@@ -298,10 +298,10 @@
                (push "" string-builder)))))
 
         (let ((final-string (apply #'concatenate 'string (nreverse string-builder))))
-          (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S (char-codes: ~S)"
-                     identifier (sanitize-string-for-logging
-                                 final-string)
-                     (when (> (length final-string) 0) (map 'list #'char-code final-string)))
+          ;; (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S (char-codes: ~S)"
+          ;;            identifier (sanitize-string-for-logging
+          ;;                        final-string)
+          ;;            (when (> (length final-string) 0) (map 'list #'char-code final-string)))
           final-string))))
   ;; (defmethod render-seq ((seq ansi-sequence) &rest args)
   ;;   "Render the ANSI control sequence with args."
