@@ -160,10 +160,15 @@
          (backend (ctx-backend ctx))
          (origin-x 0)
          (origin-y 0))
-    (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
-      (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-x origin-y)
-      (setf (ctx-front-buffer ctx) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))
-      ctx)))
+    (if (and backend (open-stream-p (elmtui.platform.api:term-stream backend)))
+        (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
+          (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-x origin-y)
+          (elmtui.platform.api:flush-output backend)
+          (setf (ctx-front-buffer ctx) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))
+          ctx)
+        (progn
+          (log:warn "PIPELINE: Display-buffer skipped as backend stream is closed.")
+          ctx))))
 
 ;;; Compose stages 0-5 into a pipeline for rendering without display
 (define-pipeline render-pipeline-0-to-5

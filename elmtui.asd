@@ -16,6 +16,7 @@
                (:file "utils")
                (:file "state/utils")
                (:file "state/msg")
+               (:file "app/system-events")
                (:file "contracts")
                (:file "core/logging")
                (:file "core/globals")
@@ -73,7 +74,6 @@
                              (:file "state")
                              (:file "model")
                              (:file "transactions") ; Added transactions.lisp
-                             (:file "elm")
                              (:file "update")
                              )) ; Moved here - loads after state implementation
                (:module "core"
@@ -186,11 +186,11 @@
                              (:file "widget-registry")))
                (:file "app/application")
                (:file "app/dsl-type-registry")
-               (:file "view/flex")
-               (:file "view/layout") ; Load layout before grid
+               (:file "view/layout/flex")
+               (:file "view/layout/core") ; Load layout before grid
                (:file "view/tree-transforms")
-               (:file "view/grid")   ; Grid depends on layout now
-               (:file "view/grid-layout") ; Load layout before grid
+               (:file "view/layout/grid")   ; Grid depends on layout now
+               (:file "view/layout/") ; Load layout before grid
                (:file "view/reactive") ; Reactive view system
                (:file "view/animation") ; Animation framework
 
@@ -234,7 +234,7 @@
 
                ;; Files loaded after modules
                (:file "pipeline")
-               (:file "platform/driver")
+               (:file "platform/driver" :depends-on ("app/system-events"))
                (:file "runtime")
 
                ;; Development Utilities

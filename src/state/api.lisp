@@ -187,10 +187,61 @@ defining models and messages, and creating update functions, following Elm Archi
    ;; Path & Component State Management (primarily for use within update logic/patches)
    ;; Predefined AppMsg Message Constructors (exported from elmtui.state.msg)
    ;; Update Logic
+   #:*log-update-results* ; Controls logging of update results
+   #:*update-contracts* ; Registry of update function contracts for documentation and validation
    #:malformed-update-result-error))
 
 (in-package :elmtui.state.api)
+(defvar *log-update-results* nil
+  "When T, logs the state patch and commands returned by update functions defined with defupdate.")
+(defvar *update-contracts* (make-hash-table :test 'equal)
+  "Registry of update function contracts for documentation and validation.
+   Populated by `elmtui.state.api:defupdate` (which is `elmtui.state.update:defupdate`).")
+;; Example of how defupdate (from elmtui.state.api, implemented in elmtui.state.update)
+;; populates *update-contracts* if the defupdate macro is modified to do so.
+;; The current defupdate in elmtui.state.update does not interact with *update-contracts*.
+;; If this is desired, elmtui.state.update:defupdate needs modification.
+;; For example:
+;; (defmacro elmtui.state.api:defupdate (name args &body body)
+;;   `(progn
+;;      (setf (gethash ',name elmtui.state.elm::*update-contracts*) ',args) ; Note package
+;;      ,(original-defupdate-expansion name args body)))
+;; This shows how one might keep *update-contracts* populated.
 
+;;; Example main-update (adapted to use API functions and patch-based returns)
+;;; This is illustrative. Actual application update logic will be more complex.
+
+#|
+;; This is an example of how an update function would be written.
+;; It's not meant to be part of the elmtui.state.elm package itself,
+;; but rather user code that USES the elmtui.state.elm (via elmtui.state.api) tools.
+
+(elmtui.state.api:defupdate main-application-updater (app-state message)
+"Main update function for an example application."
+(let ((msg-type (if (listp message) (first message) message))
+(msg-data (when (listp message) (rest message)))
+(current-data (elmtui.statelib.state:state-data-data app-state))) ; Get raw data for get-path
+(cond
+((eq msg-type :increment)
+(values `(((:counter) ,(1+ (elmtui.state.api:get-path '(:counter) current-data  0))))) ; Patches
+nil)) ; No commands
+
+((eq msg-type :set-focus)
+(let ((widget-id (getf msg-data :widget-id)))
+(values `(((:focused-widget) ,widget-id)))
+nil)))
+
+;; ... other message handlers ...
+
+(t
+(log4cl:log-warn "Unhandled message in main-application-updater: ~S" message)
+(values nil nil))))) ; No changes, no commands
+|#
+
+;; The elmtui.state.elm package itself doesn't need to define update functions,
+;; but rather provide the tools (defmodel, defmsg, defupdate) for users to do so.
+;; The core implementations of these tools are in their respective files (model.lisp, msg.lisp, update.lisp)
+;; and are exposed through elmtui.state.api.
 ;;;─── New TEA State API ────────────────────────────────────────────────────────
 ;; (declaim (ftype (function (&key (:initial hash-table)) application-state) make-state))
 (defun make-state (initial)

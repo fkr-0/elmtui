@@ -10,11 +10,21 @@
                 :application-state-data   ;; Accessor for the raw data within app-state
                 )
   (:import-from :elmtui.state.api ; Import from the central API
-   :handle-async-command :application-state :get-state
-                :application-state :with-transaction
-                :merge-patches ; For applying patches to state data
-   :publish-to-topic :dispatch-to-topic :handle-async-command
-                :malformed-update-result-error)
+   :*log-update-results* ; For controlling logging of update results
+                :get-state :state-data ; Accessor for the state data
+                :make-patch :state-get :state-set :state-patch
+                :state-observe :undo-update-state :redo-update-state
+   :application-state-data ; Accessor for the raw data within app-state
+                :application-state-data-object ; For accessing the state data object
+   :application-state-data ; For accessing the raw data plist within app-state
+                :defupdate
+                ;; Re-exports for command handling and topic dispatching
+   :dispatch-to-topic
+                :handle-async-command :application-state :get-state
+   :application-state :with-transaction
+   :merge-patches ; For applying patches to state data
+                :publish-to-topic :dispatch-to-topic :handle-async-command
+   :malformed-update-result-error)
   ;; (:import-from :elmtui.statelib.state ; For direct access to app-state internals if needed
   ;;  :state-data-data) ; Accessor for the raw data plist within app-state
   (:import-from :elmtui.core.globals #:*app-sender*)
@@ -24,7 +34,6 @@
    :defupdate
    ;; :publish-to-topic :dispatch-to-topic :handle-async-command (already imported and re-exported by api)
    ;; :malformed-update-result-error (already imported and re-exported by api)
-   :*log-update-results* ;; This can be a local export if not in the main API
    ))
 (in-package :elmtui.state.update)
 
@@ -53,10 +62,10 @@
                      (malformed-update-result-reason condition)
                      (malformed-update-result-values condition)))))
 
-(defvar *log-update-results* nil
-  "When T, logs the state patch and commands returned by update functions defined with defupdate.")
 
-(defun process-update-result (returned-values &key update-fn-name (log-p *log-update-results*))
+
+(defun process-update-result (returned-values &key update-fn-name (log-p
+                                                                   elmtui.state.api:*log-update-results*))
   "Validates and processes the values returned by an update function's body.
    Expects RETURNED-VALUES to be a list of values from MULTIPLE-VALUE-LIST.
    The first value should be a list of patches (or nil).
