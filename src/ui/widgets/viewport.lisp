@@ -1,5 +1,6 @@
 (uiop:define-package :elmtui.ui.widgets.viewport
   (:use :cl :log4cl )
+  ;;(:import-from :elmtui.view.dsl #:defcomponent-dsl)
   (:import-from :elmtui.utils
                 #:ensure-keyword)
   (:import-from :elmtui.app.api
@@ -89,8 +90,7 @@ It stores the ID of its child component in app-state under :child."))
 
          (when old-child-id
            ;; Add command to destroy old child's state
-           (push `(:destroy-component-state ,(list :components old-child-id)) commands)
-           (log4cl:log-debug "Viewport ~S: Queued destruction for old child ~S" (id-from-path id-path) old-child-id))
+           (push `(:destroy-component-state ,(list :components old-child-id)) commands))
 
          (if new-child-spec
              (let* ((child-type (first new-child-spec))
@@ -104,14 +104,12 @@ It stores the ID of its child component in app-state under :child."))
                    (apply #'init child-instance :id-path child-id-path-for-init child-props)
                  (declare (ignore init-comp))
                  (setf patches (append init-patches patches))
-                 (setf commands (append init-commands commands))
-                 (log4cl:log-debug "Viewport ~S: Initialized new child ~S" (id-from-path id-path) child-id-keyword)))
+                 (setf commands (append init-commands commands))))
              ;; else new-child-spec is nil, meaning remove child
              (setf new-child-id nil))
 
          ;; Patch to update the child ID reference in the viewport's state
-         (push (make-state-patch (append viewport-component-state-path '(:child-id)) new-child-id) patches)
-         (log4cl:log-debug "Viewport ~S: Set child-id to ~S" (id-from-path id-path) new-child-id)))
+         (push (make-state-patch (append viewport-component-state-path '(:child-id)) new-child-id) patches)))
 
       ((cons (eql :set-dimensions))
        (destructuring-bind (new-width new-height) (cdr message)
@@ -131,43 +129,34 @@ It stores the ID of its child component in app-state under :child."))
       )
     (values patches commands)))
 
-(defmethod view ((component viewport) (state elmtui.state:application-state) &key id-path (children nil) &allow-other-keys)
+(defmethod view ((component viewport) (state elmtui.tea-state:application-state) &key id-path (children nil) &allow-other-keys)
   (let* ((viewport-component-registration (get-path id-path state )) ; Get the whole registration for this viewport component
          (viewport-attrs (getf viewport-component-registration :state)) ; Get the :state sub-plist with width, height, offsets
-         (child-id (getf viewport-component-registration :child-id)) ; Get child-id from viewport's direct registration
-         ;; (child-view nil)
-         )
-    (log-info "Rendering viewport ~S with attributes: ~S"
-              (id-from-path id-path) viewport-attrs)
-    (log-info "id-path ~S: Child ID is ~S vp registr ~A vp attrs: ~A" id-path child-id viewport-component-registration
-              viewport-attrs)
-    (let ((children (when children
-                      (mapcar
-                       (lambda (c)
-                         (elmtui.view.dsl:render-dsl-to-resolved-tree c state))
-                       children))))
-      ;; (when child-id
-      ;;   (let* ((child-canonical-id-path (list :components child-id)) ; Canonical path to child's registration
-      ;;          (child-instance (get-component-instance child-canonical-id-path state)))
-      ;;     (if child-instance
-      ;;         (setf child-view (view child-instance state :id-path child-canonical-id-path))
-      ;;         (progn
-      ;;           (log4cl:log-warn "Viewport ~S: Child component ~S not found in state for rendering." (id-from-path id-path) child-id)
-      ;;           (setf child-view `(:element :id ,(gensym "ERROR-") :text ,(format nil "Error: Child ~A not found" child-id)))))))
+         ;; (child-id (getf viewport-component-registration :child-id))
+         (children-from-args children)
+         (child-from-state (elmtui.tea-state:state-ref viewport-attrs :child-dsl-spec))
+         (final-children (or children-from-args
+                             (when child-from-state (list child-from-state))))
 
-      (list :viewport
-            :id (id-from-path id-path)
-            :width (getf viewport-attrs :width 80)
-            :height (getf viewport-attrs :height 24)
-            :offset-x (getf viewport-attrs :offset-x 0)
-            :offset-y (getf viewport-attrs :offset-y 0)
-            :children (when children
-                        (if (= 1 (length children))
-                            ;; if there's only one child, just return it directly
-                            children
-                            ;; wrap children in a layout if there are multiple
-                            (list :layout :id
-                                  (gensym
-                                   (format nil "VIEWPORT-~A-CHILDREN-LAYOUT"
-                                           (id-from-path id-path)))
-                                  children)))))))
+         ) ; Get child-id from viewport's direct registration
+    (list :container
+          :id (gensym "VIEWPORT-CONTAINER-")
+          :style `(:width ,(getf viewport-attrs :width 80)
+                   :height ,(getf viewport-attrs :height 24)
+                   :offset-x ,(getf viewport-attrs :offset-x 0)
+                   :offset-y ,(getf viewport-attrs :offset-y 0))
+
+          :children final-children
+          ;; (cond
+          ;;   ((null children) nil)
+          ;;   ((and (= 1 (length children))
+          ;;         (listp (first children))
+          ;;         (keywordp (first (first children))))
+          ;;    ;; Single DSL node, wrap in a list
+          ;;    children)
+          ;;   (t
+          ;;    ;; Multiple children, wrap in a container node
+          ;;    (list (list :container
+          ;;                :id (gensym (format nil "VIEWPORT-~A-CHILDREN-LAYOUT" (id-from-path id-path)))
+          ;;                :children children))))
+          )))

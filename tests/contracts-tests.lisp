@@ -23,7 +23,7 @@
                 #:analyze-message-usage #:suggest-message-schema
                 ;; Stage contracts
                 #:define-stage #:define-pipeline)
-  (:import-from :elmtui.state.msg
+  (:import-from :elmtui.tea-state.msg
                 #:defmsg #:message-variant-p #:*message-schemas*)
   (:export #:run-contract-tests))
 

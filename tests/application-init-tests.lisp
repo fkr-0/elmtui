@@ -7,7 +7,7 @@
                 #:app-config
                 #:app-config-name)
   (:import-from :elmtui.ui.defcomponent #:defcomponent)
-  (:import-from #:elmtui.tea-state.api #:get-path #:state-ref)
+  (:import-from #:elmtui.tea-state #:get-path #:state-ref)
   (:import-from :elmtui.view.geo #:=?)
   (:export #:application-init-tests #:test-component #:test-parent-component
            #:initialize-app-state-test-init-app))
@@ -29,7 +29,7 @@
 (elmtui.ui.defcomponent:defcomponent test-component (elmtui.ui.api:component)
   (:state
    (state nil))
-  (:view (local-state-map app-state id-path)
+  (:view (local-state-map app-state id-path children)
          ;; (declare (ignore app-state))
          `(:text :id ,(elmtui.ui.api:id-from-path id-path)
                  :content ,(format nil "State: ~A" (gethash :state local-state-map)))))
@@ -51,8 +51,8 @@
               `(:state :parent-default :children-ids (,child-id))
               child-patches
               child-commands))))
-  (:view (local-state-map app-state id-path)
-         (let* ((parent-map (elmtui.state:get-path id-path app-state))
+  (:view (local-state-map app-state id-path children)
+         (let* ((parent-map (elmtui.tea-state:get-path id-path app-state))
                 (child-id (first (gethash :children-ids parent-map)))
                 ;; (child-id-path `(:components ,child-id))
                 )
@@ -187,19 +187,19 @@
       (is (= (gethash :counter app-data) 0))
       (is (string= (gethash :text app-data) "hello"))
 
-      (let ((comp1-map (elmtui.state.api:get-path '(:components :main-column :comp1) (elmtui.tea-state.state::application-state-data app-state))))
+      (let ((comp1-map (elmtui.tea-state:get-path '(:components :main-column :comp1) (elmtui.tea-state.state::application-state-data app-state))))
         (is (not (null comp1-map)))
         (is (equal (get-path :state comp1-map) "comp1 state"))
         (is (typep (elmtui.app:get-component-instance '(:main-column :comp1) app-state) 'test-component)))
 
-      (let* ((parent1-map (elmtui.state.api:get-path '(:components :main-column :parent1) (elmtui.tea-state.state::application-state-data app-state)))
+      (let* ((parent1-map (elmtui.tea-state:get-path '(:components :main-column :parent1) (elmtui.tea-state.state::application-state-data app-state)))
              (child1-id (first (gethash :children-ids parent1-map))))
         (is (not (null parent1-map)))
         (is (equal (gethash :state parent1-map) :parent-default))
         (is (typep (elmtui.app:get-component-instance '(:main-column :parent1) app-state) 'test-parent-component))
         (is (not (null child1-id)))
 
-        (let ((child1-map (elmtui.state.api:get-path (list :components child1-id) (elmtui.tea-state.state::application-state-data app-state))))
+        (let ((child1-map (elmtui.tea-state:get-path (list :components child1-id) (elmtui.tea-state.state::application-state-data app-state))))
           (is (not (null child1-map)))
           (is (equal (gethash :state child1-map) "child state"))
           (is (typep (elmtui.app:get-component-instance (list child1-id) app-state) 'test-component)))))))
@@ -241,9 +241,9 @@
       (initialize-app-state-my-state-test-app)
     (declare (ignore commands))
     (is (typep state 'elmtui.tea-state.state:application-state))
-    (is (string= "bar" (elmtui.state:get-path '(:foo) state)))
-    (is (not (null (elmtui.state:get-path '(:components :my-root) state))))
-    (is (eq :layout (elmtui.state:get-path '(:components :my-root :main :type) state)))
-    (is (eq :main (elmtui.state:get-path '(:components :my-root :main :id) state)))))
+    (is (string= "bar" (elmtui.tea-state:get-path '(:foo) state)))
+    (is (not (null (elmtui.tea-state:get-path '(:components :my-root) state))))
+    (is (eq :layout (elmtui.tea-state:get-path '(:components :my-root :main :type) state)))
+    (is (eq :main (elmtui.tea-state:get-path '(:components :my-root :main :id) state)))))
 
 ;; TODO test non-component

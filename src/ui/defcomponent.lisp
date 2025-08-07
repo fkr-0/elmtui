@@ -1,10 +1,10 @@
 (uiop:define-package :elmtui.ui.defcomponent
   (:use :cl)
   (:import-from :alexandria #:plist-hash-table)
-  (:import-from :elmtui.state.api #:make-update-result)
-  (:import-from :elmtui.state.api
+  (:import-from :elmtui.tea-state #:make-update-result
                 #:get-path)
   (:import-from :elmtui.ui.api
+                #:view
                 #:component      ;; Base class for components
                 #:component-id      ;; Base class for components
                 #:id-from-path
@@ -326,7 +326,7 @@ SYNTAX:
                          (if (fboundp 'call-next-method)
                              (call-next-method)
                              (values nil nil))
-                       ;; (declare (ignore default-patches default-commands))
+                       (declare (ignorable default-patches default-commands))
                        (destructuring-bind (local-changes-plist commands)
                            (multiple-value-list
                             (multiple-value-call #'values
@@ -344,30 +344,31 @@ SYNTAX:
                                     (loop for key being the hash-keys of local-changes-ht
                                             using (hash-value val)
                                           collect (list (elmtui.ui.api:component-state-path id-path key) val)))))
-                           (elmtui.state.api:make-update-result
+                           (elmtui.tea-state:make-update-result
                             :patches (append default-patches custom-patches)
                             :commands (append default-commands commands)))))))))
             `(defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
                (declare (ignore app-state message id-path))
-               (elmtui.state.api:make-update-result :patches nil :commands nil)))
+               (elmtui.tea-state:make-update-result :patches nil :commands nil)))
 
        ,(if view-clause
             (let* ((view-body-forms (clause-body view-clause))
                    (view-lambda-list (first view-body-forms))
                    (view-user-code (rest view-body-forms)))
-              `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path)
+              `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path children)
                  (declare (ignorable ;; ,@(remove nil view-lambda-list)
-                           id-path
+                           id-path children
                            ))
                  (let ((,(first view-lambda-list) (elmtui.utils:get-path id-path app-state)))
                    (if ,(first view-lambda-list)
                        (let ((,(second view-lambda-list) app-state)
-                             (,(third view-lambda-list) id-path))
-                         (declare (ignorable ,@(list (third view-lambda-list) (second view-lambda-list))));remove nil view-lambda-list)))
+                             (,(third view-lambda-list) id-path)
+                             (,(nth 3 view-lambda-list) children))
+                         (declare (ignorable ,@(list (third view-lambda-list) (second view-lambda-list) (nth 3 view-lambda-list))));remove nil view-lambda-list)))
                          ,@view-user-code)
                        (call-next-method)))))
-            `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path)
-               (declare (ignore app-state))
+            `(defmethod elmtui.ui.api:view ((self ,component-class-name) app-state &key id-path children)
+               (declare (ignore children app-state))
                (list (cclass-name self)
                      :id (elmtui.ui.api:id-from-path id-path)
                      :message "View not implemented for this component.")))

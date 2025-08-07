@@ -8,7 +8,7 @@
   (:import-from :log4cl #:log-debug #:log-info #:log-warn #:log-error)
   (:import-from :elmtui.style-lib.style-set #:set-style #:style-set) ; Function to add styles to a set
   (:import-from :elmtui.style-lib.api #:styles)
-  (:import-from :elmtui.view.api #:styled-ui-node-style-map
+  (:import-from :elmtui.view.api
                 #:ui-node-type #:ui-node-props #:ui-node-children
                 )
   (:import-from :elmtui.view.core #:ui-node-p)
@@ -19,7 +19,7 @@
   (:import-from :elmtui.view.styled
                 #:styled-ui-node #:styles #:style-value #:copy-styled-node)
   ;; Import specific layout engines
-  (:import-from :elmtui.view.layout.flex #:compute-flex-layout)
+  (:import-from :elmtui.view.layout.flex #:compute-flex-layout #:flex-item-children)
 
   (:export :layout-tree :layout-node #:dispatch-layout #:layout-grid-container-impl
            #:box-model #:content-box #:padding-box #:border-box
@@ -73,11 +73,11 @@
          ;; Assuming border widths are 0 if border-style is :none, or 1 if not specified but style is not :none.
          ;; This logic should ideally be part of style computation or a helper.
          (border-style (style-value styled-node :border-style :none))
-         (default-border-width (if (eq border-style :none) 0 1))
-         (border-top-width (style-value styled-node :border-top-width default-border-width))
-         (border-right-width (style-value styled-node :border-right-width default-border-width))
-         (border-bottom-width (style-value styled-node :border-bottom-width default-border-width))
-         (border-left-width (style-value styled-node :border-left-width default-border-width)))
+         (border-width (if (eq border-style :none) 0 (style-value styled-node :border-width 1)))
+         (border-top-width (style-value styled-node :border-top-width border-width))
+         (border-right-width (style-value styled-node :border-right-width border-width))
+         (border-bottom-width (style-value styled-node :border-bottom-width border-width))
+         (border-left-width (style-value styled-node :border-left-width border-width)))
 
     ;; Ensure border widths are 0 if border-style is :none, regardless of explicit width values
     (when (eq border-style :none)
@@ -243,11 +243,10 @@
              (getf (ui-node-props node) :id (gensym "ANON-NODE-")) parent-absolute-content-rect)
   (let* ((node-id (getf (ui-node-props node) :id (gensym "ANON-NODE-")))
          (display (style-value node :display :block)) ; Default to block display
-         ;; Canonical: use style-map slot if present, else inline :style from props, else nil
          (node-styles (cond
                         ((and (typep node 'styled-ui-node)
                               (ignore-errors (slot-exists-p node 'elmtui.view.api::style-map)))
-                         (ignore-errors (styled-ui-node-style-map node)))
+                         (ignore-errors (styles node)))
                         ((getf (ui-node-props node) :style))
                         (t nil)))
          ;; --- PATCH: Robust width/height resolution for root and containers ---
@@ -372,24 +371,19 @@
 
           (case display
             (:flex
-             (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S"
-                       (ui-node-type node) node-id self-content-rect)
-
-             ;; Run flex layout: returns the flex‑container object
-             (let* ((flex-container (elmtui.view.layout.flex:compute-flex-layout
-                                     node self-content-rect parent-style-set))
-                    (item-rects     (mapcar #'elmtui.view.layout.flex::rectangle
-                                            (elmtui.view.layout.flex:flex-item-children
-                                             flex-container))))
-               ;; Recurse for every UI child with its absolute rectangle
+             (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S" (ui-node-type node) node-id self-content-rect)
+             (let ((flex-container (compute-flex-layout node self-content-rect parent-style-set)))
+               ;; Sync the computed rectangles from the flex items back to the UI nodes
+               (loop for ui-child in (ui-node-children node)
+                     for flex-child in (et.flex:flex-item-children flex-container)
+                     do (setf (getf (ui-node-props ui-child) :layout-rect)
+                              (rectangle flex-child)))
+               ;; Now, recurse into the children to let them lay out their own content
                (setf laid-out-children
-                     (loop for i below (length (ui-node-children node))
-                           ;; child in (ui-node-children node)
-                           ;; for rect  in item-rects
-                           collect (let ((child (nth i (ui-node-children node)))
-                                         (rect  (nth i item-rects)))
-                                     (layout-node child rect node-styles))))
-
+                     (loop for child in (ui-node-children node)
+                           collect (layout-node child
+                                                (getf (ui-node-props child) :layout-rect)
+                                                node-styles)))
                (setf final-node-rect (getf (ui-node-props node) :layout-rect))))
             ;; (:flex
             ;;  (log-info "LAYOUT: ~A (~A) dispatching to FLEX layout in ~S"
@@ -457,9 +451,7 @@
                       (previous-child-margin-bottom 0)) ; For margin collapsing (simplified)
                   (log-info "LAYOUT: ~A (~A) dispatching to BLOCK layout in ~S children: ~A" (ui-node-type node) node-id self-content-rect (ui-node-children node))
                   (setf laid-out-children
-                        (loop for child-node in (if  (keywordp (car (ui-node-children node)))
-                                                     (list (ui-node-children node))
-                                                     (ui-node-children node))
+                        (loop for child-node in (ui-node-children node)
                               collect (let* ((child-margin-top (style-value child-node :margin-top 0))
                                              (child-margin-bottom (style-value child-node :margin-bottom 0))
                                              ;; Simplified margin collapsing: take max of prev bottom and current top
@@ -486,18 +478,26 @@
                                                    (w (getf (ui-node-props laid-out-child) :layout-rect))))
                                         (setf previous-child-margin-bottom child-margin-bottom) ; Store for next iteration
                                         laid-out-child)))
-                  ;; If container height is auto, adjust it based on children
+                  ;; If container height is auto, adjust it based on children or intrinsic size
                   (when (eq requested-h :auto)
                     (let* ((total-padding-border-h (- (h node-layout-rect) (h self-content-rect)))
-                           ;; Add the last child's bottom margin if it wasn't collapsed with a subsequent non-existent child
-                           (final-content-height (+ current-child-y-offset previous-child-margin-bottom)))
+                           (final-content-height
+                             (if (ui-node-children node)
+                                 (+ current-child-y-offset previous-child-margin-bottom)
+                                 (if (eq (ui-node-type node) :text)
+                                     1 ; Intrinsic height of a single line of text
+                                     0)))) ; Intrinsic height of other empty elements is 0
                       (setf (h final-node-rect) (+ final-content-height total-padding-border-h))))
-                  ;; If container width is auto, adjust it based on children's max width + padding/border
+                  ;; If container width is auto, adjust it based on children or intrinsic size
                   (when (eq requested-w :auto)
-                    (let* ((total-padding-border-w (- (w node-layout-rect) (w self-content-rect))))
-                      ;; max-child-width is the border-box width of the widest child.
-                      ;; The container's content width needs to accommodate this.
-                      (setf (w final-node-rect) (+ max-child-width total-padding-border-w))))
+                    (let* ((total-padding-border-w (- (w node-layout-rect) (w self-content-rect)))
+                           (final-content-width
+                             (if (ui-node-children node)
+                                 max-child-width
+                                 (if (eq (ui-node-type node) :text)
+                                     (length (getf (ui-node-props node) :content "")) ; Intrinsic width of text
+                                     0)))) ; Intrinsic width of other empty elements is 0
+                      (setf (w final-node-rect) (+ final-content-width total-padding-border-w))))
                   (setf (getf (ui-node-props node) :layout-rect) final-node-rect)))
             (:inline
              (log-warn "LAYOUT: Inline layout not yet implemented for ~A (~S). Treating as block for children." (ui-node-type node) node-id)

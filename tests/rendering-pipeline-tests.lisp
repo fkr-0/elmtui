@@ -51,6 +51,8 @@
      :backend nil)
     ;; app-state
     ))
+;; (atomic->layout-stage (styled->atomic-stage (raw->styled-stage (dsl->raw-stage (generate-dsl (setup-test-context))))))
+;; (elmtui.view.dsl:dsl->ui-node (root (ctx-dsl-tree(generate-dsl (setup-test-context)))) nil)
 ;; (setup-test-context)
 ;; (setup-test-context)
 
@@ -58,7 +60,7 @@
   "Tests the initial state of the rainbow app example."
   (let ((context (setup-test-context)))
     (is-true (ctx-state context) "Context should have an application state.")
-    (is-true (elmtui.tea-state.api:application-state-p (ctx-state context)) "Context state should be a valid app state.")
+    (is-true (elmtui.tea-state:application-state-p (ctx-state context)) "Context state should be a valid app state.")
     (is-true (ctx-viewport-rect context) "Context should have a viewport rectangle.")
     (is-true (ctx-front-buffer context) "Context should have a front buffer.")
     (is-true (virtual-terminal-buffer-p (ctx-front-buffer context))

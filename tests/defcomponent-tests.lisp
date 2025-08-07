@@ -6,8 +6,8 @@
   (:use :cl :fiveam)
   (:import-from :elmtui.ui.defcomponent #:defcomponent #:cclass-name)
   (:import-from :elmtui.ui.api #:component #:component-id #:id-from-path #:init #:update #:view)
-  (:import-from :elmtui.state.api #:get-path)
-  (:import-from :elmtui.state.api
+  (:import-from :elmtui.tea-state.api #:get-path)
+  (:import-from :elmtui.tea-state.api
                 #:make-update-result
                 #:make-state
                 #:ur-patches #:ur-commands)
@@ -65,7 +65,7 @@
   (:state
    (label "View Test" :type string :documentation "Label text"))
 
-  (:view (local-state app-state id-path)
+  (:view (local-state app-state id-path children)
          (let ((text (getf local-state :label "Default")))
            `(:div :id ,(id-from-path id-path) :text ,text))))
 
@@ -91,7 +91,7 @@
            (:toggle-active ()
                            (values `(:active ,(not (getf local-state :active))) nil)))
 
-  (:view (local-state app-state id-path)
+  (:view (local-state app-state id-path children)
          `(:component :type :test-complete
                       :id ,(id-from-path id-path)
                       :name ,(getf local-state :name)
@@ -140,6 +140,7 @@
          (id-path '(:components :test2)))
     (multiple-value-bind (returned-instance patches commands)
         (init instance :id-path id-path :initial-name "custom" :initial-value 100)
+      (is (null commands))
       (is (eq instance returned-instance))
       (is (= 1 (length patches)))
 
@@ -170,9 +171,9 @@
          (mock-app-state '())
          (message '(:some-message :data)))
     (let ((result (update instance mock-app-state message :id-path '(:components :test))))
-      (is (typep result 'elmtui.state.api:update-result))
-      (is (null (elmtui.state.api:ur-patches result)))
-      (is (null (elmtui.state.api:ur-commands result))))))
+      (is (typep result 'elmtui.tea-state.api:update-result))
+      (is (null (elmtui.tea-state.api:ur-patches result)))
+      (is (null (elmtui.tea-state.api:ur-commands result))))))
 
 (test defcomponent-custom-update
   "Test component with custom update method"
@@ -185,7 +186,7 @@
            (patches (ur-patches result))
            (counter-patch (find '(:components :test :counter) patches :key #'first :test #'equal))
            (messages-patch (find '(:components :test :messages) patches :key #'first :test #'equal)))
-      (is (typep result 'elmtui.state.api:update-result))
+      (is (typep result 'elmtui.tea-state.api:update-result))
       (is (= 2 (length patches)))
       (is (not (null counter-patch)))
       (is (= 8 (second counter-patch)))
@@ -195,14 +196,14 @@
     (let* ((result (update instance mock-app-state '(:reset) :id-path id-path))
            (patches (ur-patches result))
            (counter-patch (find '(:components :test :counter) patches :key #'first :test #'equal)))
-      (is (typep result 'elmtui.state.api:update-result))
+      (is (typep result 'elmtui.tea-state.api:update-result))
       (is (= 2 (length patches)))
       (is (not (null counter-patch)))
       (is (= 0 (second counter-patch))))
 
     ;; Test unhandled message (otherwise clause)
     (let ((result (update instance mock-app-state '(:unknown-message) :id-path id-path)))
-      (is (typep result 'elmtui.state.api:update-result))
+      (is (typep result 'elmtui.tea-state.api:update-result))
       (let ((patches (ur-patches result)))
         (is (= 1 (length patches)))))))
 
@@ -245,6 +246,7 @@
     ;; Test init
     (multiple-value-bind (returned-instance patches commands)
         (init instance :id-path id-path :name "my-complete" :data '(x y z))
+      (is (null commands))
       (is (eq instance returned-instance))
       (is (= 1 (length patches)))
 
@@ -257,7 +259,7 @@
     ;; Test update
     (let* ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "test" :active t))))))
            (result (update instance mock-app-state '(:set-name "updated") :id-path id-path)))
-      (is (typep result 'elmtui.state.api:update-result))
+      (is (typep result 'elmtui.tea-state.api:update-result))
       (let ((patches (ur-patches result)))
         (is (= 1 (length patches)))
         (is (string= "updated" (second (first patches))))))

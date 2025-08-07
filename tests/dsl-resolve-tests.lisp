@@ -36,7 +36,7 @@
 (test dsl-resolve-layout-element-positional-children
   (elmtui.app.api:with-temporary-dsl-component-registry
     (elmtui.app.api:clear-dsl-component-registry)
-    (let ((dsl '(:row (:text "a") (:text "b")))
+    (let ((dsl '(:row (:text :content "a") (:text "b")))
           (app-state nil))
       (is (equalp '(:row :children ((:text :content "a") (:text :content "b")))
                   (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))))
@@ -49,7 +49,7 @@
       (is (equalp
            '(:column :class "p-2" :children ((:text :content "x") (:text :content "y")))
            (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))
-    (let ((dsl '(:column :class "p-2" :children ((:text "x") (:text :content "y"))))
+    (let ((dsl '(:column :class "p-2" :children ((:text :content "x") (:text :content "y"))))
           (app-state nil))
       (is (equalp
            '(:column
@@ -67,7 +67,7 @@
   (declare (ignore app-state id-path))
   '(:text "0"))
 
-(defmethod elmtui.state:get-component-by-path ((app-state mock-app-state) path)
+(defmethod elmtui.tea-state:get-component-by-path ((app-state mock-app-state) path)
   (gethash path (slot-value app-state 'components)))
 
 (defun setup-test-app-state (component-specs)
@@ -104,7 +104,55 @@
                          :children ((:row :children ((:counter :id :ctr)))
                                     (:text "bye")))))
              ;; (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))))
-             (is (equalp '(:container :id :main :children ((:row :children ((:counter :id :ctr :resolved-view (:text "0"))))
-                                                           (:text :content "bye")))
+             (is (equalp '(:container :id :main :children
+                           ((:row :children
+                             ((:counter :id :ctr :resolved-view (:text "0"))))
+                            (:text :content "bye")))
                          (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))))
       (clear-dsl-component-registry))))
+;; (ELMTUI.VIEW.BASE-ELEMENTS:DSL->OBJECTS
+;;  '(:CONTAINER :ID #:VIEWPORT-CONTAINER-1288 :STYLE
+;;    (:WIDTH 80 :HEIGHT 24 :OFFSET-X 0 :OFFSET-Y 0)
+;;    :CHILDREN
+;;    (:LAYOUT :ID :KEY-TESTER-WIDGET
+;;             :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT
+;;             :FOCUSABLE T
+;;             :STYLE
+;;     (:BORDER :CHILDREN (T :DIRECTION :COLUMN :PADDING 1 :WIDTH 40 :HEIGHT 5))
+;;     :CHILDREN
+;;     ((:TEXT :VALUE "Elm TUI Key Tester")
+;;      (:TEXT :VALUE "Input: ")
+;;      (:TEXT :VALUE "Echo:  (:|j|)") (:TEXT :VALUE "Press 'q' to quit. Try Backspace and Escape.")))))
+;; (ELMTUI.VIEW.DSL:DSL->UI-NODE
+;; (elmtui.view.dsl:render-dsl-to-resolved-tree
+;;  '(:ROOT-VIEWPORT :ID :KEY-TESTER-ROOT :INITIAL-TERMINAL-DIMENSIONS #1=(1 1)
+;;    :INITIAL-CURSOR-POS #1#
+;;    :CHILDREN
+;;    (:LAYOUT :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT :FOCUSABLE T
+;;             :STYLE (:BORDER T :DIRECTION :COLUMN :PADDING 1 :WIDTH 40 :HEIGHT 5)
+;;             :CHILDREN ((:TEXT :VALUE "Elm TUI Key Tester")
+;;                        (:TEXT :VALUE "Input: ")
+;;                        (:TEXT :VALUE "Echo:  (:|j|)")
+;;                        (:TEXT :VALUE "Press 'q' to quit. Try Backspace and Escape.")))) (elmtui.tea-state:make-application-state))
+
+;; (elmtui.view.dsl:dsl->ui-node '(:LAYOUT :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT
+;;                                 :FOCUSABLE T :STYLE
+;;   (:BORDER :CHILDREN (T :DIRECTION :COLUMN :PADDING 1 :WIDTH 40 :HEIGHT 5))
+;;   :CHILDREN
+;;   ((:TEXT :VALUE "Elm TUI Key Tester") (:TEXT :VALUE "Input: ")
+;;    (:TEXT :VALUE "Echo:  (:|j|)")
+;;    (:TEXT :VALUE "Press 'q' to quit. Try Backspace and Escape.")))
+;;                                              (elmtui.tea-state.api:make-application-state))
+
+;;               (let ((spec (:LAYOUT :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT
+;;   :FOCUSABLE T :STYLE
+;;   (:BORDER :CHILDREN (T :DIRECTION :COLUMN :PADDING 1 :WIDTH 40 :HEIGHT 5))
+;;   :CHILDREN
+;;   ((:TEXT :VALUE "Elm TUI Key Tester") (:TEXT :VALUE "Input: ")
+;;    (:TEXT :VALUE "Echo:  (:|j|)")
+;;    (:TEXT :VALUE "Press 'q' to quit. Try Backspace and Escape.")))))
+;;                 (destructuring-bind (type &rest tail) spec
+;;                 (multiple-value-bind (props children) (split-props/children tail)
+;;                   (let* ((id (getf props :id))
+;;                          (new-path (if id (append path (list id)) path)))
+;;                     (list props children)))))

@@ -9,7 +9,7 @@
    :async-task-error :promise-cancelled-p :promise-cancelled-condition
                 :promise :resolve-promise :reject-promise :await)
   (:import-from :elmtui.core.globals #:*app-sender*) ; Import *app-sender* from globals
-  (:import-from :elmtui.state #:rollback-state) ; Import rollback-state from state module
+                                        ;(:import-from :elmtui.state #:rollback-state) ; Import rollback-state from state module
                                         ; Import *app-sender* from globals
   (:export :cmd-async
    :with-async-restarts
@@ -26,8 +26,6 @@
 ;;;-----------------------------------------------------------------------------
 ;;; Globals & Conditions
 ;;;-----------------------------------------------------------------------------
-
-;; *app-sender* is now defined and imported from elmtui.core.events
 
 (defvar *async-tasks* (make-hash-table :test 'equal) "Active async tasks.") ;; Still not used for cancellation
 (defvar *async-errors* (make-hash-table :test 'equal) "Async task errors.")
@@ -152,6 +150,8 @@
 
       ;; Start the first attempt
       (do-attempt attempts))))
+
+
 (defmacro with-async-restarts ((condition-var) &body forms) ; Renamed body to forms
   "Handle async task failures with DRY restarts: ignore, rollback, replace, provide result."
   `(block with-async-restarts
@@ -164,11 +164,11 @@
                 (ignore-task ()
                   :report "Ignore/discard this async task."
                   (return-from with-async-restarts nil))
-                (rollback-state ()
-                  :report "Rollback state to previous checkpoint."
-                  ;; Call the imported rollback-state function
-                  (rollback-state)
-                  (return-from with-async-restarts nil))
+                ;; (rollback-state ()
+                ;;   :report "Rollback state to previous checkpoint."
+                ;;   ;; Call the imported rollback-state function
+                ;;   (rollback-state)
+                ;;   (return-from with-async-restarts nil))
                 (replace-task (new-task)
                   :report "Replace the async task interactively or programmatically."
                   ;; Return the new task value, don't funcall body
@@ -180,6 +180,7 @@
                   :report "Retry the async task."
                   (return-from with-async-restarts (progn ,@forms))))))) ; Use forms
        ,@forms)))
+
 (defun cmd-recurring (interval-seconds function &key args on-message stop-condition max-iterations)
   "Create a recurring command that runs periodically.
    Parameters:
@@ -224,7 +225,40 @@
 ;;;-----------------------------------------------------------------------------
 
 (defun interpret-cmd (cmd)
-  "Execute CMD: spawn async-task(s) or sequence. Handles errors with restarts and async-task-error."
+  "Execute CMD: spawn async-task(s) or sequence.
+Handles errors with restarts and async-task-error.
+
+   Parameters:
+   - CMD: Command structure to interpret, can be of type :async, :batch, :dispatch, or :recurring-task.
+
+   Returns:
+   - For :async: Returns the task object and promise.
+   - For :batch: Returns a list of results from each command in the batch.
+   - For :dispatch: Returns nil (no task).
+   - For :recurring-task: Returns the task ID.
+
+   Errors are handled with restarts, allowing for recovery or cancellation.
+   If an error occurs during execution, it will signal an async-task-error condition
+   which can be handled with the provided restarts:
+   - ignore-task: Ignore the error and continue.
+   - rollback-state: Rollback the application state to the last checkpoint.
+   - replace-task: Replace the task with a new one.
+   - provide-result: Provide a custom result for the task.
+   - retry: Retry the async task.
+   This function is the main entry point for executing commands in the application.
+
+  Example usage:
+    (interpret-cmd (cmd-async #'my-function :args '(1 2 3)
+                    :on-complete #'my-on-complete
+                    :on-error #'my-on-error)
+    => Returns a promise that can be awaited.
+ (interpret-cmd (cmd-batch '((:async :task #'task1 :id 'task1-id)
+                                 (:async :task #'task2 :id 'task2-id))
+"
+
+  ;;Ensure we have a valid *app-sender* to send messages
+  (unless *app-sender*
+    (error "No *app-sender* defined. Ensure you have set it before interpreting commands."))
   ;; Use with-async-restarts for standard async error handling
   (with-async-restarts (c)
     (handler-case
@@ -295,7 +329,7 @@
                  task-id)))
             (otherwise
              (log:warn "Unknown command type: ~A" cmd-type)
-             nil)))
+             (list :unknown cmd-type))))
       ;; Error handled by with-async-restarts, which signals async-task-error
       ;; No need for explicit signaling here unless we want to add more info
       (error (e)

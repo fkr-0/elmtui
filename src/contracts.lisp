@@ -1,6 +1,6 @@
 (uiop:define-package :elmtui.contracts
   (:use :cl)
-  (:import-from :elmtui.state.msg
+  (:import-from :elmtui.tea-state.msg
                 #:message-variant-p #:*message-schemas* #:message-schema)
   (:export
    ;; transform macros
@@ -27,7 +27,7 @@
    ;; Tree root accessors
    #:root
    ;; Core contract macros
-   #:defupdate #:defview #:defsubscriptions
+   #:defupdate-ctr #:defview #:defsubscriptions
    ;; Enhanced update macros with message type support
    #:defupdate-typed #:defupdate-flexible #:defupdate-hybrid
    ;; Contract validation
@@ -395,7 +395,7 @@
 ;;; Enhanced Update Function Contracts with Message Type Support
 ;;;--------------------------------------------------------------
 
-(defmacro defupdate (name (model-param message-param) &body body)
+(defmacro defupdate-ctr (name (model-param message-param) &body body)
   "Defines an update function with flexible message validation (backward compatible).
    This is equivalent to defupdate-flexible."
   `(defupdate-flexible ,name (,model-param ,message-param) ,@body))
@@ -1012,6 +1012,9 @@
        (defun ,name ,arglist
          ;; (declare (ignorable ,arglist))
          ;; --- pre-condition -------------------------------------------------
+         (declare (ignorable ,@(remove-if
+                                (lambda (x) (or (eql x '&key)
+                                                (eql x '&optional))) arglist)))
          (check-type ,input-sym ,in-type
                      ,(format nil "~a input violated contract (expected ~a)."
                               name in-type))

@@ -62,9 +62,11 @@
                        (props (ui-node-props item))
                        (children (ui-node-children item))
                        (display-style (style-value item :display :block)) ; Default to block
-                       (overflow-x (style-value item :overflow-x :visible))
-                       (overflow-y (style-value item :overflow-y :visible))
+                       (overflow-x :visible);(style-value item :overflow-x :visible))
+                       (overflow-y :visible );(style-value item :overflow-y :visible))
                        (resolved-item item))
+                  (log-info "TREE-TRANSFORMS: resolve-view - Node ID: ~S, Type: ~S, Display: ~A, Overflow-X: ~A, Overflow-Y: ~A"
+                            (getf props :id) node-type display-style overflow-x overflow-y)
 
                   ;; 1. Handle :overflow style for scrollable content
                   (when (or (member overflow-x '(:scroll :auto :hidden))
@@ -72,22 +74,23 @@
                     (log-info "TREE-TRANSFORMS: resolve-view - Applying :overflow transformation for node ID: ~S" (getf props :id))
                     ;; Wrap children in a :viewport node.
                     ;; The original node becomes the container for this viewport.
-                    (let* ((viewport-id (gensym "VIEWPORT-"))
-                           (viewport-props `(:id ,viewport-id
-                                             :overflow-x ,overflow-x
-                                             :overflow-y ,overflow-y
-                                             ;; Viewport itself might need some default styles or inherit relevant ones
-                                             :style (:width :fill :height :fill))) ; Basic viewport style
-                           (viewport-node (make-styled-node :type :viewport
-                                                            :props viewport-props
-                                                            :children children
-                                                            ;; Parent of viewport is the original node, but this happens structurally
-                                                            ))
-                           ;; The original node now has the viewport as its single child.
-                           (new-original-node (copy-styled-node resolved-item :children (list viewport-node))))
-                      (setf resolved-item new-original-node)
-                      ;; Children of the viewport are already set, they will be resolved in the recursive call later.
-                      (setf children (list viewport-node)))) ; Update children for subsequent processing
+                    ;; (let* ((viewport-id (gensym "VIEWPORT-"))
+                    ;;        (viewport-props `(:id ,viewport-id
+                    ;;                          :overflow-x ,overflow-x
+                    ;;                          :overflow-y ,overflow-y
+                    ;;                          ;; Viewport itself might need some default styles or inherit relevant ones
+                    ;;                          :style (:width :fill :height :fill))) ; Basic viewport style
+                    ;;        (viewport-node (make-styled-node :type :viewport
+                    ;;                                         :props viewport-props
+                    ;;                                         :children children
+                    ;;                                         ;; Parent of viewport is the original node, but this happens structurally
+                    ;;                                         ))
+                    ;;        ;; The original node now has the viewport as its single child.
+                    ;;        (new-original-node (copy-styled-node resolved-item :children (list viewport-node))))
+                    ;;   (setf resolved-item new-original-node)
+                    ;;   ;; Children of the viewport are already set, they will be resolved in the recursive call later.
+                    ;;   (setf children (list viewport-node)))
+                    ) ; Update children for subsequent processing
 
                   ;; 2. Handle :display style (structural implications)
                   (cond

@@ -83,9 +83,9 @@
             ;; Key events when listbox is focused
             ((and normalized-message (typep normalized-message 'key-event) (equal current-focus listbox-id))
              (log4cl:log-debug "DIRLI-UPDATE: Processing key event for listbox: ~S" normalized-message)
-             (let ((key (key-event-key normalized-message))))
+             (let ((key (key-event-key normalized-message)))
                (cond
-                 ((and (equal key "q") (member :control (elmtui.core.events:key-event-modifiers normalized-message)))
+                 ((and (string= key "q") (member :control (elmtui.core.event-types:key-event-modifiers normalized-message)))
                   (setf current-message-patch (list :should-quit t))
                   (log4cl:log-info "App quit requested (C-q), setting should-quit flag."))
                  (t
@@ -115,9 +115,12 @@
                                                   :height (listbox-model-height listbox-state)
                                                   :selected-index (when new-items 0)
                                                   :on-select (listbox-model-on-select listbox-state))))
-                         (setf current-message-patch (list :listbox-state new-listbox-state
-                                                           :current-path new-path-attempt
-                                                           :status-message (format nil "Entered ~A" (enough-namestring new-path-attempt (uiop:pathname-parent new-path-attempt)))))))
+                         (setf current-message-patch
+                               (list :listbox-state new-listbox-state
+                                     :current-path new-path-attempt
+                                     :status-message (format nil "Entered ~A"
+                                                             (enough-namestring new-path-attempt
+                                                                                (uiop:pathname-parent-directory-pathname new-path-attempt)))))))
                       ((uiop:file-exists-p new-path-attempt)
                        (setf current-message-patch (list :status-message (format nil "Selected file: ~A" selected-item-name))))
                       (t
@@ -144,16 +147,16 @@
 
                  (otherwise
                   (unless (typep message 'key-event) ; Already handled above
-                    (log4cl:log-warn "Unhandled list-based message type in dirli-update: ~A" msg-type)))))))
+                    (log4cl:log-warn "Unhandled list-based message type in dirli-update: ~A" msg-type))))))
 
             ;; Catch-all for other unhandled messages
             (t (unless (or (null message) focus-state-patch) ; Don't warn for nil or already handled focus
-                 (log4cl:log-warn "Unhandled message in dirli-update: ~S" message))))))
+                 (log4cl:log-warn "Unhandled message in dirli-update: ~S" message))))
 
-      (when current-message-patch
-        (setf app-patch (append current-message-patch app-patch)))
+          (when current-message-patch
+            (setf app-patch (append current-message-patch app-patch)))
 
-      (values app-patch commands)))
+          (values app-patch commands))))
   :view-fn
   (lambda (app-state)
     (let* ((status-message (state-ref app-state :status-message))
@@ -171,14 +174,21 @@
             (text :value (format nil "Terminal Size: ~A x ~A" terminal-width terminal-height))
             (text :value (or output-to-print ""))
             (text :value "Press C-q to quit."))))
+  :root-component-dsl
+  '(vbox :id :dirli-app-root
+    :style '(:width (:percent 100) :height (:percent 100))
+    (text :value "Dirli - Directory Listing Application")
+    (view-listbox :widget-id :main-listbox)
+    (text :value "Press C-q to quit."))
   :command-processor-fn nil ; No external command processor needed for this example
   :event-translator-fn nil ; Use default event translation
+  :root-viewport-id :dirli-app-root
   :quit-flag-path '(:should-quit)
   :style-sheet-path '(:current-stylesheet))
 
 ;;; Main function to run the application
 (defun run-dirli (&rest args)
-  (apply #'elmtui.app:run-application #'dirli-app args))
+  (apply #'elmtui.app.api:run-application 'dirli-app args))
 
 ;;; Alias for convenience
 (defun main ()

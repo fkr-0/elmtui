@@ -6,13 +6,13 @@
   (:import-from :elmtui.utils #:get-path)
   (:import-from :elmtui.app
                 #:defapplication)
-  (:import-from :elmtui.tea-state.api #:apply-patches #:make-state nil)
+  (:import-from :elmtui.tea-state #:apply-patches #:make-state nil)
   (:import-from :elmtui.ui.api
                 #:component)
   (:import-from :elmtui.ui.defcomponent
                 #:defcomponent
                 #:defcomponent-slots)
-  (:import-from :elmtui.state.api
+  (:import-from :elmtui.tea-state
                 #:make-update-result
                 #:state-ref)
   (:import-from :elmtui.ui.api
@@ -80,7 +80,7 @@
    (id nil)
    (text "Default Text" :accessor test-simple-component-text :initarg :text)
    (count 0 :accessor test-simple-component-count :initarg :count))
-  (:view (local-state-map app-state id-path)
+  (:view (local-state-map app-state id-path children)
          ;; (declare (ignore local-state-map app-state id-path))
          `(:test-simple-component)))
 
@@ -157,6 +157,7 @@
       (setf (elmtui.tea-state.state::application-state-data app-state) (make-hash-table :test 'equal)) ; Reset state
       (multiple-value-bind (instance patches commands)
           (elmtui.ui.api:init comp-instance :id-path id-path :initial-text "Hello" :initial-count 42)
+        (declare (ignore commands)) ; No commands expected
         (is (eq comp-instance instance))
         (apply-patches app-state patches)
         (let ((state (get-component-state app-state comp-id)))
@@ -292,6 +293,7 @@
 
       (multiple-value-bind (instance patches commands)
           (elmtui.ui.api:init comp-instance :id-path id-path :initial-text "Hello Label" :initial-extra-info "Special Info")
+        (declare (ignore commands)) ; No commands expected
         (is (eq comp-instance instance))
         (apply-patches app-state patches)
         (let ((state (get-component-state app-state comp-id)))

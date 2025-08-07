@@ -46,11 +46,16 @@
                 #:terminal-style-bold #:terminal-style-italic
                 #:terminal-style-underline #:terminal-style-inverse
                 #:ansi-seqs #:stringify-sgr)
+  (:import-from #:elmtui.platform.api
+                #:clear-screen)
+
   (:import-from #:elmtui.backend.common.utils
                 #:get-sequence #:render-seq
                 #:ansi-fg-color-seq #:ansi-bg-color-seq
                 #:ansi-attr-seq)
-  (:import-from :elmtui.app.system-events #:make-terminalresized-systemevent)
+  (:import-from :elmtui.app.system-events #:make-terminalresized-systemevent
+                #:make-cursorpositionchanged-systemevent)
+
   ;; (:import-from #:elmtui.platform.canvas
   ;;               #:canvas
   ;;               #:make-terminal-canvas
@@ -109,6 +114,8 @@
   (current-termios nil :type (or null termios))
   (width 80 :type integer)
   (height 24 :type integer)
+  (cursor-start-col 24 :type integer)
+  (cursor-start-row 24 :type integer)
   (cursor-visible-p t :type boolean)
   (cursor-row 0 :type integer)
   (cursor-col 0 :type integer)
@@ -119,7 +126,8 @@
   (lock (make-instance 'lockable) :type lockable)
   (front-buffer nil :type (or null virtual-terminal-buffer))
   (back-buffer nil :type (or null virtual-terminal-buffer))
-  (publish-fn nil :type (or null function))) ; For signal handlers
+  (publish-fn nil :type (or null function)) ; For signal handlers
+  (scrolled-lines 0 :type integer))
 
 (defmethod term-w ((instance terminal-instance)) (terminal-instance-width instance))
 (defmethod term-h ((instance terminal-instance)) (terminal-instance-height instance))
@@ -136,22 +144,27 @@
 ;;;---------------------------------------------------------------
 ;;; Internal Terminal Reset Helper
 ;;;---------------------------------------------------------------
-(defun %force-clear-terminal-and-reset-buffers (instance)
+(defun %force-clear-terminal-and-reset-buffers
+    (instance &key (row -1) (buffer t) (cursor (list 1 1)))
   "Internal helper: Forces a hard clear of the terminal screen and resets internal buffers."
   (check-type instance terminal-instance)
   (log:info "TERMINAL (internal): Forcing clear of terminal and resetting buffers.")
   (with-terminal-lock (instance)
-    (send-sequence instance :erase-in-display 2)
-    (send-sequence instance :cursor-set-position 1 1)
-    (send-sequence instance :reset)
-    (let ((front-buffer (terminal-instance-front-buffer instance)))
-      (when front-buffer
-        (with-virtual-buffer-lock (front-buffer)
-          (clear-buffer front-buffer :char #\Nul))))
-    (let ((back-buffer (terminal-instance-back-buffer instance)))
-      (when back-buffer
-        (with-virtual-buffer-lock (back-buffer)
-          (clear-buffer back-buffer))))
+    (when (= -1 row)
+      (send-sequence instance :erase-in-display 2)) ;; Clear entire screen
+    (send-sequence instance :cursor-set-position (car cursor)
+                   (cadr cursor)) ;; Move cursor to top-left
+    (send-sequence instance :reset) ;; SGR 0 - Reset all styles
+    (when buffer
+      (let ((front-buffer (terminal-instance-front-buffer instance)))
+        (when front-buffer
+          (with-virtual-buffer-lock (front-buffer)
+            (clear-buffer front-buffer :char #\Nul))))
+      (let ((back-buffer (terminal-instance-back-buffer instance)))
+        (when back-buffer
+          (with-virtual-buffer-lock (back-buffer)
+            (clear-buffer back-buffer)))))
+
     (setf (terminal-instance-current-style instance) (make-terminal-style))
     (flush-output instance)
     (finish-output (terminal-instance-stream instance)))
@@ -180,8 +193,8 @@
 (defun teardown-terminal-signal-handlers ()
   (log:info "TERMINAL: Disabling signal handlers for terminal")
   ;; Disable SIGWINCH handler
-  (sb-sys:enable-interrupt sb-unix:sigwinch nil)
-  (sb-sys:enable-interrupt sb-unix:sigint nil))
+  (sb-sys:enable-interrupt sb-unix:sigwinch :default)
+  (sb-sys:enable-interrupt sb-unix:sigint :default))
 
 
 ;;;---------------------------------------------------------------
@@ -225,6 +238,13 @@
                            :current-termios curr-termios
                            :publish-fn publish-fn)))
       (log-info "TERMINAL: Initialized backend instance with fd ~A, stream ~S" fd stream)
+      (multiple-value-bind (w h) (get-cursor-position instance)
+        (setf (terminal-instance-cursor-row instance) (or h 0)
+              (terminal-instance-cursor-start-row instance) (or h 0)
+              (terminal-instance-cursor-start-col instance) (or w 0)
+              (terminal-instance-cursor-col instance) (or w 0))
+
+        (log:info "TERMINAL: Initial cursor position set to row ~A, col ~A" h w))
       (multiple-value-bind (w h) (get-screen-dimensions instance)
         (setf (terminal-instance-width instance) w
               (terminal-instance-height instance) h)
@@ -248,6 +268,10 @@
   (log-info "TERMINAL: Shutting down backend...")
   (handler-case
       (with-terminal-lock (instance)
+        (let ((scrolled (terminal-instance-scrolled-lines instance)))
+          (when (> scrolled 0)
+            (scroll-up instance scrolled)))
+        (teardown-terminal-signal-handlers)
         (send-sequence instance :cursor-show)
         (send-sequence instance :reset) ; SGR 0
         (%force-clear-terminal-and-reset-buffers instance)
@@ -325,6 +349,61 @@
       (let ((rendered (apply #'render-seq seq-obj args)))
         (write-output rendered (terminal-instance-stream instance))))))
 
+(defmethod get-cursor-position ((instance terminal-instance))
+  (let ((response-str nil)
+        ;; (default-w 0)
+        ;; (default-h 0)
+        )
+    (with-terminal-lock (instance)
+      (send-sequence instance :cursor-report)
+      (finish-output (terminal-instance-stream instance))
+
+      (let ((response-chars '())
+            (stream (terminal-instance-stream instance))
+            (deadline (+ (get-internal-real-time) (* 0.5 internal-time-units-per-second)))) ; 0.5s total timeout
+        (loop
+          (when (> (get-internal-real-time) deadline)
+            (log:warn "Timeout waiting for cursor report. Read so far: ~S"  (nreverse (copy-list response-chars) ))
+            (return)) ; Exit loop, response-str will be nil or partial
+
+          (let ((char (read-byte stream nil :eof)))
+            (cond
+              ((eq char :eof)
+               (log:warn "EOF encountered while reading cursor report. Read so far: ~S" (coerce (nreverse (copy-list response-chars)) 'string))
+               (return)) ; Exit loop
+              (t ; Character read
+               (push char response-chars)
+               (when (= char (char-code #\R))
+                 (setq response-str (coerce (mapcar #'code-char (nreverse response-chars)) 'string))
+                 (log:debug "Cursor report full response read: ~S" response-str)
+                 (return))))))))
+    (when response-str
+      (handler-case
+          (let* ((esc-pos (position #\Esc response-str))
+                 (bracket-pos (position #\[ response-str :start (if esc-pos (1+ esc-pos) 0)))
+                 (r-pos (position #\R response-str :from-end t)))
+            (if (and esc-pos bracket-pos r-pos (< bracket-pos r-pos) (> r-pos (1+ bracket-pos))) ; Ensure content between [ and R
+                (let* ((content (subseq response-str (1+ bracket-pos) r-pos))
+                       (parts (uiop:split-string content :separator '(#\;))))
+                  (if (and (= (length parts) 2)
+                           (every #'digit-char-p (first parts))
+                           (plusp (length (first parts))) ; Ensure not empty string
+                           (every #'digit-char-p (second parts))
+                           (plusp (length (second parts)))) ; Ensure not empty string
+                      (let ((parsed-h (parse-integer (first parts)))
+                            (parsed-w (parse-integer (second parts))))
+                        (log:info "Parsed dimensions: W=~A, H=~A from ~S" parsed-w parsed-h response-str)
+                        (let ((publish-fn (terminal-instance-publish-fn instance)))
+                          (when publish-fn
+                            (funcall publish-fn (elmtui.app.system-events:make-cursorpositionchanged-systemevent
+                                                 :col parsed-w :row parsed-h))))
+                        (return-from get-cursor-position (values parsed-w parsed-h)))
+                      (log:warn "Could not parse dimensions from report parts: ~S (original: ~S)" parts response-str)))
+                (log:warn "Malformed cursor report: ~S. ESC:~S, [:~S, R:~S" response-str esc-pos bracket-pos r-pos)))
+        (error (e)
+          (log:error "Error parsing cursor report string ~S: ~A" response-str e)
+          (values 0 0)))))) ; Exit loop, proceed to parse
+
 (defmethod get-screen-dimensions ((instance terminal-instance))
   (let ((response-str nil)
         (default-w (term-w instance))
@@ -340,7 +419,7 @@
             (deadline (+ (get-internal-real-time) (* 0.5 internal-time-units-per-second)))) ; 0.5s total timeout
         (loop
           (when (> (get-internal-real-time) deadline)
-            (log:warn "Timeout waiting for cursor report. Read so far: ~S" (coerce (nreverse (copy-list response-chars)) 'string))
+            (log:warn "Timeout waiting for cursor report. Read so far: ~S" (nreverse (copy-list response-chars) ))
             (return)) ; Exit loop, response-str will be nil or partial
 
           (let ((char (read-byte stream nil :eof)))
@@ -389,12 +468,14 @@
     (log:warn "Failed to get screen dimensions from terminal, using defaults: W=~A, H=~A" default-w default-h)
     (values default-w default-h))) ; Exit loop, proceed to parse
 
-(defmethod clear-screen ((instance terminal-instance))
+(defmethod clear-screen ((instance terminal-instance) &optional rect)
   (log:debug "TERMINAL clear-screen: Clearing back-buffer.")
   (let ((back-buffer (terminal-instance-back-buffer instance)))
     (when back-buffer
       (with-virtual-buffer-lock (back-buffer)
-        (clear-buffer back-buffer))))
+        (if rect
+            (clear-area instance back-buffer (y rect) (x rect) (h rect) (w rect))
+            (clear-buffer back-buffer)))))
   t)
 
 (defmethod flush-output ((instance terminal-instance))
@@ -417,11 +498,21 @@
     (send-sequence instance :cursor-set-position (1+ row) (1+ col)))
   t)
 
-(defmethod get-cursor-position ((instance terminal-instance))
-  (values (terminal-instance-cursor-row instance) (terminal-instance-cursor-col instance)))
+;; (defmethod get-cursor-position ((instance terminal-instance))
+;;   (values (terminal-instance-cursor-row instance) (terminal-instance-cursor-col instance)))
 
 (defmethod hide-cursor ((instance terminal-instance)) (set-cursor-visibility instance nil))
 (defmethod show-cursor ((instance terminal-instance)) (set-cursor-visibility instance t))
+
+(defmethod scroll-down ((instance terminal-instance) &optional (lines 1))
+  (with-terminal-lock (instance)
+    (incf (terminal-instance-scrolled-lines instance) lines)
+    (send-sequence instance :scroll-down lines)))
+
+(defmethod scroll-up ((instance terminal-instance) &optional (lines 1))
+  (with-terminal-lock (instance)
+    (decf (terminal-instance-scrolled-lines instance) lines)
+    (send-sequence instance :scroll-up lines)))
 
 ;;;---------------------------------------------------------------
 ;;; Drawing Primitives (draw to a specified target-buffer)
@@ -518,7 +609,11 @@
   (log:debug "BUFFER: clear-area on target-buffer - Row: ~A, Col: ~A, H: ~A, W: ~A, Style: ~S" row col height width style)
   (when target-buffer
     (with-virtual-buffer-lock (target-buffer)
-      (fill-buffer-region target-buffer row col width height #\Space style)))
+      (fill-buffer-region target-buffer row col width height #\Space style)
+      (send-sequence instance :erase-in-line 2)
+      (dotimes (i height)
+        (send-sequence instance :cursor-set-position (+ row i) col)
+        (send-sequence instance :erase-in-line 2))))
   t)
 
 ;;;---------------------------------------------------------------
@@ -639,7 +734,7 @@ This method should be implemented by subclasses of low-level-terminal."
   (write-output (concatenate 'string (string #\Esc) "[0m") stream))
 
 (defmethod apply-style-diff ((instance terminal-instance) new-style)
-  (log:info "APPLY-STYLE-DIFF CALLED. Current: ~S, New: ~S" (term-style instance) new-style)
+  ;; (log:info "APPLY-STYLE-DIFF CALLED. Current: ~S, New: ~S" (term-style instance) new-style)
   (let* ((current-style (term-style instance))
          (stream (term-stream instance))
          ;; If new-style is already a terminal-style, use it directly
@@ -647,12 +742,12 @@ This method should be implemented by subclasses of low-level-terminal."
                          ((typep new-style 'elmtui.platform.backend.common.ansi-styling:terminal-style)
                           new-style)
                          (new-style (progn
-                                      (log:debug "APPLY-STYLE-DIFF: Converting plist to terminal-style: ~S" new-style)
+                                      ;; (log:debug "APPLY-STYLE-DIFF: Converting plist to terminal-style: ~S" new-style)
                                       (style-to-terminal-style new-style)))
                          (t (make-terminal-style)))))
     (when (equal current-style new-style-ts)
       (return-from apply-style-diff t))
-    (log:debug "APPLY-STYLE-DIFF: Transitioning. Current: ~S, New: ~S" current-style new-style-ts)
+    ;; (log:debug "APPLY-STYLE-DIFF: Transitioning. Current: ~S, New: ~S" current-style new-style-ts)
     (let ((changes (update-style! current-style new-style-ts)))
       ;; Emit ANSI sequences only for changed attributes
       (dolist (change changes)

@@ -188,7 +188,9 @@
                   (values (urxvt-instance-width instance) (urxvt-instance-height instance))))
             (values (urxvt-instance-width instance) (urxvt-instance-height instance)))))))
 
-(defmethod clear-screen ((instance urxvt-instance))
+
+(defmethod clear-screen ((instance urxvt-instance) &optional (rect nil))
+  (declare (ignore rect)) ; rect is not used in this backend
   (with-urxvt-lock (instance)
     (send-sequence instance :erase-screen)
     (send-sequence instance :cursor-set-position 0 0))

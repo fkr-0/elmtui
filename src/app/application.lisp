@@ -27,7 +27,7 @@
                 #:app-config-renderer-fn
                 #:app-config-subscriptions-fn-form     ; <— newly imported
                 #:get-component-instance)
-  (:import-from #:elmtui.state.api                 #:merge-patches
+  (:import-from #:elmtui.tea-state.api                 #:merge-patches
                 #:update-result
                 #:ur-handled
                 #:ur-patches
@@ -35,7 +35,13 @@
   (:import-from #:elmtui.ui.api                #:init #:view #:initialize-components-from-dsl
                 #:instantiate-component-from-dsl)
   (:import-from #:elmtui.ui.widgets.root-viewport #:root-viewport)
-  (:export #:defapplication #:make-app-config #:get-component-instance))
+  (:import-from #:elmtui.keymaps
+                #:add-keybinding
+                #:define-keymap
+                #:register-keymap
+                #:define-keymap-context)
+  (:export #:defapplication #:make-app-config #:get-component-instance
+           #:register-message-binding #:define-widget-keymap))
 
 (in-package #:elmtui.app)
 
@@ -184,12 +190,13 @@ DSL cases handled:
   ;; Normalize function designators for macro keyword args.
   (defun %normalize-fn (val what app)
     "Accepts a symbol, quoted symbol, (function sym), lambda, or function object.
-  Returns a function object or lambda as-is. For a symbol/quoted symbol, returns the symbol for later resolution."
+  Returns a function object or lambda as-is.
+For a symbol/quoted symbol, returns the symbol for later resolution."
     (cond
       ((and (consp val) (eq (car val) 'lambda))
-       val)
+       val) ;;
       ((functionp val)
-       val)
+       val) ;;
       ((symbolp val)
        val)
       ((and (consp val) (eq (car val) 'quote) (symbolp (cadr val)))
@@ -261,6 +268,7 @@ DSL cases handled:
                                         ":update-fn" name))
              (view-fn*   (%normalize-fn (getf kw-plist :view-fn)
                                         ":view-fn" name))
+             (wrapped-view-fn-sym (intern (format nil "WRAPPED-VIEW-~A" name)))
              (cmd-proc-fn (%normalize-fn (coerce-fn (getf kw-plist :command-processor-fn))
                                          ":command-processor-fn" name))
              ;; Subscriptions: keep symbol | lambda | NIL, but handle lambda evaluation properly
@@ -284,6 +292,14 @@ DSL cases handled:
                   ',name ',warn-list)))
 
            ;; --------------------------------------------------------------
+           ;; Generated WRAPPED VIEW function
+           ;; --------------------------------------------------------------
+           (defun ,wrapped-view-fn-sym (model)
+             (maybe-wrap-with-root-viewport
+              (funcall ',view-fn* model)
+              :root-id ',root-vp-id))
+
+           ;; --------------------------------------------------------------
            ;; Register config object
            ;; --------------------------------------------------------------
            (log-info "Initializing application: ~A" ',name)
@@ -294,7 +310,7 @@ DSL cases handled:
                   :root-component-dsl ,root-dsl
                   :initial-state-plist ,state
                   :update-fn-sym ',update-fn*
-                  :view-fn-sym   ',view-fn*
+                  :view-fn-sym   ',wrapped-view-fn-sym
                   :command-processor-fn ,cmd-proc-fn
                   :subscriptions-fn-form ,subs-fn-form
                   :message-queue (make-message-channel :capacity 20) ; Create proper event-channel
@@ -310,7 +326,7 @@ DSL cases handled:
                                   (initial-cursor-position '(0 0))
                                 &allow-other-keys) ; Allow other platform-options
              (declare (ignorable initial-terminal-dimensions initial-cursor-position))
-             (let* ((app-state (elmtui.tea-state.api:make-state (alexandria:plist-hash-table ,initial-state-plist))))
+             (let* ((app-state (elmtui.tea-state:make-state (alexandria:plist-hash-table ,initial-state-plist))))
                (multiple-value-bind (patches commands)
                    (initialize-components-from-dsl
                     ;; (maybe-wrap-with-root-viewport
@@ -319,7 +335,7 @@ DSL cases handled:
                  ;; :term-size initial-terminal-dimensions
                  ;; :cursor-pos initial-cursor-position))
                  ;; (format t "~A ~A~%" app-state patches)
-                 (elmtui.tea-state.transactions:apply-patches app-state patches)
+                 (elmtui.tea-state:apply-patches app-state patches)
                  (values app-state commands))))
 
 
@@ -346,7 +362,14 @@ DSL cases handled:
            ;;     (elmtui.tea-state.transactions:apply-patches state (ur-patches update-result))
            ;;     (values state (ur-commands update-result))))
            (defun ,proc-fn-sym (state msg)
-             (let* ((ur (funcall (symbol-function ',update-fn*) msg state)))
+             (let* ((ur (funcall
+                         ;; ,`(if (symbol-function ',(%normalize-fn
+                         ;;                           `,`,update-fn* nil nil))
+                         ;;       ',update-fn*
+                         (%normalize-fn
+                          ',(and `,update-fn* `,(if `,(symbolp '`,update-fn*)
+                                                    `,(symbol-function '`,`,update-fn*)
+                                                    `,`,update-fn*))nil nil) msg state)))
                (unless (typep ur 'update-result)
                  (error "~A update function (~S) must return UPDATE-RESULT, got: ~S"
                         ',name ',update-fn* ur))
@@ -367,7 +390,7 @@ DSL cases handled:
 
                  (let* ((all-patches (nconc (ur-patches ur) comp-patches))
                         (all-cmds    (nconc (ur-commands ur) comp-cmds)))
-                   (elmtui.tea-state.api:apply-patches state all-patches)
+                   (elmtui.tea-state:apply-patches state all-patches)
                    (values state all-cmds)))))
            ;; --------------------------------------------------------------
            ;; RUN-<app>
@@ -411,6 +434,23 @@ DSL cases handled:
                     :backend-type platform ; keyword arg
                     :platform-options platform-options))))) ; keyword arg
            ',name)))))
+
+;;; ---------------------------------------------------------------------------
+;;; Keymap glue helpers
+;;; ---------------------------------------------------------------------------
+
+(defun register-message-binding (km key-string msg &key description)
+  "Sugar: add a :message binding that emits MSG list."
+  (add-keybinding km key-string :target msg
+                                :description description))
+
+(defmacro define-widget-keymap (name &body bindings)
+  "DSL = DEFINE-KEYMAP + automatic registration + context."
+  `(progn
+     (define-keymap ,name ,@bindings)
+     (register-keymap ',name ,name)
+     (define-keymap-context ,(intern (format nil "~A-CTX" (symbol-name name)))
+         () ,name)))
 ;;; ---------------------------------------------------------------------------
 ;;; Quick manual demo & FiveAM tests unchanged … (omitted for brevity)
 ;;; ---------------------------------------------------------------------------
@@ -430,7 +470,7 @@ DSL cases handled:
 (defun my-update-fn (msg state)
   (declare (ignore state msg))
   ;; (format t "Update called with message: ~A~%" msg)
-  (make-instance 'elmtui.state:update-result))
+  (make-instance 'elmtui.tea-state:update-result))
 
 (defun my-view-fn (state)
   (declare (ignore state))
@@ -443,7 +483,7 @@ DSL cases handled:
 (defapplication my-test-app
   :root-component-dsl *dummy-root-dsl*
   :initial-state-plist (list :some-initial-state t)
-  :update-fn 'my-update-fn
+  :update-fn (lambda (m s) (my-update-fn m s))
   :view-fn   'my-view-fn
   :subscriptions-fn (lambda (model)
                       (declare (ignore model))

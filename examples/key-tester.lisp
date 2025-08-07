@@ -60,9 +60,9 @@
 
 ;; The keymap binds keys to these message-dispatching actions.
 (define-keymap *key-tester-example-keymap*
-  ("Backspace" :type :action :target 'action-delete-char
+  ("backspace" :type :action :target 'action-delete-char
                :description "Delete last character")
-  ("Escape"    :type :action :target 'action-clear-buffer
+  ("escape"    :type :action :target 'action-clear-buffer
                :description "Clear the input buffer"))
 
 ;; The context makes the keymap active when the component is focused.
@@ -107,15 +107,21 @@
 (defun key-tester-view (app-state)
   "Renders the application's UI based on the current state."
   (let ((component (state-ref app-state :component)))
-    `(:layout
+    `(:container
       :id :key-tester-widget
       :keymap-id :key-tester-example-context ; Link to our keymap context
       :focusable t
-      :style (:border t :direction :column :padding 1 :width 40 :height 5)
-      :children ((:text :value "Elm TUI Key Tester")
-                 (:text :value ,(format nil "Input: ~A" (key-tester-input component)))
-                 (:text :value ,(format nil "Echo:  ~A" (key-tester-echo component)))
-                 (:text :value "Press 'q' to quit. Try Backspace and Escape.")))))
+      :style (:border t :direction :column :width :auto :height :auto
+              :min-width 40 :min-height 8 :display :block
+              :margin 1
+              :border-style :solid :border-width 1
+                                        ;:fg-color (128 128 128)
+              )
+      :children ((:text
+                  :content "Elm TUI Key Tester")
+                 (:text :content ,(format nil "Input: ~A" (key-tester-input component)))
+                 (:text :content ,(format nil "Echo:  ~A" (key-tester-echo component)))
+                 (:text :content "Press 'q' to quit. Try Backspace and Escape.")))))
 
 ;; Define the application using the modern `defapplication` macro.
 (defapplication key-tester-app

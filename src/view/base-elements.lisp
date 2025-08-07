@@ -4,7 +4,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.view.base-elements
   (:use :cl :alexandria :log4cl)
-  (:import-from :elmtui.utils #:as)
+
   (:import-from :sb-mop
                 class-direct-slots slot-definition-name)
   (:export
@@ -12,7 +12,7 @@
    #:base-element #:element-id #:element-children
    ;; Concrete element classes & their main readers
    #:base-dsl-error
-   #:container-element #:container-layout #:container-style #:container-class
+   #:container-element #:container-layout #:container-style #:container-classes
    #:text-element      #:text-content   #:text-wrap #:text-align #:text-color
    #:separator-element #:separator-orientation #:separator-thickness
    #:spacer-element    #:spacer-width  #:spacer-height
@@ -25,7 +25,6 @@
    #:make-dsl-element #:update-dsl-element
    #:find-elements-by-type #:find-element-by-id #:map-dsl-elements
    #:describe-element-type #:validate-dsl-tree #:dsl-statistics
-
    ))
 
 (in-package :elmtui.view.base-elements)
@@ -224,8 +223,9 @@
     this method to add their own checks."
   (declare (ignore context e))
   ;; Base rule: nothing special to validate here – subclasses add checks
-  t
-  )
+  t)
+
+
 
 ;;;----------------------------------------------------------------
 ;;; 2. Concrete element classes
@@ -236,15 +236,17 @@
   ((layout :initarg :layout :accessor container-layout :initform :vertical
            :type keyword)
    (style  :initarg :style  :accessor container-style  :initform nil)
-   (class  :initarg :class  :accessor container-class  :initform nil)
+   (classes  :initarg :classes  :accessor container-classes  :initform nil)
    (padding :initarg :padding :initform 0 :type fixnum)
    (margin  :initarg :margin  :initform 0 :type fixnum)
-   (gap     :initarg :gap     :initform 1 :type fixnum))
+   (gap     :initarg :gap     :initform 0 :type fixnum))
   (:documentation "Generic layout container holding *children*.  All
   sizing / spacing attributes are purely declarative.") )
 
 (defmethod element-type ((e container-element)) :container)
 (%register-element-class :container 'container-element)
+(%register-element-class :row 'container-element)
+(%register-element-class :column 'container-element)
 
 (defmethod validate-element ((c container-element) &optional context)
   (declare (ignore context))
@@ -257,8 +259,8 @@
   (list :container
         :id (element-id c)
         :layout (container-layout c)
-        :style (container-style c)
-        :class (container-class c)
+        :style (convert-style-plist-to-dsl (container-style c))
+        :classes (container-classes c)
         :padding (slot-value c 'padding)
         :margin  (slot-value c 'margin)
         :gap     (slot-value c 'gap)
@@ -271,6 +273,7 @@
    (wrap    :initarg :wrap    :accessor text-wrap    :initform t :type boolean)
    (align   :initarg :align   :accessor text-align   :initform :left :type keyword)
    (color   :initarg :color   :accessor text-color   :initform nil))
+  (:default-initargs :content-model :text)
   (:documentation "Plain text node."))
 
 (defmethod validate-element ((txt text-element) &optional context)
@@ -291,7 +294,7 @@
         :content (text-content txt)
         :wrap (text-wrap txt)
         :align (text-align txt)
-        :color (text-color txt)))
+        :color (to-dsl (text-color txt)))) ; Explicitly call to-dsl for color
 
 ;;; -- Separator --------------------------------------------------
 (defclass separator-element (base-element)
@@ -317,11 +320,11 @@
 (%register-element-class :spacer 'spacer-element)
 
 
-(defmethod to-dsl ((s spacer-element))
-  (list :spacer
-        :id (element-id s)
-        :width  (spacer-width s)
-        :height (spacer-height s)))
+(defmethod to-dsl ((s string)) s)
+(defmethod to-dsl ((n number)) n)
+(defmethod to-dsl ((o null)) o)
+(defmethod to-dsl ((s symbol)) s)
+(defmethod to-dsl ((l list)) l)
 
 
 
@@ -331,27 +334,36 @@
 ;;; Label
 ;;; ---------------------------------------------------------------
 (defclass label-element (base-element)
-  ((text  :initarg :text  :type string  :reader label-text  :documentation "Displayed label text." :initarg :text)
+  ((content :initarg :content :type string  :reader label-content :documentation "Displayed label text.")
    (for   :initarg :for   :initform nil :reader label-for   :documentation "ID of the control this label describes.")
    (color :initarg :color :initform nil :reader label-color :documentation "Optional colour keyword."))
   (:default-initargs :content-model :text)
   (:documentation "Plain text label element."))
+;;; ---------------------------------------------------------------
+;;; Label
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((lbl label-element))
+  (list :label
+        :id (element-id lbl)
+        :content (label-content lbl)
+        :for (label-for lbl)
+        :color (to-dsl (label-color lbl))))
 
 (defmethod element-type ((e label-element)) :label)
 (%register-element-class :label 'label-element)
 
 (defmethod validate-element ((lbl label-element) &optional context)
-  (unless (slot-boundp lbl 'text)
+  (unless (slot-boundp lbl 'content)
     (error 'base-dsl-error
            :element lbl
-           :reason "Missing required property :text"
+           :reason "Missing required property :content"
            :context context)))
 
 ;;; ---------------------------------------------------------------
 ;;; Button
 ;;; ---------------------------------------------------------------
 (defclass button-element (base-element)
-  ((text      :initarg :text      :type string  :reader button-text)
+  ((content   :initarg :content   :type string  :reader button-content)
    (disabled  :initarg :disabled  :initform nil :type boolean :reader button-disabled-p)
    (on-click  :initarg :on-click  :initform nil :reader button-on-click)
    (focusable :initarg :focusable :initform t  :type boolean :reader button-focusable-p))
@@ -362,10 +374,10 @@
 (%register-element-class :button 'button-element)
 
 (defmethod validate-element ((btn button-element) &optional context)
-  (unless (slot-boundp btn 'text)
+  (unless (slot-boundp btn 'content)
     (error 'base-dsl-error
            :element btn
-           :reason "Missing required property :text"
+           :reason "Missing required property :content"
            :context context)))
 
 ;;; ---------------------------------------------------------------
@@ -474,14 +486,14 @@
 ;;; ---------------------------------------------------------------
 (defclass link-element (base-element)
   ((href     :initarg :href     :type string :reader link-href)
-   (text     :initarg :text     :type string :reader link-text)
+   (content  :initarg :content  :type string :reader link-content)
    (target   :initarg :target   :initform :_self :reader link-target)
    (on-click :initarg :on-click :initform nil   :reader link-on-click))
   (:default-initargs :content-model :interactive)
   (:documentation "Hyperlink element."))
 
 (defmethod element-type ((e link-element)) :link)
-;; (%register-element-class :link 'link-element)
+(%register-element-class :link 'link-element)
 
 ;;; ---------------------------------------------------------------
 ;;; List
@@ -508,10 +520,7 @@
   (:documentation "Tabular data element."))
 
 (defmethod element-type ((e table-element)) :table)
-;; (%register-element-class :table 'table-element)
-
-
-
+(%register-element-class :table 'table-element)
 
 ;;;----------------------------------------------------------------
 ;;; 3. Bidirectional conversion helpers
@@ -522,49 +531,85 @@
     (error "Expected keyword or NIL, got ~A" v))
   v)
 
+(defun convert-style-plist-to-dsl (style-plist)
+  "Recursively converts a style plist to its DSL representation by applying TO-DSL to its values."
+  (when style-plist
+    (loop for (k v) on style-plist by #'cddr
+          append (list k (to-dsl v)))))
+
+(defun convert-style-dsl-to-plist (style-dsl)
+  "Recursively converts a style DSL (plist) back to a plist of objects by applying DSL->OBJECTS to its values."
+  (when style-dsl
+    (loop for (k v) on style-dsl by #'cddr
+          append (list k (dsl->objects v)))))
+
 (defun dsl->objects (dsl)
-  "Convert the old plist representation into new BASE-ELEMENT instances."
-  (cond
-    ((null dsl) nil)
-    ((or (stringp dsl) (numberp dsl)) dsl) ; raw leaf stays raw
+  "Translate an Elm-TUI style DSL (a plist/tree of keywords) into
+   concrete instances of BASE-ELEMENT subclasses.
 
-    ;; list of elements → map individually
-    ((and (listp dsl) (not (keywordp (first dsl))))
-     (mapcar #'dsl->objects dsl))
+   • strings / numbers are left untouched
+   • a list that begins with a keyword denotes *one* element
+   • a proper list whose first item is *not* a keyword is treated
+     as a sequence of sibling elements"
+  (labels (;; Ensure we always recurse on a *list* (or NIL) so that downstream
+           ;; code never has to special-case atoms.
+           (ensure-dsl-list (d)
+             (cond ((null d) nil)
+                   ((and (listp d) (keywordp (first d))) (list d))
+                   ((listp d) d)
+                   (t (list d)))))
 
-    ;; single element
-    ((and (listp dsl) (keywordp (first dsl)))
-     (destructuring-bind (type &rest props) dsl
-       (ecase type
-         (:container
-          (make-instance 'container-element
-                         :id (ensure-keyword-or-nil (getf props :id))
-                         :layout (getf props :layout :vertical)
-                         :style (getf props :style)
-                         :class (getf props :class)
-                         :padding (getf props :padding 0)
-                         :margin  (getf props :margin 0)
-                         :gap     (getf props :gap 1)
-                         :children (dsl->objects (getf props :children))) )
-         (:text
-          (make-instance 'text-element
-                         :id (ensure-keyword-or-nil (getf props :id))
-                         :content (getf props :content "")
-                         :wrap (getf props :wrap t)
-                         :align (getf props :align :left)
-                         :color (getf props :color)))
-         (:separator
-          (make-instance 'separator-element
-                         :id (ensure-keyword-or-nil (getf props :id))
-                         :orientation (getf props :orientation :horizontal)
-                         :thickness (getf props :thickness 1)))
-         (:spacer
-          (make-instance 'spacer-element
-                         :id (ensure-keyword-or-nil (getf props :id))
-                         :width (getf props :width 0)
-                         :height (getf props :height 0))) )))
+    (cond
+      ;; ------------------------------------------------------------------
+      ;; 1. primitive leaf
+      ((atom dsl)
+       dsl)
 
-    (t (error "Invalid DSL node: ~A" dsl))))
+      ;; ------------------------------------------------------------------
+      ;; 2. sibling list (e.g.  ((:row ...) (:text ...)))
+      ((and (listp dsl) (not (keywordp (first dsl))))
+       (mapcar #'dsl->objects dsl))
+
+      ;; ------------------------------------------------------------------
+      ;; 3. single element  ( e.g. (:row :gap 2 :children …) )
+      ((and (listp dsl) (keywordp (first dsl)))
+       (destructuring-bind (type &rest props) dsl
+         (let* ((class (element-class type)))
+           (unless class
+             (error "Unknown DSL element type: ~A" type))
+
+           ;; This helper returns a flattened list of allowed initargs.
+           (flet ((valid-initargs (cls)
+                    (alexandria:flatten
+                     (slot-initargs cls)
+                     ;; (mapcar #'sb-mop:slot-definition-initargs
+                     ;;         (sb-mop:class-slots
+                     ;;          (find-class cls)))
+                     )))
+
+             (let* ((allowed-keys (valid-initargs type))
+                    (children-objects (dsl->objects
+                                       (ensure-dsl-list (getf props :children))))
+                    (filtered-props
+                      (loop for (k v) on props by #'cddr
+                            when (and (member k allowed-keys) (not (eq k :children)))
+                              append (list k
+                                           (cond
+                                             ((eq k :style) (convert-style-dsl-to-plist v))
+                                             ((eq k :item-style) (convert-style-dsl-to-plist v))
+                                             ((eq k :color) (dsl->objects v)) ; Color might be a keyword or a complex object
+                                             (t (dsl->objects v))))))) ; Recursively convert other values
+
+               ;; ------------------------------------------------------------------
+               ;; CRITICAL FIX #1 – splice keyword/arg list correctly
+               (apply #'make-instance class
+                      (append (list :children children-objects)
+                              filtered-props)))))))
+
+      ;; ------------------------------------------------------------------
+      ;; 4. anything else is malformed
+      (t (error "Invalid DSL node: ~A" dsl)))))
+
 
 ;;;----------------------------------------------------------------
 ;;; 4. Traversal utilities (object side)
@@ -651,12 +696,13 @@
     (when cls
       (make-instance cls))))
 
-(defun slot-keywords (cls)
-  "Return the list of initarg keywords for CLS."
-  (mapcar #'slot-definition-name (class-direct-slots (class-of cls))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun slot-keywords (cls)
+    "Return the list of initarg keywords for CLS."
+    (mapcar #'slot-definition-name (class-direct-slots (class-of cls))))
 
-(defun slot-initargs (type-kw)
-  "Return the list of initargs for the class corresponding to TYPE-KW.
+  (defun slot-initargs (type-kw)
+    "Return the list of initargs for the class corresponding to TYPE-KW.
 
   This is a list of keywords that can be used to initialize an element.
   Arguments:
@@ -668,7 +714,6 @@
   Example:
   (slot-initargs :container) =>
   (:id :children :style :class :layout :padding :margin :gap)"
-  (eval-when (:compile-toplevel :load-toplevel :execute)
     (mapcar
      (lambda (x) (car (sb-mop:slot-definition-initargs x)))
      (sb-mop::class-slots
@@ -707,7 +752,7 @@
     (error () nil)))
 (defun element-type-p (type)
   (and (keywordp type) (element-class type)))
-
+;; (element-class :container)
 (defun valid-property-p (element-type property)
   "Checks if PROPERTY is a valid initarg for the class corresponding to ELEMENT-TYPE."
   (base-element-has-initarg element-type property))
@@ -873,7 +918,7 @@
      (loop for slot in (slot-keywords element)
            for val = (slot-value element slot)
            when val
-             append (list slot val)))
+             append (list (elmtui.utils:ensure-keyword slot) val)))
     ((listp element) (rest element))))
 
 (defun dsl-children (element)
@@ -1019,7 +1064,7 @@
 ;;                :on-click (lambda (msg) (format t "clicked!~%")))
 
 ;; Legacy DSL still works:
-;; (normalize-base-dsl '(:input :id :name :type :text :placeholder "Your name"))
+;; (normalize-base-dsl '(:container :id :name ))
 ;; (apply #'make-instance (element-class :text)
 ;; (list
 ;; (normalize-base-dsl '( :text
@@ -1033,3 +1078,136 @@
 
 ;; (validate-BASE-DSL '(:BUTTON :text "Click Me"))
 ;; (make-instance 'button-element :text "Click Me")
+
+(defmethod to-dsl ((s spacer-element))
+  (list :spacer
+        :id (element-id s)
+        :width  (spacer-width s)
+        :height (spacer-height s)))
+
+
+;;; ---------------------------------------------------------------
+;;; Button
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((btn button-element))
+  (list :button
+        :id (element-id btn)
+        :content (button-content btn)
+        :disabled (button-disabled-p btn)
+        :on-click (button-on-click btn)
+        :focusable (button-focusable-p btn)))
+
+;;; ---------------------------------------------------------------
+;;; Input (single-line)
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((inp input-element))
+  (list :input
+        :id (element-id inp)
+        :type (input-type inp)
+        :value (input-value inp)
+        :placeholder (input-placeholder inp)
+        :disabled (input-disabled-p inp)
+        :required (input-required-p inp)
+        :focusable (input-focusable-p inp)
+        :on-change (input-on-change inp)
+        :on-focus (input-on-focus inp)
+        :on-blur (input-on-blur inp)))
+
+;;; ---------------------------------------------------------------
+;;; Textarea
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((txta textarea-element))
+  (list :textarea
+        :id (element-id txta)
+        :value (textarea-value txta)
+        :placeholder (textarea-placeholder txta)
+        :rows (textarea-rows txta)
+        :cols (textarea-cols txta)
+        :disabled (textarea-disabled-p txta)
+        :required (textarea-required-p txta)
+        :focusable (textarea-focusable-p txta)
+        :on-change (textarea-on-change txta)
+        :on-focus (textarea-on-focus txta)
+        :on-blur (textarea-on-blur txta)))
+
+;;; ---------------------------------------------------------------
+;;; Select
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((sel select-element))
+  (list :select
+        :id (element-id sel)
+        :value (select-value sel)
+        :options (mapcar #'to-dsl (select-options sel))
+        :multiple (select-multiple-p sel)
+        :disabled (select-disabled-p sel)
+        :focusable (select-focusable-p sel)
+        :on-change (select-on-change sel)))
+
+;;; ---------------------------------------------------------------
+;;; Checkbox
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((chk checkbox-element))
+  (list :checkbox
+        :id (element-id chk)
+        :checked (checkbox-checked-p chk)
+        :label (checkbox-label chk)
+        :disabled (checkbox-disabled-p chk)
+        :focusable (checkbox-focusable-p chk)
+        :on-change (checkbox-on-change chk)))
+
+;;; ---------------------------------------------------------------
+;;; Radio
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((rad radio-element))
+  (list :radio
+        :id (element-id rad)
+        :name (radio-name rad)
+        :value (radio-value rad)
+        :checked (radio-checked-p rad)
+        :label (radio-label rad)
+        :disabled (radio-disabled-p rad)
+        :focusable (radio-focusable-p rad)
+        :on-change (radio-on-change rad)))
+
+;;; ---------------------------------------------------------------
+;;; Image
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((img image-element))
+  (list :image
+        :id (element-id img)
+        :src (image-src img)
+        :alt (image-alt img)
+        :width (image-width img)
+        :height (image-height img)))
+
+;;; ---------------------------------------------------------------
+;;; Link
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((lnk link-element))
+  (list :link
+        :id (element-id lnk)
+        :href (link-href lnk)
+        :content (link-content lnk)
+        :target (link-target lnk)
+        :on-click (link-on-click lnk)))
+
+;;; ---------------------------------------------------------------
+;;; List
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((lst list-element))
+  (list :list
+        :id (element-id lst)
+        :items (mapcar #'to-dsl (list-items lst))
+        :ordered (list-ordered-p lst)
+        :item-style (convert-style-plist-to-dsl (list-item-style lst))))
+
+;;; ---------------------------------------------------------------
+;;; Table
+;;; ---------------------------------------------------------------
+(defmethod to-dsl ((tbl table-element))
+  (list :table
+        :id (element-id tbl)
+        :headers (mapcar #'to-dsl (table-headers tbl))
+        :rows (mapcar #'to-dsl (table-rows tbl))
+        :border (table-border-p tbl)
+        :cell-padding (table-cell-padding tbl)))

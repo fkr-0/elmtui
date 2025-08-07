@@ -27,10 +27,10 @@
                 #:make-focus-manager
                 #:request-focus          ; For focus-element
                 #:tab-navigate           ; For focus-next/previous
-                #:component-gained-focus 
-                #:component-lost-focus   
-                #:navigate-direction     
-                #:register-focus-context 
+                #:component-gained-focus
+                #:component-lost-focus
+                #:navigate-direction
+                #:register-focus-context
                 #:switch-focus-context
                 #:handle-key-event       ; From elmtui.core.focus
                 #:list-active-keybindings) ; From elmtui.core.focus (for introspection)
@@ -52,23 +52,23 @@
    #:initialize-keymap-system
    #:create-focus-manager
    #:setup-key-event-handling
-   
+
    ;; Focus management
    #:focus-element
    #:focus-next
    #:focus-previous
    #:navigate-focus
-   
+
    ;; Keymap management (defined in this package)
    #:add-keybinding
    #:remove-keybinding
    #:register-component-keymap
-   
+
    ;; Re-exported from elmtui.core.keymap
    #:define-keymap
    #:parse-key-string
    #:normalized-key->string
-   
+
    ;; Re-exported from elmtui.core.keymap.registry
    #:define-keymap-context
    #:activate-context    ; This is fine, it's used internally and also good for export
@@ -77,16 +77,16 @@
    #:register-keymap     ; This is fine, it's used internally and also good for export
    #:find-keymap
    #:find-context
-   
+
    ;; Re-exported from elmtui.core.keymap.defaults
    #:*global-navigation-keymap*
    #:*dialog-keymap*
    #:*form-keymap*
    #:*editor-keymap*
    #:*list-navigation-keymap*
-   
+
    ;; Re-exported from elmtui.core.focus (for introspection)
-   #:list-active-keybindings 
+   #:list-active-keybindings
    ))
 
 (in-package :elmtui.core.keymap-system)
@@ -98,17 +98,17 @@
 (defun initialize-keymap-system ()
   "Initialize the keymap system with standard keymaps and focus handlers."
   (log-info "Initializing keymap system")
-  
+
   ;; Initialize event channels
   (when (find-package :elmtui.core.event-async)
     (funcall (intern "INITIALIZE-EVENT-CHANNELS" :elmtui.core.event-async)))
-  
+
   ;; Register standard keymaps
   (register-standard-keymaps)
-  
+
   ;; Ensure global context is active
   (activate-context *global-keymap-context*)
-  
+
   ;; Return success
   t)
 
@@ -119,7 +119,7 @@
 (defun setup-key-event-handling (focus-manager app-state)
   "Set up keyboard event handling for the application."
   (elmtui.core.keymap.event-integration:setup-keyboard-event-handler focus-manager app-state)
-  
+
   ;; The call to elmtui.core.keymap.focus-integration:register-focus-keymaps was here.
   ;; It's considered redundant as component keymap contexts are handled dynamically
   ;; by component-gained-focus / component-lost-focus in elmtui.core.focus.
