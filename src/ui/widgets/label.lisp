@@ -5,7 +5,7 @@
 (uiop:define-package :elmtui.ui.widgets.label
   (:use :cl :elmtui.ui.defcomponent)
   (:import-from :elmtui.ui.api #:id-from-path #:component) ; Keep only used API functions
-  (:import-from :elmtui.state.api #:app-state #:make-update-result) ; Keep app-state and make-update-result
+  (:import-from :elmtui.tea-state.api #:app-state #:make-update-result) ; Keep app-state and make-update-result
   (:import-from :elmtui.view.styled #:make-styled-node)
   (:export #:label)) ; Export only the component name
 
@@ -37,7 +37,7 @@
            (:set-for (new-for-target)
                      (values `(:for ,new-for-target) nil)))
 
-  (:view (local-state app-state self-id-path)
+  (:view (local-state app-state self-id-path children)
          ;; (declare (ignore app-state))
                                         ; app-state not directly used in this simple view
          (let* ((component-id (id-from-path self-id-path))

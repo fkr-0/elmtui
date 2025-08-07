@@ -1,7 +1,8 @@
 (uiop:define-package :elmtui.ui.widgets.layout
   (:use :cl :alexandria :elmtui.ui.defcomponent)
   (:import-from #:log4cl :log-info :log-debug :log-warn)
-  (:import-from #:elmtui.utils :ensure-keyword)
+  (:import-from #:elmtui.utils :ensure-keyword
+                #:get-path)           ; Used in user code (e.g. for child state, or in destroy)
   (:import-from :elmtui.ui.api
                 #:component-id
                 #:id-from-path       ; Used in user code
@@ -10,10 +11,9 @@
                 #:view               ; For calling on children
                 #:destroy            ; For defining and calling on children
                 #:make-state-patch)  ; For manual patch creation (e.g. in destroy)
-  (:import-from :elmtui.state.api
+  (:import-from :elmtui.tea-state.api
                 #:ur-patches       ; For collecting child patches
                 #:ur-commands       ; For collecting child commands
-                #:get-path           ; Used in user code (e.g. for child state, or in destroy)
                 #:make-update-result ; Used by defcomponent, good for reference
                 #:update-result-patches
                 #:update-result-commands)
@@ -225,7 +225,7 @@
    (:message-to (target-child-id-segment child-message)
                 (let* ((target-child-id (ensure-keyword target-child-id-segment))
                        (child-full-id-path (append self-id-path (list target-child-id)))
-                       (child-type (elmtui.state.api:get-path child-full-id-path app-state :type)))
+                       (child-type (elmtui.utils:get-path child-full-id-path app-state :type)))
                   (if (and child-type (find target-child-id (getf local-state :children-ids) :test #'equal))
                       (let* ((child-instance (make-instance child-type))
                              (child-update-result (apply #'elmtui.ui.api:update child-instance app-state child-message :id-path child-full-id-path)))
@@ -241,9 +241,10 @@
 
 
 
-  (:view (local-state app-state self-id-path)
+  (:view (local-state app-state self-id-path children)
+         (log-info "in layout viewfn")
          (let* ((component-id (id-from-path self-id-path))
-                (children-ids (getf local-state :children-ids))
+                ;; (children-ids (getf local-state :children-ids))
                 (display-mode (getf local-state :display :flex))
                 (style-properties nil))
 
@@ -281,21 +282,28 @@
            ;; Merge properties from :other-style-props
            (loop for (key val) on (getf local-state :other-style-props) by #'cddr
                  do (setf (getf style-properties key) val))
+           (let* ((children-from-args children)
+                  (child-from-state (elmtui.tea-state:state-ref local-state :child-dsl-spec))
+                  (final-children (or children-from-args
+                                      (when child-from-state (list child-from-state)))))
+             (list :container
+                   :id component-id
+                   :type :layout ; or (cclass-name self) if self was available, but type is good for renderer
+                   :style style-properties
+                   :children final-children
 
-           (list :ui-element
-                 :id component-id
-                 :type :layout ; or (cclass-name self) if self was available, but type is good for renderer
-                 :style style-properties
-                 :children (mapcar
-                            (lambda (child-id-segment)
-                              (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
-                                     (child-type (elmtui.state.api:get-path child-full-id-path  app-state :type)))
-                                (if child-type
-                                    (let ((child-instance (make-instance child-type)))
-                                      (elmtui.ui.api:view child-instance app-state :id-path child-full-id-path))
-                                    (list :error "Child component type not found for ID: ~a in layout ~a"
-                                          child-id-segment component-id))))
-                            children-ids)))))
+
+                   ;; (mapcar
+                   ;;  (lambda (child-id-segment)
+                   ;;    (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
+                   ;;           (child-type (elmtui.utils:get-path child-full-id-path  app-state :type)))
+                   ;;      (if child-type
+                   ;;          (let ((child-instance (make-instance child-type)))
+                   ;;            (elmtui.ui.api:view child-instance app-state :id-path child-full-id-path))
+                   ;;          (list :error "Child component type not found for ID: ~a in layout ~a"
+                   ;;                child-id-segment component-id))))
+                   ;;  children-ids)
+                   )))))
 
 
 

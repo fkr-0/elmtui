@@ -69,7 +69,7 @@
   "Rolls back the last transaction on the global *app-state*."
   ;; undo-last-transaction is now imported from elmtui.state.api,
   ;; which should export it from elmtui.state.transactions.
-  (undo elmtui.core.globals:*app-state*))
+  (elmtui.tea-state:undo elmtui.core.globals:*app-state*))
 
 ;;;--------------------------------------------------------------
 ;;; Path Utilities for Plists (Functional: return new plists on change)

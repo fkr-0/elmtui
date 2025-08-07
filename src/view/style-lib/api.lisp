@@ -208,7 +208,8 @@
         ((listp styles)
          ;; Convert plist to hash-table
          (loop for (key value) on styles by #'cddr
-               do (setf (gethash key (style-set-styles style-set)) value)))
+               do (setf (gethash key (style-set-styles style-set))
+                        (make-style key value))))
         ((hash-table-p styles)
          (setf (style-set-styles style-set) (alexandria:copy-hash-table styles)))
         (t

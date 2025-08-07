@@ -13,13 +13,18 @@
 ;; render ASCII previews of grid templates, and perform precise
 ;; measurements and placement of UI nodes via CSS Grid semantics.
 
-(uiop:define-package :elmtui.view.layout.grid-complete
+(uiop:define-package :elmtui.view.layout.grid
   (:use :cl)
   (:nicknames :et.grid)
   (:import-from :elmtui.view.core
                 #:ui-node #:ui-node-children #:ui-node-props)
+
+  (:import-from :elmtui.view.layout
+                #:layout-grid-container-impl)
   (:import-from :elmtui.style-lib.style-set
                 #:set-style #:style-set)
+  (:import-from :elmtui.view.api
+                #:ui-node-p)
   (:import-from :elmtui.view.geo
                 #:rectangle #:pos #:size #:h #:w #:x #:y
                 #:make-rectangle #:make-pos #:make-size
@@ -37,7 +42,6 @@
                 #:split #:trim)
   (:export
    ;; Main grid layout entry point (used by the renderer)
-   #:layout-grid-container-impl
    #:dispatch-layout
    ;; Low level track sizing primitives and helpers
    #:grid-track #:grid-item #:iterative-track-sizing
@@ -49,7 +53,7 @@
    #:build-grid-from-template #:grid-position-to-coordinates
    #:make-grid #:compute-grid-layout))
 
-(in-package :elmtui.view.layout.grid-complete)
+(in-package :elmtui.view.layout.grid)
 
 ;;;====================================================================
 ;;; Low Level Grid Layout Engine
@@ -80,7 +84,7 @@ content based sizing (:auto, :min-content, :max-content)."
   max-contribution
   final-size)
 
-(defstruct grid-item
+(defstruct (grid-item (:constructor %make-grid-item))
   "Represents a single item placed into the grid.  Holds resolved
 column/row positions and spans along with the intrinsic size
 contributions for track sizing."
@@ -116,7 +120,7 @@ contributions for track sizing."
 (defun parse-grid-template-areas (areas-string-list)
   "Parses a list of strings (from grid-template-areas style) into a
    hash table mapping each area name to a plist with :row-start,
-   :col-start, :row-end, and :col-end entries.  Dots (".") are
+   :col-start, :row-end, and :col-end entries.  Dots (\".\") are
    ignored.  Rows and columns are zero‑based internally."
   (let ((area-map (make-hash-table :test 'equal))
         (row-idx 0))
@@ -137,9 +141,9 @@ contributions for track sizing."
                   (setf (gethash token area-map)
                         (list :name token
                               :row-start row-idx :col-start col-idx
-                              :row-end (1+ row-idx) :col-end (1+ col-idx)))))))
-          (incf col-idx)))
-      (incf row-idx))
+                              :row-end (1+ row-idx) :col-end (1+ col-idx))))))
+          (incf col-idx))
+        (incf row-idx)))
     area-map))
 
 ;;;---------------------------------------------------------------------
@@ -149,7 +153,7 @@ contributions for track sizing."
 (defun resolve-grid-line-spec (line-spec line-count named-lines is-end-line default-span)
   "Resolves a grid line specification to either a zero‑based index or a
    span specification.  Supports integer indices, named lines (strings),
-   :auto, (:span n), and (:span "name").  For end lines, a default
+   :auto, (:span n), and (:span \"name\").  For end lines, a default
    span may be applied if the specification is :auto."
   (cond
     ((integerp line-spec)
@@ -235,13 +239,13 @@ contributions for track sizing."
                                           (max 0.0 (float def))
                                           0.0)
                            :fr-units (if (eq type :fr)
-                                          (cadr def)
-                                          0.0)
+                                         (cadr def)
+                                         0.0)
                            :growth-limit (if (and (eq type :minmax) (caddr def)
                                                   (numberp (caddr def)))
                                              (caddr def)
                                              most-positive-double-float)
-                           :is-flexible (not (eq type :fixed)))))
+                           :is-flexible (not (eq type :fixed))))))
 
 (defun resolve-content-based-track-sizes (tracks items dimension)
   "Resolve base and growth sizes for tracks whose definition is
@@ -272,9 +276,10 @@ contributions for track sizing."
                 (:min-content min-c)
                 (:max-content max-c)
                 (:auto min-c)
-                (otherwise min-c)))
+                ;; (otherwise min-c)
+                ))
         (setf (grid-track-growth-limit track) (max (grid-track-base-size track) max-c))
-        (setf (grid-track-is-flexible track) nil)))
+        (setf (grid-track-is-flexible track) nil))))
   tracks)
 
 (defun resolve-minmax-track-sizes (tracks items dimension available-space total-gap)
@@ -322,17 +327,17 @@ contributions for track sizing."
    non‑flexible are skipped.  This function mutates the base sizes of
    tracks in place."
   (let* ((num-flexible-auto
-          (loop for track in tracks count
-                (and (grid-track-is-flexible track)
-                     (eq (grid-track-type track) :content)
-                     (eq (grid-track-definition track) :auto))))
+           (loop for track in tracks count
+                                     (and (grid-track-is-flexible track)
+                                          (eq (grid-track-type track) :content)
+                                          (eq (grid-track-definition track) :auto))))
          (total-fr-units
-          (loop for track in tracks when (and (grid-track-is-flexible track)
-                                             (> (grid-track-fr-units track) 0))
-                sum (grid-track-fr-units track)))
+           (loop for track in tracks when (and (grid-track-is-flexible track)
+                                               (> (grid-track-fr-units track) 0))
+                 sum (grid-track-fr-units track)))
          (fixed-and-resolved-size
-          (loop for track in tracks unless (grid-track-is-flexible track)
-                sum (grid-track-base-size track)))
+           (loop for track in tracks unless (grid-track-is-flexible track)
+                 sum (grid-track-base-size track)))
          (space-for-flexible (max 0.0 (- available-space fixed-and-resolved-size total-gap-size))))
     (when (> space-for-flexible 0)
       (cond
@@ -357,7 +362,7 @@ contributions for track sizing."
                (setf (grid-track-base-size track)
                      (min (grid-track-base-size track) (grid-track-growth-limit track)))
                (setf (grid-track-is-flexible track) nil)))))))
-  tracks)
+    tracks))
 
 (defun calculate-final-track-sizes (tracks)
   "After the sizing iterations are complete, finalize each track's
@@ -368,8 +373,8 @@ contributions for track sizing."
   tracks)
 
 (defun perform-track-sizing-iteration (col-tracks row-tracks grid-items
-                                      available-width available-height
-                                      col-gap row-gap)
+                                       available-width available-height
+                                       col-gap row-gap)
   "Perform a single iteration of the track sizing algorithm.  This
    function updates intrinsic contributions, resolves content and
    minmax tracks, distributes flexible space, and returns T if all
@@ -439,8 +444,8 @@ contributions for track sizing."
   ;; First measure intrinsic sizes for all items.
   (dolist (item grid-items)
     (update-item-intrinsic-dimensions item
-                                       container-available-width
-                                       container-available-height))
+                                      container-available-width
+                                      container-available-height))
   ;; Initialize track structures.
   (let ((col-tracks (initialize-grid-tracks col-track-defs
                                             (style-value nil :grid-auto-columns :auto)
@@ -561,7 +566,7 @@ contributions for track sizing."
       (:start (setf (x final-rect) (x grid-area-rect)))
       (:end   (setf (x final-rect) (+ (x grid-area-rect) (- area-w item-w))))
       (:center (setf (x final-rect) (+ (x grid-area-rect)
-                                        (round (/ (- area-w item-w) 2)))))
+                                       (round (/ (- area-w item-w) 2)))))
       (:stretch
        (setf (x final-rect) (x grid-area-rect))
        (setf (w final-rect) area-w))
@@ -571,7 +576,7 @@ contributions for track sizing."
       (:start (setf (y final-rect) (y grid-area-rect)))
       (:end   (setf (y final-rect) (+ (y grid-area-rect) (- area-h item-h))))
       (:center (setf (y final-rect) (+ (y grid-area-rect)
-                                        (round (/ (- area-h item-h) 2)))))
+                                       (round (/ (- area-h item-h) 2)))))
       (:stretch
        (setf (y final-rect) (y grid-area-rect))
        (setf (h final-rect) area-h))
@@ -658,11 +663,11 @@ contributions for track sizing."
                                             :initial-element grid-auto-rows)))))
       ;; Calculate available track space (account for gaps)
       (let ((available-track-w
-             (max 0 (- (w parent-absolute-content-rect)
-                       (* (max 0 (1- (length col-defs))) col-gap))))
+              (max 0 (- (w parent-absolute-content-rect)
+                        (* (max 0 (1- (length col-defs))) col-gap))))
             (available-track-h
-             (max 0 (- (h parent-absolute-content-rect)
-                       (* (max 0 (1- (length row-defs))) row-gap)))))
+              (max 0 (- (h parent-absolute-content-rect)
+                        (* (max 0 (1- (length row-defs))) row-gap)))))
         ;; Step 3: iterative track sizing
         (multiple-value-bind (final-col-sizes final-row-sizes)
             (iterative-track-sizing col-defs row-defs all-grid-items
@@ -709,9 +714,9 @@ contributions for track sizing."
                        (justify (style-value item-styles :justify-self
                                              (style-value container-styles :justify-items :stretch)))
                        (final-item-rect (align-item-in-area laid-out-child
-                                                             child-layout-rect
-                                                             grid-area-rect
-                                                             align justify)))
+                                                            child-layout-rect
+                                                            grid-area-rect
+                                                            align justify)))
                   (setf (getf (ui-node-props laid-out-child) :layout-rect)
                         final-item-rect)
                   (push laid-out-child laid-out-children)))))
@@ -726,9 +731,9 @@ contributions for track sizing."
                                             (* (max 0 (1- (length col-defs))) col-gap)
                                             0)))
                    (total-rows-height (+ (loop for size in final-row-sizes sum size)
-                                          (if (> (length row-defs) 0)
-                                              (* (max 0 (1- (length row-defs))) row-gap)
-                                              0)))
+                                         (if (> (length row-defs) 0)
+                                             (* (max 0 (1- (length row-defs))) row-gap)
+                                             0)))
                    (container-final-w (if (eq container-w-style :auto)
                                           total-cols-width
                                           (w parent-absolute-content-rect)))
@@ -753,7 +758,7 @@ contributions for track sizing."
         (let ((children (ui-node-children result))
               (container-layout (getf (ui-node-props result) :layout-rect)))
           (values children (h container-layout) (w container-layout)))
-        (values (ui-node-children node) 0 0)))
+        (values (ui-node-children node) 0 0))))
 
 ;;;====================================================================
 ;;; High Level Grid Template API
@@ -771,8 +776,8 @@ contributions for track sizing."
 
 (defun parse-grid-template (template)
   "Parse a grid template string into a structured representation.
-   Templates are delimited by "|" for rows and space for columns.
-   Dots (".") denote empty cells.  Returns a list of rows where
+   Templates are delimited by \" | \" for rows and space for columns.
+   Dots (\".\") denote empty cells.  Returns a list of rows where
    each row is a list of area names or NIL for empty cells."
   (let* ((rows (str:split "|" template))
          (parsed-rows
@@ -789,10 +794,10 @@ contributions for track sizing."
 
 (defun grid-template (rows columns &key areas)
   "Create a grid template configuration.  ROWS and COLUMNS are lists
-   of strings describing track sizes (e.g. '("auto" "1fr" "30")).
-   AREAS may be a template string or a parsed representation.  Returns
-   a plist with :grid-template-rows, :grid-template-columns, and
-   :grid-template-areas."
+    of strings describing track sizes (e.g. '(\"auto\" \"1fr\" \"30\")).
+    AREAS may be a template string or a parsed representation.  Returns
+    a plist with :grid-template-rows, :grid-template-columns, and
+    :grid-template-areas."
   (let ((parsed-areas (if (stringp areas)
                           (parse-grid-template areas)
                           areas)))
@@ -802,9 +807,9 @@ contributions for track sizing."
 
 (defun grid-area (name &key row-start row-end col-start col-end)
   "Create a grid area placement specification for a single item.
-   NAME refers to a named area in the template.  ROW-START/END and
-   COL-START/END specify line numbers.  Returns a plist of
-   placement properties."
+    NAME refers to a named area in the template.  ROW-START/END and
+    COL-START/END specify line numbers.  Returns a plist of
+    placement properties."
   (let ((props nil))
     (when name
       (setf props (list* :grid-area name props)))
@@ -820,7 +825,7 @@ contributions for track sizing."
 
 (defun grid-auto-flow (direction &key dense)
   "Return a string representing the CSS grid-auto-flow property.  DIRECTION
-   is one of :row or :column; if DENSE is true, " dense" is appended."
+    is one of :row or :column; if DENSE is true, " dense" is appended."
   (if dense
       (format nil "~A dense" (string-downcase direction))
       (string-downcase direction)))
@@ -833,7 +838,8 @@ contributions for track sizing."
   (list :grid-base-config base-config
         :grid-breakpoints breakpoints))
 
-(defun make-grid-item (&key area row-start row-end col-start col-end align-self justify-self)
+(defun make-grid-item-plist (&key area row-start row-end col-start col-end align-self justify-self
+                               node id placed-p col-span row-span)
   "Construct a grid item plist for high level grid creation.  AREA
    names a template area.  ROW-START/END and COL-START/END specify
    placement lines.  ALIGN-SELF and JUSTIFY-SELF specify alignment
@@ -847,8 +853,48 @@ contributions for track sizing."
       (setf props (list* :align-self (string-downcase align-self) props)))
     (when justify-self
       (setf props (list* :justify-self (string-downcase justify-self) props)))
+    (when node
+      (setf props (list* :node node props)))
+    (when id
+      (setf props (list* :id id props)))
+    (when placed-p
+      (setf props (list* :placed-p placed-p props)))
+    (when col-span
+      (setf props (list* :col-span col-span props)))
+    (when row-span
+      (setf props (list* :row-span row-span props)))
+    (when (and col-start col-end)
+      (setf props (list* :raw-col-start col-start
+                         :raw-col-end col-end props)))
+
+    (when (and row-start row-end)
+      (setf props (list* :raw-row-start row-start
+                         :raw-row-end row-end props)))
+
+    (setf (getf props :grid-item) t)
+    (setf (getf props :grid-item-id) id)
+    (setf (getf props :grid-item-placed) placed-p)
+    (setf (getf props :grid-item-col-span) col-span)
+    (setf (getf props :grid-item-row-span) row-span)
     props))
 
+(defun make-grid-item (&key row-start row-end col-start col-end align-self justify-self
+                         node id placed-p col-span row-span)
+  "Construct a grid item plist for high level grid creation.  AREA
+   names a template area.  ROW-START/END and COL-START/END specify
+   placement lines.  ALIGN-SELF and JUSTIFY-SELF specify alignment
+   values."
+  (%make-grid-item :node node
+                   :id id
+                   :placed-p placed-p
+                   :col-span col-span
+                   :row-span row-span
+                   :align-self (and align-self (string-downcase align-self))
+                   :justify-self (and justify-self (string-downcase justify-self))
+                   :raw-col-start (or col-start :auto)
+                   :raw-col-end (or col-end :auto)
+                   :raw-row-start (or row-start :auto)
+                   :raw-row-end (or row-end :auto)))
 ;;;---------------------------------------------------------------------
 ;;; Named Grid Template Definitions
 ;;;---------------------------------------------------------------------
@@ -944,8 +990,8 @@ contributions for track sizing."
     (reverse result-lines)))
 
 (defun build-grid-from-template (template children
-                                    &key gap row-gap column-gap
-                                    justify-items align-items)
+                                 &key gap row-gap column-gap
+                                   justify-items align-items)
   "Build a grid container using a named TEMPLATE definition and a
    collection of children.  CHILDREN may be an alist mapping area
    names to elements or a list of elements with placement props.
@@ -1050,7 +1096,7 @@ contributions for track sizing."
                                         :col-start (1+ sc)
                                         :row-end (1+ er)
                                         :col-end (1+ ec))
-                                  t))))
+                                  t)))))
   (values nil nil))
 
 (defun compute-grid-layout (container-width container-height grid-props children)
@@ -1097,11 +1143,14 @@ contributions for track sizing."
                  (if (and area-name template-areas)
                      (find-named-area-coordinates template-areas area-name)
                      (values nil nil))
-               (let ((r-start (or (getf coords :row-start) row-start 1))
-                     (r-end   (or (getf coords :row-end)   row-end   (1+ (or r-start 1))))
-                     (c-start (or (getf coords :col-start) col-start 1))
-                     (c-end   (or (getf coords :col-end)   col-end   (1+ (or c-start 1))))
-                     (x 0) (y 0) (width 0) (height 0))
+               (declare (ignore found))
+               (let* ((r-start (or (getf coords :row-start) row-start 1))
+                      (r-end   (or (getf coords :row-end)   row-end   (1+ (or r-start 1))))
+                      (c-start (or (getf coords :col-start) col-start 1))
+                      (c-end   (or (getf coords :col-end)
+                                   col-end
+                                   (1+ (or c-start 1))))
+                      (x 0) (y 0) (width 0) (height 0))
                  ;; Compute x,y,width,height
                  (setf x (if (> c-start 0)
                              (+ (reduce #'+ (subseq column-sizes 0 (1- c-start)))

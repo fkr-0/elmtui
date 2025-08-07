@@ -11,12 +11,7 @@ defining models and messages, and creating update functions, following Elm Archi
   ;; (:import-from :elmtui.tea-state.api
   ;;               #:make-application-state)
   (:import-from :elmtui.tea-state.state
-   :application-state-undone-history
-                :application-state-version
-   :deep-copy-application-state
-
-                :application-state-transaction-log
-   :application-state-transaction-history)
+   :deep-copy-application-state)
   (:import-from :elmtui.core.globals
    :*app-state*)
   (:import-from :elmtui.api
@@ -25,11 +20,15 @@ defining models and messages, and creating update functions, following Elm Archi
   ;;
   ;;               :application-state-data)
   (:import-from :elmtui.tea-state.state
-                #:make-application-state
-                #:tx
-                #:application-state-data
-                #:application-state-p
-                #:application-state)
+   #:make-application-state
+   #:application-state-transaction-history
+   :application-state-undone-history
+   #:application-state-version
+   #:application-state-transaction-log
+   #:tx
+   #:application-state-data
+   #:application-state-p
+   #:application-state)
   (:import-from :elmtui.utils
                 #:get-path #:set-path #:remove-path)
 
@@ -249,25 +248,25 @@ nil)))
 
 (declaim (ftype (function (application-state t &optional t) t) get-state))
 (defun get-state (app key &optional default)
-  (elmtui.tea-state.api:get-state app key default))
+  (elmtui.tea-state:get-state app key default))
 
 (defmacro with-transaction ((app &key name) &body body)
-  `(elmtui.tea-state.api:with-transaction (,app :name ,name) ,@body))
+  `(elmtui.tea-state:with-transaction (,app :name ,name) ,@body))
 
-(declaim (ftype (function (application-state list) t) apply-patches))
+                                        ; (declaim (ftype (function (application-state list) t) apply-patches))
 (defun apply-patches (app patches)
-  (elmtui.tea-state.api:apply-patches app patches))
+  (elmtui.tea-state:apply-patches app patches))
 
-(declaim (ftype (function (application-state) (or null tx)) undo redo))
+
 (defun undo (app)
-  (elmtui.tea-state.api:undo app))
+  (elmtui.tea-state:undo app))
 
 (defun redo (app)
-  (elmtui.tea-state.api:redo app))
+  (elmtui.tea-state:redo app))
 
 (declaim (ftype (function (application-state t function) function) add-observer))
 (defun add-observer (app key callback)
-  (elmtui.tea-state.api:add-observer app key callback))
+  (elmtui.tea-state:add-observer app key callback))
 
 ;; (declaim (ftype (function (application-state t function) t) remove-observer))
 ;; (defun remove-observer (app observer-id)
@@ -302,47 +301,6 @@ nil)))
 ;;   (:documentation "Merge `PATCHES` into the application state `APP-STATE`.
 ;;   This applies a list of patches to the current state, updating it accordingly."))
 
-
-(defstruct (update-result (:conc-name ur-))
-  "Represents the result of an update operation, containing patches to apply to the state
-and commands to be executed."
-  (patches nil :type list)
-  (commands nil :type list)
-  (handled nil :type (or boolean null))) ; Indicates if the result has been handled
-;; (:constructor make-update-result (patches commands &optional handled))
-;; (:copier nil) ; Prevent copying to avoid unintended side effects
-;; (:predicate ur-p))
-
-;; (defgeneric app-state-p (state))
-;; (defmethod app-state-p ((state t))
-;;   nil)
-;; (defmethod app-state-p ((state null))
-;;   nil)
-;; Define a generic function with proper FTYPE
-(defgeneric ur-has-command-p (result command)
-  (:documentation "Checks if the update result contains a specific command."))
-
-;;; ===================================================================
-;;; IMPLEMENTATION SECTION
-;;; ===================================================================
-(defmethod ur-has-command-p ((result update-result) command)
-  "Checks if the update result contains a specific command."
-  (declare (type update-result result)
-           (type t command))
-  (check-type result update-result)
-  (member command (ur-commands result) :test #'equal)) ; Added :test for robustness
-
-;; Define a generic function with proper FTYPE
-;; (declaim (ftype (function (update-result t) (values update-result &rest t)) ur-add-command))
-(defgeneric ur-add-command (result command)
-  (:documentation "Adds a command to the update result."))
-(defmethod ur-add-command ((result update-result) command)
-  "Adds a command to the update result."
-  (declare (type update-result result)
-           (type t command))
-  (check-type result update-result)
-  (setf (ur-commands result) (cons command (ur-commands result)))
-  result)
 
 ;;;--------------------------------------------------------------
 ;; (defstruct state-data
@@ -600,17 +558,18 @@ Handles app-state, application-state, hash-table, and plist inputs."
     ;;    new-state))
     ;; Handle application-state struct
     ((application-state-p state)
-     (let ((data (make-hash-table)))
-       (if (hash-table-p data)
-           (progn
-             (loop for patch in patches
-                   do (destructuring-bind (path value) patch
-                        (set-path-in-hash data path value)))
-             state)
-           ;; (let ((new-data (merge-patches data patches)))
-           ;;   (setf (application-state-data state) new-data)
-           ;;   state)
-           )))
+     ;; (let ((data (make-hash-table)))
+     ;;   (if (hash-table-p data)
+     ;;       (progn
+     ;;         (loop for patch in patches
+     ;;               do (destructuring-bind (path value) patch
+     ;;                    (set-path-in-hash data path value)))
+     ;;         state)
+     ;;       ;; (let ((new-data (merge-patches data patches)))
+     ;;       ;;   (setf (application-state-data state) new-data)
+     ;;       ;;   state)
+     ;;       ))
+     )
     ;; Handle direct hash-table
     ((hash-table-p state)
      (let ((new-table (make-hash-table :test 'equal)))

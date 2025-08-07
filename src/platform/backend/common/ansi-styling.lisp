@@ -157,7 +157,7 @@
 
 (defun stringify-sgr (parts)
   "Turn a list of strings/numbers into a full ESC[…m sequence."
-  (log-info "PARTS: ~A" parts)
+  ;; (log-info "PARTS: ~A" parts)
   (format nil "~C[~{~A~}m" (code-char 27) parts))
 ;; == uncharming-tui/lowterm/terminal-style/color.lisp ==
 ;; -------- Colour code tables & helpers --------

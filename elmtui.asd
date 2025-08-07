@@ -14,9 +14,9 @@
   :serial t
   :components (
                (:file "utils")
-               (:file "state/utils")
-               (:file "state/msg")
-               (:file "app/system-events")
+               ;; (:file "state/utils")
+               (:file "tea-state/msg")
+
                (:file "contracts")
                (:file "core/logging")
                (:file "core/globals")
@@ -52,30 +52,34 @@
                (:module "tea-state"
                 :pathname "tea-state/"
                 :serial t
-                :components (
+                :components ((:file "api")
                              (:file "state")
                              (:file "transactions") ; Added transactions.lisp
                              (:file "observers")
-                             (:file "api")))
-               (:file "update-dsl")
-               (:module "state"
-                :pathname "state/"
-                :serial t
-                :components ((:file "api")
-                             ;; (:module "state-lib"
-                             ;;  :serial t
-                             ;;  :pathname "statelib/"
-                             ;;  :components (
-                             ;;               (:file "state")
-                             ;;               (:file "observe")
-                             ;;               (:file "transaction")
-                             ;;               (:file "package")))
-
-                             (:file "state")
-                             (:file "model")
-                             (:file "transactions") ; Added transactions.lisp
                              (:file "update")
-                             )) ; Moved here - loads after state implementation
+                             (:file "model")
+                             (:file "core")))
+               (:file "update-dsl")
+               (:file "app/system-events")
+               ;; (:module "state"
+               ;;  :pathname "state/"
+               ;;  :serial t
+               ;;  :components ((:file "api")
+               ;;               ;; (:module "state-lib"
+               ;;               ;;  :serial t
+               ;;               ;;  :pathname "statelib/"
+               ;;               ;;  :components (
+               ;;               ;;               (:file "state")
+               ;;               ;;               (:file "observe")
+               ;;               ;;               (:file "transaction")
+               ;;               ;;               (:file "package")))
+
+               ;;               (:file "state")
+               ;;               (:file "model")
+               ;;               (:file "transactions") ; Added transactions.lisp
+               ;;               (:file "update")
+               ;;               ))
+                                        ; Moved here - loads after state implementation
                (:module "core"
                 :pathname "./core/"
                 :serial t
@@ -87,27 +91,29 @@
                              (:file "topics")
                              (:file "topic-registry")
                              (:file "event-types") ; Event type definitions
+                             (:file "keymaps")
                              (:file "events")
                              (:file "event-compat") ; Event compatibility layer
                              (:file "event-propagation") ; Event propagation system
                              (:file "event-async") ; Async event handling
-                             (:file "base-keymap")
+                             ;; (:file "base-keymap")
                              ;; (:file "focus-manager")
                              ;; Enhanced Focus Management
                              ;; Advanced Keyboard Event Handling
 
-                             (:module "keymap"
-                              :pathname "keymap/"
-                              :serial t
-                              :components ((:file "sequence")
-                                           (:file "registry")
-                                           (:file "defaults")
-                                           (:file "event-integration")))
+                             ;; (:module "keymap"
+                             ;;  :pathname "keymap/"
+                             ;;  :serial t
+                             ;;  :components ((:file "sequence")
+                             ;;               (:file "registry")
+                             ;;               (:file "defaults")
+                             ;;               (:file "event-integration")))
                              (:module "focus"
                               :pathname "focus/"
                               :serial t
                               :components ((:file "manager")))
-                             (:file "keymap-system") ; Main entry point for keyboard/focus system
+                             ;; (:file "keymap-system")
+                                        ; Main entry point for keyboard/focus system
                              (:file "loop")))
                ;; ================= API LAYER =================
                ;; These API files define the public interface for each module
@@ -154,9 +160,6 @@
                ;; Load UI Components (depend on view/core, view/styled, view/style-lib)
                ;; Load remaining View components (depend on UI widgets, layout etc)
                (:file "view/memo")
-               ;; (:file "view/dsl")
-               (:file "view/dsl")
-
                (:module "ui"
                 :serial t
                 :pathname "ui/"
@@ -169,28 +172,32 @@
                               :serial t
                               :components (
                                            (:file "utils")
-                                           (:file "layout")
                                            (:file "viewport")
                                            (:file "root-viewport")
                                            (:file "drawable-content")
                                            (:file "button")
+                                           (:file "layout")
                                            (:file "label")
                                            (:file "textinput")
                                            (:file "grid-container")
                                            (:file "form") ; Using v2 form widget
+                                           (:file "keytester")
+                                           (:file "keytester-map")
                                            (:file "listbox")
                                            ;; (:file "counter")
-                                           (:file "scrollable-container")))
+                                           (:file "scrollable-container")
+                                           ))
                              ;; Load the main package file AFTER the individual widget files
                              (:file "widgets-pkg") ; Correct filename to load widgets.lisp
                              (:file "widget-registry")))
                (:file "app/application")
                (:file "app/dsl-type-registry")
+               ;; (:file "view/dsl")
+               (:file "view/dsl")
                (:file "view/layout/flex")
                (:file "view/layout/core") ; Load layout before grid
                (:file "view/tree-transforms")
                (:file "view/layout/grid")   ; Grid depends on layout now
-               (:file "view/layout/") ; Load layout before grid
                (:file "view/reactive") ; Reactive view system
                (:file "view/animation") ; Animation framework
 
@@ -235,7 +242,6 @@
                ;; Files loaded after modules
                (:file "pipeline")
                (:file "platform/driver" :depends-on ("app/system-events"))
-               (:file "runtime")
 
                ;; Development Utilities
                (:module "examples"
@@ -243,7 +249,8 @@
                 :pathname "../examples/"
                 :components (
                              (:file "rainbow-app")
-                             (:file "rainbow-app-canvas")))
+                             (:file "key-tester")
+                             (:file "mini-rainbow")))
                (:file "../dev-setup")
                (:file "dev/dev")
                (:file "elmtui"))

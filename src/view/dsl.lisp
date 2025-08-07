@@ -3,10 +3,11 @@
 ;;; Enhanced View DSL with Standardized Widget Support
 ;;;===============================================================
 (uiop:define-package #:elmtui.view.dsl
-  (:use #:cl #:log4cl)
+  (:use #:cl )
+  (:import-from #:log4cl #:log-info)
   (:import-from #:elmtui.view.styled #:make-styled-node)
   (:import-from #:elmtui.app.api #:get-component-class-for-dsl-type #:registered-dsl-component-p)
-  (:import-from #:elmtui.state.utils #:split-props/children)
+  ;; (:import-from #:elmtui.utils #:split-props/children)
   (:export #:render-dsl-to-resolved-tree
            #:defcomponent-dsl
            #:dsl->ui-node))
@@ -73,150 +74,293 @@
        (loop for (k v . rest) on tail by #'cddr
              always (keywordp k))))
 
-;;; --- DSL Rendering ---
+(defun remove-from-plist (plist key)
+  "Remove KEY from PLIST and return a new plist without mutating the original.
+
+   Arguments:
+     PLIST -- (list) The property list to modify.
+     KEY   -- (keyword) The key to remove.
+
+   Returns:
+     A new plist with KEY removed, or the original plist if KEY is not found.
+
+   Example:
+     (remove-from-plist '(:foo 1 :bar 2) :bar) ; => (:foo 1)
+
+   (list, keyword) => list (pure, no side-effects)
+  "
+  (loop for (k v) on plist by #'cddr
+        unless (eq k key)
+          append (list k v)))
+
+
+;;; ------------------------------------------------------------------
+;;; helpers -----------------------------------------------------------
+(defun normalise-shorthand (type tail)
+  ;; ( :TEXT "bye" )      → (:TEXT :content "bye")
+  ;; ( :ROW a b c )       → (:ROW  :children (a b c))
+  (if (= 1 (length tail))
+      `(,type :content ,(first tail))
+      `(,type :children ,tail)))
+(defun copy-plist (plist)
+  "Return a deep copy of PLIST (keywords alternating with values).
+   Any value that is a cons is copied with COPY-TREE so that the
+   copy shares no structure with the original."
+  (loop for (k v) on plist by #'cddr
+        append (list k (if (consp v) (copy-tree v) v))))
+
+(defun split-props/children (args)
+  "Split ARGS into two values: PROPS (a plist) and CHILDREN (a list).
+
+Any keyword/value pairs at the head of ARGS are regarded as properties.
+Positional children start at the first non-keyword object.
+If a :CHILDREN property is present it *overrides* any positional
+children.
+
+The function NEVER mutates ARGS."
+  (let ((props '())
+        (cursor args))
+    ;; harvest leading keyword/value pairs
+    (loop while (and cursor (keywordp (first cursor)))
+          do (let ((key (pop cursor)))
+               (when (null cursor)
+                 (error "Property list for ~S is missing a value." key))
+               (push key props)
+               (push (pop cursor) props)))
+    (setf props (nreverse props))
+    ;; explicit children override positional ones
+    (let* ((positional cursor)
+           (explicit   (getf props :children)))
+      (values (remove :children (if explicit
+                                    (alexandria:remove-from-plist props :children)
+                                    props))
+              (if explicit
+                  explicit
+                  (copy-tree positional))))))
+
+(registered-dsl-component-p :layout)
+;;; ------------------------------------------------------------------
+;;; main walker -------------------------------------------------------
 (defun render-dsl-to-resolved-tree (dsl-spec app-state)
-  "Walks DSL-SPEC and returns a resolved DSL tree.
+  "Replaces every component DSL form with its :RESOLVED-VIEW, but does NOT yet instantiate base-ui-nodes."
+  (let ((resolved-something nil))
+    (labels
+        ((process-node (spec path)
+           (cond
+             ;; leaf
+             ((or (null spec) (stringp spec) (numberp spec))
+              spec)
 
-   In short, let components own :resolved-view, let layout tags own :children, and
-   you’ll keep both your update loop and your mental model simple.
+             ;; list of items
+             ((and (listp spec) (not (keywordp (first spec))))
+              (mapcar (lambda (item) (process-node item path)) spec))
 
-  • A: No injection at all**<br>*(component’s subtree is 100 % private)*
-    • Components stay flack-box → strong encapsulation.
-    • `view` always returns the same skeleton → simpler to reason about diffs & layout.
-    • The public API is just `(state → view)` plus messages → minimal surface.
-    • Caller can’t reuse the
-      component as a layout wrapper.<br>• You end up cloning “header-body-footer” or
-      “card” patterns as **three** almost-identical components.
-    • Behaviour-centric or
-      leaf widgets (e.g. `:counter`, `:spinner`).
-    • Projects where strict invariants and predictable diffs trump flexibility.
+             ;; potential DSL form
+             ((and (listp spec) (keywordp (first spec)))
+              (destructuring-bind (type &rest tail) spec
+                (multiple-value-bind (props children) (split-props/children tail)
+                  (let* ((id (getf props :id))
+                         (new-path (if id (append path (list id)) path)))
+                    (log:info "Processing DSL node: ~S with path: ~S" spec new-path)
+                    (log:info "type: ~S, props: ~S, children: ~S" type props children)
+                    (when (and id (member id path :test #'equal))
+                      (error "Circular dependency detected for ID ~S" id))
+                    (if (registered-dsl-component-p type)
+                        ;; Component → resolve to its :resolved-view
+                        (progn
+                          (log-info "Resolving DSL component: ~S with ID: ~S" type id)
+                          (setf resolved-something t)
+                          (let* ((klass (get-component-class-for-dsl-type type))
+                                 (instance (make-instance klass))
+                                 (view (elmtui.ui.api:view instance app-state
+                                                           :id-path new-path
+                                                           :children (if (listp (car children))
+                                                                         children (list children)))))
+                            (log:info "Resolved view for component ~S: ~S" type view)
+                            (process-node view new-path))) ;; RECURSE into returned view
+                        ;; Base DSL
+                        (let ((resolved-children (mapcar (lambda (x)
+                                                           (log-info "Processing child: ~S with path: ~S" x new-path)
+                                                           (process-node x new-path))
+                                                         (if (listp (car children))
+                                                             children (list children)))))
+                          `(,type ,@props
+                            ,@(when resolved-children
+                                (list :children resolved-children)))))))))
+             ;; fallback
+             (t
+              spec))))
+      (values (process-node dsl-spec '()) resolved-something))))
 
-  • B: Controlled injection via *named slots***<br>`(:dialog :header (…) :body (…) :footer (…))`
-    • Flexibility **and** determinism: the component decides *where* each slot is
-      placed.
-    • Slot structure can be validated at macro-expansion time (using your
-      `defcomponent-dsl`).
-    • Easy theming: wrap the same content into a different skin
-      component.
-    • Slightly larger API: you document the accepted slot names and
-      defaults.
-    • Inside `view` you must resolve each slot (one extra `mapcar`).
-    • Layout / container components (`:viewport`, `:dialog`, `:grid`) whose *purpose is
-      exactly to position other views*.
-    • Design systems that need “card with custom
-      header”-style reuse.
+;; (defun render-dsl-to-resolved-tree (dsl-spec app-state)
+;;   "Return a *new* DSL tree where every stateful component is replaced
+;; with its :RESOLVED-VIEW.  DSL-SPEC itself is left untouched so the
+;; function is idempotent and safe to call in a loop until no
+;; :RESOLVED-VIEW remains.
+;; Walks DSL-SPEC and returns a resolved DSL tree.
 
-  ---
-  Design
-  ---
-  1. **Default to option A** for behaviour-driven widgets.
-    `:counter`, `:progress-bar`, `:input-field` shouldn’t accept caller-supplied
-    trees—keep them single-purpose and testable.
+;;    In short, let components own :resolved-view, let layout tags own :children, and
+;;    you’ll keep both your update loop and your mental model simple.
 
-  2. **Named slots -- for container/layout components**.
-    It fits TEA nicely:
-    (defcomponent-dsl :viewport (:id &key content)
-      (view (state slot-content)
-        (let ((children (resolve-slot :content slot-content state)))
-          `(:viewport
-            :id ,(state-id state)
-            :width  ,(state-width state)
-            :height ,(state-height state)
-            :children ,children))))
+;;   • A: No injection at all**<br>*(component’s subtree is 100 % private)*
+;;     • Components stay flack-box → strong encapsulation.
+;;     • `view` always returns the same skeleton → simpler to reason about diffs & layout.
+;;     • The public API is just `(state → view)` plus messages → minimal surface.
+;;     • Caller can’t reuse the
+;;       component as a layout wrapper.<br>• You end up cloning “header-body-footer” or
+;;       “card” patterns as **three** almost-identical components.
+;;     • Behaviour-centric or
+;;       leaf widgets (e.g. `:counter`, `:spinner`).
+;;     • Projects where strict invariants and predictable diffs trump flexibility.
 
-    * The macro can reject unknown slot keys at compile time.
+;;   • B: Controlled injection via *named slots***<br>`(:dialog :header (…) :body (…) :footer (…))`
+;;     • Flexibility **and** determinism: the component decides *where* each slot is
+;;       placed.
+;;     • Slot structure can be validated at macro-expansion time (using your
+;;       `defcomponent-dsl`).
+;;     • Easy theming: wrap the same content into a different skin
+;;       component.
+;;     • Slightly larger API: you document the accepted slot names and
+;;       defaults.
+;;     • Inside `view` you must resolve each slot (one extra `mapcar`).
+;;     • Layout / container components (`:viewport`, `:dialog`, `:grid`) whose *purpose is
+;;       exactly to position other views*.
+;;     • Design systems that need “card with custom
+;;       header”-style reuse.
 
-    * In the caller you write:
-      (:viewport :id :main
-                 :content ((:label :content \"Hello\")
-                           (:counter :id :c1)))
+;;   ---
+;;   Design
+;;   ---
+;;   1. **Default to option A** for behaviour-driven widgets.
+;;     `:counter`, `:progress-bar`, `:input-field` shouldn’t accept caller-supplied
+;;     trees—keep them single-purpose and testable.
 
-    * Inside `view` you still control **when** and **how** those children are resolved.
-  ---
-  Advice
-  ---
-  Injecting content *isn’t strictly necessary* for a TEA engine to work, but a
-  **slot-based API (option B)** is highly advisable for components whose whole job is
-  to lay out or decorate other views. It preserves encapsulation, keeps diffs
-  predictable, and lets application code stay pleasant to read—without opening the door
-  to the chaos of completely free positional children."
+;;   2. **Named slots -- for container/layout components**.
+;;     It fits TEA nicely:
+;;     (defcomponent-dsl :viewport (:id &key content)
+;;       (view (state slot-content)
+;;         (let ((children (resolve-slot :content slot-content state)))
+;;           `(:viewport
+;;             :id ,(state-id state)
+;;             :width  ,(state-width state)
+;;             :height ,(state-height state)
+;;             :children ,children))))
 
-  (labels ((normalise-shorthand (type tail)
-             ;; ( :TEXT "bye" )      → (:TEXT :content "bye")
-             ;; ( :ROW a b c )       → (:ROW  :children (a b c))
-             (if (= 1 (length tail))
-                 `(,type :content ,(first tail))
-                 `(,type :children ,tail)))
+;;     * The macro can reject unknown slot keys at compile time.
 
-           (process-stateful-component (tag id path children)
-             (unless id
-               (error "Stateful component ~S requires an :id." tag))
-             ;; ── STATEFUL COMPONENT ──────────────────────────────────────
-             (let* ;; (props     (extract-props rest))        ; everything except :children
-                 ;; (raw-slot  (getf rest :children))       ; may be NIL
-                 ;;(comp-id   (getf props :id))
-                 ;; (slice     (sub-state app-state comp-id))
-                 ;; call the component’s VIEW, handing the raw, *unresolved* slot
-                 ((component-class (get-component-class-for-dsl-type tag))
-                  (component (make-instance component-class))
-                  (view-dsl (elmtui.ui.api:view component app-state :id-path path :children children)))
-               ;; wrap it
-               `(,tag :id ,id :resolved-view ,view-dsl)))
-           (process-node (spec path)
-             (cond
-               ;; --------------- raw leaf ---------------------------
-               ((not (and (listp spec) (keywordp (first spec))))
-                spec)
+;;     * In the caller you write:
+;;       (:viewport :id :main
+;;                  :content ((:label :content \"Hello\")
+;;                            (:counter :id :c1)))
 
-               ;; --------------- element ----------------------------
-               (t
-                (destructuring-bind (type &rest tail) spec
-                  (if (proper-plist-p tail)
-                      ;; ----- full plist element --------------------
-                      (let* ((id       (getf tail :id))
-                             (new-path (if id (append path (list id)) path)))
-                        (when (and id (member id path :test #'equal))
-                          (error "Circular dependency detected for ID ~S" id))
-                        (multiple-value-bind (props children)
-                            (split-props/children tail)
-                          (if (registered-dsl-component-p type)
-                              (process-stateful-component type id new-path children)
-                              ;; layout element
-                              (let ((resolved-children
-                                      (mapcar (lambda (ch) (process-node ch new-path))
-                                              children)))
-                                (if  (< 0 (length resolved-children))
-                                     `(,type ,@props :children ,resolved-children)
-                                     `(,type ,@props))))))
-                      ;; ----- shorthand element ----------------------
-                      (process-node (normalise-shorthand type tail) path)))))))
-    ;; (process-node (spec path)
-    ;;   (log-info "Processing DSL node: ~S at path: ~S" spec path)
-    ;;   (cond
-    ;;     ;; --- Leaf node (string, number, etc.) ---
-    ;;     ((not (and (listp spec) (keywordp (first spec))))
-    ;;      spec)
+;;     * Inside `view` you still control **when** and **how** those children are resolved.
+;;   ---
+;;   Advice
+;;   ---
+;;   Injecting content *isn’t strictly necessary* for a TEA engine to work, but a
+;;   **slot-based API (option B)** is highly advisable for components whose whole job is
+;;   to lay out or decorate other views. It preserves encapsulation, keeps diffs
+;;   predictable, and lets application code stay pleasant to read—without opening the door
+;;   to the chaos of completely free positional children. "
+;;   (let ((resolved-something nil))
+;;     (labels
+;;         ((process-node (spec path)
+;;            (unless (and (listp spec) (keywordp (first spec)))
+;;              (return-from process-node spec))
+;;            (destructuring-bind (type &rest tail) spec
+;;              (multiple-value-bind (props children) (split-props/children tail)
+;;                (let* ((id (getf props :id))
+;;                       (new-path (if id (append path (list id)) path)))
+;;                  (when (and id (member id path :test #'equal))
+;;                    (error "Circular dependency detected for ID ~S" id))
+;;                  (if (registered-dsl-component-p type)
+;;                      (progn
+;;                        (setf resolved-something t)
+;;                        (let* ((klass (get-component-class-for-dsl-type type))
+;;                               (instance (make-instance klass))
+;;                               (view (elmtui.ui.api:view instance app-state
+;;                                                         :id-path new-path
+;;                                                         :children children)))
+;;                          view))
+;;                      (let ((resolved-children (mapcar (lambda (c) (process-node c new-path))
+;;                                                       children)))
+;;                        (append (list type)
+;;                                (copy-plist props)
+;;                                (when resolved-children
+;;                                  (list :children resolved-children))))))))))
+;;       (values (process-node dsl-spec '())
+;;               resolved-something))))
+;;; --- DSL Rendering ---
+;; (defun render-dsl-to-resolved-tree (dsl-spec app-state)
+;;   (labels
+;;       ((process-stateful-component (tag id path props children)
+;;          (unless id
+;;            (error "Stateful component ~S requires an :id." tag))
+;;          (let* ((new-path (append path (list id)))
+;;                 (class    (get-component-class-for-dsl-type tag))
+;;                 (inst     (make-instance class))
+;;                 (view-dsl (elmtui.ui.api:view inst
+;;                                               app-state
+;;                                               :id-path  new-path
+;;                                               :children children
+;;                                               :props    props)))
+;;            `(,tag ,@props
+;;              :resolved-view ,view-dsl)))
 
-    ;;     ;; --- Element node ---
-    ;;     (t
-    ;;      (let* ((type (first spec))
-    ;;             (id (getf (rest spec) :id))
-    ;;             (new-path (if id (append path (list id)) path))
-    ;;             (props (rest spec)))
+;;        (process-node (spec path)
+;;          (unless (and (listp spec) (keywordp (first spec)))
+;;            (return-from process-node spec))
 
-    ;;        ;; --- Cycle detection ---
-    ;;        (when (and id (member id path :test #'equal))
-    ;;          (error "Circular dependency detected: component ID ~S is already in the rendering path ~S" id path))
+;;          (destructuring-bind (tag &rest tail) spec
+;;            (let (props children)
+;;              ;; Phase 1: Separate props and children from the tail
+;;              (loop with rest = tail
+;;                    while (and rest (keywordp (first rest)))
+;;                    do (progn
+;;                         (unless (cdr rest) (error "Dangling keyword ~S in ~S" (first rest) spec))
+;;                         (push (first rest) props)
+;;                         (push (second rest) props)
+;;                         (setf rest (cddr rest)))
+;;                    finally (setf children rest)
+;;                            (setf props (nreverse props)))
 
-    ;;        (multiple-value-bind (properties children) (split-props/children props)
-    ;;          (log-info "Properties: ~S, Children: ~S" properties children)
-    ;;          (if (registered-dsl-component-p type)
-    ;;              ;; --- Stateful Component ---
-    ;;              (process-stateful-component type id new-path children)
-    ;;              ;; --- Layout Element ---
-    ;;              (let ((resolved-children (mapcar (lambda (child) (process-node child new-path)) children)))
-    ;;                `(,type ,@properties :children ,resolved-children))))))))
-    (process-node dsl-spec nil)))
+;;              ;; Phase 2: Handle special cases for children
+;;              (when (null props)
+;;                (cond
+;;                  ((and (= 1 (length children)) (atom (first children)))
+;;                   (setf props `(:content ,(first children)))
+;;                   (setf children nil))
+;;                  (t t)))
+
+;;              ;; Phase 3: Unwrap children if they are in a single list
+;;              (when (and (= 1 (length children)) (listp (first children)))
+;;                (setf children (first children)))
+
+;;              ;; Phase 4: Check for :children prop and merge if necessary
+;;              (let ((children-prop (getf props :children)))
+;;                (when children-prop
+;;                  (when children (error "Children specified twice in ~S" spec))
+;;                  (setf children children-prop)
+;;                  (setf props (loop for (k v) on props by #'cddr
+;;                                    unless (eq k :children)
+;;                                      append (list k v)))))
+
+;;              ;; Phase 5: Recurse and build result
+;;              (let* ((id (getf props :id))
+;;                     (new-path (if id (append path (list id)) path)))
+;;                (when (and id (member id path :test #'equal))
+;;                  (error "Circular dependency: ~S in ~S" id path))
+
+;;                (if (registered-dsl-component-p tag)
+;;                    (process-stateful-component tag id path props children)
+;;                    (let ((resolved-children
+;;                            (mapcar (lambda (ch) (process-node ch new-path))
+;;                                    children)))
+;;                      (if resolved-children
+;;                          `(,tag ,@props :children ,resolved-children)
+;;                          `(,tag ,@props)))))))))
+;;     (process-node dsl-spec '())))
+
 
 ;;; --- DSL to UI-Node Conversion Utility ---
 (defun dsl->ui-node (dsl-spec app-state)
@@ -243,117 +387,35 @@
 
    Purity: impure (logging, error signaling)
   "
-  (if (and (listp dsl-spec)
-           (keywordp (first dsl-spec))
-           (not (getf (rest dsl-spec) :id))) ; Raw DSL doesn't require :id
-      ;; Handle raw DSL directly
-      (progn
-        ;; Log conversion for debugging
-        (log-info "dsl->ui: Converting raw DSL to styled node directly: ~S" dsl-spec)
-        (convert-raw-dsl-to-ui-node dsl-spec))
-      ;; Handle component-based DSL
-      (let ((resolved (render-dsl-to-resolved-tree dsl-spec app-state)))
-        (unless resolved
-          (error "dsl->ui-node: Conversion returned NIL for ~S" dsl-spec))
-        (convert-raw-dsl-to-ui-node resolved))))
+  (let ((spec nil))
+    (loop with current-dsl = dsl-spec
+          for i from 1 to 10
+          do (multiple-value-bind (next-dsl resolved-p)
+                 (render-dsl-to-resolved-tree current-dsl app-state)
+               (setf spec current-dsl)
+               (setf current-dsl next-dsl)
+               (unless resolved-p
+                 (return)))
+          finally (when (> i 9)
+                    (warn "DSL resolution took more than 10 iterations.")))
+    (elmtui.utils:as :styled-ui-node
+                     (elmtui.view.base-elements:dsl->objects
+                      spec))))
+;; (if (and (listp dsl-spec)
+;;          (keywordp (first dsl-spec))
+;;          (not (getf (rest dsl-spec) :id))) ; Raw DSL doesn't require :id
+;;     ;; Handle raw DSL directly
+;;     (progn
+;;       ;; Log conversion for debugging
+;;       (log-info "dsl->ui: Converting raw DSL to styled node directly: ~S" dsl-spec)
+;;       (convert-raw-dsl-to-ui-node dsl-spec))
+;;     ;; Handle component-based DSL
+;;     (let ((resolved (render-dsl-to-resolved-tree dsl-spec app-state)))
+;;       (unless resolved
+;;         (error "dsl->ui-node: Conversion returned NIL for ~S" dsl-spec))
+;;       (convert-raw-dsl-to-ui-node resolved))))
 ;; (dsl->ui-node '(:container :id :main :style (:bg-color :red) :children ((:text :id :child1 :content "Hello")))
 ;; (elmtui.tea-state.state:make-state nil))
-(defun convert-ui-tree-to-styled-node (dsl-spec)
-  "Converts a DSL-SPEC to a styled-ui-node, handling both raw and component-based DSL.
-
-     Arguments:
-         DSL-SPEC -- (list) The DSL specification (raw or component-based).
-
-     Returns:
-         A styled-ui-node object representing the DSL node and its children.
-
-     Example:
-         (convert-ui-tree-to-styled-node
-         '(:container :id :main :style (:bg-color red)
-                        :children ((:text :content \"hi\"))))
-         ;; => styled-ui-node
-
-     (list) => styled-ui-node (side-effect: logs info, error on invalid input)
-
-     Side-effects:
-         - Logs info messages.
-         - Signals error if conversion fails.
-
-     Purity: impure (logging, error signaling)
-    "
-  ;; Validate DSL-SPEC format
-  (unless (and (listp dsl-spec) (keywordp (first dsl-spec)))
-    (error "Invalid DSL spec: ~S" dsl-spec))
-
-  ;; Convert raw DSL to styled node
-  (convert-raw-dsl-to-ui-node dsl-spec))
-
-(defun convert-raw-dsl-to-ui-node (dsl-spec)
-  "Converts a raw DSL-SPEC (property list format) directly to a styled-ui-node.
-
-   Arguments:
-     DSL-SPEC -- (list) A property list describing a UI node.
-                 Must start with a keyword (node type).
-
-   Returns:
-     A styled-ui-node object representing the DSL node and its children.
-
-   Example:
-     (convert-raw-dsl-to-styled-node
-       '(:container :id :main :style (:bg-color red)
-                    :children ((:text :content \"hi\"))))
-     ;; => styled-ui-node
-
-   (list) => styled-ui-node (side-effect: logs info, error on invalid input)
-
-   Side-effects:
-     - Logs info messages.
-     - Signals error if DSL-SPEC is invalid.
-
-   Purity: impure (logging, error signaling)
-  "
-  ;; Validate DSL-SPEC format
-  (unless (and (listp dsl-spec) (keywordp (first dsl-spec)))
-    (error "Invalid DSL spec: ~S" dsl-spec))
-
-  ;; Extract node properties
-  (let* ((node-type (first dsl-spec))
-         (props (rest dsl-spec))
-         (id (getf props :id))
-         (style (getf props :style))
-         (classes (getf props :classes))
-         (content (getf props :content))
-         (children-specs (getf props :children))
-         (text (getf props :text)))
-
-    ;; Recursively convert children if present
-    (let ((converted-children
-            (when children-specs
-              ;; malformed one-child-childrenlist))
-              (mapcar
-               #'convert-raw-dsl-to-ui-node
-               (if (and  (< 0 (length children-specs))
-                         (not (listp (car children-specs))))
-                   (list children-specs)
-                   children-specs)))))
-
-      ;; Log and create the styled node
-      (log-info "Converting raw DSL to styled node: ~S"
-                (make-styled-node
-                 :type node-type
-                 :props (append (when id (list :id id))
-                                (when classes (list :classes classes))
-                                (when text (list :text text))
-                                (when style (list :style style)))
-                 :children converted-children))
-      (elmtui.view.core:make-ui-node
-       :type node-type
-       :props (append (when id (list :id id))
-                      (when classes (list :classes classes))
-                      (when text (list :text text))
-                      (when content (list :content content))
-                      (when style (list :style style)))
-       :children converted-children))))
 ;; Example Usage (conceptual - actual components need to be defined and registered)
 ;; (defcomponent-dsl :my-box my-box-component)
 ;; (defcomponent-dsl :my-label my-label-component)
@@ -362,4 +424,4 @@
 ;;  '(:my-box :id :root-box :children
 ;;    ((:my-label :id :label1 :text "Hello")
 ;;     (:my-label :id :label2 :text "World")))
-;;  *application-state*)
+;;  (elmtui.tea-state:make-application-state))

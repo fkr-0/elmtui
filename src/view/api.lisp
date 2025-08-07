@@ -14,7 +14,7 @@
 
 (uiop:define-package #:elmtui.view.api
   (:use #:cl)
-  (:import-from #:elmtui.style-lib.api :styles)
+  (:import-from #:elmtui.style-lib.api :styles :stylable)
   (:export
    ;; Transformation generics
    #:render-view
@@ -317,17 +317,10 @@ These nodes may still be declarative/high-level."))
   (check-type (ui-node-props node) list) ; Plists are lists
   (check-type (ui-node-children node) list))
 
-(defclass styled-ui-node (ui-node)
-  ((style-map
-    :initarg :style-map
-    :accessor styled-ui-node-style-map
-    :type list ; Actually a plist
-    :documentation "Fully-resolved style plist after APPLY-STYLE."))
+(defclass styled-ui-node (ui-node stylable)
+  ()
   (:documentation
    "UI node after stylesheet cascade expansion and normalisation."))
-(defmethod styles ((styled-ui-node styled-ui-node))
-  "Return the style-map of a STYLED-UI-NODE."
-  (styled-ui-node-style-map styled-ui-node))
 ;; (defmethod style-set-to-style-map ((node styled-ui-node) (style-set style-set))
 ;;   "Convert a STYLE-SET to a STYLE-MAP plist."
 ;;   (styles.properties:get-style-set-properties style-set))
@@ -367,8 +360,6 @@ These nodes may still be declarative/high-level."))
 (defmethod ui-node-children ((node styled-ui-node))
   (and (slot-boundp node 'children)
        (slot-value node 'children))) ; Inherit children from ui-node)
-(defmethod initialize-instance :after ((node styled-ui-node) &key)
-  (check-type (styled-ui-node-style-map node) list)) ; Plists are lists
 
 (defclass atomic-ui-node (styled-ui-node)
   ()

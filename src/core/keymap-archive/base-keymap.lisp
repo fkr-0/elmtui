@@ -4,7 +4,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.core.keymap
   (:use :cl :alexandria :log4cl )
-  (:import-from :elmtui.state.api #:state-ref) ; For list-widget-keybindings
+  (:import-from :elmtui.tea-state #:state-ref) ; For list-widget-keybindings
   (:import-from :str :split)
   (:export #:keymap
            #:nkwrap
@@ -116,13 +116,14 @@
                  (when (> i 0)
                    (write-char #\- out))
                  (princ (string-capitalize (symbol-name m)) out)))
-      
+
       ;; If we have modifiers, add a dash before the key
       (when mods
         (write-char #\- out))
-      
+
       ;; Add the key itself
       (princ key-str out))))
+
 ;; "Human-readable form, e.g. \"Shift-Ctrl-Alt-Z\"."
 ;; (string-trim (list #\-)
 ;;              (with-output-to-string (out)
@@ -422,4 +423,21 @@
                      (keymap-bindings keymap))
             results))))))
 
-;; TODO: Implement list-global-keybindings and list-active-keybindings as per spec.
+(defun list-global-keybindings (&key (keymap-slot :active-keymap))
+  "Lists global keybindings from the active keymap.
+   KEYMAP-SLOT: The slot in the global state where the active keymap is stored.
+   Returns a list of plists, each describing a global keybinding."
+  (let ((global-keymap (state-ref :elmtui.core.state/global-state keymap-slot)))
+    (when (and global-keymap (typep global-keymap 'keymap))
+      (let ((results '()))
+        (maphash (lambda (norm-key binding-plist)
+                   (push (list :key (normalized-key->string norm-key)
+                               :description (getf binding-plist :description)
+                               :type (getf binding-plist :type)
+                               :target (getf binding-plist :target)
+                               :scope :global
+                               :source 'global
+                               :keymap-name (keymap-name global-keymap)) ; Add name of specific keymap
+                         results))
+                 (keymap-bindings global-keymap))
+        results))))

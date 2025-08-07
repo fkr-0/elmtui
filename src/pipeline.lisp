@@ -1,6 +1,8 @@
 (uiop:define-package :elmtui.pipeline
   (:use :cl :elmtui.contracts)
   (:import-from :elmtui.view.dsl #:dsl->ui-node)
+  (:import-from #:elmtui.utils #:split-props/children)
+  (:import-from #:log4cl :log-info)
   (:import-from :elmtui.view.styled #:apply-stylesheet-to-tree)
   (:import-from :elmtui.view.tree-transforms #:resolve-view #:layout-view)
   (:import-from :elmtui.platform.tree-renderer #:render-laid-out-tree-to-buffer)
@@ -53,41 +55,29 @@
 ;;                 (abc &key state view-fn)
 ;;   (make-dsl-tree :root (funcall view-fn state)))
 ;;; STAGE 1: DSL tree -> Raw tree (pure, typed)
+(defun make-component-path (parent-path component-id)
+  "Return a canonical [:components …] path.
+   Guarantees that :components appears exactly *once* at the head."
+  (cond
+    ;; first level – we are not inside any component yet
+    ((null parent-path)
+     (list :components component-id))
+
+    ;; already inside the component subtree
+    ((eq (first parent-path) :components)
+     (append parent-path (list component-id)))
+
+    ;; defensive fallback – shouldn’t happen, but stays correct
+    (t
+     (append (list :components) parent-path (list component-id)))))
+
 (deftransformer ;; raw->styled (raw-tree) (styled-tree)
     dsl->raw (dsl-tree) (raw-tree)
     (dsl-tree &key state)
   "Transforms a DSL tree into a raw UI-node tree."
-  (let ((dsl (root dsl-tree)))
-    (labels ((expand-components (dsl parent-path)
-               (if (and (consp dsl) (elmtui.app.api:registered-dsl-component-p (first dsl)))
-                   (let* ((component-id (getf (cdr dsl) :id))
-                          (id-path (append parent-path (list component-id)))
-                          (full-id-path
-                            (if (eq (car  id-path) :components)
-                                id-path
-                                        ;(cons :components id-path))
-                                `(:components ,@id-path)))
-                          (instance (elmtui.app.api:get-component-instance
-                                     full-id-path state ;; (elmtui.utils:get-path
-                                     ;;  '(:components) state)
-                                     )))
-                     (if instance
-                         (funcall #'expand-components (elmtui.ui.api:view instance state :id-path full-id-path)
-                                  id-path)
-                         (error (format nil "Component instance not found for ID ~A in state ~A" component-id state))))
-                   (if (and (consp dsl) (getf (cdr dsl) :children))
-                       (let* ((children (getf (cdr dsl) :children))
-                              (expanded-children (mapcar (lambda (child-dsl)
-                                                           (expand-components child-dsl parent-path))
-                                                         children))
-                              (new-dsl (copy-list dsl)))
-                         (setf (getf (cdr new-dsl) :children) expanded-children)
-                         new-dsl)
-                       dsl))))
-      (make-raw-tree
-       :root
-       (dsl->ui-node (expand-components dsl nil)
-                     state)))))
+  (make-raw-tree
+   :root
+   (dsl->ui-node (root dsl-tree) state)))
 
 
 (deftransformer raw->styled (raw-tree) (styled-tree)
@@ -149,6 +139,17 @@
          (rendered-buffer (render-laid-out-tree-to-buffer (list (root laid-out-tree)) :buffer target-buffer)))
     (setf (ctx-back-buffer ctx) rendered-buffer)
     ctx))
+
+;; (deftransformer render-to-buffer-stage (laid-out-tree) (virtual-buffer)
+;;                 (laid-out-tree &key viewport-rect)
+;;   "Renders the laid-out tree to a virtual buffer."
+;;   (let* ((rect viewport-rect)
+;;          (target-buffer (make-virtual-buffer (w rect) (h rect)))
+;;          (rendered-buffer
+;;            (render-laid-out-tree-to-buffer
+;;             (list (root laid-out-tree))
+;;             :buffer target-buffer)))
+;;     rendered-buffer))
 
 ;;; STAGE 6: Display the back buffer, handling diffing.
 (define-stage display-buffer

@@ -1,6 +1,6 @@
 (uiop:define-package :elmtui.ui.api
   (:use :cl #:log4cl)
-  (:import-from :elmtui.state.api #:state-ref #:make-update-result)
+  (:import-from :elmtui.tea-state #:state-ref #:make-update-result)
   (:import-from :elmtui.utils #:ensure-keyword #:get-path)
   (:export
    ;; Component Class & Generics
@@ -416,14 +416,14 @@
     (make-update-result)))
 
 
-(defmethod view ((component cons) app-state &key id-path)
-  "Fallback view method for raw plists found in state, treating them as raw DSL."
+(defmethod view ((component hash-table) app-state &key id-path)
+  "Fallback view method for raw hash-tables found in state, treating them as raw DSL."
   (declare (ignore app-state id-path))
-  component)
+  (gethash :dsl component))
 ;; (declaim (ftype (function (component t &key (:id-path list)) list) view))
 (defgeneric view (component app-state &key id-path &allow-other-keys)
   (:documentation "Generates a view representation (DSL spec) for a component instance.")
-  (:method ((component component) app-state &key id-path)
+  (:method ((component component) app-state &key id-path children)
     (declare (type component component)
              (type t app-state) ; app-state type can be more specific
              (type list id-path))
@@ -431,7 +431,11 @@
               component id-path)
     (check-type component component)
     (check-type id-path list)
-    (list (component-type component) :id (id-from-path id-path))))
+    (list          :container
+                   :id (intern (format nil "~A-CONTAINER" (id-from-path id-path)) :keyword)
+
+                   ;;:type (component-type component)
+                   :children children)))
 
 
 (defmethod view ((component null) app-state &key id-path)

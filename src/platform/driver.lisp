@@ -21,10 +21,10 @@
   (:import-from :elmtui.core.focus
                 #:get-current-focus
                 #:make-focus-manager)
-  (:import-from :elmtui.core.keymap
-                #:key-event->normalized-key
-                #:lookup-keymap)
-  (:import-from :elmtui.state #:get-path)
+  (:import-from :elmtui.keymaps
+                #:initialise
+                #:process-key-event)
+  (:import-from :elmtui.tea-state #:get-path)
   (:import-from :elmtui.platform.api
                 #:initialize-backend #:shutdown-backend #:render-and-present
                 #:term-w #:term-h #:handle-backend-resize
@@ -57,36 +57,6 @@
 (declaim (type (or null elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer) *previous-frame-buffer*))
 (declaim (type t *current-app-model*)) ; Holds the application state object
 (declaim (type list *root-viewport-id-path*)) ; e.g., '(:components :my-root-vp)
-
-;;; ---------------------------------------------------------------------------
-;;; == Application Entry Point ==
-;;; ---------------------------------------------------------------------------
-;; Method for elmtui.app.api:run-application
-(defmethod elmtui.app.api:run-application ((APP-SPEC list)
-                                           &key (BACKEND-TYPE :terminal)
-                                             PLATFORM-OPTIONS)
-  "Entry point for running an application from an APP-SPEC plist.
-  Arguments:
-    APP-SPEC (list): Plist with :name, :init-fn, :update-fn, :view-fn, etc.
-    BACKEND-TYPE (keyword): Backend type, e.g., :terminal.
-    PLATFORM-OPTIONS (list): Plist of backend/platform options.
-  Returns:
-    (t): Result of run-app-platform.
-  Example:
-    (elmtui.app.api:run-application my-app-spec :backend-type :terminal)
-  Type: (list, &key keyword list) => t
-  Side-effects: Starts the application, may initialize hardware or OS resources."
-  (declare (type list app-spec platform-options)
-           (type keyword backend-type))
-  (log:info "DRIVER: elmtui.app.api:run-application method called for app-spec (list).~%  App Name: ~S~%  Backend: ~A~%  Platform Options: ~S"
-            (getf app-spec :name) backend-type platform-options)
-  ;; Apply platform-options as keyword arguments to run-app-platform.
-  ;; run-app-platform should have &allow-other-keys to ignore options it doesn't explicitly handle.
-  (apply #'run-app-platform
-         app-spec ; Pass the app_spec plist as the first argument to run-app-platform
-         :backend-type backend-type
-         platform-options))
-
 ;;; ---------------------------------------------------------------------------
 ;;; Global state (driver-level)
 ;;; ---------------------------------------------------------------------------
@@ -141,6 +111,46 @@
   Type: t
   Side-effects: Mutable global state.")
 
+(defvar *focus-manager* nil
+  "Holds the application's focus manager instance.")
+
+;;; ---------------------------------------------------------------------------
+;;; == Application Entry Point ==
+;;; ---------------------------------------------------------------------------
+;; Method for elmtui.app.api:run-application
+(defmethod elmtui.app.api:run-application ((app-spec list)
+                                           &key (backend-type :terminal)
+                                             platform-options)
+  "Entry point for running an application from an APP-SPEC plist."
+  (declare (type list app-spec platform-options)
+           (type keyword backend-type))
+  (log:info "DRIVER: run-application called for ~S with backend ~A."
+            (getf app-spec :name) backend-type)
+
+  ;; Initialize keymap system
+  (elmtui.keymaps:initialise)
+
+  ;; Create a focus manager
+  (setf *focus-manager* (make-focus-manager))
+
+  ;; Subscribe keymap processor to key events
+  (elmtui.core.loop:subscribe
+   :key-event
+   (lambda (evt)
+     (unless (elmtui.keymaps:process-key-event
+              evt
+              *focus-manager*
+              :app-state *current-app-model*
+              :dispatch-fn #'publish)
+       ;; Fallback for unhandled keys
+       (publish (list :raw-key evt)))))
+
+  (apply #'run-app-platform
+         app-spec
+         :backend-type backend-type
+         platform-options))
+
+
 ;;; ---------------------------------------------------------------------------
 ;;; == Backend Initialization Utilities ==
 ;;; ---------------------------------------------------------------------------
@@ -166,7 +176,6 @@
 ;;; ---------------------------------------------------------------------------
 ;;; == Application State Bootstrap ==
 ;;; ---------------------------------------------------------------------------
-
 (defun initialize-app-model (app-spec)
   (declare (type list app-spec))
   (let* (
@@ -207,12 +216,14 @@
                         (cmd-proc-fn (getf app-spec :command-processor-fn))
                         (message-queue (getf app-spec :message-queue))
                         (app-cfg-for-cmd (gethash (getf app-spec :name) elmtui.core.globals:*applications*)))
+                    (log-info "DRIVER: calling update")
                     (multiple-value-bind (next-model commands)
                         (funcall update-fn *current-app-model* msg)
                       ;; Update global model
                       (setf *current-app-model* next-model)
+                      (log-info "DRIVER: update phase done")
                       ;; Check for shutdown flag in model
-                      (when (elmtui.state:get-path '(:should-quit) next-model)
+                      (when (elmtui.tea-state:get-path '(:should-quit) next-model)
                         (log:info "DRIVER: :should-quit flag is true in model. Setting *shutdown-requested*.")
                         (setf elmtui.core.loop::*shutdown-requested* t))
                       ;; Process commands if a command processor is present
@@ -221,18 +232,19 @@
                           (funcall cmd-proc-fn c message-queue next-model app-cfg-for-cmd)))
                       ;; If not shutting down, update rendering context and previous frame buffer
                       (unless elmtui.core.loop::*shutdown-requested*
+                        (log-info "DRIVER: view next-model")
                         (let ((ctx (make-context-from-spec app-spec next-model *backend*)))
                           (setf *last-ctx* (elmtui.pipeline:full-view-pipeline ctx))
                           (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*)))))))))
       (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
       (values initial-model initial-cmds))))
 
-(defun process-initial-commands (cmds publish-fn app-spec)
+(defun process-initial-commands (cmds app-spec)
   "Process a list of initial commands for an application, using an app-specific processor if available.
 CMDs: list of commands to process.
 PUBLISH-FN: function to publish messages (unused here, but may be used in future).
 APP-SPEC: property list describing the app, must contain :command-processor-fn, :message-queue, and :name."
-  (declare (type list cmds) (type function publish-fn) (type list app-spec))
+  (declare (type list cmds) (type list app-spec))
   (when (and cmds (listp cmds))
     (log:debug "DRIVER: Processing initial commands...")
     (destructuring-bind (&key command-processor-fn message-queue name &allow-other-keys) app-spec
@@ -265,7 +277,7 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
      :state state
      :view-fn (getf app-spec :view-fn)
      :backend backend
-     :stylesheet (elmtui.state:get-path '(:current-stylesheet) state)
+     :stylesheet (elmtui.tea-state:get-path '(:current-stylesheet) state)
      :viewport-rect (elmtui.view.geo:make-rectangle
                      :pos (elmtui.view.geo:make-pos :x 0 :y 0) :size (elmtui.view.geo:make-size :w w :h h))
      :front-buffer *previous-frame-buffer*)))
@@ -343,7 +355,8 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
             *backend* *input-thread* *stop-input-fn* *driver-initiated-shutdown-p* *previous-frame-buffer* *current-app-model* *root-viewport-id-path*)
   (start-loop)
   (let (;(event-loop ) ; Start the main event loop
-        (initial-model nil) ;; gets
+                                        ;(initial-model nil)
+        ;; gets
         ;; initialized in initialize-app-model
         (initial-commands nil))
     ;; (declare (type list initial-commands))
@@ -366,11 +379,11 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
            (multiple-value-bind (im ic)
                (initialize-app-model app-spec)
              (log:debug "DRIVER: Initial model: ~S, initial commands: ~S..binding" im ic)
-             (setf initial-model im)
+             ;; (setf initial-model im)
              (setf initial-commands ic))
            (when initial-commands
-             (process-initial-commands initial-commands (lambda (ev) (publish ev)) app-spec))
-           (send-initial-resize-message *backend* (lambda (ev) (publish ev)))
+             (process-initial-commands initial-commands app-spec))
+           ;; (send-initial-resize-message *backend* (lambda (ev) (publish ev)))
 
            ;; Initial render is now handled by the first :terminal-resized event
            ;; (render-frame app-spec initial-model *backend*)

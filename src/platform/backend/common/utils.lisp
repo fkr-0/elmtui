@@ -268,8 +268,8 @@
     "Render the ANSI control sequence with args."
     (let ((control-parts (slot-value seq 'seq))
           (identifier (slot-value seq 'identifier)))
-      (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string template: ~S, args: ~S"
-                 identifier control-parts args)
+      ;; (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string template: ~S, args: ~S"
+      ;;            identifier control-parts args)
 
       (let* ((string-builder (list (string (code-char 27))))) ; Start with ESC
         (let ((arg-index 0))
@@ -293,7 +293,7 @@
                                identifier arg-index)
                      (push "" string-builder)))) ; Insert empty string if not enough args
               (t
-               (log:error "RENDER-SEQ: Unknown part ~S in sequence definition for ~S. Skipping part." part identifier)
+               ;; (log:error "RENDER-SEQ: Unknown part ~S in sequence definition for ~S. Skipping part." part identifier)
                ;; Optionally, insert an error marker or an empty string
                (push "" string-builder)))))
 

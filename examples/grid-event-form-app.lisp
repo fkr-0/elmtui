@@ -33,13 +33,13 @@
 
 ;; Define model for form data
 (defmodel form-state
-  ((name "" :type string)
-   (email "" :type string)
-   (subject "" :type string)
-   (message "" :type string)
-   (focus-manager (make-focus-manager) :type focus-manager)
-   (submitted nil :type boolean)
-   (validation-errors nil :type list)))
+    ((name "" :type string)
+     (email "" :type string)
+     (subject "" :type string)
+     (message "" :type string)
+     (focus-manager (make-focus-manager) :type focus-manager)
+     (submitted nil :type boolean)
+     (validation-errors nil :type list)))
 
 ;; Define messages for form updates
 (defmsg update-field (field value))
@@ -68,7 +68,7 @@
       (push '(:field email :message "Email must contain @") errors))
     (when (string= (slot-value state 'subject) "")
       (push '(:field subject :message "Subject is required") errors))
-    
+
     (setf (slot-value state 'validation-errors) errors)
     state))
 
@@ -76,11 +76,11 @@
   "Submit the form"
   ;; First validate
   (setq state (validate-form state (list :type :validate-form)))
-  
+
   ;; If no errors, mark as submitted
   (when (null (slot-value state 'validation-errors))
     (setf (slot-value state 'submitted) t))
-  
+
   state)
 
 (defupdate change-focus (state msg)
@@ -96,8 +96,8 @@
          (focus-manager (slot-value state 'focus-manager))
          (current-focus (elmtui.core.focus-manager:focus-manager-current-focus focus-manager))
          (next-focus (if shift-pressed
-                        (elmtui.core.focus-manager:get-previous-focusable focus-manager current-focus)
-                        (elmtui.core.focus-manager:get-next-focusable focus-manager current-focus))))
+                         (elmtui.core.focus-manager:get-previous-focusable focus-manager current-focus)
+                         (elmtui.core.focus-manager:get-next-focusable focus-manager current-focus))))
     (when next-focus
       (set-focus focus-manager next-focus))
     state))
@@ -108,14 +108,14 @@
 
 ;; Define a grid template for our form
 (defparameter *form-grid-template*
-  (define-grid-template 
-   :form-layout
-   ;; Rows: header, form fields (4 rows), submit row, footer
-   '("auto" "auto" "auto" "auto" "auto" "auto" "1fr")
-   ;; Columns: label, field, validation
-   '("100px" "1fr" "200px")
-   ;; Named areas
-   "header header header |
+  (define-grid-template
+      :form-layout
+      ;; Rows: header, form fields (4 rows), submit row, footer
+      '("auto" "auto" "auto" "auto" "auto" "auto" "1fr")
+    ;; Columns: label, field, validation
+    '("100px" "1fr" "200px")
+    ;; Named areas
+    "header header header |
     name-label name-field name-validation |
     email-label email-field email-validation |
     subject-label subject-field subject-validation |
@@ -131,7 +131,7 @@
 (defparameter *form-keymap* (make-keymap :name :form-keymap))
 
 ;; Define key bindings
-(define-key *form-keymap* :tab 
+(define-key *form-keymap* :tab
   (lambda (event app-state)
     (elmtui.state.msg:send-message
      (list :type :form-tab-pressed
@@ -240,7 +240,7 @@
         (message (slot-value state 'message))
         (submitted (slot-value state 'submitted))
         (validation-errors (slot-value state 'validation-errors)))
-    
+
     ;; Build the form components
     (let* ((header (make-ui-node
                     :type :h1
@@ -250,55 +250,55 @@
                         :props (list :text "Name:")))
            (name-field (make-text-input :name-field name "Enter your name"))
            (name-validation (make-validation-message validation-errors 'name))
-           
+
            (email-label (make-ui-node
                          :type :label
                          :props (list :text "Email:")))
            (email-field (make-text-input :email-field email "Enter your email"))
            (email-validation (make-validation-message validation-errors 'email))
-           
+
            (subject-label (make-ui-node
                            :type :label
                            :props (list :text "Subject:")))
            (subject-field (make-text-input :subject-field subject "Enter subject"))
            (subject-validation (make-validation-message validation-errors 'subject))
-           
+
            (message-label (make-ui-node
                            :type :label
                            :props (list :text "Message:")))
            (message-field (make-textarea :message-field message "Enter your message"))
            (message-validation (make-validation-message validation-errors 'message))
-           
+
            (submit-btn (make-submit-button submitted validation-errors))
-           
+
            (footer (make-ui-node
                     :type :div
                     :props (list :class "footer")
-                    :children (list 
+                    :children (list
                                (make-ui-node
                                 :type :span
                                 :props (list :text "Press Tab to navigate, Enter to submit")))))
-           
+
            ;; Map areas to components
            (area-map `(("header" . ,header)
-                        ("name-label" . ,name-label)
-                        ("name-field" . ,name-field)
-                        ("name-validation" . ,name-validation)
-                        ("email-label" . ,email-label)
-                        ("email-field" . ,email-field)
-                        ("email-validation" . ,email-validation)
-                        ("subject-label" . ,subject-label)
-                        ("subject-field" . ,subject-field)
-                        ("subject-validation" . ,subject-validation)
-                        ("message-label" . ,message-label)
-                        ("message-field" . ,message-field)
-                        ("message-validation" . ,message-validation)
-                        ("submit-btn" . ,submit-btn)
-                        ("footer" . ,footer))))
-      
+                       ("name-label" . ,name-label)
+                       ("name-field" . ,name-field)
+                       ("name-validation" . ,name-validation)
+                       ("email-label" . ,email-label)
+                       ("email-field" . ,email-field)
+                       ("email-validation" . ,email-validation)
+                       ("subject-label" . ,subject-label)
+                       ("subject-field" . ,subject-field)
+                       ("subject-validation" . ,subject-validation)
+                       ("message-label" . ,message-label)
+                       ("message-field" . ,message-field)
+                       ("message-validation" . ,message-validation)
+                       ("submit-btn" . ,submit-btn)
+                       ("footer" . ,footer))))
+
       ;; Build the complete form using our grid layout
-      (build-grid-from-template 
-       *form-grid-template* 
+      (build-grid-from-template
+       *form-grid-template*
        area-map
        :gap 10))))
 
@@ -311,11 +311,11 @@
   (let ((initial-state (make-instance 'form-state)))
     ;; Set up initial focus to the name field
     (let ((focus-manager (slot-value initial-state 'focus-manager)))
-      (elmtui.core.focus-manager:recalculate-focusable-elements 
-       focus-manager 
+      (elmtui.core.focus-manager:recalculate-focusable-elements
+       focus-manager
        (form-app-view initial-state))
       (set-focus focus-manager :name-field))
-    
+
     ;; Run the application with our UI and update functions
     (elmtui:run-app initial-state 'form-app-view)))
 

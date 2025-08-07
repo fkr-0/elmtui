@@ -87,6 +87,9 @@
 (defgeneric initialize-backend (backend-type &key &allow-other-keys)
   (:documentation "Initialize the backend for the specified platform. If PUBLISH-FN is provided, it will be used to publish events."))
 
+(defgeneric clear-screen (backend-type &optional rect)
+  (:documentation "Initialize the backend for the specified platform. If PUBLISH-FN is provided, it will be used to publish events."))
+
 ;; Defensive check for initialize-backend
 (defmethod initialize-backend :before ((backend-type t) &key &allow-other-keys)
   (unless (keywordp backend-type)

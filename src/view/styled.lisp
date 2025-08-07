@@ -3,9 +3,10 @@
 ;;; UI Node Style Integration with elmtui.style-lib
 ;;;===============================================================
 (uiop:define-package :elmtui.view.styled
-  (:use :cl :log4cl)
-  (:import-from :log4cl #:log-debug #:log-warn) ; Added log-warn
-  (:import-from :elmtui.view.api :styled-ui-node :styled-ui-node-style-map)
+  (:use :cl)
+  (:import-from :elmtui.utils #:as)
+  (:import-from :log4cl #:log-info #:log-debug #:log-warn) ; Added log-warn
+  (:import-from :elmtui.view.api :styled-ui-node)
   (:import-from :elmtui.view.core
    :ui-node :make-ui-node :copy-ui-node
                 :ui-node-type :ui-node-props :ui-node-children :node-type)
@@ -21,12 +22,19 @@
                 #:merge-sets!) ; Added merge-sets! for inline styles
   ;; Import query-stylesheet from sheet package
   (:import-from :elmtui.style-lib.sheet #:query-stylesheet)
-  (:import-from #:elmtui.state.utils #:split-props/children)
+  (:import-from #:elmtui.utils #:split-props/children #:as)
+  (:import-from #:elmtui.view.base-elements
+                #:base-element
+                #:element-type
+                #:element-id
+                #:element-children
+                #:element-content-model
+                #:dsl-properties) ; Import dsl-properties for converting base elements to styled-ui-nodes
   (:export
+   #:as
    #:ui-node-children
    #:ui-node-props
    #:styled-ui-node
-   #:styled-ui-node-style-map
    :make-styled-node       ; Constructor
    :copy-styled-node       ; Copier
    :apply-stylesheet-to-tree ; Main styling function
@@ -35,7 +43,42 @@
    :mark-tree-dirty-for-styling
    :with-attributes))
 (in-package :elmtui.view.styled)
-
+(defmethod as ((enforced-type (eql :styled-ui-node)) (obj base-element) &key (default nil) (err nil) &allow-other-keys)
+  "Convert OBJ to a UI node of type ENFORCED-TYPE."
+  ;; dsl-properties is missing id, and is
+  ;; containing styles, so we need to extract those
+  (log:debug "STYLED: Converting ~A to a UI node of type ~A" obj enforced-type)
+  (let ((props-filtered
+          (let ((props (dsl-properties obj)))
+            (let ((filtered nil))
+              ;; Filter out :children and any other non-style keys
+              (loop for (k v) on props by #'cddr
+                    unless
+                    (or (eq k :children)
+                        (eq k :styles)
+                        (eq k :style))
+                    do (setf filtered (append filtered (list k v))))
+              filtered))))
+    ;; Create a styled-ui-node with the filtered properties
+    ;; and the children from the base element
+    (setf (getf props-filtered :id) (element-id obj)) ; Ensure ID is set
+                                        ; Ensure classes are set
+    ;; Create the node with the filtered properties and children
+    ;; If obj is nil, return default or error if specified)
+    (if obj (make-styled-node
+             :type (element-type obj)
+             :props props-filtered
+             :styles (getf (dsl-properties obj) :style) ; Use :style from filtered props
+             ;; :id (element-id obj)
+             :children (mapcar
+                        (lambda (x) (as :styled-ui-node x))
+                        (element-children obj)))
+        ;; :content-model (element-content-model obj))
+        (if default
+            default
+            (if err
+                (error "Cannot convert ~A to a UI node of type ~A" obj enforced-type)
+                nil)))))
 ;;;-----------------------------------------------------------------------------
 ;;; Styled UI Node Class
 ;;;-----------------------------------------------------------------------------
@@ -51,24 +94,17 @@
           ((listp classes-prop) classes-prop)
           ((keywordp classes-prop) (list classes-prop))
           ((stringp classes-prop) (list (intern (string-upcase classes-prop) :keyword)))
-          (t (log-warn "STYLED: Invalid :classes ~S in props for node ID ~S. Ignored." 
+          (t (log-warn "STYLED: Invalid :classes ~S in props for node ID ~S. Ignored."
                        classes-prop (getf (ui-node-props node) :id))
              nil))))
 
-                                        ; (defmethod styles ((node styled-ui-node))
-;;   "Returns the styles of the styled node from its style-map.
-;;    If no styles are set, returns an empty style-set."
-;;   (let ((style-map (styled-ui-node-style-map node)))
-;;     (if (and style-map (listp style-map))
-;;         (elmtui.style-lib.api:make-style-set :styles style-map)
-;;         *default-style-set*)))
-                                        ; Return default if no styles are set
 
 ;; parents-of, styles, dirty/dirty-p would be handled by stylesheet system if needed
 
 ;;;-----------------------------------------------------------------------------
 ;;; Node Creation / Copying
 ;;;-----------------------------------------------------------------------------
+
 
 (defun make-styled-node (&key type props children (styles nil) (parent nil))
   "Create a new styled UI node.
@@ -80,9 +116,7 @@
          (final-id (or provided-id (gensym "NODE-")))
          ;; Props for the base ui-node part, ensure :id is the final-id
          (effective-props (let ((p (copy-list props))) (setf (getf p :id) final-id) p))
-         (node (make-instance 'styled-ui-node
-                              ;; Only use the initargs that styled-ui-node actually accepts
-                              :style-map nil))) ; Initialize with empty style-map for now
+         (node (make-instance 'styled-ui-node)))
     (log:debug "STYLED: make-styled-node - Created node with ID: ~S, Type: ~S, Effective Props: ~S"
                final-id type effective-props)
     ;; Set basic ui-node slots
@@ -90,28 +124,19 @@
     (setf (ui-node-props node) effective-props)
     (setf (ui-node-children node) children)
 
-    ;; Initialize style-map: convert inline styles from :style prop to a plist
+
+    ;; Initialize styles: convert inline styles from :style prop to a style-set
     (let ((inline-style-data (or styles (getf props :style))))
       (cond
         ((listp inline-style-data)
-         ;; Direct plist - use as-is
-         (setf (styled-ui-node-style-map node) inline-style-data))
+         (setf (styles node) (make-style-set :styles inline-style-data)))
         ((typep inline-style-data 'elmtui.style-lib.api:style-set)
-         ;; Convert style-set to plist with raw values
-         (let ((plist nil))
-           (maphash (lambda (key value)
-                      ;; Extract raw value from style object
-                      (let ((raw-value (if (typep value 'elmtui.style-lib.api:style)
-                                          (elmtui.style-lib.api:style-property-value-raw-value
-                                           (elmtui.style-lib.api:style-value value))
-                                          value)))
-                        (setf plist (append plist (list key raw-value)))))
-                    (elmtui.style-lib.api:style-set-styles inline-style-data))
-           (setf (styled-ui-node-style-map node) plist)))
+         (setf (styles node) (copy-set inline-style-data)))
         (t
-         ;; Other types - ignore or log warning
          (when inline-style-data
            (log-warn "STYLED: Unsupported style data type: ~A" (type-of inline-style-data))))))
+    ;; (log-info "STYLED: make-styled-node - Final Style Map for ID ~S: ~S -props ~A"
+    ;;           final-id (styles node) props)
     node))
 
 (defun copy-styled-node (node &key type props children parent)
@@ -124,6 +149,7 @@
   (make-styled-node
    :type (or type (ui-node-type node))
    :props (or props (copy-list (ui-node-props node)))
+   :styles (styles node)
    ;; Children are taken from the original node's children list.
    ;; apply-stylesheet-to-tree will iterate over these and process them.
 
@@ -144,6 +170,20 @@
   "Fallback for stylable-id on raw DSL lists. Returns :id if present, else NIL."
   (getf node :id))
 
+(defmethod apply-stylesheet-to-tree ((node base-element) stylesheet &optional parent)
+  "Base case for applying styles to a base element.
+     Returns the node as-is, since base elements are not styled."
+  (log:debug "STYLED: apply-stylesheet-to-tree for base-element - Type: ~S, Stylesheet: ~A, Parent ID: ~S"
+             (class-of node)
+             (if stylesheet (stylesheet-name stylesheet) "NIL_STYLESHEET")
+             (if parent (getf (ui-node-props parent) :id) "NIL_PARENT"))
+  (apply-stylesheet-to-tree (elmtui.view.base-elements:to-dsl node) stylesheet parent))
+;; (defmethod apply-stylesheet-to-tree ((styled-node styled-ui-node) stylesheet &optional parent)
+;; (let* ((styled-children (mapcar (lambda (child)
+;;                                          (apply-stylesheet-to-tree child stylesheet nil))
+;;                                        children))
+;;                )
+;;           (apply-stylesheet-to-tree styled-node stylesheet parent)))
 ;; Improved: Always convert DSL list directly to styled-ui-node, not ui-node, for robust style handling
 (defmethod apply-stylesheet-to-tree ((node list) stylesheet &optional parent)
   (when node
@@ -155,11 +195,8 @@
     (let* ((type (first node))
            (args (rest node)))
       (multiple-value-bind (props children)
-          (elmtui.state.utils:split-props/children args)
-        (let* ((styled-children (mapcar (lambda (child)
-                                          (apply-stylesheet-to-tree child stylesheet nil))
-                                        children))
-               (styled-node (make-styled-node :type type :props props :children styled-children :parent parent)))
+          (elmtui.utils:split-props/children args)
+        (let ((styled-node (make-styled-node :type type :props props :children children :parent parent)))
           (apply-stylesheet-to-tree styled-node stylesheet parent))))))
 (defgeneric apply-stylesheet-to-tree (node stylesheet &optional parent)
   (:documentation
@@ -180,9 +217,23 @@
   (let ((new-node (copy-styled-node node :parent parent)))
 
     ;; 2. Apply the stylesheet.
-    ;;    For now, we just keep the inline styles since the stylesheet system is simplified
-    ;;    In the future, this would query the stylesheet and compute final styles
-    (log:debug "STYLED: Style-map for ID ~S: ~S" (getf (ui-node-props new-node) :id) (styled-ui-node-style-map new-node))
+    ;; (when stylesheet
+    ;;   (let* ((stylesheet-styles (query-stylesheet stylesheet new-node))
+    ;;          (inline-styles-plist (elmtui.style-lib.stylable:styles  new-node)))
+
+    ;;     (when (listp inline-styles-plist)
+    ;;       (let ((inline-style-set (make-style-set :styles inline-styles-plist)))
+    ;;         (merge-sets! stylesheet-styles inline-style-set)))
+
+    ;;     (setf (elmtui.style-lib.stylable:styles new-node) stylesheet-styles)))
+
+    (let* ((stylesheet-styles (query-stylesheet stylesheet new-node))
+           (inline-styles (styles new-node)))
+      (when inline-styles
+        (merge-sets! stylesheet-styles inline-styles))
+      (setf (styles new-node) stylesheet-styles))
+
+    (log:debug "STYLED: Style-map for ID ~S: ~S" (getf (ui-node-props new-node) :id) (styles new-node))
 
     ;; 3. Recursively process children from the original node's children list.
     ;;    Each child will be processed, and 'new-node' (the current styled node)
@@ -227,16 +278,26 @@
 ;;;-----------------------------------------------------------------------------
 (defmethod style-value ((l list) property &optional default)
   "Get the style value of PROPERTY from a raw DSL list.
-   Returns DEFAULT if PROPERTY is not found in the list."
-  (log-info "STYLED: style-value called on list ~S for property ~S with default ~S"
-            l property default)
-  (let* ((l (if (= 1 (mod (length l) 2)) (cdr l) l))
-         (value (or (getf l property)
-                    (getf (getf l :style)
-                          property))))
-    (if value
-        value
-        default)))
+   Returns DEFAULT if PROPERTY is not found in the list. Filters out :children to prevent malformed property lists."
+  (log-debug "STYLED: style-value called on list ~S for property ~S with default ~S"
+             l property default)
+  (flet ((filter-style-plist (plist)
+           (unless (listp plist)
+             (log-warn "STYLED: Invalid style plist: ~S" plist)
+             (return-from filter-style-plist nil))
+           (let ((filtered nil))
+             (loop for (k v) on plist by #'cddr
+                   unless (eq k :children)
+                     do (setf filtered (append filtered (list k v))))
+             filtered)))
+    (let* ((filtered-l (filter-style-plist (if (= 1 (mod (length l) 2)) (cdr l) l)))
+           (value (or (getf filtered-l property)
+                      (let ((style-prop (getf filtered-l :style)))
+                        (when (listp style-prop)
+                          (getf (filter-style-plist style-prop) property))))))
+      (if value
+          value
+          default))))
 
 (defmethod style-value ((node styled-ui-node) property &optional default)
   "Get the computed style value of PROPERTY for NODE.
@@ -244,20 +305,9 @@
    Looks up in style-map (computed/cascaded), then falls back to inline :style in props, then DEFAULT."
   (cond
     ((typep node 'styled-ui-node)
-     (let* ((style-map (ignore-errors (styled-ui-node-style-map node)))
-            (inline-style (getf (ui-node-props node) :style)))
-       (cond
-         ((and style-map (listp style-map) (getf style-map property))
-          (getf style-map property))
-         ((and style-map (typep style-map 'elmtui.style-lib.api:style-set)
-               (gethash property (styles.properties:get-style-set-properties style-map)))
-          (gethash property (styles.properties:get-style-set-properties style-map)))
-         ((and style-map (hash-table-p style-map) (gethash property style-map))
-          (gethash property style-map))
-         ((and inline-style (listp inline-style) (getf inline-style property))
-          (getf inline-style property))
-
-         (t default))))
+     (let* ((style-set (styles node))
+            (value (value-of style-set property)))
+       (or value default)))
     (t default)))
 
 ;;;-----------------------------------------------------------------------------
