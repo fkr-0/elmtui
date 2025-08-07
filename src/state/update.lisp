@@ -140,8 +140,8 @@
   "
   `(defun ,name (,state-var ,msg-var)
      (declare (ignorable ,msg-var)
-              (type elmtui.tea-state.api:application-state ,state-var))
-     (elmtui.tea-state.api:with-transaction (,state-var :name ',name)
+              (type elmtui.tea-state:application-state ,state-var))
+     (elmtui.tea-state:with-transaction (,state-var :name ',name)
        (multiple-value-bind (returned-patches returned-commands)
            (progn ,@body) ; Execute the user-provided body
          (let ((processed-patches (process-update-result (list returned-patches returned-commands)
@@ -153,7 +153,7 @@
              (let* ((the-state-data-object (application-state-data ,state-var))
                     (current-raw-data (application-state-data the-state-data-object)))
                (setf (application-state-data the-state-data-object)
-                     (elmtui.state.api:merge-patches
+                     (elmtui.state:merge-patches
                       current-raw-data
                       processed-patches))))
 

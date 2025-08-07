@@ -5,7 +5,7 @@
 (uiop:define-package :elmtui.ui.widgets.button
   (:use :cl :elmtui.ui.defcomponent)
   (:import-from :elmtui.ui.api #:id-from-path #:app-state) ; Keep only used API functions
-  (:import-from :elmtui.state.api #:make-update-result)
+  (:import-from :elmtui.tea-state.api #:make-update-result)
   (:import-from :elmtui.view.styled #:make-styled-node)
   ;; Removed :elmtui.core.async and :elmtui.core.events as commands are now data.
   ;; Removed :elmtui.state.msg :defmsg as the specific ButtonMsg is not used internally by the refactored component.
@@ -54,7 +54,7 @@
            (:blur ()
                   (values `(:focused nil) nil)))
 
-  (:view (local-state app-state self-id-path)
+  (:view (local-state app-state self-id-path children)
          ;; (declare (ignore app-state))
                                         ; app-state not directly used
          (let* ((component-id (id-from-path self-id-path))

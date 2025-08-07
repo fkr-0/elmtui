@@ -64,6 +64,7 @@
   (make-keymap :name "app-global-keymap" ; Added name for introspection
                :bindings 
                `(((,(parse-key-string "C-q") . (:app-quit-requested :source :global-C-q))))))
+
 ;; (define-keymap *editor-keymap*
 ;;   ("C-a" :type :message :target '(:select-all) :description "Select All")
 ;;   ("C-c" :type :message :target '(:copy) :description "Copy")
@@ -71,6 +72,7 @@
 ;;   ("C-x" :type :message :target '(:cut) :description "Cut")
 ;;   ("C-z" :type :message :target '(:undo) :description "Undo")
 ;;   ("C-y" :type :message :target '(:redo) :description "Redo"))
+
 (defun app-component-keymaps ()
   "Defines keymaps specific to components, returned as an alist."
   ;; The type warning HASH-TABLE vs CONS is because this returns an alist,
@@ -81,7 +83,6 @@
                                        ((,(parse-key-string "=") . (:dispatch-to-component ,*counter-a-id* :increment)))
                                        ((,(parse-key-string "-") . (:dispatch-to-component ,*counter-a-id* :decrement)))
                                        ((,(parse-key-string "Enter") . (:dispatch-to-component ,*counter-a-id* :reset))))))))
-
 
 (defun app-update (message app-state) ; Flipped order to convention: message, app-state
   "Main application update function."

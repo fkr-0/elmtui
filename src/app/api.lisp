@@ -8,7 +8,7 @@
   (:import-from #:elmtui.ui.api #:instantiate-component-from-dsl)
   (:import-from :elmtui.core.event-channels
    :event-channel)
-  (:import-from :elmtui.state :get-path)
+  (:import-from :elmtui.tea-state :get-path)
   (:export #:defapplication
            #:with-temporary-dsl-component-registry
            #:run-application
@@ -33,8 +33,9 @@
   (name nil :type symbol :read-only t)
   (root-component-dsl nil :type list :read-only t)
   (initial-state-plist nil :type list :read-only t)
-  (update-fn-sym nil :type symbol :read-only t)
-  (view-fn-sym nil :type symbol :read-only t)
+  (update-fn-sym nil :type (or symbol function list) :read-only t)
+  (view-fn-sym nil :type (or symbol function list )
+                   :read-only t)
   (subscriptions-fn-form nil :type (or symbol list) :read-only t)
   (command-processor-fn nil :type (or symbol function) :read-only t)
   (message-queue (error "Message queue must be provided.") :type event-channel :read-only t)

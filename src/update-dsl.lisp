@@ -106,6 +106,7 @@
    #:state-patch
    #:patch
    #:command
+   #:with-read-only-cycle
    #:cycle-context
    #:with-cycle
    #:state>
@@ -151,10 +152,10 @@ Side-effects: None (pure data struct).
    STATE can be an application-state or a plist.")
   (:method ((state list) (path list) &optional default)
     "Get value from a plist STATE at PATH, returning DEFAULT if not found."
-    (let ((value (getf state (car path) default)))
-      (if (null path)
-          value
-          (if (= 1 (length path ))
+    (if (null path)
+        state
+        (let ((value (getf state (car path) default)))
+          (if (= 1 (length path))
               (or value default)
               (state-get value (cdr path) default))))
     )
@@ -325,6 +326,22 @@ Side-effects: None (pure data struct).
                  (cycle-context-app-state ,ctx-var))
           (nreverse (cycle-context-patches  ,ctx-var))
           (nreverse (cycle-context-commands ,ctx-var)))))))
+
+(defmacro with-read-only-cycle ((ctx-sym initial-app-state &key component-path)
+                                &body body)
+  "Evaluate BODY with a fresh CYCLE-CONTEXT in read-only mode.
+   Returns the updated application state after evaluating BODY.
+   This is similar to `with-cycle`, but does not allow mutations or command registration."
+  (let ((ctx-var (gensym "CTX")))              ; one real lexical var
+    `(let ((,ctx-var (make-cycle-context
+                      :app-state      ,initial-app-state
+                      :component-path (if (listp ,component-path)
+                                          ,component-path
+                                          (list ,component-path)))))
+       (symbol-macrolet ((,ctx-sym ,ctx-var)   ; pleasant short name for caller
+                         (elmtui.update-dsl.api::ctx ,ctx-var))
+         (progn ,@body
+                (cycle-context-app-state ,ctx-var))))))
 
 
 (defmethod state-patch ((state list) patches)
@@ -657,7 +674,7 @@ Side-effects: Mutates app state and pushes PATCH to context.
 
 (defmethod elmtui.update-dsl.api:state-get ((state elmtui.tea-state.state:application-state) (path t)  &optional default)
   "Access value at PATH in application-state, using tea-state get-path."
-  (elmtui.tea-state.api:get-path path state default))
+  (elmtui.tea-state:get-path path state default))
 
 (defmethod elmtui.update-dsl.api:state-set ((state elmtui.tea-state.state:application-state) (path t) value)
   "Set value at PATH in application-state, using tea-state state-set."
@@ -666,22 +683,22 @@ Side-effects: Mutates app state and pushes PATCH to context.
 
 (defmethod elmtui.update-dsl.api:state-patch ((state elmtui.tea-state.state:application-state) patches)
   "Apply PATCHES to application-state using tea-state apply-patches."
-  (elmtui.tea-state.api:apply-patches state
-                                      (mapcar
-                                       (lambda (patch)
-                                         (if (typep patch 'patch)
-                                             (list (elmtui.update-dsl.api::patch-path patch)
-                                                   (elmtui.update-dsl.api::patch-value patch))
-                                             patch))
-                                       patches)))
+  (elmtui.tea-state:apply-patches state
+                                  (mapcar
+                                   (lambda (patch)
+                                     (if (typep patch 'patch)
+                                         (list (elmtui.update-dsl.api::patch-path patch)
+                                               (elmtui.update-dsl.api::patch-value patch))
+                                         patch))
+                                   patches)))
 
 (defmethod elmtui.update-dsl.api:state-observe ((state elmtui.tea-state.state:application-state) key fn)
   "Register observer FN for KEY in application-state."
-  (elmtui.tea-state.api:add-observer state key fn))
+  (elmtui.tea-state:add-observer state key fn))
 
-(defmethod elmtui.update-dsl.api:state-get ((state elmtui.tea-state.state:application-state) (path null) &optional default)
+(defmethod elmtui.update-dsl.api:state-get ((state elmtui.tea-state:application-state) (path null) &optional default)
   "Access root data in application-state."
-  (elmtui.tea-state.api:get-path nil state default))
+  (elmtui.tea-state:get-path nil state default))
 
 (defmethod elmtui.update-dsl.api:state-set ((state elmtui.tea-state.state:application-state) (path null) value)
   "Set root data in application-state."
@@ -691,16 +708,16 @@ Side-effects: Mutates app state and pushes PATCH to context.
 
 (defun with-update-transaction (state name fn)
   "Run FN inside a tea-state transaction named NAME."
-  (elmtui.tea-state.api:with-transaction (state :name name)
+  (elmtui.tea-state:with-transaction (state :name name)
     (funcall fn state)))
 
 (defun undo-update-state (state)
   "Undo last transaction in application-state."
-  (elmtui.tea-state.api:undo state))
+  (elmtui.tea-state:undo state))
 
 (defun redo-update-state (state)
   "Redo last undone transaction in application-state."
-  (elmtui.tea-state.api:redo state))
+  (elmtui.tea-state:redo state))
 
 ;;;; ---------------------------------------------------------------------------
 ;;;;  End Application-State Specializations

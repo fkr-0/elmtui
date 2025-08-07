@@ -5,9 +5,10 @@
                 #:make-tx
                 #:tx-p
                 #:tx-id
+                #:make-state
                 #:tx-name
                 #:tx-changes
-
+                #:make-application-state
                 #:application-state-data
                 #:application-state-log
                 #:application-state-history
@@ -19,7 +20,6 @@
   (:import-from :elmtui.utils #:get-path #:set-path #:as
                 #:copy-hash-table)
   (:export #:application-state
-           #:state-ref
            #:state-set
            #:make-state
            #:get-state))
@@ -138,16 +138,15 @@
 
 ;;;── Factory ──────────────────────────────────────────────────
 (defmethod make-state ((initial hash-table))
-  (let ((app (make-application-state)))
-    (when initial
-      (loop for k being the hash-keys of initial using (hash-value v)
-            do (setf (gethash k (application-state-data app)) v)))
-    app))
+  (elmtui.tea-state.api:make-application-state
+   :data initial))
+
 (defmethod make-state ((initial null))
-  (make-application-state
+  (elmtui.tea-state.api:make-application-state
    :data
    (make-hash-table :test 'equal)))
 
 (defmethod make-state ((initial list))
-  (make-application-state :data
-                          (as :hash-table initial :test 'equal)))
+  (elmtui.tea-state.api:make-application-state
+   :data
+   (as :hash-table initial :test 'equal)))

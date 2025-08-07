@@ -1,13 +1,12 @@
 (uiop:define-package :elmtui.tests.helpers
   (:use :cl :fiveam)
-  (:use :cl :fiveam)
   (:import-from :elmtui.view.dsl #:dsl->ui-node)
   (:import-from :elmtui.view.core #:ui-node #:ui-node-p #:ui-node-type #:ui-node-props #:ui-node-children)
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.ui.defcomponent #:defcomponent)
-  (:import-from :elmtui.state.api #:make-state)
+  (:import-from :elmtui.tea-state #:make-state)
   (:import-from :elmtui.ui.api #:update #:view)
-  (:import-from :elmtui.tea-state.api #:state-ref #:get-path)
+  (:import-from :elmtui.tea-state #:state-ref #:get-path)
   ;; (:import-from :elmtui.tea-state.state  #:get-path)
   (:export #:helpers-tests))
 
@@ -22,12 +21,18 @@
 ;; Test for dsl->ui-node
 (test dsl-ui-node-children-wrapping
   "Test that dsl->ui-node wraps children in individual lists"
-  (let* ((dsl '(:container :id :main
+  (let* ((dsl '(:container :id :main :style (:width 10 :height 10) :classes '("test-class")
                 :children ((:text :id :child1 :content "a")
                            (:text :id :child2 :content "b"))))
-         (app-state (elmtui.state.api:plist-to-application-state  '(:components (:main (:children (:child1 nil :child2 nil)))))))
+         (app-state (elmtui.tea-state.api::plist-to-application-state  '(:components (:main (:children (:child1 nil :child2 nil)))))))
     (let ((ui-node (dsl->ui-node dsl app-state)))
       ;; (list ui-node dsl)))
+      ;; (elmtui.utils:as :styled-ui-node ui-node)
+      ;; (elmtui.view.base-elements:dsl-properties
+      ;; ;; )
+      ;; ui-node
+      ;; )
+      ;; ))
       (let ((children (elmtui.view.api:ui-node-children ui-node)))
         (is (listp children))
         (is (= 2 (length children)))
@@ -41,7 +46,7 @@
 
 (defun test-app-for-state-update (msg state)
   (declare (ignore msg state))
-  (make-instance 'elmtui.state.api:update-result))
+  (make-instance 'elmtui.tea-state:update-result))
 
 (defapplication test-app-for-state
   :initial-state-plist '(:counter 99)
@@ -61,7 +66,7 @@
 ;; Test for defcomponent view
 (defcomponent test-component-for-view-helper ()
   (:state (:message "hello"))
-  (:view (state app-state id-path)
+  (:view (state app-state id-path children)
          ;; (declare (ignore app-state id-path))
          `(:text :content ,(getf state :message "default"))))
 
@@ -69,7 +74,7 @@
 (test defcomponent-view-defaults-to-state
   "Test that defcomponent's view method uses the state by default"
   (let* ((instance (make-instance 'test-component-for-view-helper))
-         (app-state (elmtui.state.api:plist-to-application-state '(:components (:test1 (:message "hello")))))
+         (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:message "hello")))))
          (id-path '(:components :test1))
          (view (view instance app-state :id-path id-path)))
     (cddr view) view;)
@@ -106,7 +111,7 @@
 (test defcomponent-view-honors-custom-view
   "Test that defcomponent's view method uses the custom view"
   (let* ((instance (make-instance 'test-component-for-view-helper))
-         (app-state (elmtui.state.api:plist-to-application-state '(:components (:test1 (:message "custom")))))
+         (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:message "custom")))))
          (id-path '(:components :test1))
          (view (view instance app-state :id-path id-path)))
     ;; (cddr view) view)
@@ -125,9 +130,9 @@
 (test defcomponent-update-merges-patches
   "Test that defcomponent's update method merges patches"
   (let* ((instance (make-instance 'test-component-for-update-helper))
-         (app-state (elmtui.state.api:plist-to-application-state '(:components (:test1 (:count 5)))))
+         (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:count 5)))))
          (id-path '(:components :test1))
          (result (update instance app-state '(:increment) :id-path id-path)))
-    (let ((patches (elmtui.state.api:ur-patches result)))
+    (let ((patches (elmtui.tea-state:ur-patches result)))
       (is (= 1 (length patches)))
       (is (= 6 (second (first patches)))))))

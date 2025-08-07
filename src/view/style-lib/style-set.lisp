@@ -160,9 +160,9 @@
 ;;   (default-style-set)
 ;;   "Default style set containing all default styles.")
 
-(defmethod print-object ((set style-set) stream)
-  "Print a representation of the style-set to the given stream."
-  (format stream "#<STYLE-SET ~A>" (styles-list set)))
+;; (defmethod print-object ((set style-set) stream)
+;;   "Print a representation of the style-set to the given stream."
+;;   (format stream "#<STYLE-SET ~A>" (styles-list set)))
 
 ;;; Fix around-styles to use group-key and apply-after correctly
 (defmethod around-styles ((set style-set))
@@ -265,9 +265,9 @@
   (default-style-set)
   "Default style set containing all default styles.")
 
-(defmethod print-object ((set style-set) stream)
-  "Print a representation of the style-set to the given stream."
-  (format stream "#<STYLE-SET ~A>" (styles-list set)))
+;; (defmethod print-object ((set style-set) stream)
+;;   "Print a representation of the style-set to the given stream."
+;;   (format stream "#<STYLE-SET ~A>" (styles-list set)))
 
 
 ;;; Fix invert-colors! to use the value-of function correctly

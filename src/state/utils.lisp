@@ -69,23 +69,7 @@
 ;;   (if (member :children args)
 ;;       (let ((v (getf  args :children)))
 ;;         (remove :children (remove v args))))) ;:key #'car :test #'eq)))
-(defun split-props/children (args)
-  "Splits a list of arguments into properties (a plist) and children.
-   Keyword arguments are considered properties. Anything else is a child.
-   The special :children property overrides positional children."
-  (let ((props '())
-        (children '())
-        (arg-list args))
-    (loop while (and arg-list (keywordp (car arg-list)))
-          do
-             (push (pop arg-list) props)
-             (push (pop arg-list) props))
-    (setf props (nreverse props))
-    (setf children arg-list)
-    (let ((explicit-children (getf props :children)))
-      (if explicit-children
-          (values (alexandria:remove-from-plist props :children) explicit-children)
-          (values props children)))))
+
 ;; (defun split-props/children (args)
 ;;   "Splits a list of arguments into properties (a plist) and children.
 ;;    The special :children property overrides positional children."
@@ -132,6 +116,7 @@
 ;;             (values (subseq args 0 (1- split-pos)) (subseq args (1- split-pos))))
 ;;         (values args nil))))
 ;; (split-props/children '(:width 100 :height 200 :children (:child1 :child2)))
+
 (defun %empty-container-p (obj)
   "Predicate used by REMOVE-PATH to decide whether to prune a branch."
   (typecase obj

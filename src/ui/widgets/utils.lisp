@@ -43,7 +43,7 @@
    WIDGET-ID: The ID of the widget to check.
 
    Returns t if the widget has focus, nil otherwise."
-  (eq widget-id (get-current-focus app-state)))
+  (eql widget-id (get-current-focus app-state)))
 
 (defmacro with-widget-model ((var app-state widget-id &optional model-path) &body body)
   "Binds VAR to the widget model retrieved from app-state and executes BODY.
@@ -57,9 +57,9 @@
     `(let* ((,app-state-sym ,app-state)
             (,widget-id-sym ,widget-id)
             (,var (get-widget-model ,app-state-sym ,widget-id-sym ,model-path))
-            ;; (is-focused (widget-focused-p ,app-state-sym ,widget-id-sym))
+            (is-focused (widget-focused-p ,app-state-sym ,widget-id-sym))
             )
-       ;; (declare (ignorable is-focused))
+       (declare (ignorable is-focused))
        ,@body)))
 
 (defmacro defwidget-view

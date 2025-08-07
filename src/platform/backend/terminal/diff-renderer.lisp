@@ -212,7 +212,7 @@ Optimizes by batching contiguous character updates with the same style."
 
     (loop for r from 0 below height do
       (let ((current-batch nil)) ; To hold (:type :write-chars :row r :start-col c :chars string :style s)
-        (log-info "BUFFER DIFF: Processing row ~A" r)
+        ;; (log-info "BUFFER DIFF: Processing row ~A" r)
         (loop for c from 0 below width do
           (incf (rendering-stats-cells-compared *current-rendering-stats*))
           (let ((front-cell (buffer-cell-at front-buffer r c))
@@ -245,7 +245,7 @@ Optimizes by batching contiguous character updates with the same style."
             (incf (rendering-stats-diff-batches-created *current-rendering-stats*))))))
     (log-info "BUFFER DIFF: Cells compared - Equal: ~A, Different: ~A" equal-count diff-count)
     (log-info "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
-    (log-info "BUFFER DIFF: Final diff-ops: ~A" diff-ops)
+    ;; (log-info "BUFFER DIFF: Final diff-ops: ~A" diff-ops)
     (log-info "RENDERING STATS (diff): Compared=~A, Changed=~A, Batches=~A, FullRedraws=~A"
               (rendering-stats-cells-compared *current-rendering-stats*)
               (rendering-stats-cells-changed *current-rendering-stats*)
@@ -261,11 +261,12 @@ Optimizes by batching contiguous character updates with the same style."
     (log-info "~A: Buffer size: ~Ax~A (showing ~Ax~A sample)"
               message (buffer-width buffer) (buffer-height buffer) width height)
 
-    (loop for r from 0 below height do
-      (log-info "~A: Row ~A styles:" message r)
-      (let ((row-styles (loop for c from 0 below width
-                              collect (buffer-cell-style (buffer-cell-at buffer r c)))))
-        (log-info "~A:   ~S" message row-styles)))))
+    ;; (loop for r from 0 below height do
+    ;;   (log-info "~A: Row ~A styles:" message r)
+    ;;   (let ((row-styles (loop for c from 0 below width
+    ;;                           collect (buffer-cell-style (buffer-cell-at buffer r c)))))
+    ;;     (log-info "~A:   ~S" message row-styles)))
+    ))
 
 (defun debug-buffer-diff (front-buffer back-buffer)
   "Print detailed buffer comparison for debugging."
@@ -287,13 +288,15 @@ Optimizes by batching contiguous character updates with the same style."
                   (type-of first-front-style) (type-of first-back-style))
 
         ;; Check each key-value pair
-        (loop for slot-def in (sb-mop:class-slots (class-of first-front-style))
-              do (let* ((slot-name (sb-mop:slot-definition-name slot-def))
-                        (front-v (slot-value first-front-style slot-name))
-                        (back-v (slot-value first-back-style slot-name)))
-                   (log-info "Slot ~S: Front=~S, Back=~S, Equal=~A, Type equal=~A"
-                             slot-name front-v back-v (equal front-v back-v)
-                             (eq (type-of front-v) (type-of back-v)))))))))
+        ;; (loop for slot-def in (sb-mop:class-slots (class-of first-front-style))
+        ;;       do (let* ((slot-name (sb-mop:slot-definition-name slot-def))
+        ;;                 (front-v (slot-value first-front-style slot-name))
+        ;;                 (back-v (slot-value first-back-style slot-name)))
+        ;;            ;; (log-info "Slot ~S: Front=~S, Back=~S, Equal=~A, Type equal=~A"
+        ;;            ;;           slot-name front-v back-v (equal front-v back-v)
+        ;;            ;;           (eq (type-of front-v) (type-of back-v)))
+        ;;            ))
+        ))))
 
 ;; Add helper function to modify the apply-terminal-diff function for better debugging
 (defun safe-equalp (a b)
@@ -303,7 +306,8 @@ Optimizes by batching contiguous character updates with the same style."
         (when (and (not result)
                    (or (and (listp a) (listp b))
                        (and (vectorp a) (vectorp b))))
-          (log-info "SAFE-EQUALP: Comparison failed between: ~S and ~S" a b))
+          ;; (log-info "SAFE-EQUALP: Comparison failed between: ~S and ~S" a b)
+          )
         result)
     (error (e)
       (log-error "SAFE-EQUALP: Error comparing ~S and ~S: ~A" a b e)
@@ -358,8 +362,8 @@ TERMINAL-OFFSET-ROW/COL shift the canvas so its (0,0) lands on the terminal."
         (stream (terminal-instance-stream backend-instance))
         (last-row -1))
 
-    (log:debug "APPLY-DIFF: offset (~A,~A) initial-style=~S ops=~A"
-               terminal-offset-row terminal-offset-col current-style (length diff-ops))
+    ;; (log:debug "APPLY-DIFF: offset (~A,~A) initial-style=~S ops=~A"
+    ;;            terminal-offset-row terminal-offset-col current-style (length diff-ops))
 
     (dolist (op diff-ops)
       (incf (rendering-stats-ops-processed *current-rendering-stats*))

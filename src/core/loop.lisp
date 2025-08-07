@@ -21,10 +21,10 @@
   (:import-from :elmtui.core.event-channels
                 #:event-channel #:handlers #:name #:channel-of #:wait-for-event
                 #:standard-event-channels)
-  (:import-from :elmtui.state.update ; Assuming this is the correct package for handle-async-command
+  (:import-from :elmtui.tea-state.update ; Assuming this is the correct package for handle-async-command
                 #:handle-async-command)
   (:import-from :elmtui.app.system-events #:terminalresized-system-event)
-  (:export :start-loop :elm-stop-loop :publish :*event-loop* #:as-plist
+  (:export :start-loop :elm-stop-loop :publish :subscribe :*event-loop* #:as-plist
    :get-event-loop-status :get-event-queue-length :instrument-event-loop
    ;; Make *consumer-thread* accessible for joining in driver.lisp
            :*consumer-thread*))
@@ -79,8 +79,9 @@ as well as the view function for the application.")
   ;; Set the global *app-sender* to this system's publish function
   (setf elmtui.core.globals:*app-sender* #'publish)
   (log-info "LOOP: *app-sender* set to #'elmtui.core.loop:publish (channel system)")
-  (when (or (and (null *consumer-thread*) (not *shutdown-requested*))
-            (not (sb-thread:thread-alive-p *consumer-thread*)))
+  (when (or (null *consumer-thread*)
+            (and  (not *shutdown-requested*))
+            (and *consumer-thread* (not (sb-thread:thread-alive-p *consumer-thread*))))
     (setf *shutdown-requested* nil)
     (setf *consumer-thread*
           (bt:make-thread #'event-consumer-loop :name "elmtui-event-consumer"))
@@ -186,31 +187,35 @@ as well as the view function for the application.")
 
       ;; 2-b compound events (lists)
       (otherwise
-       (destructuring-bind  (tag &rest payload) event*
-         (case tag
-           ;; (1) terminal resize = forward WHOLE event
-           (:terminal-resized
-            (log-info "Routing :terminal-resized ~S to *app-message-processor*" payload)
-            (if elmtui.core.globals:*app-message-processor*
-                (funcall elmtui.core.globals:*app-message-processor* event*)
-                (log-error "*app-message-processor* not set—cannot process resize: ~S" payload)))
+       (if (typep event* 'elmtui.core.event-types:key-event)
+           (if elmtui.core.globals:*app-message-processor*
+               (funcall elmtui.core.globals:*app-message-processor* event*)
+               (log-error "*app-message-processor* not set—cannot process key-event: ~S" event*))
+           (destructuring-bind (tag &rest payload) event*
+             (case tag
+               ;; (1) terminal resize = forward WHOLE event
+               (:terminal-resized
+                (log-info "Routing :terminal-resized ~S to *app-message-processor*" payload)
+                (if elmtui.core.globals:*app-message-processor*
+                    (funcall elmtui.core.globals:*app-message-processor* event*)
+                    (log-error "*app-message-processor* not set—cannot process resize: ~S" payload)))
 
-           ;; (2) application message = forward first payload element
-           (:app-message
-            (let ((msg (first payload)))
-              (log-info "Routing :app-message ~S to *app-message-processor*" msg)
-              (if elmtui.core.globals:*app-message-processor*
-                  (funcall elmtui.core.globals:*app-message-processor* msg)
-                  (log-error "*app-message-processor* not set—cannot process: ~S" msg))))
+               ;; (2) application message = forward first payload element
+               (:app-message
+                (let ((msg (first payload)))
+                  (log-info "Routing :app-message ~S to *app-message-processor*" msg)
+                  (if elmtui.core.globals:*app-message-processor*
+                      (funcall elmtui.core.globals:*app-message-processor* msg)
+                      (log-error "*app-message-processor* not set—cannot process: ~S" msg))))
 
-           ;; (3) async commands
-           ((:async :async-task :cmd-async :recurring-task)
-            (log-debug "Handling async command ~S" event*)
-            (handle-async-command event* elmtui.core.globals:*app-state*))
+               ;; (3) async commands
+               ((:async :async-task :cmd-async :recurring-task)
+                (log-debug "Handling async command ~S" event*)
+                (handle-async-command event* elmtui.core.globals:*app-state*))
 
-           ;; (4) fallback
-           (otherwise
-            (log-warn "Unknown event tag ~S on channel ~S" tag channel-name))))))
+               ;; (4) fallback
+               (otherwise
+                (log-warn "Unknown event tag ~S on channel ~S" tag channel-name)))))))
 
     ;; ─── phase 3 ─ accounting ────────────────────────────────────
     (let* ((ms (/ (* (- (get-internal-real-time) start-time) 1000.0)
@@ -318,6 +323,21 @@ as well as the view function for the application.")
 ;;                                 :fill-pointer 100 :adjustable t)))
 ;;         (incf (gethash :processed-event-count *event-loop-metrics* 0))
 ;;         (incf (gethash :total-processing-time *event-loop-metrics* 0.0) processing-time-ms))))
+
+(defun subscribe (event-type handler)
+  "Subscribe a HANDLER to a specific EVENT-TYPE.
+   EVENT-TYPE should be a keyword matching a channel name."
+  (let ((channel-obj (find event-type *active-event-channels*
+                           :key #'elmtui.core.event-channels:name
+                           :test #'eq)))
+    (if channel-obj
+        (progn
+          (pushnew handler (elmtui.core.event-channels:handlers channel-obj))
+          (log-info "SUBSCRIBE: Handler ~S subscribed to ~S." handler event-type)
+          t)
+        (progn
+          (log-warn "SUBSCRIBE: Channel for event type ~S not found." event-type)
+          nil))))
 
 (defun elm-stop-loop ()
   "Gracefully stop the event loop and consumer thread."

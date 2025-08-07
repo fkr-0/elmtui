@@ -13,9 +13,9 @@
   (:use :cl :log4cl)
   (:import-from :elmtui.view.api
                 #:stylable-id) ; Only import what's actually there
-  (:import-from :elmtui.core.keymap.event-integration
-                #:handle-key-event
-                #:handle-key-binding)
+  ;; (:import-from :elmtui.core.keymap.event-integration
+  ;;               #:handle-key-event
+  ;;               #:handle-key-binding)
   (:import-from :elmtui.view.position ; Import from our new module
                 #:element-position
                 #:make-element-position
@@ -35,8 +35,6 @@
                 #:element-grid-coordinates-col-span
                 #:direction-to-position
                 #:find-nearest-in-direction)
-  (:import-from :elmtui.core.event-compat
-                #:normalize-event)
   (:import-from :elmtui.core.event-types
                 #:key-event
                 #:key-event-p
@@ -48,29 +46,33 @@
                 #:state-ref
                 #:application-state)
   ;; Imports for keymap integration (from legacy focus-integration.lisp)
-  (:import-from :elmtui.core.keymap
-   :key-event->normalized-key
-                :normalized-key-key      ; Added for handle-default-navigation-keys
-   :normalized-key-modifiers ; Added for handle-default-navigation-keys
-                :keymap-bindings         ; Added for list-active-keybindings
-   :normalized-key->string  ; Added for list-active-keybindings
-   )
-  (:import-from :elmtui.core.keymap.registry
-   :lookup-key-binding
-                :resolve-keymap-reference
-   :current-context
-                :define-keymap-context
-   :keymap-context-name
-                :add-keymap-to-context
+  (:import-from :elmtui.keymaps
+   #:key-event->normalized-key
+   #:keymap-context-name
+   #:deactivate-context
+   #:activate-context
+   :normalized-key-key      ; Added for handle-default-navigation-keys
+                :normalized-key-modifiers ; Added for handle-default-navigation-keys
+   :keymap-bindings         ; Added for list-active-keybindings
+                :normalized-key->string  ; Added for list-active-keybindings
    :keymap-context
-                :keymap-context-keymaps
-   :keymap-context-parent
-                :make-keymap-context
-   :keymap-context-parents ; Corrected from keymap-context-keymaps (potential typo in legacy)
-                :find-context
-   :activate-context
-                :deactivate-context
-   :*global-keymap-context*)
+                :current-context
+   :lookup-binding
+                :*global-keymap-context*
+   :*registry*
+                :*contexts*
+   :*active-contexts*
+                :add-keybinding
+   :resolve-keymap-reference
+   :make-keymap-context
+   :add-keymap-to-context
+   :find-context
+
+
+   :keymap-context-keymaps
+                :keymap-context-parent
+
+                )
   (:import-from :elmtui.core.event-async
    :dispatch-event-async) ; Added for handle-key-binding
 
@@ -609,7 +611,7 @@
       (let ((focused-element (focus-manager-current-focus focus-manager))
             (keymap-context (current-context))
             (normalized-key-modifiers (normalized-key-modifiers normalized-key))
-            (binding (lookup-key-binding normalized-key)))
+            (binding (lookup-binding normalized-key)))
         (log-debug "component-id: ~A Key event: ~A, normalized: ~A, binding: ~A" component-id key-event normalized-key binding )
         (log-debug "Keymap context: ~A modifiers: ~A focused ~A" keymap-context normalized-key-modifiers focused-element)
         (when binding
@@ -638,7 +640,9 @@
    and expects app-state for context when calling set-focus or other operations
    that might interact with the broader application state (e.g., component-gained/lost-focus hooks).
    It returns T if a message was handled and resulted in a change, NIL otherwise."
-  (let ((normalized-message (if (listp message) message (normalize-event message))))
+  (let ((normalized-message (if (listp message) message
+                                (et.keymaps:key-event->normalized-key message))))
+
     (if (not (listp normalized-message))
         nil ; Not a list-based message
         (let ((msg-type (first normalized-message))
@@ -755,7 +759,7 @@
     (when active-context
       (log-debug "Handling key event for component ~A in context ~A" current-focus-id (keymap-context-name active-context))
       (let* ((normalized-key (key-event->normalized-key key-event))
-             (binding (when normalized-key (lookup-key-binding normalized-key)))) ;; active-context)))) ; Lookup in specific context
+             (binding (when normalized-key (lookup-binding normalized-key)))) ; Lookup in specific context
         (when binding
           (handle-key-binding binding :app-state app-state))))))
 

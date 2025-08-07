@@ -3,12 +3,13 @@
   ;; State Management
   ;; UI Utilities
   (:export #:ensure-list
-    #:copy-hash-table
-    #:as
-    #:get-path #:set-path
-    #:parse-plist-and-children
-    #:remove-path #:ensure-keyword
-    #:coerce-fn #:hex-str-to-rgb))
+           #:copy-hash-table
+           #:split-props/children
+           #:as
+           #:get-path #:set-path
+           #:parse-plist-and-children
+           #:remove-path #:ensure-keyword
+           #:coerce-fn #:hex-str-to-rgb))
 
 
 (in-package :elmtui.utils)
@@ -18,10 +19,10 @@
    If X is already a list, returns it unchanged."
   (declare (type t x))
   (if (null x)
-    nil
-    (if (listp x)
-      x
-      (list x))))
+      nil
+      (if (listp x)
+          x
+          (list x))))
 
 (defun ensure-keyword (val)
   "Converts the value to a keyword. Strings are upcased.
@@ -35,21 +36,21 @@ Useful for ensuring path segments are keywords."
 (defun hex-str-to-rgb (hex-str)
   "Convert a hex color string (e.g., #RRGGBB) to a list of RGB integers."
   (when (and (stringp hex-str)
-          (string= (subseq hex-str 0 1) "#")
-          (= (length hex-str) 7))
+             (string= (subseq hex-str 0 1) "#")
+             (= (length hex-str) 7))
     (let ((r (parse-integer (subseq hex-str 1 3) :radix 16))
-           (g (parse-integer (subseq hex-str 3 5) :radix 16))
-           (b (parse-integer (subseq hex-str 5 7) :radix 16)))
+          (g (parse-integer (subseq hex-str 3 5) :radix 16))
+          (b (parse-integer (subseq hex-str 5 7) :radix 16)))
       (list r g b))))
 (defun coerce-fn (v)
   "Coerce V to a symbol or lambda form."
   (cond ((symbolp v) `',v) ; Quote symbol for later evaluation
-    ((and (consp v) (eq (car v) 'lambda)) `',v) ; Quote lambda form to store as cons
-    ;; ((null v)
-    ;;  (if err-on-nil
-    ;;      (error "DEFAPPLICATION: :subscriptions-fn cannot be NIL")
-    ;;      ''(lambda (model) (declare (ignore model)) nil)))
-    ))
+        ((and (consp v) (eq (car v) 'lambda)) `',v) ; Quote lambda form to store as cons
+        ;; ((null v)
+        ;;  (if err-on-nil
+        ;;      (error "DEFAPPLICATION: :subscriptions-fn cannot be NIL")
+        ;;      ''(lambda (model) (declare (ignore model)) nil)))
+        ))
 
 
 
@@ -344,26 +345,26 @@ Useful for ensuring path segments are keywords."
    or DEFAULT when the key is absent."
   (etypecase container
     (hash-table
-      (multiple-value-bind (val presentp) (gethash key container)
-        (if presentp val default)))
+     (multiple-value-bind (val presentp) (gethash key container)
+       (if presentp val default)))
     ;; treat *any* proper list as a plist first and fall back to alist
     (null default)
     (list
-      (if (= 0 (length container))
-        default
-        (let ((plist-val (getf container key :+|not-found|+)))
-          (if (not (eq plist-val :+|not-found|+))
-            plist-val
-            (let ((pair (assoc key container :test #'equal)))
-              (if pair (cdr pair) default))))))
+     (if (= 0 (length container))
+         default
+         (let ((plist-val (getf container key :+|not-found|+)))
+           (if (not (eq plist-val :+|not-found|+))
+               plist-val
+               (let ((pair (assoc key container :test #'equal)))
+                 (if pair (cdr pair) default))))))
 
     ))
 
 (defun %plist-set (plist key value)
   (let ((pos (position key plist :test #'equal)))
     (if pos
-      (progn (setf (nth (1+ pos) plist) value) plist)
-      (append plist (list key value)))))
+        (progn (setf (nth (1+ pos) plist) value) plist)
+        (append plist (list key value)))))
 
 (defun %set-entry (container key value)
   "Store VALUE at KEY in CONTAINER and return *new* container when needed."
@@ -379,27 +380,27 @@ Useful for ensuring path segments are keywords."
   (cond
     ;; ─ hash-table ------------------------------------------------------
     ((%hash-table-p container)
-      (multiple-value-bind (val presentp) (gethash key container)
-        (declare (ignore val))
-        (when presentp (remhash key container))
-        (values container presentp)))
+     (multiple-value-bind (val presentp) (gethash key container)
+       (declare (ignore val))
+       (when presentp (remhash key container))
+       (values container presentp)))
 
     ;; ─ proper list (try plist first, then alist) -----------------------
     ((listp container)
-      ;; —— 1. plist path: (:k v :l w …)
-      (loop with out = '() and foundp = nil
-        for (k v) on container by #'cddr
-        do (if (equal k key)
-             (setf foundp t)                 ; skip the pair
-             (setf out (list* v k out)))
-        finally (return
-                  (if foundp
-                    (values (nreverse out) t)
-                    ;; —— 2. alist path: ((k . v) …)
-                    (let* ((pair (assoc key container :test #'equal)))
-                      (if pair
-                        (values (remove pair container :test #'equal) t)
-                        (values container nil)))))))
+     ;; —— 1. plist path: (:k v :l w …)
+     (loop with out = '() and foundp = nil
+           for (k v) on container by #'cddr
+           do (if (equal k key)
+                  (setf foundp t)                 ; skip the pair
+                  (setf out (list* v k out)))
+           finally (return
+                     (if foundp
+                         (values (nreverse out) t)
+                         ;; —— 2. alist path: ((k . v) …)
+                         (let* ((pair (assoc key container :test #'equal)))
+                           (if pair
+                               (values (remove pair container :test #'equal) t)
+                               (values container nil)))))))
 
     (t (values container nil))))
 
@@ -416,37 +417,37 @@ are discarded recursively."
   (etypecase path
     ;; ─── leaf ----------------------------------------------------------
     (symbol
-      (%remove-entry data path))
+     (%remove-entry data path))
 
     ;; ─── list / interior ----------------------------------------------
     (cons
-      (destructuring-bind (key . rest) path
-        (if (null rest)
-          (%remove-entry data key)                     ; single‑element list ⇒ leaf
-          (let ((child (%get-entry key data nil)))
-            (if (null child)                           ; nothing down there
-              (values data nil)
-              (multiple-value-bind (new-child removedp)
-                (remove-path child rest :prune-empty prune-empty)
-                (if (not removedp)                   ; untouched branch
-                  (values data nil)
-                  (let ((child-empty (%empty-container-p new-child)))
-                    (cond
-                      ;; drop branch completely
-                      ((and prune-empty child-empty)
-                        (multiple-value-bind (data* _) (%remove-entry data key)
-                          (declare (ignore _))
-                          (values data* t)))
-                      ;; keep empty shell (make same type)
-                      (child-empty
-                        (values (%set-entry data key
-                                  (typecase child
-                                    (hash-table (make-hash-table :test 'equal))
-                                    (t nil)))
-                          t))
-                      ;; updated, non‑empty child
-                      (t
-                        (values (%set-entry data key new-child) t)))))))))))
+     (destructuring-bind (key . rest) path
+       (if (null rest)
+           (%remove-entry data key)                     ; single‑element list ⇒ leaf
+           (let ((child (%get-entry key data nil)))
+             (if (null child)                           ; nothing down there
+                 (values data nil)
+                 (multiple-value-bind (new-child removedp)
+                     (remove-path child rest :prune-empty prune-empty)
+                   (if (not removedp)                   ; untouched branch
+                       (values data nil)
+                       (let ((child-empty (%empty-container-p new-child)))
+                         (cond
+                           ;; drop branch completely
+                           ((and prune-empty child-empty)
+                            (multiple-value-bind (data* _) (%remove-entry data key)
+                              (declare (ignore _))
+                              (values data* t)))
+                           ;; keep empty shell (make same type)
+                           (child-empty
+                            (values (%set-entry data key
+                                                (typecase child
+                                                  (hash-table (make-hash-table :test 'equal))
+                                                  (t nil)))
+                                    t))
+                           ;; updated, non‑empty child
+                           (t
+                            (values (%set-entry data key new-child) t)))))))))))
     (t (values data nil))))
 
 (defun %empty-container-p (obj)
@@ -467,30 +468,30 @@ PATH is either a symbol/keyword (single level) or a proper list."))
 
 (defmethod get-path ((path list) data &optional default)
   (if (or (null path) (equal path '(nil)) (= 0 (length path)))
-    data
-    (let ((next (%get-entry (car path) data default)))
-      (if (eq next default)
-        default
-        (get-path (cdr path) next default)))))
+      data
+      (let ((next (%get-entry (car path) data default)))
+        (if (eq next default)
+            default
+            (get-path (cdr path) next default)))))
 
 (defun set-path (data path value &key (createp t))
   "Store VALUE at PATH inside DATA, creating intermediate nodes when CREATEP."
   (etypecase path
     (symbol (%set-entry data path value))
     (list
-      (if (= 1 (length path))
-        (%set-entry data (car path) value)
-        (let* ((key  (car path))
+     (if (= 1 (length path))
+         (%set-entry data (car path) value)
+         (let* ((key  (car path))
                 (rest (cdr path))
                 (child (%get-entry key data nil)))
-          (when (and (null child) (not createp))
-            (error "Missing node ~S in path ~S and :CREATEP is NIL" key path))
-          (let* ((child* (or child
-                           (if key
-                             (make-hash-table :test 'equal)
-                             value)))
+           (when (and (null child) (not createp))
+             (error "Missing node ~S in path ~S and :CREATEP is NIL" key path))
+           (let* ((child* (or child
+                              (if key
+                                  (make-hash-table :test 'equal)
+                                  value)))
                   (new-child (set-path child* rest value :createp createp)))
-            (%set-entry data key new-child)))))
+             (%set-entry data key new-child)))))
     (t (error "SET-PATH: invalid PATH ~A" path))))
 
 ;; (defun remove-path (data path &key (prune-empty t))
@@ -531,27 +532,27 @@ PATH is either a symbol/keyword (single level) or a proper list."))
 (defmethod as ((enforced-type t) obj &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a keyword, returning DEFAULT if conversion fails."
   (if (keywordp enforced-type)
-    (as (intern (string-upcase (symbol-name enforced-type))) obj :default default :err err)
-    (if (symbolp enforced-type)
-      (if default
-        default
-        (if err
-          (error "Cannot convert ~S to a keyword." obj)
-          nil))
+      (as (intern (string-upcase (symbol-name enforced-type))) obj :default default :err err)
+      (if (symbolp enforced-type)
+          (if default
+              default
+              (if err
+                  (error "Cannot convert ~S to a keyword." obj)
+                  nil))
 
-      (as (if (stringp obj)
-            (intern (string-upcase enforced-type))
-            (intern (string-upcase (format nil "~A" enforced-type))))
-        obj :default default :err err)
-      )))
+          (as (if (stringp obj)
+                  (intern (string-upcase enforced-type))
+                  (intern (string-upcase (format nil "~A" enforced-type))))
+              obj :default default :err err)
+          )))
 
 (defmethod as ((enforced-type (eql 'keyword)) obj &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a keyword, returning DEFAULT if conversion fails."
   (declare (ignore err default))
   (if (keywordp obj) obj
-    (if (symbolp obj)
-      (intern (string-upcase (symbol-name obj)) :keyword)
-      (intern (string-upcase (format nil "~A" obj)) :keyword))))
+      (if (symbolp obj)
+          (intern (string-upcase (symbol-name obj)) :keyword)
+          (intern (string-upcase (format nil "~A" obj)) :keyword))))
 
 ;; (defmethod as ((enforced-type (eql :keyword)) obj &key (default nil) (err nil) &allow-other-keys)
 ;;   "Convert OBJ to a keyword, returning DEFAULT if conversion fails."
@@ -586,8 +587,8 @@ PATH is either a symbol/keyword (single level) or a proper list."))
 (defmethod as ((enforced-type (eql 'plist))  obj &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a property list, returning DEFAULT if conversion fails."
   (if default default
-    (if err (error "Cannot convert ~S to a property list." obj)
-      nil)))
+      (if err (error "Cannot convert ~S to a property list." obj)
+          nil)))
 
 (defmethod as ((enforced-type (eql 'plist))  (obj hash-table) &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a property list, returning DEFAULT if conversion fails."
@@ -599,13 +600,13 @@ PATH is either a symbol/keyword (single level) or a proper list."))
 (defun %alist->plist (alist)
   "Convert an association list to a property list."
   (if (%alist-p alist)
-    (loop for (k . v) in alist
-      collect (as :kw k) collect v)
-    (error "Cannot convert ~S to a property list." alist)))
+      (loop for (k . v) in alist
+            collect (as :kw k) collect v)
+      (error "Cannot convert ~S to a property list." alist)))
 (defun %alist-p (obj)
   "True when OBJ is a proper association list (every element is a dotted pair)."
   (and (listp obj)
-    (every #'consp obj)))
+       (every #'consp obj)))
 (defmethod as ((enforced-type (eql 'plist))  (obj list) &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a property list, returning DEFAULT if conversion fails.
 This method handles conversion to plist for both property lists and association lists.
@@ -614,22 +615,22 @@ Example:
   (as 'plist '(:key1 value1 :key2 value2)) ; returns (:KEY1 value1 :KEY2 value2)
   (as 'plist '((key1 . value1) (key2 . value2))) ; returns (:KEY1 value1 :KEY2 value2)"
   (if (%plist-p obj)
-    obj
-    (if (%alist-p obj)
-      (%alist->plist obj)
-      (if default default
-        (if err (error "Cannot convert ~S to a property list." obj)
-          nil)))))
+      obj
+      (if (%alist-p obj)
+          (%alist->plist obj)
+          (if default default
+              (if err (error "Cannot convert ~S to a property list." obj)
+                  nil)))))
 
 (defmethod as ((enforced-type (eql 'hash-table))  (obj list) &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a hash-table, returning DEFAULT if conversion fails."
   (let ((o (as 'plist obj :default default :err err)))
     (if o
-      (let ((ht (make-hash-table :test 'equal)))
-        (loop for i from 0 below (length o) by 2
-          do (setf (gethash (nth i o) ht) (nth (1+ i) o)))
-        ht)
-      nil)))
+        (let ((ht (make-hash-table :test 'equal)))
+          (loop for i from 0 below (length o) by 2
+                do (setf (gethash (nth i o) ht) (nth (1+ i) o)))
+          ht)
+        nil)))
 
 (defun %plist-p (obj)
   "True when OBJ is a property list.
@@ -637,9 +638,9 @@ Example:
 A property list is a list of alternating keys and values, where keys are keywords or nil, and values are cons cells.
 Example: (:key1 value1 :key2 value2 :key3 (value3a . value3b) :key4 '('a 'b 3))."
   (and (listp obj)
-    (= 0 (mod (length obj) 2))
-    (every (lambda (x)  (keywordp x)) (loop for i from 0 below (length obj) by 2
-                                        collect (nth i obj)))))
+       (= 0 (mod (length obj) 2))
+       (every (lambda (x)  (keywordp x)) (loop for i from 0 below (length obj) by 2
+                                               collect (nth i obj)))))
 
 ;; (defun %alist->plist (alist)
 ;;   "Convert an association list to a property list."
@@ -656,27 +657,27 @@ Example: (:key1 value1 :key2 value2 :key3 (value3a . value3b) :key4 '('a 'b 3)).
 (defmethod as ((enforced-type t) obj &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a keyword, returning DEFAULT if conversion fails."
   (if (keywordp enforced-type)
-    (as (intern (string-upcase (symbol-name :dud))) obj :default default :err err)
-    (if (symbolp enforced-type)
-      (if default
-        default
-        (if err
-          (error (format nil "Cannot convert ~S to a keyword." obj))
-          nil))
+      (as (intern (string-upcase (symbol-name :dud))) obj :default default :err err)
+      (if (symbolp enforced-type)
+          (if default
+              default
+              (if err
+                  (error (format nil "Cannot convert ~S to a keyword." obj))
+                  nil))
 
-      (as (if (stringp obj)
-            (intern (string-upcase enforced-type))
-            (intern (string-upcase (format nil "~A" enforced-type))))
-        obj :default default :err err)
-      )))
+          (as (if (stringp obj)
+                  (intern (string-upcase enforced-type))
+                  (intern (string-upcase (format nil "~A" enforced-type))))
+              obj :default default :err err)
+          )))
 
 (defmethod as ((enforced-type (eql 'keyword)) obj &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a keyword, returning DEFAULT if conversion fails."
   (declare (ignore err default))
   (if (keywordp obj) obj
-    (if (symbolp obj)
-      (intern (string-upcase (symbol-name obj)) :keyword)
-      (intern (string-upcase (format nil "~A" obj)) :keyword))))
+      (if (symbolp obj)
+          (intern (string-upcase (symbol-name obj)) :keyword)
+          (intern (string-upcase (format nil "~A" obj)) :keyword))))
 
 ;; (defmethod as ((enforced-type (eql :keyword)) obj &key (default nil) (err nil) &allow-other-keys)
 ;;   "Convert OBJ to a keyword, returning DEFAULT if conversion fails."
@@ -711,8 +712,8 @@ Example: (:key1 value1 :key2 value2 :key3 (value3a . value3b) :key4 '('a 'b 3)).
 (defmethod as ((enforced-type (eql 'plist))  obj &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a property list, returning DEFAULT if conversion fails."
   (if default default
-    (if err (error (format nil "Cannot convert ~S to a property list." obj))
-      nil)))
+      (if err (error (format nil "Cannot convert ~S to a property list." obj))
+          nil)))
 
 (defmethod as ((enforced-type (eql 'plist))  (obj hash-table) &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a property list, returning DEFAULT if conversion fails."
@@ -733,31 +734,31 @@ Example:
   (as 'plist '(:key1 value1 :key2 value2)) ; returns (:KEY1 value1 :KEY2 value2)
   (as 'plist '((key1 . value1) (key2 . value2))) ; returns (:KEY1 value1 :KEY2 value2)"
   (if (%plist-p obj)
-    obj
-    (if (%alist-p obj)
-      (%alist->plist obj)
-      (if default default
-        (if err (error (format nil "Cannot convert ~S to a property list." obj))
-          nil)))))
+      obj
+      (if (%alist-p obj)
+          (%alist->plist obj)
+          (if default default
+              (if err (error (format nil "Cannot convert ~S to a property list." obj))
+                  nil)))))
 
 (defmethod as ((enforced-type (eql :hash-table))  (obj list) &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a hash-table, returning DEFAULT if conversion fails."
   (let ((o (as 'plist obj :default default :err err)))
     (if o
-      (let ((ht (make-hash-table :test 'equal)))
-        (loop for i from 0 below (length o) by 2
-          do (setf (gethash (nth i o) ht) (nth (1+ i) o)))
-        ht)
-      nil)))
+        (let ((ht (make-hash-table :test 'equal)))
+          (loop for i from 0 below (length o) by 2
+                do (setf (gethash (nth i o) ht) (nth (1+ i) o)))
+          ht)
+        nil)))
 (defmethod as ((enforced-type (eql 'hash-table))  (obj list) &key (default nil) (err nil) &allow-other-keys)
   "Convert OBJ to a hash-table, returning DEFAULT if conversion fails."
   (let ((o (as :plist obj :default default :err err)))
     (if o
-      (let ((ht (make-hash-table :test 'equal)))
-        (loop for i from 0 below (length o) by 2
-          do (setf (gethash (nth i o) ht) (nth (1+ i) o)))
-        ht)
-      nil)))
+        (let ((ht (make-hash-table :test 'equal)))
+          (loop for i from 0 below (length o) by 2
+                do (setf (gethash (nth i o) ht) (nth (1+ i) o)))
+          ht)
+        nil)))
 
 (defun copy-hash-table (ht)
   "Create a shallow copy of the hash table HT."
@@ -765,3 +766,20 @@ Example:
     (maphash (lambda (k v) (setf (gethash k new-ht) v)) ht)
     new-ht))
 ;; == end/path-utils.lisp =====================================================
+(defun split-props/children (args)
+  "Splits a list of arguments into properties (a plist) and children.
+   Keyword arguments are considered properties. Anything else is a child.
+   The special :children property overrides positional children."
+  (let ((props '())
+        (children '())
+        (arg-list args))
+    (loop while (and arg-list (keywordp (car arg-list)))
+          do
+             (push (pop arg-list) props)
+             (push (pop arg-list) props))
+    (setf props (nreverse props))
+    (setf children arg-list)
+    (let ((explicit-children (getf props :children)))
+      (if explicit-children
+          (values (alexandria:remove-from-plist props :children) explicit-children)
+          (values props children)))))

@@ -4,12 +4,16 @@
         :elmtui.ui.api
    :elmtui.ui.widgets.viewport)
   (:import-from :elmtui.utils :ensure-list)
-  (:import-from :elmtui.state.msg
+  (:import-from :elmtui.tea-state :state-ref)
+  (:import-from :elmtui.tea-state.msg
                 #:msg-data #:msg-type)
   (:import-from :elmtui.app.api
                 #:get-component-instance)
   (:import-from :elmtui.app.system-events
-                #:terminalresized-system-event)
+                #:terminalresized-system-event
+                #:cursorpositionchanged-system-event)
+  ;; (:import-from :elmtui.core.event-types
+  ;;               #:key-left #:key-right #:key-up #:key-down)
   (:export #:root-viewport
            #:get-cleanup-info
            #:make-root-viewport
@@ -33,27 +37,23 @@
 ;;; ---------------------------------------------------------------------------
 
 (defclass root-viewport (viewport)
-  () ;; Removed slots: anchor, initial-cursor-row, initial-cursor-col
+  ()
   (:documentation
    "Stateless root viewport component. All mutable attributes (size,
-offsets, scroll-state, anchor, initial cursor position, etc.) are maintained
-in the external application state as *patches* rather than CLOS slots."))
+   offsets, scroll‑state, anchor, initial cursor position, etc.) are maintained
+   in the external application state as *patches* rather than CLOS slots."))
 
 ;;; ---------------------------------------------------------------------------
-;;; Helpers
+;;; Helper functions
 ;;; ---------------------------------------------------------------------------
+
+(defun %clamp (val min max)
+  (max min (min max val)))
 
 (defun compute-anchor-offset (anchor viewport-width viewport-height term-cols term-rows cursor-row cursor-col)
-  "Compute (offset-y, offset-x) for the root-viewport based on anchor, terminal size, viewport size, and cursor position."
+  "Return (offset-y offset-x) for ANCHOR given viewport & terminal geometry."
   (declare (type anchor-type anchor)
            (type (integer 0 *) viewport-width viewport-height term-cols term-rows cursor-row cursor-col))
-  (check-type anchor anchor-type)
-  (check-type viewport-width (integer 0 *))
-  (check-type viewport-height (integer 0 *))
-  (check-type term-cols (integer 0 *))
-  (check-type term-rows (integer 0 *))
-  (check-type cursor-row (integer 0 *))
-  (check-type cursor-col (integer 0 *))
   (ecase anchor
     (:top-left      (values 0 0))
     (:top           (values 0 (floor (- term-cols viewport-width) 2)))
@@ -69,58 +69,33 @@ in the external application state as *patches* rather than CLOS slots."))
     (:bottom-right  (values (- term-rows viewport-height)
                             (- term-cols viewport-width)))
     (:below-cursor  (values (min (1+ cursor-row) (- term-rows viewport-height))
-                            (max 0 (min cursor-col (- term-cols viewport-width)))))
-    (:above-cursor  (values (max 0 (- cursor-row viewport-height))
-                            (max 0 (min cursor-col (- term-cols viewport-width)))))))
+                            (%clamp cursor-col 0 (- term-cols viewport-width))))
+    (:above-cursor  (values (%clamp (- cursor-row viewport-height) 0 (- term-rows viewport-height))
+                            (%clamp cursor-col 0 (- term-cols viewport-width))))) )
 
 (defun compute-view-size (anchor term-cols term-rows cursor-row)
-  "Return three values: width height offset-y."
-  (declare (type anchor-type anchor)
-           (type (integer 0 *) term-cols term-rows cursor-row))
-  (check-type anchor anchor-type)
-  (check-type term-cols (integer 0 *))
-  (check-type term-rows (integer 0 *))
-  (check-type cursor-row (integer 0 *))
+  "Return three values: width height offset-y for ANCHOR variant requiring dynamic height."
   (ecase anchor
-    (:below-cursor (values term-cols (- term-rows cursor-row 1) 0))
-    (:above-cursor (values term-cols cursor-row                 0))
-    ((:top-left :top :top-right
-                :left :center :right
-      :bottom-left :bottom :bottom-right)
-     ;; Full screen; renderer handles offset mapping.
-     (values term-cols term-rows 0))))
+    (:below-cursor (values term-cols (max 1 (- term-rows cursor-row 1)) 0))
+    (:above-cursor (values term-cols (max 1 cursor-row) 0))
+    (t             (values term-cols term-rows 0))) )
 
 (defun child-instance (state id-path)
-  "Return the live child component instance, or NIL when absent.
-   Assumes the child's specification is stored at (append id-path '(:child))
-   and the first element of this spec is the child's ID (a keyword)."
-  (let ((child-spec (get-path (append id-path '(:child))state )))
-    (when (and child-spec (consp child-spec)) ; Ensure spec is a non-nil list
-      (let ((child-id (car child-spec)))
-        ;; Ensure ID is a keyword, which is the convention for component IDs.
-        (when (keywordp child-id)
-          (let ((child-actual-id-path (append id-path (list child-id))))
-            (get-component-instance child-actual-id-path state)))))))
+  "Return the live child component instance, or NIL when absent."
+  (let* ((child-spec (get-path (append id-path '(:child)) state)))
+    (when (and (consp child-spec) (keywordp (car child-spec)))
+      (get-component-instance (append id-path (list (car child-spec))) state))))
 
 ;;; ---------------------------------------------------------------------------
-;;; Instantiation
+;;; Factory
 ;;; ---------------------------------------------------------------------------
 
-;; Removed initialize-instance :after method as it was setting slots that no longer exist.
-;; The :anchor and :initial-cursor-pos initargs to make-instance in make-root-viewport
-;; will be effectively ignored by root-viewport's own make-instance, which is fine,
-;; as the elmtui.ui.api:init method is responsible for setting these values in the app state.
-
-(defun make-root-viewport (id
-                           &key (anchor :below-cursor)
-                             (initial-cursor-pos '(0 . 0)))
-  "Convenience factory. Creates a root-viewport instance with the given ID.
-   Anchor and initial cursor position are configured via the 'init' method."
-  (declare (ignore anchor initial-cursor-pos)) ; These are handled by the init method
+(defun make-root-viewport (id &key (anchor :below-cursor) (initial-cursor-pos '(0 . 0)))
+  (declare (ignore anchor initial-cursor-pos))
   (make-instance 'root-viewport :id id))
 
 ;;; ---------------------------------------------------------------------------
-;;; API – INIT
+;;; INIT – sets up stub state until first terminal & cursor info arrive
 ;;; ---------------------------------------------------------------------------
 
 (defmethod elmtui.ui.api:init ((component root-viewport)
@@ -129,178 +104,186 @@ in the external application state as *patches* rather than CLOS slots."))
                                  initial-cursor-pos
                                  initial-child-spec
                                  dsl)
-  "Return a *patch list* describing the component’s initial state."
-  (declare (type list id-path initial-terminal-dimensions initial-cursor-pos)
-           (type (or null list) initial-child-spec dsl))
-  (check-type id-path list)
-  (check-type initial-terminal-dimensions (cons (integer 0 *) (cons (integer 0 *) null)))
-  (check-type initial-cursor-pos (cons (integer 0 *) (cons (integer 0 *) null)))
-
   (let* ((anchor (or (getf (getf dsl :props) :anchor) :below-cursor))
-         (term-cols (first initial-terminal-dimensions))
-         (term-rows (second initial-terminal-dimensions))
-         (cursor-c (first initial-cursor-pos))
-         (cursor-r (second initial-cursor-pos))
-         (size-uninitialized (or (zerop term-cols) (zerop term-rows)))
-         (patches nil)
-         (commands nil))
+         (term-cols (or (first initial-terminal-dimensions) 0))
+         (term-rows (or (second initial-terminal-dimensions) 0))
+         (cursor-c  (or (first initial-cursor-pos) 0))
+         (cursor-r  (or (second initial-cursor-pos) 0))
+         (size-known (and (> term-cols 0) (> term-rows 0)))
+         (pos-known  (and (> cursor-c 0)  (> cursor-r 0)))
+         (width  (if size-known term-cols 1))
+         (height (if size-known term-rows 1))
+         (offset-x 0)
+         (offset-y 0))
 
-    (log4cl:log-debug "Initializing root-viewport with ID ~A, anchor ~A, term-size ~Ax~A, cursor ~A"
-                      (car id-path) anchor term-cols term-rows initial-cursor-pos)
+    ;; If both size and cursor pos known compute offsets immediately
+    (when (and size-known pos-known)
+      (multiple-value-setq (offset-y offset-x)
+        (compute-anchor-offset anchor width height term-cols term-rows cursor-r cursor-c)))
 
-    (multiple-value-bind (computed-width computed-height computed-offset-y computed-offset-x)
-        (if size-uninitialized
-            (values 1 1 0 0) ; Default to 1x1 if terminal size is unknown
-            (if (member anchor '(:above-cursor :below-cursor))
-                (multiple-value-bind (w h oy) (compute-view-size anchor term-cols term-rows cursor-r)
-                  (values w h oy cursor-c))
-                (multiple-value-bind (offset-y offset-x)
-                    (compute-anchor-offset anchor term-cols term-rows term-cols term-rows cursor-r cursor-c)
-                  (values term-cols term-rows offset-y offset-x))))
-
-      (log4cl:log-debug "Computed viewport size: width ~A, height ~A, offset-x ~A, offset-y ~A"
-                        computed-width computed-height computed-offset-x computed-offset-y)
-      (setf patches
-            (list
+    (values component
+            (list ;; component registration
              (list (append id-path '(:type)) :root-viewport)
-             (list (append id-path '(:state :width)) computed-width)
-             (list (append id-path '(:state :height)) computed-height)
-             (list (append id-path '(:state :offset-x)) computed-offset-x)
-             (list (append id-path '(:state :offset-y)) computed-offset-y)
+             ;; geometry
+             (list (append id-path '(:state :width))  width)
+             (list (append id-path '(:state :height)) height)
+             (list (append id-path '(:state :offset-x)) offset-x)
+             (list (append id-path '(:state :offset-y)) offset-y)
+             ;; flags/metadata
              (list (append id-path '(:state :anchor)) anchor)
-             (list (append id-path '(:state :initial-cursor-pos)) initial-cursor-pos)
-             (list (append id-path '(:state :terminal-size)) initial-terminal-dimensions)
-             (list (append id-path '(:state :size-uninitialized)) size-uninitialized)
+             (list (append id-path '(:state :terminal-size)) (list term-cols term-rows))
+             (list (append id-path '(:state :cursor-pos))  (list cursor-c cursor-r))
+             (list (append id-path '(:state :size-known))  size-known)
+             (list (append id-path '(:state :pos-known))   pos-known)
              (list (append id-path '(:state :child-dsl-spec)) initial-child-spec)
-             (list (append id-path '(:state :dsl)) dsl))))
-
-    (values component patches commands)))
-
-;;; ---------------------------------------------------------------------------
-;;; API – UPDATE
-;;; ---------------------------------------------------------------------------
-
-(defmethod elmtui.ui.api:update ((component root-viewport)
-                                 message state
-                                 &key id-path)
-  "Handle :terminal-resized plus delegate all other messages downward."
-  (declare (type list id-path) (type t state message))
-  (check-type id-path list)
-  (log-info "ROOT-VIEWPORT>Update: ~A ~A" state message)
-  (flet ((patch (subkey value)
-           `(,(append id-path subkey) ,value)))
-    (let ((own-patches
-            (case (msg-type message)
-              (:terminalresized
-               (let ((width (msg-data message :width))
-                     (height (msg-data message :height)))
-                 (log-info "ROOT-VIEWPORT>Update: Terminal resized to ~A x ~A" width height)
-                 (when (and width height)
-                   (let* ((term-cols width)
-                          (term-rows height)
-                          (anchor (get-path (append id-path '(:state :anchor)) state))
-                          (initial-cursor-pos (get-path (append id-path '(:state :initial-cursor-pos)) state))
-                          (cursor-c (or (first initial-cursor-pos) 0))
-                          (cursor-r (or (second initial-cursor-pos) 0))
-                          (new-width term-cols)
-                          (new-height (nth-value 1 (compute-view-size anchor term-cols term-rows cursor-r)))
-                          (offsets (multiple-value-list
-                                    (compute-anchor-offset anchor new-width new-height
-                                                           term-cols term-rows
-                                                           cursor-r cursor-c))))
-                     (list (patch '(:state :width) new-width)
-                           (patch '(:state :height) new-height)
-                           (patch '(:state :offset-y) (first offsets))
-                           (patch '(:state :offset-x) (second offsets))
-                           (patch '(:state :terminal-size) (list term-cols term-rows))
-                           (patch '(:state :size-uninitialized) nil))))))
-              (t
-               (log-info "ROOT-VIEWPORT>Update: message not matched. ~S" message)
-               nil))))
-      (let ((child (child-instance state id-path)))
-        (if child
-            (multiple-value-bind (child-patches child-commands)
-                (elmtui.ui.api:update child message state
-                                      :id-path (append id-path
-                                                       (list (slot-value child 'id))))
-              (values (nconc own-patches child-patches) child-commands))
-            (values own-patches nil nil))))))
-                                        ;(elmtui.state.api:ur-handled )))))
+             (list (append id-path '(:state :dsl)) dsl))
+            nil)))
 
 ;;; ---------------------------------------------------------------------------
-;;; API – VIEW
+;;; UPDATE – handle terminal/cursor updates & arrow‑key scrolling
 ;;; ---------------------------------------------------------------------------
 
+(defmethod elmtui.ui.api:update ((component root-viewport) message state &key id-path)
+  (log-info "ROOT-UPDATE: ~A ~A"
+            (msg-type message) (msg-data message))
+  (flet ((patch (subkey value) `(,(append id-path subkey) ,value)))
+    (let* ((st-path (append id-path '(:state)))
+           (anchor   (get-path (append st-path '(:anchor)) state))
+           (term-size (get-path (append st-path '(:terminal-size)) state '(0 0)))
+           (cursor-pos (get-path (append st-path '(:cursor-pos)) state '(0 0)))
+           (width  (get-path (append st-path '(:width)) state 1))
+           (height (get-path (append st-path '(:height)) state 1))
+           (offset-x (get-path (append st-path '(:offset-x)) state 0))
+           (offset-y (get-path (append st-path '(:offset-y)) state 0))
+           (own-patches nil))
+
+      (case (msg-type message)
+        ;; -------------------------------------------------------------------
+        (:terminalresized
+         (let* ((cols (msg-data message :width))
+                (rows (msg-data message :height)))
+           (when (and cols rows (> cols 0) (> rows 0))
+             (setf term-size (list cols rows)
+                   width cols height rows)
+             ;; recompute offset if we already know cursor position
+             (when (get-path (append st-path '(:pos-known)) state)
+               (multiple-value-bind (new-oy new-ox)
+                   (compute-anchor-offset anchor width height cols rows (second cursor-pos) (first cursor-pos))
+                 (setf offset-x new-ox offset-y new-oy)
+                 (push (patch '(:offset-x) offset-x) own-patches)
+                 (push (patch '(:offset-y) offset-y) own-patches)))
+             (push (patch '(:terminal-size) term-size) own-patches)
+             (push (patch '(:width) width) own-patches)
+             (push (patch '(:height) height) own-patches)
+             (push (patch '(:size-known) t) own-patches))))
+        ;; -------------------------------------------------------------------
+        (:cursorpositionchanged
+         (let ((c (msg-data message :col))
+               (r (msg-data message :row)))
+           (when (and c r (> c 0) (> r 0))
+             (setf cursor-pos (list c r))
+             ;; recompute offset if we already know size
+             (when (get-path (append st-path '(:size-known)) state)
+               (multiple-value-bind (new-oy new-ox)
+                   (compute-anchor-offset anchor width height (first term-size) (second term-size) r c)
+                 (setf offset-x new-ox offset-y new-oy)
+                 (push (patch '(:offset-x) offset-x) own-patches)
+                 (push (patch '(:offset-y) offset-y) own-patches)))
+             (push (patch '(:cursor-pos) cursor-pos) own-patches)
+             (push (patch '(:pos-known) t) own-patches))))
+        ;; -------------------------------------------------------------------
+        ((list :key-right :key-left :key-up :key-down)
+         ;; Arrow key panning – independent of anchor
+         (let ((cols (first term-size)) (rows (second term-size)))
+           (case (msg-type message)
+             (:key-right (incf offset-y))
+             (:key-left  (decf offset-y))
+             (:key-up   (decf offset-x))
+             (:key-down  (incf offset-x)))
+           ;; clamp so viewport remains inside terminal bounds
+           (setf offset-x (%clamp offset-x 0 (max 0 (- rows height)))
+                 offset-y (%clamp offset-y 0 (max 0 (- cols width))))
+           (push (patch '(:offset-x) offset-x) own-patches)
+           (push (patch '(:offset-y) offset-y) own-patches)))
+        ;; -------------------------------------------------------------------
+        (t nil))
+
+      ;; propagate message downstream
+      (log-info "PROPAGATE: ~A to child at ~S"
+                (msg-type message) (append id-path '(:child)))
+      (multiple-value-bind (child-patches child-cmds)
+          (let ((child (child-instance state id-path)))
+            (log-info "Child instance at ~S: ~S"
+                      (append id-path '(:child)) child)
+            (when child
+              (elmtui.ui.api:update child message state :id-path (append id-path (list (slot-value child 'id)))) ) )
+        (values (nconc own-patches child-patches) child-cmds)))) )
+
+;;; ---------------------------------------------------------------------------
+;;; VIEW – convert state into DSL for renderer
+;;; ---------------------------------------------------------------------------
 (defmethod elmtui.ui.api:view ((component root-viewport) state
-                               &key id-path)
+                               &key id-path children &allow-other-keys)
   (declare (type list id-path) (type t state))
   (check-type id-path list)
+  (log4cl:log-debug "Rendering root-viewport with ID path: ~A" id-path)
   (let* ((vp-state (get-path (append id-path '(:state)) state))
-         (effective-id (getf vp-state :id (first id-path)))
-         (size-uninitialized (getf vp-state :size-uninitialized)))
+         (effective-id (state-ref vp-state :id (first (last id-path))))
+         (size-uninitialized (state-ref vp-state :size-uninitialized)))
 
     (when size-uninitialized
       (log4cl:log-debug "Root-viewport ~A size is uninitialized. Skipping child view." effective-id)
       (return-from elmtui.ui.api:view
-        `(:viewport :id ,effective-id :width 1 :height 1 :children nil)))
+        `(:layout :id ,effective-id :width 1 :height 1 :children nil)))
 
-    (let* ((child-dsl-spec (getf vp-state :child-dsl-spec))
-           (width (getf vp-state :width))
-           (height (getf vp-state :height))
-           (offset-x (getf vp-state :offset-x 0))
-           (offset-y (getf vp-state :offset-y 0))
-           (scroll-x (getf vp-state :scroll-x 0))
-           (scroll-y (getf vp-state :scroll-y 0)))
+    (let* ((children-from-args children)
+           (child-from-state (state-ref vp-state :child-dsl-spec))
+           (final-children (or children-from-args
+                               (when child-from-state (list child-from-state))))
+           (width (state-ref vp-state :width))
+           (height (state-ref vp-state :height))
+           (offset-x (state-ref vp-state :offset-x 0))
+           (offset-y (state-ref vp-state :offset-y 0))
+           (scroll-x (state-ref vp-state :scroll-x 0))
+           (scroll-y (state-ref vp-state :scroll-y 0))
+           (effective-id-viewport (intern (format nil "ROOT-VIEWPORT-~A" effective-id) :keyword)))
 
-      (unless child-dsl-spec
-        (log4cl:log-warn "Root-viewport ~A has no child-dsl-spec in its state." effective-id)
-        (return-from elmtui.ui.api:view
-          `(:viewport :id ,effective-id
-                      :width ,width :height ,height
-                      :offset-x ,offset-x :offset-y ,offset-y
-                      :children nil)))
+      (unless final-children
+        (log4cl:log-warn "Root-viewport ~A has no children." effective-id))
 
-      `(:viewport :id ,effective-id
-                  :width ,width :height ,height
-                  :offset-x ,offset-x :offset-y ,offset-y
-                  :scroll-x ,scroll-x :scroll-y ,scroll-y
-                  :children (list child-dsl-spec)))))
-
-;; (let ((message (elmtui.app.system-events:make-terminalresized-systemevent
-;;  :width 1000 :height 13)))
-;; (let ((msg-list (ensure-list message))
-;;           (stop nil))
-;;       (case (car msg-list)
-;;         ;; ── Terminal resize ────────────────────────────────────────────────────
-;;         (:terminalresized
-;;          (log-info "RESIZED!!!!! ~A" msg-list)
-;;          (destructuring-bind (&key width height) (cdr msg-list)
-;;            (log-info "ROOT-VIEWPORT>Update: Terminal resized to ~A x ~A" width height)
-;;            (when (and width height)
-;;              (let* ((term-cols width)
-;;                     (term-rows height)
-;;                     ;; (anchor (get-path (append id-path '(:state :anchor)) state))
-;;                     (initial-cursor-pos (list 1  2))
-;;                     (cursor-c (or (first initial-cursor-pos) 0))
-;;                     (cursor-r (or (second initial-cursor-pos) 0))
-;;                     (anchor :below-cursor)
-;;                     (new-width term-cols)
-;;                     (new-height (nth-value 1 (compute-view-size anchor term-cols term-rows cursor-r)))
-;;                     (offsets (multiple-value-list
-;;                               (compute-anchor-offset anchor new-width new-height
-;;                                                      term-cols term-rows
-;;                                                      cursor-r cursor-c))))
-;;                (list (list :patch (list :state :width) new-width)
-;;                      (list :patch (list :state :height) new-height)
-;;                      '(:patch '(:state :offset-y) (first offsets))
-;;                      '(:patch '(:state :offset-x) (second offsets))
-;;                      (list :patch (list :state :terminal-size) (list term-cols term-rows))
-;;                      '(:patch '(:state :size-uninitialized) nil))))))
-;;         ;; ── Pass-through: send to child, keep accumulated patches ─────────────
-;;         (t
-;;          (progn
-;;            (log-info "ROOT-VIEWPORT>Update: message not matched." message))))
-
-;;       )
-
+      `(:viewport :id ,effective-id-viewport
+                  :style (:width ,width :height ,height
+                          :offset-x ,offset-x :offset-y ,offset-y
+                          :scroll-x ,scroll-x :scroll-y ,scroll-y)
+                  :children ,final-children))))
+;; (defmethod elmtui.ui.api:view ((component root-viewport) state &key id-path)
+;;   (log-info "ROOT-VIEW: ~A" id-path)
+;;   (let ((dud nil))
+;;     (elmtui.update-dsl:with-read-only-cycle
+;;         (ctx state)
+;;       (let* ((vp-state (elmtui.tea-state:state-ref  state (append id-path '(:state))))
+;;              (width     (elmtui.tea-state:state-ref vp-state :width 1))
+;;              (height    (elmtui.tea-state:state-ref vp-state :height 1))
+;;              (offset-x  (elmtui.tea-state:state-ref vp-state :offset-x 0))
+;;              (offset-y  (elmtui.tea-state:state-ref vp-state :offset-y 0))
+;;              (child-dsl (elmtui.tea-state:state-ref vp-state :child-dsl-spec))
+;;              (vp-id (first (last id-path))))
+;;                                         ;(or (elmtui.tea-state:state-ref vp-state :id) (first id-path))))
+;;         (setf dud `(:root-viewport :id ,vp-id
+;;                                    :width ,width :height ,height
+;;                                    :offset-x ,offset-x :offset-y ,offset-y
+;;                                    :children ,(when child-dsl (list child-dsl))))))
+;;     (log-info "ROOT-VIEW: ~A -> ~S"
+;;               id-path
+;;               dud)
+;;     dud)
 ;;   )
+;;; ---------------------------------------------------------------------------
+;;; Cleanup stub (future use)
+;;; ---------------------------------------------------------------------------
+
+(defun get-cleanup-info (state id-path)
+  (declare (ignore state id-path))
+  nil)
+
+;; (defcomponent-dsl :root-viewport root-viewport)

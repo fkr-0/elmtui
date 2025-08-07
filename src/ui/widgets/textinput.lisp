@@ -9,7 +9,7 @@
   (:import-from :elmtui.ui.api ; Added for component base class
                 #:component
                 #:make-state-patch)
-  (:import-from :elmtui.state.api ; For make-update-result
+  (:import-from :elmtui.tea-state.api ; For make-update-result
                 #:make-update-result)
   (:import-from :elmtui.utils
                 #:ensure-list #:ensure-keyword)

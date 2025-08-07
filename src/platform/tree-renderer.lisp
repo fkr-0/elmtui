@@ -5,10 +5,11 @@
 (uiop:define-package :elmtui.platform.tree-renderer
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.contracts #:define-stage)
+  (:import-from :elmtui.style-lib.api #:styles)
   (:import-from :elmtui.view.core #:ui-node #:ui-node-p #:ui-node-type #:ui-node-props #:ui-node-children)
   (:import-from :elmtui.view.api #:ui-node-p #:styled-ui-node)
   (:import-from :elmtui.view.geo #:rectangle #:pos #:size #:x #:y #:w #:h)
-  (:import-from :elmtui.view.styled #:styled-ui-node #:style-value #:styled-ui-node-style-map)
+  (:import-from :elmtui.view.styled #:styled-ui-node #:style-value )
   (:import-from :elmtui.style-lib.api #:styles #:style-set)
 
 
@@ -54,6 +55,7 @@
                 (unless (or (null style) (eq style :none) (eq style :solid)) ; don't warn for common/default cases
                   (format t "TREE-RENDERER: Unknown border style '~A', defaulting to :solid." style))
                 (list :h #\─ :v #\│ :tl #\┌ :tr #\┐ :bl #\└ :br #\┘)))))
+
 ;; (defun color-or-nil (raw &optional (bgp nil))
 ;;   "Like FUZZ-COLOR but returns NIL instead of signalling."
 ;;   (when raw
@@ -67,28 +69,27 @@
   (let ((result
           (handler-case
               (progn
-                (format t "TREE-RENDERER: convert-abstract-style-to-terminal-style ENTRY - node=~S~%" node)
+                                        ;(format t "TREE-RENDERER: convert-abstract-style-to-terminal-style ENTRY - node=~S~%" node)
                 (if (typep node 'styled-ui-node)
-                    (let* ((node-id (getf (ui-node-props node) :id "N/A"))
-                           (style-map (styled-ui-node-style-map node)))
+                    (let* ((style-map (styles node)))
 
-                      (format t "TREE-RENDERER: Node ID: ~S - style-map=~S~%" node-id style-map)
+                      ;; (format t "TREE-RENDERER: Node ID: ~S - style-map=~S~%" node-id style-map)
 
                       (if (null style-map)
                           (progn
-                            (format t "TREE-RENDERER: Node ID: ~S - No style-map found. Using empty terminal-style.~%" node-id)
+                            ;; (format t "TREE-RENDERER: Node ID: ~S - No style-map found. Using empty terminal-style.~%" node-id)
                             (make-terminal-style))
-                          (let* ((raw-fg-val (or (getf style-map :fg nil)
-                                                 (getf style-map :fg-color nil)
-                                                 (getf style-map :color nil)
-                                                 (getf style-map :foreground-color nil)))
-                                 (raw-bg-val (or (getf style-map :bg nil)
-                                                 (getf style-map :bg-color nil)
-                                                 (getf style-map :background-color nil)))
-                                 (attrs-val (getf style-map :attributes nil)) ; e.g., '(:bold :underline)
+                          (let* ((raw-fg-val (or (elmtui.style-lib.style-set:value-of style-map :fg nil)
+                                                 (elmtui.style-lib.style-set:value-of style-map :fg-color nil)
+                                                 (elmtui.style-lib.style-set:value-of style-map :color nil)
+                                                 (elmtui.style-lib.style-set:value-of style-map :foreground-color nil)))
+                                 (raw-bg-val (or (elmtui.style-lib.style-set:value-of style-map :bg nil)
+                                                 (elmtui.style-lib.style-set:value-of style-map :bg-color nil)
+                                                 (elmtui.style-lib.style-set:value-of style-map :background-color nil)))
+                                 (attrs-val (elmtui.style-lib.style-set:value-of style-map :attributes nil)) ; e.g., '(:bold :underline)
                                  (ts (make-terminal-style))) ; Always create a terminal-style instance
 
-                            (format t "TREE-RENDERER: Style extraction - fg=~S bg=~S attrs=~S~%" raw-fg-val raw-bg-val attrs-val)
+                            ;; (format t "TREE-RENDERER: Style extraction - fg=~S bg=~S attrs=~S~%" raw-fg-val raw-bg-val attrs-val)
 
                             (when raw-fg-val
                               (handler-case
@@ -117,7 +118,7 @@
                                     (when (member :invisible attrs-val) (setf (terminal-style-invisible ts) t)))
                                 (error (e) (format t "TREE-RENDERER: Error setting attributes: ~A~%" e))))
 
-                            (format t "TREE-RENDERER: Terminal style created successfully: ~S~%" ts)
+                            ;; (format t "TREE-RENDERER: Terminal style created successfully: ~S~%" ts)
                             ts))) ; Return the terminal-style struct
                     ;; If not a styled-ui-node, return empty terminal-style
                     (progn
@@ -168,11 +169,11 @@
 ;;         ;; Only proceed if node is visible and has dimensions
 ;;         ;; (format t "DEBUG: Visibility check - border-box-w=~A border-box-h=~A visibility=~S display=~S~%"
 ;;         ;;         border-box-w border-box-h
-;;         ;;         (getf (styled-ui-node-style-map node) :visibility :visible)
-;;         ;;         (getf (styled-ui-node-style-map node) :display :block))
+;;         ;;         (getf (styles node) :visibility :visible)
+;;         ;;         (getf (styles node) :display :block))
 ;;         (when (and (> border-box-w 0) (> border-box-h 0)
-;;                    (not (eq (getf (styled-ui-node-style-map node) :visibility :visible) :hidden))
-;;                    (not (eq (getf (styled-ui-node-style-map node) :display :block) :none)))
+;;                    (not (eq (getf (styles node) :visibility :visible) :hidden))
+;;                    (not (eq (getf (styles node) :display :block) :none)))
 ;;           ;; (format t "DEBUG: Visibility check PASSED - proceeding to background fill~%")
 
 ;;           ;; 1. First render Background (fills the border-box)
@@ -198,7 +199,7 @@
 ;;                                               (when cell (terminal-style-bg-color (buffer-cell-style cell)))))))))))
 
 ;;           ;; Calculate effective border widths and padding
-;;           (let* ((style-map (styled-ui-node-style-map node))
+;;           (let* ((style-map (styles node))
 ;;                  (border-style-val (getf style-map :border-style :none))
 ;;                  (effective-btw (if (eq border-style-val :none) 0 (getf style-map :border-top-width 1)))
 ;;                  (effective-brw (if (eq border-style-val :none) 0 (getf style-map :border-right-width 1)))
@@ -384,11 +385,10 @@
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;;  High-level predicates
 ;;; ─────────────────────────────────────────────────────────────────────────
-
 (defun %visible-node-p (node width height)
-  (let* ((style (styled-ui-node-style-map node))
-         (vis   (getf style :visibility :visible))
-         (disp  (getf style :display    :block)))
+  (let* ((style (styles node))
+         (vis   (elmtui.style-lib.style-set:value-of style :visibility :visible))
+         (disp  (elmtui.style-lib.style-set:value-of style :display    :block)))
     (and (> width 0) (> height 0)
          (not (eq vis  :hidden))
          (not (eq disp :none)))))
@@ -413,56 +413,57 @@
 
 
 (defun %draw-border (node buffer x y width height style)
-  (let* ((smap             (styled-ui-node-style-map node))
-         (border-style-val (getf smap :border-style :none)))
+  (let* ((smap             (styles node))
+         (border-style-val (elmtui.style-lib.style-set:value-of smap :border-style :none)))
     (when (and (not (eq border-style-val :none)) ; nothing to draw
                style)
       ;; border widths (default 1 when style present)
-      (flet ((bw (side) (if (eq border-style-val :none) 0
-                            (getf smap side 1))))
-        (let* ((btw (bw :border-top-width))
-               (brw (bw :border-right-width))
-               (bbw (bw :border-bottom-width))
-               (blw (bw :border-left-width))
-               (fg  (color-or-nil (or (getf smap :border-color)
-                                      (terminal-style-fg-color style)))))
-          (when fg
-            (log-debug "Drawing border id=~A style=~A fg=~A"
-                       (getf (ui-node-props node) :id) border-style-val fg)
-            (destructuring-bind (&key h v tl tr bl br)
-                (get-border-characters border-style-val)
-              ;; horizontal
-              (when (> btw 0)
-                (loop for c from (if (> blw 0) 1 0)
-                        below (- width (if (> brw 0) 1 0))
-                      do (%draw-border-char buffer y       (+ x c) h style fg)))
-              (when (> bbw 0)
-                (loop for c from (if (> blw 0) 1 0)
-                        below (- width (if (> brw 0) 1 0))
-                      do (%draw-border-char buffer (+ y height -1) (+ x c) h style fg)))
-              ;; vertical
-              (when (> blw 0)
-                (loop for r from (if (> btw 0) 1 0)
-                        below (- height (if (> bbw 0) 1 0))
-                      do (%draw-border-char buffer (+ y r) x               v style fg)))
-              (when (> brw 0)
-                (loop for r from (if (> btw 0) 1 0)
-                        below (- height (if (> bbw 0) 1 0))
-                      do (%draw-border-char buffer (+ y r) (+ x width -1)      v style fg)))
-              ;; corners
-              (when (and (> btw 0) (> blw 0)) (%draw-border-char buffer y             x               tl style fg))
-              (when (and (> btw 0) (> brw 0)) (%draw-border-char buffer y             (+ x width -1)      tr style fg))
-              (when (and (> bbw 0) (> blw 0)) (%draw-border-char buffer (+ y height -1) x               bl style fg))
-              (when (and (> bbw 0) (> brw 0)) (%draw-border-char buffer (+ y height -1) (+ x width -1) br style fg)))))))))
+      (let* ((border-width (if (eq border-style-val :none) 0 (elmtui.style-lib.style-set:value-of smap :border-width 1)))
+             (btw (elmtui.style-lib.style-set:value-of smap :border-top-width border-width))
+             (brw (elmtui.style-lib.style-set:value-of smap :border-right-width border-width))
+             (bbw (elmtui.style-lib.style-set:value-of smap :border-bottom-width border-width))
+             (blw (elmtui.style-lib.style-set:value-of smap :border-left-width border-width))
+             (fg  (color-or-nil (or (elmtui.style-lib.style-set:value-of smap :border-color)
+                                    (terminal-style-fg-color style)))))
+        (when (or t fg)
+          (log-debug "Drawing border id=~A style=~A fg=~A"
+                     (getf (ui-node-props node) :id) border-style-val fg)
+          (destructuring-bind (&key h v tl tr bl br)
+              (get-border-characters border-style-val)
+            ;; horizontal
+            (when (> btw 0)
+              (loop for c from (if (> blw 0) 1 0)
+                      below (- width (if (> brw 0) 1 0))
+                    do (%draw-border-char buffer y       (+ x c) h style fg)))
+            (when (> bbw 0)
+              (loop for c from (if (> blw 0) 1 0)
+                      below (- width (if (> brw 0) 1 0))
+                    do (%draw-border-char buffer (+ y height -1) (+ x c) h style fg)))
+            ;; vertical
+            (when (> blw 0)
+              (loop for r from (if (> btw 0) 1 0)
+                      below (- height (if (> bbw 0) 1 0))
+                    do (%draw-border-char buffer (+ y r) x               v style fg)))
+            (when (> brw 0)
+              (loop for r from (if (> btw 0) 1 0)
+                      below (- height (if (> bbw 0) 1 0))
+                    do (%draw-border-char buffer (+ y r) (+ x width -1)      v style fg)))
+            ;; corners
+            (when (and (> btw 0) (> blw 0)) (%draw-border-char buffer y             x               tl style fg))
+            (when (and (> btw 0) (> brw 0)) (%draw-border-char buffer y             (+ x width -1)      tr style fg))
+            (when (and (> bbw 0) (> blw 0)) (%draw-border-char buffer (+ y height -1) x               bl style fg))
+            (when (and (> bbw 0) (> brw 0)) (%draw-border-char buffer (+ y height -1) (+ x width -1) br style fg))))))))
 
 (defun %render-content (node buffer x y w h style)
+  (log-info "Rendering content for node id=~A at (~A,~A) size ~Ax~A with style ~S"
+            (getf (ui-node-props node) :id "N/A") x y w h style)
   (when (and style (> w 0) (> h 0))
     (case (ui-node-type node)
       ((:text :drawable-content)
        ;; simple left-to-right, top-to-bottom text renderer
        (loop with cur-x = 0
              with cur-y = 0
-             for ch across (getf (ui-node-props node) :text "")
+             for ch across (or (getf (ui-node-props node) :content) (getf (ui-node-props node) :text) "")
              do (when (>= cur-y h) (return))
                 (let ((rr (+ y cur-y))
                       (cc (+ x cur-x)))
@@ -479,6 +480,8 @@
                   (incf cur-y))))
       (t
        ;; extend with more node-types when ready
+       (log-info "TREE-RENDERER: %render-content - Unsupported node type: ~A, skipping content rendering."
+                 (ui-node-type node))
        nil))))
 
 
@@ -492,32 +495,36 @@
   (when (typep node 'styled-ui-node)
     (multiple-value-bind (abs-x abs-y bw bh okp)
         (%abs-rect parent-x parent-y (getf (ui-node-props node) :layout-rect))
-      (when (and okp
-                 (%visible-node-p node bw bh))
+      (log-info "TREE-RENDERER: Rendering node id=~A at (~A,~A) size ~Ax~A"
+                (getf (ui-node-props node) :id "N/A") abs-x abs-y bw bh)
+      (when (or t (and okp
+                       (%visible-node-p node bw bh)))
         (let ((ts (convert-abstract-style-to-terminal-style node)))
           ;; pass 1 – background
           (%render-background buffer abs-x abs-y bw bh ts)
           ;; pass 2 – border
           (%draw-border       node buffer abs-x abs-y bw bh ts)
           ;; content box calculation
-          (let* ((smap     (styled-ui-node-style-map node))
-                 (btw      (getf smap :border-top-width    0))
-                 (brw      (getf smap :border-right-width  0))
-                 (bbw      (getf smap :border-bottom-width 0))
-                 (blw      (getf smap :border-left-width   0))
-                 (pad-t    (getf smap :padding-top    0))
-                 (pad-r    (getf smap :padding-right 0))
-                 (pad-b    (getf smap :padding-bottom 0))
-                 (pad-l    (getf smap :padding-left  0))
+          (let* ((smap     (styles node))
+                 (btw      (elmtui.style-lib.style-set:value-of smap :border-top-width    0))
+                 (brw      (elmtui.style-lib.style-set:value-of smap :border-right-width  0))
+                 (bbw      (elmtui.style-lib.style-set:value-of smap :border-bottom-width 0))
+                 (blw      (elmtui.style-lib.style-set:value-of smap :border-left-width   0))
+                 (pad-t    (elmtui.style-lib.style-set:value-of smap :padding-top    0))
+                 (pad-r    (elmtui.style-lib.style-set:value-of smap :padding-right 0))
+                 (pad-b    (elmtui.style-lib.style-set:value-of smap :padding-bottom 0))
+                 (pad-l    (elmtui.style-lib.style-set:value-of smap :padding-left  0))
                  (cx (+ abs-x blw pad-l))
                  (cy (+ abs-y btw pad-t))
                  (cw (max 0 (- bw blw brw pad-l pad-r)))
                  (ch (max 0 (- bh btw bbw pad-t pad-b))))
             ;; pass 3 – content
-            (%render-content node buffer cx cy cw ch ts)))
-        ;; recurse
-        (dolist (child (ui-node-children node))
-          (%render-node child buffer abs-x abs-y))))))
+            (%render-content node buffer cx cy cw ch ts)
+            ;; recurse
+            (dolist (child (ui-node-children node))
+              (log-info "TREE-RENDERER: Rendering child node id=~A at (~A,~A)"
+                        (getf (ui-node-props child) :id "N/A") cx cy)
+              (%render-node child buffer cx cy))))))))
 
 (define-stage render-laid-out-tree-to-buffer
     ((or null (cons styled-ui-node null)) ; Input: list with 0 or 1 laid-out styled-ui-node

@@ -10,7 +10,7 @@
                 #:with-interruptable-signal #:cond-message)
   (:import-from :elmtui.platform.api
                 #:poll-input-event)
-  (:import-from :elmtui.state.msg #:make-focusprevious-appmsg #:make-focusnext-appmsg)
+  (:import-from :elmtui.tea-state.msg #:make-focusprevious-appmsg #:make-focusnext-appmsg)
   (:export :start-reader
    :stop-reader
            :request-stop-input-reader)) ; Assuming request-stop-input-reader might be a default name

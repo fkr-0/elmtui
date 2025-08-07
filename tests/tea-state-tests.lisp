@@ -6,10 +6,8 @@
 (uiop:define-package :elmtui-tests.tea-state
   (:use :cl :fiveam :elmtui.tea-state.api)
   (:import-from :elmtui.tea-state.state
-                #:make-state
                 #:get-state
                 #:application-state
-                #:application-state-p
                 #:state-ref)
   (:import-from :elmtui.tea-state.transactions
                 #:with-transaction

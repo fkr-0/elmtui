@@ -7,6 +7,7 @@
 ;;; Register built-in DSL types to component classes.
 ;; (register-dsl-component-type :label 'elmtui.ui.widgets.label:label)
 (register-dsl-component-type :root-viewport 'elmtui.ui.widgets.root-viewport:root-viewport)
+(register-dsl-component-type :key-tester-widget 'example.key-tester:key-tester)
 (register-dsl-component-type :viewport 'elmtui.ui.widgets.viewport:viewport)
 (register-dsl-component-type :grid-container 'elmtui.ui.widgets.grid-container:grid-container)
 ;; (register-dsl-component-type :scrollable-container 'elmtui.ui.widgets.scrollable-container:scrollable-container)

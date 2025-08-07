@@ -17,13 +17,14 @@
                 #:button-element #:button-text
                 #:container-element #:element-children #:element-id)
 
-  (:import-from :elmtui.state.model
+  (:import-from :elmtui.tea-state.model
                 #:transaction-status
                 #:defmodel-contracted #:validate-state-schema #:validate-state-instance
                 #:defpatch #:deftransaction #:apply-state-patches
                 #:state-patch #:make-state-patch #:transaction
                 #:get-state-value #:set-state-value #:update-state-value
                 #:*state-schemas*)
+  ;; (:import-from :et.glob #:*state-schemas*
   (:import-from :elmtui.contracts
                 #:enable-contract-debugging #:validate-model)
   (:export #:run-dsl-tests))
@@ -62,8 +63,8 @@
 
   ;; Valid complex elements
   (is-true (base-dsl-p '(:container :id :main
-                                   :children ((:text :content "Child 1")
-                                              (:text :content "Child 2")))))
+                         :children ((:text :content "Child 1")
+                                    (:text :content "Child 2")))))
 
   ;; Invalid structures
   (is-false (base-dsl-p '(not-a-keyword :invalid)))
@@ -527,37 +528,3 @@
   (signals error
     (validate-test-user-model '(:name "Child" :email "child@example.com" :age 10 :active nil))))
 
-;;;--------------------------------------------------------------
-;;; Test Runner
-;;;--------------------------------------------------------------
-
-(defun run-dsl-tests (;; &key verbose
-                      )
-  "Run the complete DSL system test suite"
-  (format t "~&=== Running Elmtui DSL System Tests ===~%")
-
-  ;; Clean state before testing
-  (setf *state-schemas* (make-hash-table :test 'eq))
-
-  ;; Run all tests
-  (let ((results (run 'dsl-tests)))
-    (format t "~&=== Test Results ===~%")
-    (format t "Tests run: ~A~%" (length (fiveam::tests results)))
-    ;; (format t "Passed: ~A~%" (length (fiveam::passed results)))
-    ;; (format t "Failed: ~A~%" (length (fiveam::failed results)))
-    ;; (format t "Skipped: ~A~%" (length (fiveam::skipped results)))
-
-    ;; (when (and verbose (fiveam::failed results))
-    ;;   (format t "~&=== Failed Tests ===~%")
-    ;;   (dolist (failure (fiveam::failed results))
-    ;;     (format t "~A: ~A~%"
-    ;;             (fiveam::name failure)
-    ;;             (fiveam::description failure))))
-
-    ;; Return success if all tests passed
-    ;; (zerop (length (fiveam::failed results)))
-    ))
-
-;; Auto-run tests when file is loaded in test mode
-#+test-mode
-(run-dsl-tests :verbose t)

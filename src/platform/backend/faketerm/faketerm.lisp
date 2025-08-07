@@ -10,6 +10,8 @@
 (uiop:define-package :elmtui.backend.faketerm
   (:use :cl :elmtui.platform.api)
   (:import-from :alexandria #:array-index) ; For 2D array indexing if needed
+  (:import-from :elmtui.view.geo #:w #:h #:x #:y)
+  (:import-from :elmtui.platform.api #:clear-screen)
   (:export #:faketerm-instance
            #:initialize-backend ; Re-exporting for discoverability
            #:shutdown-backend
@@ -95,14 +97,20 @@
 (defmethod get-screen-dimensions ((instance faketerm-instance))
   (values (faketerm-instance-width instance) (faketerm-instance-height instance)))
 
-(defmethod clear-screen ((instance faketerm-instance))
+
+(defmethod clear-screen ((instance faketerm-instance) &optional rect)
   (let ((stream (faketerm-instance-stream instance))
         (buffer (faketerm-instance-screen-buffer instance))
+        (w (or (and rect (w rect))(faketerm-instance-width instance)))
+        (h (or (and rect (h rect))(faketerm-instance-width instance)))
+        (x (or (and rect (x rect)) 0))
+        (y (or (and rect (y rect)) 0))
         (default-style (list :fg (default-foreground-color instance) :bg (default-background-color instance) :attrs nil)))
     (format stream "; CLEAR_SCREEN~%")
-    (loop for r below (faketerm-instance-height instance) do
-      (loop for c below (faketerm-instance-width instance) do
-        (setf (aref buffer r c) (make-faketerm-cell :char #\Space :style default-style))))
+    (loop for r below h do
+      (loop for c below w do
+        (setf (aref buffer (+ r y) (+ x c))
+              (make-faketerm-cell :char #\Space :style default-style))))
     (finish-output stream))
   t)
 
@@ -148,10 +156,10 @@
 ;;; Drawing Primitives
 ;;;---------------------------------------------------------------
 (defmethod render-and-present ((instance faketerm-instance) model app-spec)
- (let ((stream (faketerm-instance-stream instance)))
-   (format stream "; RENDER_AND_PRESENT App: ~S~%" (getf app-spec :name))
-   (finish-output stream))
- t)
+  (let ((stream (faketerm-instance-stream instance)))
+    (format stream "; RENDER_AND_PRESENT App: ~S~%" (getf app-spec :name))
+    (finish-output stream))
+  t)
 
 (defmethod draw-text-at ((instance faketerm-instance) target-buffer row col text &key style)
   (let ((stream (faketerm-instance-stream instance))

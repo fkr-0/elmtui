@@ -15,7 +15,7 @@
   (:import-from :elmtui.style-lib.styles #:rgb)
   (:import-from :elmtui.style-lib.selector #:cls> #:type>)
   (:import-from :elmtui.core.event-types #:key-event)
-  (:import-from :elmtui.state.api #:make-update-result)
+  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
   (:export
    :run-rainbow-example-app
    :rainbow-content-view
@@ -43,7 +43,7 @@
   (loop for (color-name class-name rgb-vals) in rainbow-colors-with-names
         collect `(defrule (cls> ,class-name)
                    :bg-color ,(rgb rgb-vals)
-                   :width 12
+                   :width 2
                    :height :fill)))
 
 ;; Define the stylesheet for the rainbow app
@@ -51,7 +51,7 @@
   (defstylesheet
     ;; Container base style
     (defrule (type> :container)
-      :display :flex
+      :display :block
       :flex-direction :row
       :width :fill
       :height :fill)
@@ -121,48 +121,62 @@
 ;;; Application Update Function
 ;;;--------------------------------------------------------------
 (defun app-update (message app-state)
-  "Handles updates to the application state based on messages.
-Any key event or :app-quit-requested sets :should-quit to t."
+  "Handles updates to the application state based on messages."
   (log-info "Rainbow: RECEIVED MESSAGE: ~S" message)
   (cond
-    ((or (typep message 'key-event)
-                                        ; (and (listp message) (eq (car message) :key-event))
-         (and (listp message) (eq (first message) :app-quit-requested)))
-     (progn
-       (log-info "Rainbow: App quit requested or key event received. key? ~A quit? ~A"
-                 (typep message 'key-event)
-                 (and (listp message) (eq (first message) :app-quit-requested)))
-       (make-update-result :patches `(((:should-quit) t)))))
-    ((and (listp message)
-          (eq (car message) :terminal-resized))
-     (let* ((root-vp-path
-              '(:components :rainbow-root-vp))
-            (root-vp-instance
-              (get-component-instance root-vp-path app-state)))
-       (if root-vp-instance
-           (let ((patches (update root-vp-instance message app-state :id-path root-vp-path)))
-             (make-update-result :patches patches))
-           (make-update-result))))
+    ((typep message 'key-event)
+     (let* ((current-count (state-ref app-state :switch-count 0))
+            (new-count (1+ current-count)))
+       (if (>= new-count 15)
+           (make-update-result :patches `(((:should-quit) t)))
+           (let ((new-orientation (if (eql (state-ref app-state :orientation) :row)
+                                      :column
+                                      :row)))
+             (make-update-result :patches `(((:switch-count) ,new-count)
+                                            ((:orientation) ,new-orientation)))))))
+    ((and (listp message) (eq (first message) :app-quit-requested))
+     (make-update-result :patches `(((:should-quit) t))))
     (t
      (make-update-result))))
 
+;; (defun rainbow-content-view (app-state)
+;;   "Defines the UI DSL for the rainbow app's content. The root viewport is set via :root-viewport-id in defapplication."
+;;   (declare (ignore app-state))
+;;   `(:container
+;;     :style (:display :flex :flex-direction :row :height :fill :width :fill)
+;;     :children
+;;     ,(loop for (color-name class-name rgb-val) in rainbow-colors-with-names
+;;            collect
+;;            `(:container
+;;              :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
+;;              :classes (,class-name)
+;;              :style (:width :fill
+;;                      :height :fill
+;;                      :min-width 10
+;;                      :fg-color ,(rgb rgb-val)
+;;                      :bg-color ,(rgb rgb-val))))))
+
+
 (defun rainbow-content-view (app-state)
-  "Defines the UI DSL for the rainbow app's content. The root viewport is set via :root-viewport-id in defapplication."
-  (declare (ignore app-state))
-  `(:container
-    :id :rainbow-main-container
-    :style (:display :flex :flex-direction :row :height :fill :width :fill :bg-color ,(rgb '(100 100 00)))
-    :children ,(loop for (color-name class-name rgb-val) in rainbow-colors-with-names
-                     collect
-                     `(:container
-                       :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
-                       :classes (,class-name)
-                       :style (:width :fill
-                               :height :fill
-                               :min-width 10
-                               :fg-color ,(rgb rgb-val)
-                               :bg-color ,(rgb rgb-val))
-                       :children nil)))) ;;,(list :text :content "abcdefgh123456")))))
+  "Defines the UI DSL for the rainbow app's content."
+  (let* ((orientation (state-ref app-state :orientation :row))
+         (flex-direction orientation)
+         (stripe-style (if (eq orientation :row)
+                           '(:width 1 :height :fill :flex-grow 1)
+                           '(:width :fill :height 1 :flex-grow 1))))
+    `(:container
+      :id :rainbow-content
+      :style (:display :flex :flex-grow 1 :flex-direction ,flex-direction :height 7 :width 7)
+      :children ,(loop for i from 0 below 7
+                       for (color-name class-name rgb-val) in rainbow-colors-with-names
+                       collect
+                       `(:container
+                         :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
+                         :classes (,class-name)
+                         :style ,(append (list :fg-color (rgb rgb-val)
+                                               :bg-color (rgb rgb-val))
+                                         stripe-style)
+                         :children nil)))))
 
 (defun rainbow-app-subscriptions (model)
   (declare (ignore model))
@@ -175,7 +189,9 @@ Any key event or :app-quit-requested sets :should-quit to t."
 (defapplication rainbow-example-app
   :root-viewport-id :rainbow-root-vp
   :initial-state-plist (list :current-stylesheet rainbow-stylesheet
-                             :should-quit nil)
+                             :should-quit nil
+                             :orientation :row
+                             :switch-count 0)
   ;; :root-component-dsl `(:column)
   :root-component-dsl
   '(:layout :id :rainbow-main-container
@@ -188,6 +204,49 @@ Any key event or :app-quit-requested sets :should-quit to t."
 
   :update-fn 'app-update
   :view-fn 'rainbow-content-view)
+
+;; (elmtui.view.dsl:dsl->ui-node (elmtui.app::maybe-wrap-with-root-viewport
+;;                                (funcall 'rainbow-content-view (elmtui.tea-state:make-application-state)) :root-id
+;;                                ':rainbow-root-vp)(elmtui.tea-state:make-application-state))
+
+;; (let* ((o (elmtui.view.dsl:render-dsl-to-resolved-tree
+;;            '(:ROOT-VIEWPORT :ID :RAINBOW-ROOT-VP :INITIAL-TERMINAL-DIMENSIONS (1 1)
+;;              :INITIAL-CURSOR-POS (1 1) :CHILDREN
+;;              (:CONTAINER :STYLE
+;;               (:DISPLAY :FLEX :FLEX-DIRECTION :ROW :HEIGHT :FILL :WIDTH :FILL) :CHILDREN
+;;               ((:CONTAINER :ID :STRIPE-RED :CLASSES ("red-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (255 0 0) :BG-COLOR
+;;                  (255 0 0)))
+;;                (:CONTAINER :ID :STRIPE-PINK :CLASSES ("pink-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (255 192 203) :BG-COLOR
+;;                  (255 192 203)))
+;;                (:CONTAINER :ID :STRIPE-ORANGE :CLASSES ("orange-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (255 165 0) :BG-COLOR
+;;                  (255 165 0)))
+;;                (:CONTAINER :ID :STRIPE-YELLOW :CLASSES ("yellow-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (255 255 0) :BG-COLOR
+;;                  (255 255 0)))
+;;                (:CONTAINER :ID :STRIPE-GREEN :CLASSES ("green-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (0 255 0) :BG-COLOR
+;;                  (0 255 0)))
+;;                (:CONTAINER :ID :STRIPE-BLUE :CLASSES ("blue-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (0 0 255) :BG-COLOR
+;;                  (0 0 255)))
+;;                (:CONTAINER :ID :STRIPE-INDIGO :CLASSES ("indigo-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (75 0 130) :BG-COLOR
+;;                  (75 0 130)))
+;;                (:CONTAINER :ID :STRIPE-VIOLET :CLASSES ("violet-stripe") :STYLE
+;;                 (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (238 130 238) :BG-COLOR
+;;                  (238 130 238)))))) (elmtui.tea-state:make-application-state)))
+;;        (r (getf (cdr o)
+;;                 :resolved-view))
+;;        (i (getf (cdr (elmtui.view.dsl:render-dsl-to-resolved-tree r (elmtui.tea-state:make-application-state)))
+;;                 :resolved-view))
+;;        (j (elmtui.view.dsl:render-dsl-to-resolved-tree i (elmtui.tea-state:make-application-state))))
+;;   ;; (elmtui.view.dsl:render-dsl-to-resolved-tree r (elmtui.tea-state:make-application-state))
+;;   ;; (elmtui.utils:as :styled-ui-node
+;;   ;;                    r)
+;;   j)
 
 ;;;--------------------------------------------------------------
 ;;; Application Runner Function
@@ -218,3 +277,29 @@ Any key event or :app-quit-requested sets :should-quit to t."
 ;;    (:container :id :rainbow-main-container :initial-terminal-dimensions
 ;;     (1 1) :initial-cursor-pos (1 1) :children
 ;;     ((:viewport :id :main)))))
+;; (elmtui.style-lib.api:make-style-set :styles (getf (cdr (car (getf (cdr `(:container
+;;     :style (:display :flex :flex-direction :row :height :fill :width :fill)
+;;     :children
+;;     ,(loop for (color-name class-name rgb-val) in rainbow-colors-with-names
+;;            collect
+;;            `(:container
+;;              :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
+;;              :classes (,class-name)
+;;              :style (:width :fill
+;;                      :height :fill
+;;                      :min-width 10
+;;                      :fg-color ,(rgb rgb-val)
+;;                      :bg-color ,(rgb rgb-val)))))) :children))) :style))
+;; `(:container
+;;   :style (:display :flex :flex-direction :row :height :fill :width :fill)
+;;   :children
+;;   ,(loop for (color-name class-name rgb-val) in rainbow-colors-with-names
+;;          collect
+;;          `(:container
+;;            :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
+;;            :classes (,class-name)
+;;            :style (:width :fill
+;;                    :height :fill
+;;                    :min-width 10
+;;                    :fg-color ,(rgb rgb-val)
+;;                    :bg-color ,(rgb rgb-val)))))

@@ -1,11 +1,19 @@
 (uiop:define-package :elmtui.tests.path
-  (:use :cl :fiveam :elmtui.contracts :elmtui.pipeline :elmtui.tea-state.state
+  (:use :cl :fiveam :elmtui.contracts :elmtui.pipeline
+        :elmtui.tea-state
    :elmtui.utils)
   (:import-from :elmtui.view.core #:ui-node-p)
   (:import-from :elmtui.view.styled #:styled-ui-node-p)
   (:import-from :elmtui.pipeline
                 #:generate-dsl)
 
+  (:import-from :elmtui.tea-state
+                #:state-ref
+                #:state-patch
+                #:state-observe
+                #:undo-update-state
+                #:redo-update-state
+                #:make-patch)
   (:import-from :elmtui.view.geo #:make-rectangle #:w #:h #:rectangle #:make-size
                 #:make-pos)
   (:import-from :elmtui.platform.backend.common.virtual-buffer

@@ -2,9 +2,9 @@
 
 (uiop:define-package :elmtui.update-dsl.appstate-tests
   (:use :cl :fiveam
-    :elmtui.tea-state.api
-    :elmtui.update-dsl.api
-    :elmtui.update-dsl))
+        :elmtui.tea-state.api
+   :elmtui.update-dsl.api
+        :elmtui.update-dsl))
 
 (in-package :elmtui.update-dsl.appstate-tests)
 
@@ -15,9 +15,9 @@
 (defvar *test-app-state* nil)
 
 (defun make-test-app-state ()
-  (elmtui.tea-state.api:make-state
+  (elmtui.tea-state:make-state
 
-    (list :counter 0 :flag nil :data (list :x 1 :y 2))))
+   (list :counter 0 :flag nil :data (list :x 1 :y 2))))
 
 ;; (with-fixture reset-app-state ()
 ;;   (setf *test-app-state* (make-test-app-state)))
@@ -36,8 +36,8 @@
 (test state-patch
   (with-fixture reset-app-state ()
     (state-patch *test-app-state*
-      (list (make-patch :path '(:counter) :value 99)
-            (make-patch :path '(:flag) :value nil)))
+                 (list (make-patch :path '(:counter) :value 99)
+                       (make-patch :path '(:flag) :value nil)))
     (is (= (state-get *test-app-state* :counter) 99))
     (is (not (state-get *test-app-state* :flag)))))
 
@@ -45,7 +45,7 @@
   (with-fixture reset-app-state ()
     (let ((called nil))
       (state-observe *test-app-state* :counter
-        (lambda (old new) (setf called (list old new))))
+                     (lambda (old new) (setf called (list old new))))
       (state-set *test-app-state* :counter 123)
       (is (equal called (list 0 123))))))
 
