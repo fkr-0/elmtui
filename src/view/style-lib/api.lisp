@@ -127,6 +127,7 @@
    ;; Generics & Accessors
    :property-name :value-value :value-type ; Basic accessors
    :style-property :style-value :style-sub-styles ; Style accessors
+   :style-set-styles
    :stylegroup-p :group-key :group-styles ; Style group specifics
    :valid-value-p ; Validation generic
    :dirty :dirty-p ; Export dirty accessor and predicate

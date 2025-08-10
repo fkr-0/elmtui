@@ -4,7 +4,6 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.scrollable-container
   (:use :cl)
-  (:import-from :elmtui.view.styled #:make-styled-node)
   (:import-from :elmtui.core.async #:cmd-async)
   (:import-from :elmtui.core.events #:send-message)
   (:import-from :elmtui.ui.widgets.utils
@@ -308,27 +307,27 @@
                                         overflow-x-class overflow-y-class custom-class))))
 
     ;; Create the styled node representing the scrollable container
-    (make-styled-node
-     :type :scrollable-container
-     :props (list* :id widget
-                   :scroll-top effective-scroll-top
-                   :scroll-left effective-scroll-left
-                   :viewport-width effective-viewport-width
-                   :viewport-height effective-viewport-height
-                   :content-width effective-content-width
-                   :content-height effective-content-height
-                   :show-scrollbar-x show-x-scrollbar
-                   :show-scrollbar-y show-y-scrollbar
-                   :disabled effective-disabled
-                   :on-scroll effective-on-scroll
-                   :focusable (not effective-disabled)
-                   :class (format nil "~{~A~^ ~}" all-classes)
-                   :aria-role "scrollbox"
-                   ;; Include optional properties only if provided
-                   (append
-                    (when tooltip (list :title tooltip))
-                    (when aria-label (list :aria-label aria-label))))
-     :children children)))
+    (list :viewport
+          :type :scrollable-container
+          :props (list* :id widget
+                        :scroll-top effective-scroll-top
+                        :scroll-left effective-scroll-left
+                        :viewport-width effective-viewport-width
+                        :viewport-height effective-viewport-height
+                        :content-width effective-content-width
+                        :content-height effective-content-height
+                        :show-scrollbar-x show-x-scrollbar
+                        :show-scrollbar-y show-y-scrollbar
+                        :disabled effective-disabled
+                        :on-scroll effective-on-scroll
+                        :focusable (not effective-disabled)
+                        :class (format nil "~{~A~^ ~}" all-classes)
+                        :aria-role "scrollbox"
+                        ;; Include optional properties only if provided
+                        (append
+                         (when tooltip (list :title tooltip))
+                         (when aria-label (list :aria-label aria-label))))
+          :children children)))
 
 ;;;---------------------------------------------------------------
 ;;; Backward Compatibility Wrapper

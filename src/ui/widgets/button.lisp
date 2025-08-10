@@ -6,7 +6,6 @@
   (:use :cl :elmtui.ui.defcomponent)
   (:import-from :elmtui.ui.api #:id-from-path #:app-state) ; Keep only used API functions
   (:import-from :elmtui.tea-state.api #:make-update-result)
-  (:import-from :elmtui.view.styled #:make-styled-node)
   ;; Removed :elmtui.core.async and :elmtui.core.events as commands are now data.
   ;; Removed :elmtui.state.msg :defmsg as the specific ButtonMsg is not used internally by the refactored component.
   (:export #:button)) ; Export only the component name
@@ -65,18 +64,18 @@
                 (disabled-class (when disabled "button-disabled"))
                 (focused-class (when focused "button-focused"))
                 (all-classes (remove nil (list base-class disabled-class focused-class))))
-           (make-styled-node
-            :type :button ; This type is used by the renderer/event handler
-            :props (list :id component-id
-                         :focusable (not disabled) ; Can't focus if disabled
-                         :label label
-                         :disabled disabled
-                         ;; The view's :on-click should send a message to this component's update
-                         :on-click (unless disabled '(:button-click))
-                         :class (format nil "~{~A~^ ~}" all-classes)
-                         :aria-role "button"
-                         :aria-disabled (if disabled "true" "false"))
-            :children nil))))
+           (list :container
+                 ;; :type :button ; This type is used by the renderer/event handler
+                 :props (list :id component-id
+                              :focusable (not disabled) ; Can't focus if disabled
+                              :label label
+                              :disabled disabled
+                              ;; The view's :on-click should send a message to this component's update
+                              :on-click (unless disabled '(:button-click))
+                              :class (format nil "~{~A~^ ~}" all-classes)
+                              :aria-role "button"
+                              :aria-disabled (if disabled "true" "false"))
+                 :children nil))))
 
 ;; To make a button instance:
 ;; (make-instance 'button :id :my-button

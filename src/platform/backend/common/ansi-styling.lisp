@@ -75,38 +75,40 @@
                                               :green (second rgb)
                                               :blue (third rgb))))))))
 (defun style-to-terminal-style (style-plist)
-  "Converts a style plist to a terminal-style instance.
+  "Converts a style plist to a terminal-style instance, ensuring a valid
+   terminal-style object is always returned.
    Args:
    - STYLE-PLIST: A property list containing style attributes.
    Returns:
-   - A terminal-style instance with the specified attributes.
-
-   Example:
-   (style-to-terminal-style '(:fg-color :blue :bg-color :green :attrs '(:bold :underline)))
-   => #<TERMINAL-STYLE fg-color: #<TERMINAL-COLOR red: 0 green: 0 blue: 255>
-                        bg-color: #<TERMINAL-COLOR red: 0 green: 128 blue: 0>
-                        bold: T italic: NIL underline: T faint: NIL blink: NIL inverse: NIL strike: NIL invisible: NIL>
-   "
-  (when style-plist
-    (let ((ts (make-terminal-style)))
-      (let ((bg (fuzz-color (or (getf style-plist :bg)
-                                (getf style-plist :bg-color)
-                                (getf style-plist :color)
-                                (getf style-plist :background-color)))))
-        (when bg
-          (setf (terminal-color-bg bg) t)
-          (setf (terminal-style-bg-color ts) bg)))
-      (let ((fg (fuzz-color (or (getf style-plist :fg)
-                                (getf style-plist :fg-color)
-                                (getf style-plist :color)
-                                (getf style-plist :foreground-color)))))
-        (when fg (setf (terminal-style-fg-color ts) fg)))
-      (let ((attrs (getf style-plist :attrs)))
-        (when (member :bold attrs) (setf (terminal-style-bold ts) t))
-        (when (member :italic attrs) (setf (terminal-style-italic ts) t))
-        (when (member :underline attrs) (setf (terminal-style-underline ts) t))
-        (when (member :inverse attrs) (setf (terminal-style-inverse ts) t)))
-      ts)))
+   - A terminal-style instance with the specified attributes."
+  (let ((ts (make-terminal-style)))
+    (when (and style-plist (listp style-plist))
+      (let ((bg-color-val (or (getf style-plist :bg)
+                              (getf style-plist :bg-color)
+                              (getf style-plist :background-color))))
+        (when bg-color-val
+          (let ((bg (fuzz-color bg-color-val t)))
+            (when bg
+              (setf (terminal-style-bg-color ts) bg)))))
+      (let ((fg-color-val (or (getf style-plist :fg)
+                              (getf style-plist :fg-color)
+                              (getf style-plist :color)
+                              (getf style-plist :foreground-color))))
+        (when fg-color-val
+          (let ((fg (fuzz-color fg-color-val)))
+            (when fg
+              (setf (terminal-style-fg-color ts) fg)))))
+      (let ((attrs (getf style-plist :attributes)))
+        (when (listp attrs)
+          (when (member :bold attrs) (setf (terminal-style-bold ts) t))
+          (when (member :italic attrs) (setf (terminal-style-italic ts) t))
+          (when (member :underline attrs) (setf (terminal-style-underline ts) t))
+          (when (member :inverse attrs) (setf (terminal-style-inverse ts) t))
+          (when (member :faint attrs) (setf (terminal-style-faint ts) t))
+          (when (member :blink attrs) (setf (terminal-style-blink ts) t))
+          (when (member :strike attrs) (setf (terminal-style-strike ts) t))
+          (when (member :invisible attrs) (setf (terminal-style-invisible ts) t)))))
+    ts))
 ;; (defgeneric mcopy-terminal-style (style)
 ;;   (:method ((style terminal-style))
 ;;     "Creates a deep copy of a terminal-style instance."

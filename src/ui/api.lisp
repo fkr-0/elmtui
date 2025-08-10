@@ -10,6 +10,7 @@
    #:init #:update #:view #:destroy ;; Core lifecycle
    #:component-children #:component-width #:component-height
    #:resolve-component-node
+   #:layout-node
    #:id-from-path #:get-path
    ;; State Helpers
    #:component-state-path #:get-component-property #:make-state-patch #:component-state-map-path
@@ -407,11 +408,11 @@
 (defgeneric update (component msg app-state &key id-path)
   (:documentation "Processes a message for a component instance. Returns an `update-result` struct.")
   (:method ((component component) msg app-state &key id-path)
-    (declare (type component component)
-             (type t msg app-state) ; app-state type can be more specific
-             (type list id-path))
-    (check-type component component)
-    (check-type id-path list)
+    (declare (ignore msg id-path))
+    ;;          (type t msg app-state) ; app-state type can be more specific
+    ;;          (type list id-path))
+    ;; (check-type component component)
+    ;; (check-type id-path list)
 
     (make-update-result)))
 

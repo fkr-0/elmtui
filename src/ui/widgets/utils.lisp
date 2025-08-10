@@ -6,7 +6,7 @@
   (:use :cl )
   (:import-from :elmtui.tea-state.api #:application-state #:state-ref)
   (:import-from :elmtui.core.focus #:get-current-focus)
-  (:import-from :elmtui.view.styled #:make-styled-node)
+
   (:export
    #:get-widget-model
    #:widget-focused-p

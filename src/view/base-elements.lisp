@@ -6,13 +6,20 @@
   (:use :cl :alexandria :log4cl)
 
   (:import-from :sb-mop
-                class-direct-slots slot-definition-name)
+                #:class-direct-slots #:slot-definition-name)
+  ;; (:import-from #:elmtui.view.layout #:layout-node)
+  (:import-from #:elmtui.view.geo #:h #:w #:x #:y #:rectangle #:make-size #:make-pos)
+  (:import-from #:elmtui.view.api #:styled-ui-node #:ui-node-props)
+
+  (:import-from :elmtui.view.api #:layout-node #:ui-node-children #:ui-node-type)
   (:export
    ;; Base class & common accessors
    #:base-element #:element-id #:element-children
    ;; Concrete element classes & their main readers
    #:base-dsl-error
    #:container-element #:container-layout #:container-style #:container-classes
+   #:element-layout-rect #:element-content-model
+   #:element-children #:element-id #:element-style
    #:text-element      #:text-content   #:text-wrap #:text-align #:text-color
    #:separator-element #:separator-orientation #:separator-thickness
    #:spacer-element    #:spacer-width  #:spacer-height
@@ -25,6 +32,11 @@
    #:make-dsl-element #:update-dsl-element
    #:find-elements-by-type #:find-element-by-id #:map-dsl-elements
    #:describe-element-type #:validate-dsl-tree #:dsl-statistics
+   #:element-layout
+   #:set-element-layout
+   #:rect=
+   #:compute-layout
+   #:layout-element
    ))
 
 (in-package :elmtui.view.base-elements)
@@ -185,10 +197,18 @@
        :accessor element-id
        :initform nil
        :type (or null keyword))
+   (layout-rect :initarg :layout-rect
+                :accessor element-layout-rect
+                :initform nil
+                :type (or null rectangle))
    (children :initarg :children
              :accessor element-children
              :initform nil
              :type list)
+   (style :initarg :style
+          :accessor element-style
+          :initform nil ;;(elmtui.style-lib.style-set::make-style-set)
+          :type list) ;; elmtui.style-lib:style-set)
    (content-model :initarg :content-model
                   :accessor element-content-model
                   :initform :void
@@ -225,6 +245,40 @@
   ;; Base rule: nothing special to validate here – subclasses add checks
   t)
 
+;; Weak-key hash to hold *computed* props (size/layout/dirty/prev-*)
+(defparameter *computed* (trivial-garbage:make-weak-hash-table :weakness :key :test 'eq))
+
+(defun %props (el)
+  (or (gethash el *computed*)
+      (setf (gethash el *computed*) nil)))
+
+(defun (setf %props) (plist el)
+  (setf (gethash el *computed*) plist))
+
+(defun element-props (el) (%props el))
+(defun (setf element-props) (plist el) (setf (%props el) plist))
+
+(defun element-size (el) (getf (%props el) :size))
+(defun (setf element-size) (val el)
+  (setf (getf (%props el) :size) val))
+
+(defun (setf element-layout) (val el)
+  (setf (getf (%props el) :layout) val))
+
+(defun element-dirty-p (el) (getf (%props el) :dirty))
+(defun (setf element-dirty-p) (flag el)
+  (setf (getf (%props el) :dirty) (and flag t)))
+
+(defun snapshot-props-for-diff (el)
+  (let* ((p (%props el)))
+    (setf (getf p :prev-size)   (getf p :size))
+    (setf (getf p :prev-layout) (getf p :layout))
+    p))
+
+(defun element-changed-p (el)
+  (let* ((p (%props el)))
+    (or (not (equal (getf p :size)   (getf p :prev-size)))
+        (not (equal (getf p :layout) (getf p :prev-layout))))))
 
 
 ;;;----------------------------------------------------------------
@@ -242,6 +296,31 @@
    (gap     :initarg :gap     :initform 0 :type fixnum))
   (:documentation "Generic layout container holding *children*.  All
   sizing / spacing attributes are purely declarative.") )
+(defmethod element-style ((el container-element))
+  (container-style el))
+(defmethod (setf element-style) (val (el container-element))
+  (setf (container-style el) val))
+
+;; Shallow copy that preserves *all slot values* unless overridden.
+(defun copy-element-like (el &key children style)
+  (let* ((class (class-of el))
+         (copy (make-instance class)))
+    ;; copy all bound slots
+    (dolist (slot (sb-mop:class-slots (class-of el)))
+      (let* ((name (sb-mop:slot-definition-name slot)))
+        (when (slot-boundp el name)
+          (setf (slot-value copy name) (slot-value el name)))))
+    ;; apply overrides
+    (when children (setf (slot-value copy 'children) children))
+    (when (%slot-exists-p class 'style)
+      (when (eq style :keep) (setf style (element-style el)))
+      (when style (setf (element-style copy) style)))
+    copy))
+
+(defun %slot-exists-p (class slot-name)
+  (find slot-name (mapcar #'sb-mop:slot-definition-name
+                          (sb-mop:class-slots class))
+        :test #'eq))
 
 (defmethod element-type ((e container-element)) :container)
 (%register-element-class :container 'container-element)
@@ -557,7 +636,16 @@
              (cond ((null d) nil)
                    ((and (listp d) (keywordp (first d))) (list d))
                    ((listp d) d)
-                   (t (list d)))))
+                   (t (list d))))
+           (normalize-dsl-props (props)
+             (let ((res nil))
+               (loop while props
+                     do (let ((key (pop props)))
+                          (push key res)
+                          (if (or (not props) (keywordp (car props)))
+                              (push t res)
+                              (push (pop props) res))))
+               (nreverse res))))
 
     (cond
       ;; ------------------------------------------------------------------
@@ -574,37 +662,39 @@
       ;; 3. single element  ( e.g. (:row :gap 2 :children …) )
       ((and (listp dsl) (keywordp (first dsl)))
        (destructuring-bind (type &rest props) dsl
-         (let* ((class (element-class type)))
-           (unless class
-             (error "Unknown DSL element type: ~A" type))
 
-           ;; This helper returns a flattened list of allowed initargs.
-           (flet ((valid-initargs (cls)
-                    (alexandria:flatten
-                     (slot-initargs cls)
-                     ;; (mapcar #'sb-mop:slot-definition-initargs
-                     ;;         (sb-mop:class-slots
-                     ;;          (find-class cls)))
-                     )))
+         (let* ((props (normalize-dsl-props props)))
+           (let* ((class (element-class type)))
+             (unless class
+               (error "Unknown DSL element type: ~A" type))
 
-             (let* ((allowed-keys (valid-initargs type))
-                    (children-objects (dsl->objects
-                                       (ensure-dsl-list (getf props :children))))
-                    (filtered-props
-                      (loop for (k v) on props by #'cddr
-                            when (and (member k allowed-keys) (not (eq k :children)))
-                              append (list k
-                                           (cond
-                                             ((eq k :style) (convert-style-dsl-to-plist v))
-                                             ((eq k :item-style) (convert-style-dsl-to-plist v))
-                                             ((eq k :color) (dsl->objects v)) ; Color might be a keyword or a complex object
-                                             (t (dsl->objects v))))))) ; Recursively convert other values
+             ;; This helper returns a flattened list of allowed initargs.
+             (flet ((valid-initargs (cls)
+                      (alexandria:flatten
+                       (slot-initargs cls)
+                       ;; (mapcar #'sb-mop:slot-definition-initargs
+                       ;;         (sb-mop:class-slots
+                       ;;          (find-class cls)))
+                       )))
 
-               ;; ------------------------------------------------------------------
-               ;; CRITICAL FIX #1 – splice keyword/arg list correctly
-               (apply #'make-instance class
-                      (append (list :children children-objects)
-                              filtered-props)))))))
+               (let* ((allowed-keys (valid-initargs type))
+                      (children-objects (dsl->objects
+                                         (ensure-dsl-list (getf props :children))))
+                      (filtered-props
+                        (loop for (k v) on props by #'cddr
+                              when (and (member k allowed-keys) (not (eq k :children)))
+                                append (list k
+                                             (cond
+                                               ((eq k :style) (convert-style-dsl-to-plist v))
+                                               ((eq k :item-style) (convert-style-dsl-to-plist v))
+                                               ((eq k :color) (dsl->objects v)) ; Color might be a keyword or a complex object
+                                               (t (dsl->objects v))))))) ; Recursively convert other values
+
+                 ;; ------------------------------------------------------------------
+                 ;; CRITICAL FIX #1 – splice keyword/arg list correctly
+                 (apply #'make-instance class
+                        (append (list :children children-objects)
+                                filtered-props))))))))
 
       ;; ------------------------------------------------------------------
       ;; 4. anything else is malformed
@@ -700,9 +790,9 @@
   (defun slot-keywords (cls)
     "Return the list of initarg keywords for CLS."
     (mapcar #'slot-definition-name (class-direct-slots (class-of cls))))
-
-  (defun slot-initargs (type-kw)
-    "Return the list of initargs for the class corresponding to TYPE-KW.
+  )
+(defun slot-initargs (type-kw)
+  "Return the list of initargs for the class corresponding to TYPE-KW.
 
   This is a list of keywords that can be used to initialize an element.
   Arguments:
@@ -714,10 +804,10 @@
   Example:
   (slot-initargs :container) =>
   (:id :children :style :class :layout :padding :margin :gap)"
-    (mapcar
-     (lambda (x) (car (sb-mop:slot-definition-initargs x)))
-     (sb-mop::class-slots
-      (find-class (element-class type-kw))))))
+  (mapcar
+   (lambda (x) (car (sb-mop:slot-definition-initargs x)))
+   (sb-mop::class-slots
+    (find-class (element-class type-kw)))))
 
 (defmethod base-element-has-initarg ((base-element-kw symbol) (property symbol))
   "Check if BASE-ELEMENT-KW has PROPERTY as an initarg."
@@ -1069,7 +1159,7 @@
 ;; (list
 ;; (normalize-base-dsl '( :text
 ;;                       :id :welcome-message
-;;                       :content "Welcome to the application!"
+;;                       :CONTENT "Welcome to the application!"
 ;;                       :align :center
 ;;                       :color :blue))
 ;; ⇒ returns an INPUT-ELEMENT instance (plus default values)
@@ -1079,11 +1169,6 @@
 ;; (validate-BASE-DSL '(:BUTTON :text "Click Me"))
 ;; (make-instance 'button-element :text "Click Me")
 
-(defmethod to-dsl ((s spacer-element))
-  (list :spacer
-        :id (element-id s)
-        :width  (spacer-width s)
-        :height (spacer-height s)))
 
 
 ;;; ---------------------------------------------------------------
@@ -1211,3 +1296,80 @@
         :rows (mapcar #'to-dsl (table-rows tbl))
         :border (table-border-p tbl)
         :cell-padding (table-cell-padding tbl)))
+;;; == elmtui/view/layout/element-utils.lisp ==
+;;; Utilities: element layout accessors, rect comparators, and layout wrappers.
+
+
+
+(defparameter *layout-fallback-root-size*
+  ;; sensible default for headless calls (e.g., tests / tree-transforms)
+  (make-size :w 80 :h 24)
+  "Used when no parent rectangle or styled width/height can be inferred.")
+
+(defun rect= (a b &key (epsilon 0))
+  (and (typep a 'rectangle) (typep b 'rectangle)
+       (<= (abs (- (x a) (x b))) epsilon)
+       (<= (abs (- (y a) (y b))) epsilon)
+       (<= (abs (- (w a) (w b))) epsilon)
+       (<= (abs (- (h a) (h b))) epsilon)))
+
+(defun element-layout (node)
+  (element-layout-rect node))
+
+(defun set-element-layout (node rect)
+  (setf (element-layout-rect node) rect))
+
+(defun %num-or-nil (v)
+  (and (numberp v) (>= v 0) v))
+
+(defun infer-parent-rect (node maybe-rect)
+  "Best-effort: prefer MAYBE-RECT; else node’s current :layout-rect;
+   else styled :width/:height; else *layout-fallback-root-size*."
+  (cond
+    ;; 1) explicit rect provided
+    ((typep maybe-rect 'rectangle) maybe-rect)
+    ;; 2) node already carries a rect (e.g., earlier pass)
+    ((typep (element-layout-rect node) 'rectangle)
+     (element-layout-rect node))
+    ((typep (getf (ui-node-props node) :layout-rect) 'rectangle)
+     (getf (ui-node-props node) :layout-rect))
+    ;; 3) styled absolute width/height (numbers only) → make a parent rect at (0,0)
+    (t
+     (let* ((w* (%num-or-nil (getf (element-style node) :width nil)))
+            (h* (%num-or-nil (getf (element-style node) :height nil)))
+            (sz (cond
+                  ((and w* h*) (make-size :w w* :h h*))
+                  (t *layout-fallback-root-size*))))
+       (elmtui.view.geo:make-rectangle :pos (make-pos :x 0 :y 0) :size sz)))))
+
+(defun compute-layout (node &optional parent-rect parent-style-set)
+  "Layout NODE inside PARENT-RECT if provided, otherwise infer a reasonable parent.
+Returns the final layout rectangle."
+
+  (let* ((parent (infer-parent-rect node parent-rect))
+         (laid   (layout-node node parent parent-style-set))
+         (rect   (element-layout-rect laid)))
+    (unless (typep rect 'rectangle)
+      (error "compute-layout: node did not produce a rectangle: ~S" laid))
+    rect))
+
+(defun layout-element (node &optional parent-rect parent-style-set)
+  "Idempotent layout: if the resulting rect matches, return NODE; else return LAID."
+
+  (let* ((parent (infer-parent-rect node parent-rect))
+         (before (element-layout-rect node))
+         (laid   (layout-node node parent parent-style-set))
+         (after  (element-layout-rect laid)))
+    (if (and (typep before 'rectangle) (rect= before after))
+        node
+        laid)))
+
+(defmethod ui-node-type ((node elmtui.view.base-elements:base-element))
+  (class-name (class-of node)))
+
+(defmethod ui-node-props ((node elmtui.view.base-elements:base-element))
+  (list :id (elmtui.view.base-elements:element-id node)
+        :style (elmtui.view.base-elements:element-style node)))
+
+(defmethod ui-node-children ((node elmtui.view.base-elements:base-element))
+  (elmtui.view.base-elements:element-children node))

@@ -15,7 +15,7 @@
                 #:make-terminalresized-systemevent)
   (:import-from :elmtui.core.event-types
                 #:key-event #:resize-event #:resize-event-width #:resize-event-height)
-  (:import-from :elmtui.pipeline #:render-frame)
+  (:import-from :elmtui.pipeline #:full-view-pipeline)
   (:import-from :elmtui.core.globals
                 #:*app-sender* #:*app-message-processor*)
   (:import-from :elmtui.core.focus
@@ -114,6 +114,15 @@
 (defvar *focus-manager* nil
   "Holds the application's focus manager instance.")
 
+(defvar *initial-render-done* nil
+  "Tracks if the initial render has been performed after terminal size and cursor position are known.")
+
+(defvar *got-initial-terminal-resized* nil
+  "Tracks if a :terminal-resized event has been received after startup.")
+
+(defvar *got-initial-cursor-position* nil
+  "Tracks if a :cursorpositionchanged event has been received after startup.")
+
 ;;; ---------------------------------------------------------------------------
 ;;; == Application Entry Point ==
 ;;; ---------------------------------------------------------------------------
@@ -144,6 +153,31 @@
               :dispatch-fn #'publish)
        ;; Fallback for unhandled keys
        (publish (list :raw-key evt)))))
+
+  ;; Initial render logic: subscribe to terminal-resized and cursorpositionchanged
+  (setf *initial-render-done* nil
+        *got-initial-terminal-resized* nil
+        *got-initial-cursor-position* nil)
+
+  (elmtui.core.loop:subscribe
+   :terminal-resized
+   (lambda (evt)
+     (log:info "DRIVER: Terminal resized event received: ~S" evt)
+     (setf *got-initial-terminal-resized* t)
+     (when (and *got-initial-terminal-resized* *got-initial-cursor-position* (not *initial-render-done*))
+       (setf *initial-render-done* t)
+       (when (and *current-app-model* *backend* *app-spec*)
+         (full-view-pipeline (make-context-from-spec *app-spec* *current-app-model* *backend*))))))
+
+  (elmtui.core.loop:subscribe
+   :cursorpositionchanged
+   (lambda (evt)
+     (log:debug "DRIVER: cursor position changed event received: ~S" evt)
+     (setf *got-initial-cursor-position* t)
+     (when (and *got-initial-terminal-resized* *got-initial-cursor-position* (not *initial-render-done*))
+       (setf *initial-render-done* t)
+       (when (and *current-app-model* *backend* *app-spec*)
+         (full-view-pipeline (make-context-from-spec *app-spec* *current-app-model* *backend*))))))
 
   (apply #'run-app-platform
          app-spec
@@ -205,7 +239,7 @@
       ;; Set up the global app message processor lambda
       (setf elmtui.core.globals:*app-message-processor*
             (lambda (msg)
-              (log:debug "DRIVER: *app-message-processor* received ~S" msg)
+              (log:info "DRIVER: *app-message-processor* received ~S" msg)
               ;; Handle quit request
               (if (and (listp msg) (eq (car msg) :app-quit-requested))
                   (progn
@@ -218,7 +252,7 @@
                         (app-cfg-for-cmd (gethash (getf app-spec :name) elmtui.core.globals:*applications*)))
                     (log-info "DRIVER: calling update")
                     (multiple-value-bind (next-model commands)
-                        (funcall update-fn *current-app-model* msg)
+                        (funcall update-fn msg *current-app-model* )
                       ;; Update global model
                       (setf *current-app-model* next-model)
                       (log-info "DRIVER: update phase done")
@@ -234,7 +268,7 @@
                       (unless elmtui.core.loop::*shutdown-requested*
                         (log-info "DRIVER: view next-model")
                         (let ((ctx (make-context-from-spec app-spec next-model *backend*)))
-                          (setf *last-ctx* (elmtui.pipeline:full-view-pipeline ctx))
+                          (setf *last-ctx* (full-view-pipeline ctx))
                           (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*)))))))))
       (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
       (values initial-model initial-cmds))))
