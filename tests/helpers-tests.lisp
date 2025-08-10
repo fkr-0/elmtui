@@ -34,10 +34,11 @@
       ;; )
       ;; ))
       (let ((children (elmtui.view.api:ui-node-children ui-node)))
+
         (is (listp children))
         (is (= 2 (length children)))
-        (is (elmtui.view.api:ui-node-p (first children)))
-        (is (elmtui.view.api:ui-node-p (second children)))))))
+        (is (elmtui.view.element:element-p (first children)))
+        (is (elmtui.view.element:element-p (second children)))))))
 
 ;; Test for defapplication initial state
 (defun test-app-for-state-view (state)

@@ -125,17 +125,30 @@
     (t          nil)))
 
 (defun %get-entry (container key default)
-  (cond
-    ((hash-table-p container)
+  (typecase container
+    (elmtui.contracts:app-context
+     (case key
+       (:view-fn (elmtui.contracts:ctx-view-fn container))
+       (:state (elmtui.contracts:ctx-state container))
+       (:stylesheet (elmtui.contracts:ctx-stylesheet container))
+       (:viewport-rect (elmtui.contracts:ctx-viewport-rect container))
+       (:dsl-tree (elmtui.contracts:ctx-dsl-tree container))
+       (:raw-tree (elmtui.contracts:ctx-raw-tree container))
+       (:styled-tree (elmtui.contracts:ctx-styled-tree container))
+       (:atomic-tree (elmtui.contracts:ctx-atomic-tree container))
+       (:laid-out-tree (elmtui.contracts:ctx-laid-out-tree container))
+       (:front-buffer (elmtui.contracts:ctx-front-buffer container))
+       (:back-buffer (elmtui.contracts:ctx-back-buffer container))
+       (:backend (elmtui.contracts:ctx-backend container))
+       (t default)))
+    (hash-table
      (multiple-value-bind (v foundp) (gethash key container)
        (if foundp v default)))
-
-    ((listp container)
-     (if (%alist-p container)                  ; alist
-         (let ((pair (assoc key container)))
+    (list
+     (if (%alist-p container)
+         (let ((pair (assoc key container :test #'eq)))
            (if pair (cdr pair) default))
-         (getf container key default)))        ; plist
-
+         (getf container key default)))
     (t default)))
 
 (defun %set-entry (container key value)

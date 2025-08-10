@@ -27,6 +27,7 @@
    #:apply-diff
    #:stylable-id
    #:ui-node-type
+   #:layout-node
    #:ui-node-props
    #:ui-node-children
    ;; Abstract node classes
@@ -240,6 +241,8 @@
 ;;; 2. Diff/patch helpers  (optional but recommended)
 ;;; -----------------------------------------------------------------------
 
+(defgeneric layout-node (node available-rect parent-styles)
+  (:documentation "Compute layout for NODE within AVAILABLE-RECT."))
 (defgeneric diff-buffer (prev-buffer curr-buffer)
   (:documentation "Compute minimal diff operations to transform PREV-BUFFER into CURR-BUFFER.
 
@@ -359,7 +362,12 @@ These nodes may still be declarative/high-level."))
        (slot-value node 'props))) ; Inherit props from ui-node
 (defmethod ui-node-children ((node styled-ui-node))
   (and (slot-boundp node 'children)
-       (slot-value node 'children))) ; Inherit children from ui-node)
+       (slot-value node 'children)))
+
+
+(defmethod ui-node-children ((node null))
+  nil)
+
 
 (defclass atomic-ui-node (styled-ui-node)
   ()

@@ -284,70 +284,70 @@ cons (:fr <number>), or list (:minmax <min-track-size> <max-track-size>)."
 (defstyle :padding-char 'character :default *pad-fill-char* :docstring "Padding fill character.")
 (defstyle :padding-charstyle 'list :default nil :docstring "Padding character style.")
 
-(defstylegroup (:groups
-                (:padding-top :padding-bottom :padding-left :padding-right :padding-char :padding-charstyle)
-                :decorating-after :top
-                :docstring "Group for padding styles.")
-  ;; The `value` here is the shorthand value passed to (make-style :padding <value>)
-  (let ((processed-value value)
-        (sub-styles-list '()))
+;; (defstylegroup (:groups
+;;                 (:padding-top :padding-bottom :padding-left :padding-right :padding-char :padding-charstyle)
+;;                 :decorating-after :top
+;;                 :docstring "Group for padding styles.")
+;;   ;; The `value` here is the shorthand value passed to (make-style :padding <value>)
+;;   (let ((processed-value value)
+;;         (sub-styles-list '()))
 
-    ;; 1. Normalize input `value`
-    (when (null processed-value) (setf processed-value 0))
+;;     ;; 1. Normalize input `value`
+;;     (when (null processed-value) (setf processed-value 0))
 
-    (if (integerp processed-value)
-        (setf processed-value (list processed-value)))
+;;     (if (integerp processed-value)
+;;         (setf processed-value (list processed-value)))
 
-    ;; Handle potential single-element list nesting e.g. :padding '((1 2)) -> '(1 2)
-    ;; This applies only if the inner list is entirely numeric.
-    (when (and (listp processed-value)
-               (= 1 (length processed-value))
-               (listp (first processed-value))
-               (every #'integerp (first processed-value)))
-      (setf processed-value (first processed-value)))
+;;     ;; Handle potential single-element list nesting e.g. :padding '((1 2)) -> '(1 2)
+;;     ;; This applies only if the inner list is entirely numeric.
+;;     (when (and (listp processed-value)
+;;                (= 1 (length processed-value))
+;;                (listp (first processed-value))
+;;                (every #'integerp (first processed-value)))
+;;       (setf processed-value (first processed-value)))
 
-    ;; 2. Process if `processed-value` is a list of solely integers (valid numeric shorthand)
-    (if (and (listp processed-value) (every #'integerp processed-value))
-        (progn
-          (case (length processed-value)
-            (1 (let ((val (first processed-value)))
-                 (push (make-style :padding-top val) sub-styles-list)
-                 (push (make-style :padding-bottom val) sub-styles-list)
-                 (push (make-style :padding-left val) sub-styles-list)
-                 (push (make-style :padding-right val) sub-styles-list)))
-            (2 (let ((v-val (first processed-value))
-                     (h-val (second processed-value)))
-                 (push (make-style :padding-top v-val) sub-styles-list)
-                 (push (make-style :padding-bottom v-val) sub-styles-list)
-                 (push (make-style :padding-left h-val) sub-styles-list)
-                 (push (make-style :padding-right h-val) sub-styles-list)))
-            (3 (let ((top (first processed-value))
-                     (h-val (second processed-value))
-                     (bottom (third processed-value)))
-                 (push (make-style :padding-top top) sub-styles-list)
-                 (push (make-style :padding-left h-val) sub-styles-list)
-                 (push (make-style :padding-right h-val) sub-styles-list)
-                 (push (make-style :padding-bottom bottom) sub-styles-list)))
-            (4 (let ((top (first processed-value))
-                     (right (second processed-value))
-                     (bottom (third processed-value))
-                     (left (fourth processed-value)))
-                 (push (make-style :padding-top top) sub-styles-list)
-                 (push (make-style :padding-right right) sub-styles-list)
-                 (push (make-style :padding-bottom bottom) sub-styles-list)
-                 (push (make-style :padding-left left) sub-styles-list)))
-            (t
-             ;; Not a valid number of arguments (0 or >4 integers) for numeric shorthand.
-             ;; Return nil, which causes defstylegroup to signal illegal-group-value.
-             nil))
+;;     ;; 2. Process if `processed-value` is a list of solely integers (valid numeric shorthand)
+;;     (if (and (listp processed-value) (every #'integerp processed-value))
+;;         (progn
+;;           (case (length processed-value)
+;;             (1 (let ((val (first processed-value)))
+;;                  (push (make-style :padding-top val) sub-styles-list)
+;;                  (push (make-style :padding-bottom val) sub-styles-list)
+;;                  (push (make-style :padding-left val) sub-styles-list)
+;;                  (push (make-style :padding-right val) sub-styles-list)))
+;;             (2 (let ((v-val (first processed-value))
+;;                      (h-val (second processed-value)))
+;;                  (push (make-style :padding-top v-val) sub-styles-list)
+;;                  (push (make-style :padding-bottom v-val) sub-styles-list)
+;;                  (push (make-style :padding-left h-val) sub-styles-list)
+;;                  (push (make-style :padding-right h-val) sub-styles-list)))
+;;             (3 (let ((top (first processed-value))
+;;                      (h-val (second processed-value))
+;;                      (bottom (third processed-value)))
+;;                  (push (make-style :padding-top top) sub-styles-list)
+;;                  (push (make-style :padding-left h-val) sub-styles-list)
+;;                  (push (make-style :padding-right h-val) sub-styles-list)
+;;                  (push (make-style :padding-bottom bottom) sub-styles-list)))
+;;             (4 (let ((top (first processed-value))
+;;                      (right (second processed-value))
+;;                      (bottom (third processed-value))
+;;                      (left (fourth processed-value)))
+;;                  (push (make-style :padding-top top) sub-styles-list)
+;;                  (push (make-style :padding-right right) sub-styles-list)
+;;                  (push (make-style :padding-bottom bottom) sub-styles-list)
+;;                  (push (make-style :padding-left left) sub-styles-list)))
+;;             (t
+;;              ;; Not a valid number of arguments (0 or >4 integers) for numeric shorthand.
+;;              ;; Return nil, which causes defstylegroup to signal illegal-group-value.
+;;              nil))
 
-          ;; Add default char and charstyle for numeric shorthand
-          (push (make-style :padding-char *pad-fill-char*) sub-styles-list)
-          (push (make-style :padding-charstyle nil) sub-styles-list)
-          (nreverse sub-styles-list)) ; Return the list of created style objects
-        ;; Not a list of solely integers, so not a valid numeric shorthand.
-        ;; Return nil to signal illegal-group-value.
-        nil)))
+;;           ;; Add default char and charstyle for numeric shorthand
+;;           (push (make-style :padding-char *pad-fill-char*) sub-styles-list)
+;;           (push (make-style :padding-charstyle nil) sub-styles-list)
+;;           (nreverse sub-styles-list)) ; Return the list of created style objects
+;;         ;; Not a list of solely integers, so not a valid numeric shorthand.
+;;         ;; Return nil to signal illegal-group-value.
+;;         nil)))
 
 (defstyle :margin-top 'integer
   :default 0 :docstring "Margin above the element.")
@@ -362,65 +362,65 @@ cons (:fr <number>), or list (:minmax <min-track-size> <max-track-size>)."
 (defstyle :margin-charstyle 'list
   :default nil :docstring "Margin character style.")
 
-(defstylegroup (:groups
-                (:margin-top :margin-bottom :margin-left :margin-right :margin-char :margin-charstyle)
-                :decorating-after :box
-                :docstring "Group for margin styles.")
-  ;; The `value` here is the shorthand value passed to (make-style :margin <value>)
-  (let ((processed-value value)
-        (sub-styles-list '()))
+;; (defstylegroup (:groups
+;;                 (:margin-top :margin-bottom :margin-left :margin-right :margin-char :margin-charstyle)
+;;                 :decorating-after :box
+;;                 :docstring "Group for margin styles.")
+;;   ;; The `value` here is the shorthand value passed to (make-style :margin <value>)
+;;   (let ((processed-value value)
+;;         (sub-styles-list '()))
 
-    ;; 1. Normalize input `value`
-    (when (null processed-value) (setf processed-value 0))
+;;     ;; 1. Normalize input `value`
+;;     (when (null processed-value) (setf processed-value 0))
 
-    (if (integerp processed-value)
-        (setf processed-value (list processed-value)))
+;;     (if (integerp processed-value)
+;;         (setf processed-value (list processed-value)))
 
-    ;; Handle potential single-element list nesting e.g. :margin '((1 2)) -> '(1 2)
-    (when (and (listp processed-value)
-               (= 1 (length processed-value))
-               (listp (first processed-value))
-               (every #'integerp (first processed-value)))
-      (setf processed-value (first processed-value)))
+;;     ;; Handle potential single-element list nesting e.g. :margin '((1 2)) -> '(1 2)
+;;     (when (and (listp processed-value)
+;;                (= 1 (length processed-value))
+;;                (listp (first processed-value))
+;;                (every #'integerp (first processed-value)))
+;;       (setf processed-value (first processed-value)))
 
-    ;; 2. Process if `processed-value` is a list of solely integers (valid numeric shorthand)
-    (if (and (listp processed-value) (every #'integerp processed-value))
-        (progn
-          (case (length processed-value)
-            (1 (let ((val (first processed-value)))
-                 (push (make-style :margin-top val) sub-styles-list)
-                 (push (make-style :margin-bottom val) sub-styles-list)
-                 (push (make-style :margin-left val) sub-styles-list)
-                 (push (make-style :margin-right val) sub-styles-list)))
-            (2 (let ((v-val (first processed-value))
-                     (h-val (second processed-value)))
-                 (push (make-style :margin-top v-val) sub-styles-list)
-                 (push (make-style :margin-bottom v-val) sub-styles-list)
-                 (push (make-style :margin-left h-val) sub-styles-list)
-                 (push (make-style :margin-right h-val) sub-styles-list)))
-            (3 (let ((top (first processed-value))
-                     (h-val (second processed-value))
-                     (bottom (third processed-value)))
-                 (push (make-style :margin-top top) sub-styles-list)
-                 (push (make-style :margin-left h-val) sub-styles-list)
-                 (push (make-style :margin-right h-val) sub-styles-list)
-                 (push (make-style :margin-bottom bottom) sub-styles-list)))
-            (4 (let ((top (first processed-value))
-                     (right (second processed-value))
-                     (bottom (third processed-value))
-                     (left (fourth processed-value)))
-                 (push (make-style :margin-top top) sub-styles-list)
-                 (push (make-style :margin-right right) sub-styles-list)
-                 (push (make-style :margin-bottom bottom) sub-styles-list)
-                 (push (make-style :margin-left left) sub-styles-list)))
-            (t
-             nil)) ; Signal illegal-group-value
+;;     ;; 2. Process if `processed-value` is a list of solely integers (valid numeric shorthand)
+;;     (if (and (listp processed-value) (every #'integerp processed-value))
+;;         (progn
+;;           (case (length processed-value)
+;;             (1 (let ((val (first processed-value)))
+;;                  (push (make-style :margin-top val) sub-styles-list)
+;;                  (push (make-style :margin-bottom val) sub-styles-list)
+;;                  (push (make-style :margin-left val) sub-styles-list)
+;;                  (push (make-style :margin-right val) sub-styles-list)))
+;;             (2 (let ((v-val (first processed-value))
+;;                      (h-val (second processed-value)))
+;;                  (push (make-style :margin-top v-val) sub-styles-list)
+;;                  (push (make-style :margin-bottom v-val) sub-styles-list)
+;;                  (push (make-style :margin-left h-val) sub-styles-list)
+;;                  (push (make-style :margin-right h-val) sub-styles-list)))
+;;             (3 (let ((top (first processed-value))
+;;                      (h-val (second processed-value))
+;;                      (bottom (third processed-value)))
+;;                  (push (make-style :margin-top top) sub-styles-list)
+;;                  (push (make-style :margin-left h-val) sub-styles-list)
+;;                  (push (make-style :margin-right h-val) sub-styles-list)
+;;                  (push (make-style :margin-bottom bottom) sub-styles-list)))
+;;             (4 (let ((top (first processed-value))
+;;                      (right (second processed-value))
+;;                      (bottom (third processed-value))
+;;                      (left (fourth processed-value)))
+;;                  (push (make-style :margin-top top) sub-styles-list)
+;;                  (push (make-style :margin-right right) sub-styles-list)
+;;                  (push (make-style :margin-bottom bottom) sub-styles-list)
+;;                  (push (make-style :margin-left left) sub-styles-list)))
+;;             (t
+;;              nil)) ; Signal illegal-group-value
 
-          ;; Add default char and charstyle for numeric shorthand
-          (push (make-style :margin-char *margin-fill-char*) sub-styles-list)
-          (push (make-style :margin-charstyle nil) sub-styles-list)
-          (nreverse sub-styles-list))
-        nil)))
+;;           ;; Add default char and charstyle for numeric shorthand
+;;           (push (make-style :margin-char *margin-fill-char*) sub-styles-list)
+;;           (push (make-style :margin-charstyle nil) sub-styles-list)
+;;           (nreverse sub-styles-list))
+;;         nil)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Grid Style Properties
@@ -451,17 +451,17 @@ cons (:fr <number>), or list (:minmax <min-track-size> <max-track-size>)."
 (defstyle :grid-row-gap '(integer 0 *) :default 0
   :docstring "Specifies the size of the gap between grid rows.")
 
-(defstylegroup (:groups (:grid-row-gap :grid-column-gap)
-                :docstring "Shorthand for grid-row-gap and grid-column-gap.")
-  ;; Value can be a single integer (applies to both row and column gaps)
-  ;; or a list of two integers (row-gap column-gap).
-  (let ((row-gap-val value)
-        (col-gap-val value))
-    (when (listp value)
-      (setf row-gap-val (first value))
-      (setf col-gap-val (if (second value) (second value) (first value))))
-    (list (make-style :grid-row-gap row-gap-val)
-          (make-style :grid-column-gap col-gap-val))))
+;; (defstylegroup (:groups (:grid-row-gap :grid-column-gap)
+;;                 :docstring "Shorthand for grid-row-gap and grid-column-gap.")
+;;   ;; Value can be a single integer (applies to both row and column gaps)
+;;   ;; or a list of two integers (row-gap column-gap).
+;;   (let ((row-gap-val value)
+;;         (col-gap-val value))
+;;     (when (listp value)
+;;       (setf row-gap-val (first value))
+;;       (setf col-gap-val (if (second value) (second value) (first value))))
+;;     (list (make-style :grid-row-gap row-gap-val)
+;;           (make-style :grid-column-gap col-gap-val))))
 
 
 ;; Grid Item Properties
@@ -477,27 +477,27 @@ cons (:fr <number>), or list (:minmax <min-track-size> <max-track-size>)."
 (defstyle :grid-row-end #'is-grid-line-value :default :auto
   :docstring "Specifies the ending grid line for a grid item's row.")
 
-(defstylegroup (:groups (:grid-column-start :grid-column-end)
-                :docstring "Shorthand for grid-column-start and grid-column-end.")
-  ;; Value can be a single grid-line-value (start, end is auto or span 1)
-  ;; or a list of two grid-line-values (start end).
-  (let ((start-val value)
-        (end-val :auto))
-    (when (listp value)
-      (setf start-val (first value))
-      (setf end-val (if (second value) (second value) :auto)))
-    (list (make-style :grid-column-start start-val)
-          (make-style :grid-column-end end-val))))
+;; (defstylegroup (:groups (:grid-column-start :grid-column-end)
+;;                 :docstring "Shorthand for grid-column-start and grid-column-end.")
+;;   ;; Value can be a single grid-line-value (start, end is auto or span 1)
+;;   ;; or a list of two grid-line-values (start end).
+;;   (let ((start-val value)
+;;         (end-val :auto))
+;;     (when (listp value)
+;;       (setf start-val (first value))
+;;       (setf end-val (if (second value) (second value) :auto)))
+;;     (list (make-style :grid-column-start start-val)
+;;           (make-style :grid-column-end end-val))))
 
-(defstylegroup (:groups (:grid-row-start :grid-row-end)
-                :docstring "Shorthand for grid-row-start and grid-row-end.")
-  (let ((start-val value)
-        (end-val :auto))
-    (when (listp value)
-      (setf start-val (first value))
-      (setf end-val (if (second value) (second value) :auto)))
-    (list (make-style :grid-row-start start-val)
-          (make-style :grid-row-end end-val))))
+;; (defstylegroup (:groups (:grid-row-start :grid-row-end)
+;;                 :docstring "Shorthand for grid-row-start and grid-row-end.")
+;;   (let ((start-val value)
+;;         (end-val :auto))
+;;     (when (listp value)
+;;       (setf start-val (first value))
+;;       (setf end-val (if (second value) (second value) :auto)))
+;;     (list (make-style :grid-row-start start-val)
+;;           (make-style :grid-row-end end-val))))
 
 (defstyle :grid-area #'is-grid-area-value :default nil
   :docstring "Shorthand for grid-row-start, grid-column-start, grid-row-end, and grid-column-end. Can also be a string to assign to a named grid area.")
@@ -699,19 +699,19 @@ Possible values are :none, :solid, :dashed, :dotted.")
 ;; Other ;; TODO: Add more properties as needed, e.g. cursor, user-select, transitions, transforms
 
 ;;; Style Set Definition
-(defstruct style-set "Represents a collection of style properties and their values."
-           (properties (make-hash-table :test 'eq) :type hash-table)
-           (parent nil :type (or null style-set)))
+;; (defstruct style-set "Represents a collection of style properties and their values."
+;;            (properties (make-hash-table :test 'eq) :type hash-table)
+;;            (parent nil :type (or null style-set)))
 
-(defmethod %get-style-set-parents-properties ((style-set style-set) &optional (inkl-actual nil))
-  "Returns the properties hash-table of a style-set, including parent properties."
-  (let ((pts (when inkl-actual
-               (list (style-set-properties style-set))))
-        (piv (style-set-parent style-set)))
-    (loop while (not (null piv))
-          do (progn (push (style-set-properties piv) pts)
-                    (setf piv (style-set-parent piv))))
-    pts))
+;; (defmethod %get-style-set-parents-properties ((style-set style-set) &optional (inkl-actual nil))
+;;   "Returns the properties hash-table of a style-set, including parent properties."
+;;   (let ((pts (when inkl-actual
+;;                (list (style-set-properties style-set))))
+;;         (piv (style-set-parent style-set)))
+;;     (loop while (not (null piv))
+;;           do (progn (push (style-set-properties piv) pts)
+;;                     (setf piv (style-set-parent piv))))
+;;     pts))
 ;; (let ((mh (make-hash-table)))
 ;;   (setf (gethash 'style-set-properties mh) #'style-set-properties)
 ;;   (%get-style-set-parents-properties
@@ -719,27 +719,27 @@ Possible values are :none, :solid, :dashed, :dotted.")
                                         ; :parent (make-style-set :parent (make-style-set
                                         ;                                 :properties mh)))))
 
-(defmethod get-style-set-properties ((style-set style-set) &optional (parents nil))
-  "Returns the properties hash-table of a style-set.
-This is primarily for internal use, to access the properties directly, also,
-recurse for parent style-sets if needed, with the children style-sets overriding
-the parent properties.
+;; (defmethod get-style-set-properties ((style-set style-set) &optional (parents nil))
+;;   "Returns the properties hash-table of a style-set.
+;; This is primarily for internal use, to access the properties directly, also,
+;; recurse for parent style-sets if needed, with the children style-sets overriding
+;; the parent properties.
 
-If PARENTS is true, it will include properties from parent style-sets.
-Arguments:
-STYLE-SET: The style-set to retrieve properties from.
-PARENTS: If true, include properties from parent style-sets.
+;; If PARENTS is true, it will include properties from parent style-sets.
+;; Arguments:
+;; STYLE-SET: The style-set to retrieve properties from.
+;; PARENTS: If true, include properties from parent style-sets.
 
-Returns:
-A hash-table containing the properties of the style-set, optionally including parent properties."
-  (let ((properties (style-set-properties style-set)))
-    (when parents
-      (let ((parent (%get-style-set-parents-properties style-set t)))
-        (dolist (p parent)
-          (maphash (lambda (key value)
-                     (setf (gethash key properties) value))
-                   p))))
-    properties))
+;; Returns:
+;; A hash-table containing the properties of the style-set, optionally including parent properties."
+;;   (let ((properties (style-set-properties style-set)))
+;;     (when parents
+;;       (let ((parent (%get-style-set-parents-properties style-set t)))
+;;         (dolist (p parent)
+;;           (maphash (lambda (key value)
+;;                      (setf (gethash key properties) value))
+;;                    p))))
+;;     properties))
 
 ;; (defun make-style-set (&key parent)
 ;;   "Creates a new style-set, optionally inheriting from a parent style-set."
@@ -755,9 +755,9 @@ If not found anywhere, returns the default value for the property."
   (check-type property-name keyword)
   (unless (member property-name *known-properties*) (warn "Accessing unknown style property: ~S" property-name)) ;; Or
   ;; (error "Unknown style property: ~S" property-name) ;; Uncomment for stricter checking
-  (let ((value (gethash property-name (style-set-properties style-set)))) ;; Check if the property is set locally
+  (let ((value (gethash property-name (elmtui.style-lib.api:style-set-styles style-set)))) ;; Check if the property is set locally
     (if (and (null value) inherit) ;; If not set locally, check parent style-set)
-        (let ((parent (style-set-parent style-set))) ;; Check if parent exists)
+        (let ((parent (elmtui.style-lib.api:style-set-styles style-set))) ;; Check if parent exists)
           ;; If parent exists, recursively check parent style-set
           (if parent
               (get-style-property parent property-name :inherit t)
@@ -794,7 +794,7 @@ against the property's type definition."
       (error "Cannot set unknown style property: ~S"
              property-name))
     (let ((parsed-value (parse-property-value definition value)))
-      (setf (gethash property-name (style-set-properties style-set)) parsed-value)
+      (setf (gethash property-name (elmtui.style-lib.api:style-set-styles style-set)) parsed-value)
       parsed-value)))
 
 ;; (defmacro defstyle (name &body properties)
@@ -806,37 +806,37 @@ against the property's type definition."
 ;;              `(set-style-property ,name ,prop-name ,prop-value))
 ;;      ,name))
 
-(defun merge-style-sets
-    (&rest style-sets) "Merges multiple style-sets into a new style-set. Properties from later style-sets in the argument list override earlier ones. The parent of the new style-set is nil."
-  (let
-      ((merged-set (make-style-set)))
-    (dolist (ss style-sets)
-      (when ss
-        (loop for key being the hash-keys
-                of
-                (style-set-properties ss) using
-                (hash-value value) do
-                  (setf (gethash key (style-set-properties merged-set)) value))))
-    merged-set))
+;; (defun merge-style-sets
+;;     (&rest style-sets) "Merges multiple style-sets into a new style-set. Properties from later style-sets in the argument list override earlier ones. The parent of the new style-set is nil."
+;;   (let
+;;       ((merged-set (make-style-set)))
+;;     (dolist (ss style-sets)
+;;       (when ss
+;;         (loop for key being the hash-keys
+;;                 of
+;;                 (style-set-properties ss) using
+;;                 (hash-value value) do
+;;                   (setf (gethash key (style-set-properties merged-set)) value))))
+;;     merged-set))
 
-(defun inherit-style-set (parent-style-set) "Creates a new style-set that inherits from a parent style-set."
-  (make-style-set :parent parent-style-set))
+;; (defun inherit-style-set (parent-style-set) "Creates a new style-set that inherits from a parent style-set."
+;;   (make-style-set :parent parent-style-set))
 
-(defun style-set-to-string
-    (style-set &key (indent 0))
-  "Returns a string representation of the style-set, primarily for debugging."
-  (let ((indent-str
-          (make-string indent :initial-element #\Space)))
-    (with-output-to-string (s)
-      (format s "~AStyleSet:~%" indent-str)
-      (when (style-set-parent style-set)
-        (format s "~A Parent: ~A~%" indent-str
-                (if (style-set-parent style-set) "Yes" "No")))
-      (loop for key being the hash-keys of
-                                        (style-set-properties style-set) using
-                                        (hash-value value) do
-                                          (format s "~A ~A: ~A~%" indent-str key
-                                                  (style-property-value-raw-value value))))))
+;; (defun style-set-to-string
+;;     (style-set &key (indent 0))
+;;   "Returns a string representation of the style-set, primarily for debugging."
+;;   (let ((indent-str
+;;           (make-string indent :initial-element #\Space)))
+;;     (with-output-to-string (s)
+;;       (format s "~AStyleSet:~%" indent-str)
+;;       (when (style-set-parent style-set)
+;;         (format s "~A Parent: ~A~%" indent-str
+;;                 (if (style-set-parent style-set) "Yes" "No")))
+;;       (loop for key being the hash-keys of
+;;                                         (style-set-properties style-set) using
+;;                                         (hash-value value) do
+;;                                           (format s "~A ~A: ~A~%" indent-str key
+;;                                                   (style-property-value-raw-value value))))))
 
 (defun find-style-property-definition
     (property-name) "Finds the definition for a style property."
@@ -911,3 +911,169 @@ against the property's type definition."
 ;;   (:border-color :red)
 ;;   (:border-style :solid)
 ;;   (:display :block))
+;;; == elmtui/style/groups.lisp ==
+
+;; Helpers to map tuple shorthands like CSS:
+;;  1 value: all
+;;  2 values: (y x)
+;;  3 values: (top x bottom)
+;;  4 values: (top right bottom left)
+
+(defun %edge-tuple->map (tuple leaf-order)
+  (labels ((broadcast (val)
+             (loop for leaf in leaf-order append (list leaf val))))
+    (case (length tuple)
+      (1 (broadcast (first tuple)))
+      (2 (destructuring-bind (v-y v-x) tuple
+           ;; y -> (top bottom), x -> (left right)
+           (list (first leaf-order) v-y
+                 (second leaf-order) v-x
+                 (third leaf-order) v-y
+                 (fourth leaf-order) v-x)))
+      (3 (destructuring-bind (v-top v-x v-bottom) tuple
+           (list (first leaf-order)  v-top
+                 (second leaf-order) v-x
+                 (third leaf-order)  v-bottom
+                 (fourth leaf-order) v-x)))
+      (4 (loop for leaf in leaf-order
+               for v in tuple
+               append (list leaf v)))
+      (t (error "Invalid tuple length ~a for edges; expected 1..4" (length tuple))))))
+
+;; -----------------------
+;; PADDING
+;; -----------------------
+(defstylegroup :padding
+  :doc "Padding shorthand group with axis forms.
+Keys recognized: :padding, :padding-x, :padding-y, :padding-top, :padding-right, :padding-bottom, :padding-left.
+Tuple for :padding follows CSS (1,2,3,4)."
+  :leaf-keys (:padding-top :padding-right :padding-bottom :padding-left)
+  :axes ((:padding-x . (:padding-left :padding-right))
+         (:padding-y . (:padding-top :padding-bottom)))
+  :synonyms (:p) ; optional alias
+  :tuple->map (lambda (tuple)
+                (%edge-tuple->map tuple
+                                  '(:padding-top :padding-right :padding-bottom :padding-left))))
+
+;; -----------------------
+;; MARGIN
+;; -----------------------
+(defstylegroup :margin
+  :doc "Margin shorthand group with axis forms.
+Keys recognized: :margin, :margin-x, :margin-y, :margin-top, :margin-right, :margin-bottom, :margin-left.
+Tuple for :margin follows CSS (1,2,3,4)."
+  :leaf-keys (:margin-top :margin-right :margin-bottom :margin-left)
+  :axes ((:margin-x . (:margin-left :margin-right))
+         (:margin-y . (:margin-top :margin-bottom)))
+  :synonyms (:m) ; optional alias
+  :tuple->map (lambda (tuple)
+                (%edge-tuple->map tuple
+                                  '(:margin-top :margin-right :margin-bottom :margin-left))))
+
+;; -----------------------
+;; BOX (sizes)
+;; -----------------------
+;; We support:
+;;   :box              -> width & height (scalar or (h w) tuple allowed)
+;;   :box-min          -> min-width & min-height (scalar or tuple)
+;;   :box-max          -> max-width & max-height (scalar or tuple)
+;; Axis-ish helpers:
+;;   :box-w            -> width (alias :w)
+;;   :box-h            -> height (alias :h)
+;;
+;; Allowed values for size leaves are your lib’s own domain, e.g. numbers, :fill, :auto.
+;;
+(flet ((size-tuple->map (tuple key-h key-w)
+         (case (length tuple)
+           (1 (list key-h (first tuple) key-w (first tuple)))
+           (2 (destructuring-bind (v-h v-w) tuple
+                (list key-h v-h key-w v-w)))
+           (t (error "Invalid length ~a for :box tuple; expected 1 or 2" (length tuple))))))
+  (defstylegroup :box
+    :doc "Box size shorthand. :box => (:height :width). Also supports :box-min, :box-max, and :box-w/:box-h."
+    :leaf-keys (:height :width :min-height :min-width :max-height :max-width)
+    ;; Treat :box-w/:box-h like axes that map to a single leaf
+    :axes ((:box-w . (:width))
+           (:box-h . (:height)))
+    :synonyms (:size) ; optional alias for :box
+    :tuple->map (lambda (tuple)
+                  (size-tuple->map tuple :height :width))
+    :normalizers ((:min-height . identity)  ; hook for unit normalization if needed
+                  (:min-width  . identity)
+                  (:max-height . identity)
+                  (:max-width  . identity)
+                  (:height     . identity)
+                  (:width      . identity))))
+
+;; Pseudo-groups for :box-min and :box-max; we reuse the same macro but with different leaves.
+(flet ((minmax-tuple (tuple key-h key-w)
+         (case (length tuple)
+           (1 (list key-h (first tuple) key-w (first tuple)))
+           (2 (destructuring-bind (v-h v-w) tuple
+                (list key-h v-h key-w v-w)))
+           (t (error "Invalid length for :box-min/:box-max; expected 1 or 2")))))
+  (defstylegroup :box-min
+    :doc "Shorthand for min sizes: :box-min => (:min-height :min-width)."
+    :leaf-keys (:min-height :min-width)
+    :axes ()
+    :tuple->map (lambda (tuple)
+                  (minmax-tuple tuple :min-height :min-width)))
+
+  (defstylegroup :box-max
+    :doc "Shorthand for max sizes: :box-max => (:max-height :max-width)."
+    :leaf-keys (:max-height :max-width)
+    :axes ()
+    :tuple->map (lambda (tuple)
+                  (minmax-tuple tuple :max-height :max-width))))
+
+;;; Convenience synonyms (optional). If you want direct :w/:h keys to participate in precedence,
+;;; you can define two tiny groups that map scalar to leaf.
+(defstylegroup :w
+  :doc "Width scalar convenience: :w -> :width."
+  :leaf-keys (:width)
+  :axes ())
+
+(defstylegroup :h
+  :doc "Height scalar convenience: :h -> :height."
+  :leaf-keys (:height)
+  :axes ())
+
+
+(defun expand-style (style)
+  (elmtui.style-lib.macros:expand-stylegroups style))
+
+;;; == end/expand.lisp ==
+
+;;; == end/groups.lisp ==
+;; Example 1: padding scalar
+;; (expand-style '(:padding 2))
+;; ;; => (:padding-left 2 :padding-bottom 2 :padding-right 2 :padding-top 2)
+
+;; ;; Example 2: padding tuple (top right bottom left)
+;; (expand-style '(:padding (1 2 3 4)))
+;; ;; => (:padding-top 1 :padding-right 2 :padding-bottom 3 :padding-left 4)
+
+;; ;; Example 3: axis overrides group
+;; (expand-style '(:padding (1 2) :padding-x 9))
+;; ;; => (:padding-top 1 :padding-bottom 1 :padding-left 9 :padding-right 9)
+
+;; ;; Example 4: leaf overrides axis & group
+;; (expand-style '(:padding 2 :padding-y 5 :padding-top 7))
+;; ;; => (:padding-left 2 :padding-right 2 :padding-bottom 5 :padding-top 7)
+
+;; ;; Example 5: margin alias
+;; (expand-style '(:m 3 :margin-left 0))
+;; ;; => (:margin-top 3 :margin-right 3 :margin-bottom 3 :margin-left 0)
+
+;; ;; Example 6: box sizes
+;; (expand-style '(:box (10 20)))
+;; ;; => (:height 10 :width 20)
+
+;; (expand-style '(:box 5 :box-w :fill))
+;; ;; => (:height 5 :width :fill)
+
+;; (expand-style '(:box-min 2 :box-max (100 200)))
+;; ;; => (:min-height 2 :min-width 2 :max-height 100 :max-width 200)
+
+;; (expand-style '(:h 9 :w 11 :box (5 6)))
+;; => (:height 9 :width 11) ; leaf convenience took precedence over group

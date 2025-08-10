@@ -47,7 +47,7 @@
     (let ((dsl '(:column :class "p-2" :children ((:text "x") (:text "y"))))
           (app-state nil))
       (is (equalp
-           '(:column :class "p-2" :children ((:text :content "x") (:text :content "y")))
+           '(:column :class "p-2" :children ((:text "x") (:text "y")))
            (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))
     (let ((dsl '(:column :class "p-2" :children ((:text :content "x") (:text :content "y"))))
           (app-state nil))
@@ -65,7 +65,7 @@
 
 (defmethod elmtui.ui.api:view ((component mock-counter-component) app-state &key id-path)
   (declare (ignore app-state id-path))
-  '(:text "0"))
+  '(:text :content "0"))
 
 (defmethod elmtui.tea-state:get-component-by-path ((app-state mock-app-state) path)
   (gethash path (slot-value app-state 'components)))
@@ -82,17 +82,26 @@
 ;; --- Stateful component tests ---
 
 (test dsl-resolve-stateful-component
-  (elmtui.app.api:with-temporary-dsl-component-registry
-    (unwind-protect
-         (progn
-           (elmtui.app.api:register-dsl-component-type :counter 'mock-counter-component)
-           (let* ((app-state (setup-test-app-state `(((:ctr) ,(make-instance 'mock-counter-component)))))
-                  (dsl '(:counter :id :ctr)))
-             (is (equalp '(:counter :id :ctr :resolved-view (:text "0"));:children ("0")))
-                         (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))
-           ;; Test that an error is signaled if :id is missing
-           (signals error (elmtui.view.dsl::render-dsl-to-resolved-tree '(:counter) (make-instance 'mock-app-state))))
-      (clear-dsl-component-registry))))
+  (list (elmtui.app.api:with-temporary-dsl-component-registry
+          (unwind-protect
+               (progn
+                 (elmtui.app.api:register-dsl-component-type :counter 'mock-counter-component)
+                 (let* ((app-state (setup-test-app-state `(((:ctr) ,(make-instance 'mock-counter-component)))))
+                        (dsl '(:counter :id :ctr))
+                        (app-ctx (make-app-context :state app-state)))
+                   ;; (is (equalp '(:counter :id :ctr :resolved-view (:text "0"));:children ("0")))
+                   ;;             (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))
+                   (is (equalp '(:TEXT :ID NIL :CONTENT "0" :WRAP T :ALIGN :LEFT :COLOR NIL)
+                               (elmtui.view.base-elements:to-dsl
+                                (elmtui.view.tree-transforms:process-tree
+                                 dsl
+                                 :ctx app-ctx
+                                 :root-rect (ctx-viewport-rect app-ctx)))))))
+            ;; (elmtui.view.tree-transforms:process-tree  )
+
+            ;; Test that an error is signaled if :id is missing
+            (signals error (elmtui.view.dsl::render-dsl-to-resolved-tree '(:counter) (make-instance 'mock-app-state))))
+          (clear-dsl-component-registry))))
 
 (test dsl-resolve-mixed-nesting-with-path-tracking
   (elmtui.app.api:with-temporary-dsl-component-registry

@@ -24,9 +24,9 @@
 ;;; 1. Normalisation → correct class & defaults
 ;;; ---------------------------------------------------------------
 (test base-elements-label-normalisation
-  (let ((obj (normalize-base-dsl '(:label :id :greet :text "Hi"))))
+  (let ((obj (normalize-base-dsl '(:label :id :greet :content "Hi"))))
     (is (typep obj 'elmtui.view.base-elements::label-element))
-    (is (string= "Hi" (elmtui.view.base-elements::label-text obj)))
+    (is (string= "Hi" (elmtui.view.base-elements::label-content obj)))
     (is (eq :greet (element-id obj)))
     (is (eq :label (elmtui.view.base-elements::element-type obj)))))
 
@@ -43,29 +43,32 @@
 (test base-elements-traversal-and-find
   (let* ((tree (normalize-base-dsl
                 '(:container :id :root
-                  :children ((:label  :id :lbl1 :text "A")
+                  :children ((:label  :id :lbl1 :content "A")
                              (:container :id :inner
-                                         :children ((:label  :id :lbl2 :text "B")
-                                                    (:button :id :btn  :text "Go")))))))
+                                         :children ((:label  :id :lbl2 :content "B")
+                                                    (:button :id :btn  :content "Go")))))))
          (labels (find-elements-by-type tree :label))
          (btn    (find-element-by-id tree :btn)))
     (is (= 2 (length labels)))
     (is (every (lambda (n) (typep n 'elmtui.view.base-elements::label-element)) labels))
     (is (typep btn 'elmtui.view.base-elements::button-element))
-    (is (string= "Go" (elmtui.view.base-elements::button-text btn)))))
+    (is (string= "Go" (elmtui.view.base-elements::button-content btn)))))
 
 ;;; ---------------------------------------------------------------
 ;;; 3. map-dsl-elements can mutate / transform nodes
 ;;; ---------------------------------------------------------------
 (test base-elements-map-transform-uppercase-labels
-  (let* ((tree  (normalize-base-dsl '(:label :id :l1 :text "hello")))
+  (let* ((tree  (normalize-base-dsl '(:label :id :l1 :content "hello")))
          (upper (map-dsl-elements
                  (lambda (node)
                    (if (typep node 'elmtui.view.base-elements::label-element)
-                       (update-dsl-element node :text (string-upcase (elmtui.view.base-elements::label-text node)))
+                       (update-dsl-element node
+                                           :content
+                                           (string-upcase
+                                            (elmtui.view.base-elements::label-content node)))
                        node))
                  tree)))
-    (is (string= "HELLO" (elmtui.view.base-elements::label-text upper)))))
+    (is (string= "HELLO" (elmtui.view.base-elements::label-content upper)))))
 
 ;;; ---------------------------------------------------------------
 ;;; 4. base-dsl-p recognises invalid element types
@@ -77,10 +80,10 @@
 ;;; 5. make-dsl-element & update-dsl-element round-trip
 ;;; ---------------------------------------------------------------
 (test base-elements-constructor-and-update
-  (let* ((btn (make-dsl-element :button :id :ok :text "OK"))
-         (btn* (update-dsl-element btn :text "Confirm" :disabled t)))
+  (let* ((btn (make-dsl-element :button :id :ok :content "OK"))
+         (btn* (update-dsl-element btn :content "Confirm" :disabled t)))
     (is (typep btn* 'elmtui.view.base-elements::button-element))
-    (is (string= "Confirm" (elmtui.view.base-elements::button-text btn*)))
+    (is (string= "Confirm" (elmtui.view.base-elements::button-content btn*)))
     (is-true (elmtui.view.base-elements::button-disabled-p btn*))))
 
 ;;; --- End of file ------------------------------------------------

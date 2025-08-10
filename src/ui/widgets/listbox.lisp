@@ -276,50 +276,49 @@ Usage:
          (all-classes (remove nil (list base-class focused-class empty-class custom-class))))
 
     ;; Create the styled node representing the listbox
-    (make-styled-node
-     :type :list-box
-     :props (list* :id widget-id
-                   :item-count item-count
-                   :height effective-height
-                   :scroll-offset (or scroll-offset 0)
-                   :focusable (not (zerop item-count))
-                   :class (format nil "~{~A~^ ~}" all-classes) ; Join classes with spaces
-                   :aria-role "listbox"
-                   :aria-multiselectable "false"
-                   ;; Include optional properties only if provided
-                   (append
-                    (when width (list :width width))
-                    (when tooltip (list :title tooltip))
-                    (when aria-label (list :aria-label aria-label))
-                    (when effective-on-select (progn
-                                                (log-info "Listbox on-select: ~A" effective-on-select)
-                                                (list :on-select effective-on-select)))))
-     ;; Build child nodes for each visible item
-     :children (if (zerop item-count)
-                   ;; Empty state
-                   (list (make-styled-node :type :text
-                                           :props (list :value effective-empty-text
-                                                        :class "listbox-empty-text")
-                                           :children nil))
-                   ;; Items
-                   (loop for item in visible-items
-                         for visible-index from 0
-                         for actual-index = (+ (or scroll-offset 0) visible-index)
-                         for is-selected = (equal actual-index effective-selected-index)
-                         for item-text = (if (stringp item) item (getf item :label (format nil "Item ~A" actual-index)))
-                         collect (make-styled-node
-                                  :type :list-item
-                                  :props (list :id (format nil "~A-item-~A" widget-id actual-index)
-                                               :value item-text
-                                               :selected is-selected
-                                               :index actual-index
-                                               :aria-role "option"
-                                               :aria-selected (if is-selected "true" "false")
-                                               :class (if is-selected "list-item list-item-selected" "list-item"))
-                                  :children (list (make-styled-node
-                                                   :type :text
-                                                   :props (list :value item-text)
-                                                   :children nil))))))))
+    (list :container
+          :props (list* :id widget-id
+                        :item-count item-count
+                        :height effective-height
+                        :scroll-offset (or scroll-offset 0)
+                        :focusable (not (zerop item-count))
+                        :class (format nil "~{~A~^ ~}" all-classes) ; Join classes with spaces
+                        :aria-role "listbox"
+                        :aria-multiselectable "false"
+                        ;; Include optional properties only if provided
+                        (append
+                         (when width (list :width width))
+                         (when tooltip (list :title tooltip))
+                         (when aria-label (list :aria-label aria-label))
+                         (when effective-on-select (progn
+                                                     (log-info "Listbox on-select: ~A" effective-on-select)
+                                                     (list :on-select effective-on-select)))))
+          ;; Build child nodes for each visible item
+          :children (if (zerop item-count)
+                        ;; Empty state
+                        (list :text :content effective-empty-text
+                                    :props (list :value effective-empty-text
+                                                 :class "listbox-empty-text")
+                                    :children nil)
+                        ;; Items
+                        (loop for item in visible-items
+                              for visible-index from 0
+                              for actual-index = (+ (or scroll-offset 0) visible-index)
+                              for is-selected = (equal actual-index effective-selected-index)
+                              for item-text = (if (stringp item) item (getf item :label (format nil "Item ~A" actual-index)))
+                              collect (list :text
+                                            :type :list-item
+                                            :props (list :id (format nil "~A-item-~A" widget-id actual-index)
+                                                         :value item-text
+                                                         :selected is-selected
+                                                         :index actual-index
+                                                         :aria-role "option"
+                                                         :aria-selected (if is-selected "true" "false")
+                                                         :class (if is-selected "list-item list-item-selected" "list-item"))
+                                            :children (list :text
+                                                            :content item-text
+                                                            :props (list :value item-text)
+                                                            :children nil)))))))
 
 ;;;---------------------------------------------------------------
 ;;; Backward Compatibility Wrapper

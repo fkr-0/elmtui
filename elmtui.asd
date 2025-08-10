@@ -41,11 +41,13 @@
                              (:file "ems")
                              (:file "clevelib")))
 
+               (:file "view/geo")
                (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
                ;; Core Modules (Load after cleve-elm, before API Layer)
                (:file "view/position") ; Load position before focus manager
                (:file "view/api") ; Imports: cl (pure declarations)
                (:file "view/base-elements") ;
+               (:file "view/element-protocol") ;
 
                (:file "core/conditions")
                ;; Load state module early since focus manager needs it
@@ -126,7 +128,6 @@
 
 
 
-               (:file "view/geo")
                (:file "view/core")
                (:module "view/style-lib"
                 :pathname "view/style-lib/"
@@ -184,7 +185,7 @@
                                            (:file "keytester")
                                            (:file "keytester-map")
                                            (:file "listbox")
-                                           ;; (:file "counter")
+                                           (:file "counter")
                                            (:file "scrollable-container")
                                            ))
                              ;; Load the main package file AFTER the individual widget files
@@ -194,12 +195,13 @@
                (:file "app/dsl-type-registry")
                ;; (:file "view/dsl")
                (:file "view/dsl")
+               (:file "view/layout/utils")   ; Grid depends on layout now
                (:file "view/layout/flex")
-               (:file "view/layout/core") ; Load layout before grid
-               (:file "view/tree-transforms")
                (:file "view/layout/grid")   ; Grid depends on layout now
+               (:file "view/layout/core") ; Load layout before grid
                (:file "view/reactive") ; Reactive view system
                (:file "view/animation") ; Animation framework
+               (:file "view/tree-transforms")
 
                ;; Styling System (Moved here as it depends on view/style-lib)
                (:module "style"
