@@ -14,7 +14,7 @@
   (:import-from #:elmtui.style-lib.sheet #:defstylesheet)
   (:import-from #:elmtui.style-lib.selector #:type>)
   (:import-from #:elmtui.style-lib.style-set #:set-style)
-  (:import-from #:elmtui.view.layout #:layout-tree #:calculate-content-rect)
+  (:import-from #:elmtui.view.layout #:layout-tree )
   (:import-from #:elmtui.view.geo
                 #:make-rectangle #:make-pos #:make-size
                 #:x #:y #:w #:h #:rectangle))
@@ -40,7 +40,7 @@
 
 ;; Helper to get layout-rect from a node
 (defun get-lr (node)
-  (getf (ui-node-props node) :layout-rect))
+  (elmtui.view.element:el/layout-rect node))
 
 (test basic-block-layout-single-child
   "Test block layout with a single child, padding, border, and margin."

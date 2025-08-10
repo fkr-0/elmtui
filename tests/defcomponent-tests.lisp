@@ -85,11 +85,13 @@
                    :active t)
                  nil))
 
-  (:update (msg local-state app-state id-path)
+  (:update (local-state app-state msg id-path)
            (:set-name (new-name)
                       (values `(:name ,new-name) nil))
            (:toggle-active ()
-                           (values `(:active ,(not (getf local-state :active))) nil)))
+                                        ;(let ((local-state (elmtui.utils:get-path app-state id-path)))
+                           (values `(:active ,(not (getf local-state :active))) nil);)
+                           ))
 
   (:view (local-state app-state id-path children)
          `(:component :type :test-complete

@@ -47,9 +47,9 @@
                          :text-content ,text
                          :aria-role "label"
                          ,@(when for-target `(:label-for ,for-target)))))
-           (make-styled-node
-            :type :drawable-content
-            :props props
-            :children nil))))
+           (list :drawable-content
+                 :type :drawable-content
+                 :props props
+                 :children nil))))
 
 ;; To make a label instance: (make-instance 'label :id :my-label :text "My Label Text" :for :my-input-id)

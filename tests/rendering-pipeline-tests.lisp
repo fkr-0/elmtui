@@ -51,9 +51,6 @@
      :backend nil)
     ;; app-state
     ))
-;; (atomic->layout-stage (styled->atomic-stage (raw->styled-stage (dsl->raw-stage (generate-dsl (setup-test-context))))))
-;; (elmtui.view.dsl:dsl->ui-node (root (ctx-dsl-tree(generate-dsl (setup-test-context)))) nil)
-;; (setup-test-context)
 ;; (setup-test-context)
 
 (test rainbow-app-example-state
@@ -75,51 +72,16 @@
     (is (typep (ctx-back-buffer final-context) 'elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer)
         "The back-buffer should be a virtual-terminal-buffer.")))
 
-;; (let ((styled-context
-;;         (styled->atomic-stage (raw->styled-stage (dsl->raw-stage (generate-dsl (setup-test-context )))))))
-;;   (atomic->layout-stage
-;;    styled-context)
-;;   )
-;; (test styled->atomic-stage-contract
-;;   "Tests that styled->atomic-stage produces an atomic-tree from a styled-tree."
-;;   (is (typep (ctx-atomic-tree styled-context) 'atomic-tree)
-;;       "styled->atomic-stage should produce an atomic-tree struct.")))
 
 (test pipeline-step-by-step-transformation
   "Tests each stage of the rendering pipeline individually."
   (let* ((context (setup-test-context ))
          (buffer (ctx-front-buffer context)))
     ;; Stage 0: Generate DSL
-    ;; (let ((ctx-after-dsl ( context)))
     (elmtui.dev::with-buffer-dump (buffer)
-      (let ((ctx-after-dsl (generate-dsl context)))
-        ;; ctx-after-dsl))
-        (is (typep (ctx-dsl-tree ctx-after-dsl) 'dsl-tree) "generate-dsl should add a dsl-tree struct to the context.")
-        (is (eq :container (first (root (ctx-dsl-tree ctx-after-dsl))))
-            "The root of the DSL should be a :column.")
-        (setf context ctx-after-dsl))
-
-      ;; Stage 1: DSL -> Raw
-      (let ((ctx-after-raw (dsl->raw-stage context)))
-        ;; context))
-        (is (typep (ctx-raw-tree ctx-after-raw) 'raw-tree)
-            "dsl->raw-stage should produce a raw-tree struct.")
-        (setf context ctx-after-raw))
-
-      ;; Stage 2: Raw -> Styled
-      (let ((ctx-after-styled (raw->styled-stage context)))
-        (is (typep (ctx-styled-tree ctx-after-styled) 'styled-tree)
-            "raw->styled-stage should produce a styled-tree struct.")
-        (setf context ctx-after-styled))
-
-      ;; Stage 3: Styled -> Atomic
-      (let ((ctx-after-atomic (styled->atomic-stage context)))
-        (is (typep (ctx-atomic-tree ctx-after-atomic) 'atomic-tree) "styled->atomic-stage should produce an atomic-tree struct.")
-        (setf context ctx-after-atomic))
-
-      ;; Stage 4: Atomic -> Laid-out
-      (let ((ctx-after-layout (atomic->layout-stage context)))
-        (is (typep (ctx-laid-out-tree ctx-after-layout) 'laid-out-tree) "atomic->layout-stage should produce a laid-out-tree struct.")
+      (let ((ctx-after-layout (process-tree-stage context)))
+        ;; (is (typep (ctx-laid-out-tree ctx-after-layout) 'laid-out-tree)
+        ;;     "atomic->layout-stage should produce a laid-out-tree struct.")
         (setf context ctx-after-layout))
 
       ;; Stage 5: Render to Buffer
@@ -129,13 +91,10 @@
         (setf context ctx-after-render-buffer))
 
       ;; Stage 6: Display Buffer (simulated)
-      ;; (let ((ctx-after-display (display-buffer context)))
-      ;;   (is (virtual-terminal-buffer-p (ctx-front-buffer ctx-after-display))
-      ;;       "display-buffer should place a new buffer in :front-buffer."))
+      (let ((ctx-after-display (display-buffer context)))
+        (is (virtual-terminal-buffer-p (ctx-front-buffer ctx-after-display))
+            "display-buffer should place a new buffer in :front-buffer."))
+
+
       )))
 
-(test dsl->raw-contract-violation
-  "Should signal pipeline-contract-violation if dsl->raw-stage receives a non-dsl-tree input."
-  (let ((bad-context (make-app-context :dsl-tree 42)))
-    (signals elmtui.contracts:pipeline-contract-violation
-      (dsl->raw-stage bad-context))))

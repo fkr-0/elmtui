@@ -1,17 +1,19 @@
 ;;; == exampleproject/src/components/key-tester.lisp ==
 (uiop:define-package :example.key-tester
   (:use :cl :alexandria)
+  (:import-from :log4cl
+    :log-info)
   (:import-from :elmtui.keymaps
-                #:key-event->normalized-key
-                #:normalized-key->string
-                )
+    #:key-event->normalized-key
+    #:normalized-key->string
+    )
   (:export
-   #:make-key-tester
-   #:key-tester
-   #:key-tester-on-key-event
-   #:key-tester-render
-   #:nk->keyword-list
-   #:printable-ascii-char-p))
+    #:make-key-tester
+    #:key-tester
+    #:key-tester-on-key-event
+    #:key-tester-render
+    #:nk->keyword-list
+    #:printable-ascii-char-p))
 
 (in-package :example.key-tester)
 
@@ -40,14 +42,14 @@
    - If NK.key is already a keyword (e.g. :ENTER), keep it.
    Example → '(:CTRL :ALT :A)"
   (let* ((mods (slot-value nk 'elmtui.keymaps::modifiers))            ; use exported behavior; nk is a struct
-         (key  (slot-value nk 'elmtui.keymaps::key))
-         (key-kw (etypecase key
-                   (character (intern (string-upcase (string key)) :keyword))
-                   (keyword   key))))
+          (key  (slot-value nk 'elmtui.keymaps::key))
+          (key-kw (etypecase key
+                    (character (intern (string-upcase (string key)) :keyword))
+                    (keyword   key))))
     (append (mapcar #'alexandria:make-keyword
-                    ;; NOTE: MODS are already normalized by elmtui.keymaps.
-                    (copy-list mods))
-            (list key-kw))))
+              ;; NOTE: MODS are already normalized by elmtui.keymaps.
+              (copy-list mods))
+      (list key-kw))))
 
 (defun printable-ascii-char-p (ch)
   "True iff CH is a printable ASCII character. Assumes CHAR input."
@@ -67,26 +69,35 @@
    - Update ECHO with keyword notation.
    - If key is printable ASCII and has no modifiers, append to INPUT.
    Returns the updated COMPONENT."
-  (let* ((nk (key-event->normalized-key evt)))
+  (log-info "Key-Tester> Key event: ~A" evt)
+  (let* ((e (getf (elmtui.tea-state.msg:msg-data evt) :event))
+          (chr (getf (elmtui.tea-state.msg:msg-data evt) :char))
+          (nk (key-event->normalized-key e))
+          (ck (getf (elmtui.tea-state.msg:msg-data evt) :key)))
     (if (null nk)
-        component
-        (let* ((kw-form (nk->keyword-list nk))
-               (echo-str (prin1-to-string kw-form))
-               ;; extract key & modifiers (using the same slots the NK struct uses)
-               (mods (slot-value nk 'elmtui.keymaps::modifiers))
-               (key  (slot-value nk 'elmtui.keymaps::key)))
+      component
+      (let* ((kw-form (nk->keyword-list nk))
+              (echo-str (prin1-to-string kw-form)))
+        ;; extract key & modifiers (using the same slots the NK struct uses)
+        ;; (mods (slot-value nk 'elmtui.keymaps::modifiers))
+        ;;(key  (slot-value nk 'elmtui.keymaps::key)))
 
-          ;; Always refresh echo to the parsed value:
-          (setf (key-tester-echo component) echo-str)
-
-          ;; Append printable ASCII only if no modifiers are held:
-          (when (and (characterp key)
-                     (printable-ascii-char-p key)
-                     (null mods))
-            (setf (key-tester-input component)
-                  (concatenate 'string (key-tester-input component) (string key))))
-
-          component))))
+        ;; Always refresh echo to the parsed value:
+        (setf (key-tester-echo component) echo-str)
+        (when (eql ck :backspace)
+          ;; Backspace: delete last character in INPUT (if any).
+          (setf (key-tester-input component)
+            (if (> (length (key-tester-input component)) 0)
+              (subseq (key-tester-input component) 0
+                (1- (length (key-tester-input component)))))))
+        ;; Append printable ASCII only if no modifiers are held:
+        (when chr ;; (and (characterp key)
+          ;;   (printable-ascii-char-p key)
+          ;;   (null mods))
+          (setf (key-tester-input component)
+            (concatenate 'string (key-tester-input component)
+              (format nil "~C" chr))))
+        component))))
 
 ;;; --------------------------------------------------------------------------
 ;;; (Very) Simple Renderer for demonstration / console logs

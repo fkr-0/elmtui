@@ -14,7 +14,7 @@
                 #:base-dsl-error
                 ;; classes and accessors
                 #:text-element #:text-content #:text-wrap #:text-align
-                #:button-element #:button-text
+                #:button-element #:button-content
                 #:container-element #:element-children #:element-id)
 
   (:import-from :elmtui.tea-state.model
@@ -58,7 +58,7 @@
 
   ;; Valid simple elements
   (is-true (base-dsl-p '(:text :content "Hello")))
-  (is-true (base-dsl-p '(:button :text "Click Me")))
+  (is-true (base-dsl-p '(:button :content "Click Me")))
   (is-true (base-dsl-p '(:container :id :main)))
 
   ;; Valid complex elements
@@ -89,12 +89,12 @@
   (is-true (valid-property-p :container :id))
   (is-true (valid-property-p :container :children))
   (is-true (valid-property-p :text :content))
-  (is-true (valid-property-p :button :text))
+  (is-true (valid-property-p :button :content))
 
   ;; Invalid properties
   (is-false (valid-property-p :container :invalid-prop))
   (is-false (valid-property-p :text :invalid-prop))
-  (is-false (valid-property-p :button :content))) ; :content is for :text, not :button
+  (is-false (valid-property-p :button :text))) ; :content is for :text, not :button
 
 ;; (test required-property-validation
 ;;   "Test validation of required properties"
@@ -139,10 +139,10 @@
     (is (equal (text-content element) "Test")))
 
   ;; Test update-dsl-element on a CLOS object
-  (let* ((original (make-dsl-element :button :text "Original" :id :btn1))
-         (updated (update-dsl-element original :text "Updated" :id :btn2)))
+  (let* ((original (make-dsl-element :button :content "Original" :id :btn1))
+         (updated (update-dsl-element original :content "Updated" :id :btn2)))
     (is (not (eq original updated))) ; Should be a new object
-    (is (equal (button-text updated) "Updated"))
+    (is (equal (elmtui.view.base-elements::button-content updated) "Updated"))
     (is (eq (element-id original) :btn1)) ; Original is untouched
     (is (eq (element-id updated) :btn2))) ; New object has new id
 
@@ -157,7 +157,7 @@
                 :id :main
                 :children ((:text :id :title :content "Title")
                            (:container :id :sub
-                                       :children ((:button :id :btn :text "Click"))))))))
+                                       :children ((:button :id :btn :content "Click"))))))))
     ;; Test find by type
     (let ((texts (find-elements-by-type dsl :text)))
       (is (= (length texts) 1))
@@ -183,7 +183,7 @@
                '(:container
                  :children ((:text :content "Text1")
                             (:text :content "Text2")
-                            (:button :text "Button")))))
+                            (:button :content "Button")))))
          (stats (dsl-statistics dsl)))
 
     (is (= (getf stats :total-elements) 4))
