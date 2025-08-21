@@ -33,8 +33,7 @@
       ;; ui-node
       ;; )
       ;; ))
-      (let ((children (elmtui.view.api:ui-node-children ui-node)))
-
+      (let ((children (elmtui.view.element:el/children ui-node)))
         (is (listp children))
         (is (= 2 (length children)))
         (is (elmtui.view.element:element-p (first children)))
