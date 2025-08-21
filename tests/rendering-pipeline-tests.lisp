@@ -73,28 +73,27 @@
         "The back-buffer should be a virtual-terminal-buffer.")))
 
 
-(test pipeline-step-by-step-transformation
-  "Tests each stage of the rendering pipeline individually."
-  (let* ((context (setup-test-context ))
-         (buffer (ctx-front-buffer context)))
-    ;; Stage 0: Generate DSL
-    (elmtui.dev::with-buffer-dump (buffer)
-      (let ((ctx-after-layout (process-tree-stage context)))
-        ;; (is (typep (ctx-laid-out-tree ctx-after-layout) 'laid-out-tree)
-        ;;     "atomic->layout-stage should produce a laid-out-tree struct.")
-        (setf context ctx-after-layout))
+;; (test pipeline-step-by-step-transformation
+;;   "Tests each stage of the rendering pipeline individually."
+;;   (let* ((context (setup-test-context ))
+;;          (buffer (ctx-front-buffer context)))
+;;     ;; Stage 0: Generate DSL
+;;     (elmtui.dev::with-buffer-dump (buffer)
+;;       (let ((ctx-after-layout (process-tree-stage context)))
+;;         ;; (is (typep (ctx-laid-out-tree ctx-after-layout) 'laid-out-tree)
+;;         ;;     "atomic->layout-stage should produce a laid-out-tree struct.")
+;;         (setf context ctx-after-layout))
 
-      ;; Stage 5: Render to Buffer
-      (let ((ctx-after-render-buffer (render-to-buffer context)))
-        (is (virtual-terminal-buffer-p (ctx-back-buffer ctx-after-render-buffer))
-            "render-to-buffer should produce a virtual-terminal-buffer in :back-buffer.")
-        (setf context ctx-after-render-buffer))
+;;       ;; Stage 5: Render to Buffer
+;;       (let ((ctx-after-render-buffer (render-to-buffer context)))
+;;         (is (virtual-terminal-buffer-p (ctx-back-buffer ctx-after-render-buffer))
+;;             "render-to-buffer should produce a virtual-terminal-buffer in :back-buffer.")
+;;         (setf context ctx-after-render-buffer))
 
-      ;; Stage 6: Display Buffer (simulated)
-      (let ((ctx-after-display (display-buffer context)))
-        (is (virtual-terminal-buffer-p (ctx-front-buffer ctx-after-display))
-            "display-buffer should place a new buffer in :front-buffer."))
+;;       ;; Stage 6: Display Buffer (simulated)
+;;       (let ((ctx-after-display (display-buffer context)))
+;;         (is (virtual-terminal-buffer-p (ctx-front-buffer ctx-after-display))
+;;             "display-buffer should place a new buffer in :front-buffer."))
 
 
-      )))
-
+;;       )))

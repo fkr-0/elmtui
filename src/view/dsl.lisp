@@ -1,7 +1,11 @@
 (uiop:define-package #:elmtui.view.dsl
   (:use #:cl)
   (:import-from #:log4cl #:log-info)
-  (:import-from #:elmtui.app.api #:get-component-class-for-dsl-type #:registered-dsl-component-p)
+  (:import-from #:elmtui.view.base-elements
+                #:element-class)
+  (:import-from #:elmtui.app.api
+                #:get-component-class-for-dsl-type
+                #:registered-dsl-component-p)
   (:export #:render-dsl-to-resolved-tree #:defcomponent-dsl #:dsl->ui-node))
 
 (in-package #:elmtui.view.dsl)
@@ -14,70 +18,137 @@
          (list* ,dsl-type :id id args))
        (export ',helper-fn-name))))
 
+
+
+;; == elmtui/view/dsl/resolve.lisp ==
+;; robust DSL resolver:
+;; - never descends into property values (e.g. :style stays intact)
+;; - :resolved-view is attached as a PROP, not under :children
+;; - only lists that are *explicit children* are treated as DSL sibling bags
+
+;; (defun split-props/children (args)
+;;   (let ((props '()) (cursor args))
+;;     (loop while (and cursor (keywordp (first cursor)))
+;;           do (let ((key (pop cursor)))
+;;                (when (null cursor) (error "Property list for ~S is missing a value." key))
+;;                (push key props)
+;;                (push (pop cursor) props)))
+;;     (setf props (nreverse props))
+;;     (let* ((positional cursor)
+;;            (explicit (getf props :children)))
+;;       (values (if explicit (alexandria:remove-from-plist props :children) props)
+;;               (if explicit explicit (copy-tree positional))))))
+;; (defun split-props/children (args)
+;;   "Split the DSL tail into (values PROPS CHILDREN).
+;;    PROPS is a plist of *top-level* k/v pairs with any top-level :children removed.
+;;    CHILDREN is either the explicit :children value or the tail starting at the first
+;;    non-keyword (positional children)."
+;;   (let ((props '())
+;;         (children nil)
+;;         (cursor args))
+;;     (loop
+;;       (when (null cursor) (return))
+;;       (let ((k (first cursor)))
+;;         (cond
+;;           ((keywordp k)
+;;            (when (null (rest cursor))
+;;              (error "Property list for ~S is missing a value." k))
+;;            (let ((v (second cursor)))
+;;              (if (eq k :children)
+;;                  (setf children v)
+;;                  (setf props (nconc props (list k v)))))
+;;            (setf cursor (cddr cursor)))
+;;           (t
+;;            ;; First non-keyword → the remainder are positional children.
+;;            (setf children cursor
+;;                  cursor   nil)))))
+;;     (values props (copy-tree children))))
+
 (defun split-props/children (args)
-  (let ((props '()) (cursor args))
-    (loop while (and cursor (keywordp (first cursor)))
-          do (let ((key (pop cursor)))
-               (when (null cursor) (error "Property list for ~S is missing a value." key))
-               (push key props)
-               (push (pop cursor) props)))
-    (setf props (nreverse props))
-    (let* ((positional cursor)
-           (explicit (getf props :children)))
-      (values (if explicit (alexandria:remove-from-plist props :children) props)
-              (if explicit explicit (copy-tree positional))))))
+  "Split top-level tail into (values PROPS CHILDREN), without touching prop values.
+   CHILDREN is either the explicit :children value, or the positional tail
+   (starting at the first non-keyword)."
+  (let ((props '())
+        (children nil)
+        (cursor args))
+    (loop
+      (when (null cursor) (return))
+      (let ((k (first cursor)))
+        (cond
+          ((keywordp k)
+           (when (null (rest cursor))
+             (error "Property list for ~S is missing a value." k))
+           (let ((v (second cursor)))
+             (if (eq k :children)
+                 (setf children v)
+                 (setf props (nconc (list k v) props ))))
+           (setf cursor (cddr cursor)))
+          (t
+           (setf children cursor
+                 cursor   nil)))))
+    (values props (copy-tree children))))
+
+(defun %emit-node (type props &optional children)
+  "Emit `(TYPE ...props... [:children children])`. CHILDREN remains a list."
+  (append (list type)
+          props
+          (when children (list :children children))))
 
 (defun render-dsl-to-resolved-tree (dsl-spec app-state)
-  "Walks DSL-SPEC and returns a resolved DSL tree where component views are expanded,
-   handling shorthand and preserving structure."
+  "Resolve DSL to a tree. Only recurse into *children*. Prop values are opaque data.
+   Treat a list as a DSL node only if its head keyword is a *known* DSL tag."
   (let ((resolved-something nil))
-    (labels ((process-node (spec path)
-               (cond
-                 ;; Atomic values are returned as-is.
-                 ((atom spec) spec)
+    (labels
+        ((process-node (spec path &key (in-children-p nil))
+           (cond
+             ;; atoms pass through
+             ((atom spec) spec)
 
-                 ;; A list of specs is processed recursively.
-                 ((and (listp spec) (not (keywordp (first spec))))
-                  (let ((processed-children (remove nil (mapcar (lambda (item) (process-node item path)) spec))))
-                    (if (= 1 (length processed-children))
-                        (first processed-children)
-                        processed-children)))
+             ;; sibling bag: only inside a children position
+             ((and in-children-p (listp spec) (not (keywordp (first spec))))
+              (mapcar (lambda (item) (process-node item path :in-children-p nil)) spec))
 
-                 ;; A DSL form (e.g., (:BOX ...))
-                 ((and (listp spec) (keywordp (first spec)))
-                  (destructuring-bind (type &rest tail) spec
-                    (multiple-value-bind (props children) (split-props/children tail)
-                      (let* ((id (getf props :id))
-                             (new-path (if id (append path (list id)) path)))
+             ;; potential DSL node: only if head is a known DSL tag
+             ((and (listp spec)
+                   (keywordp (first spec))
+                   (or (and (fboundp 'registered-dsl-component-p)
+                            (ignore-errors (registered-dsl-component-p (first spec))))
+                       (element-class (first spec))))
+              (destructuring-bind (type &rest tail) spec
+                ;; shorthand (:TEXT "hello")
+                (when (and (= (length tail) 1) (stringp (first tail)))
+                  (return-from process-node `(,type :content ,(first tail))))
+                (multiple-value-bind (props children) (split-props/children tail)
+                  (let* ((id (getf props :id))
+                         (new-path (if id (append path (list id)) path)))
+                    (when (and id (member id path :test #'equal))
+                      (error "Circular dependency for ID ~S detected in path ~S" id path))
+                    (if (and (fboundp 'registered-dsl-component-p)
+                             (ignore-errors (registered-dsl-component-p type)))
+                        ;; component → resolve view, attach as a PROP
+                        (progn
+                          (unless id (error "Component ~S requires an :id" type))
+                          (setf resolved-something t)
+                          (let* ((klass    (get-component-class-for-dsl-type type))
+                                 (instance (make-instance klass))
+                                 (view     (elmtui.ui.api:view instance app-state
+                                                               :id-path new-path
+                                                               :children children))
+                                 (rv       (process-node view new-path :in-children-p nil)))
+                            (%emit-node type (append props (list :resolved-view rv)) nil)))
+                        ;; normal element → recurse only into CHILDREN
+                        (%emit-node type props
+                                    (when children
+                                      (mapcar (lambda (c) (process-node c new-path :in-children-p t))
+                                              children))))))))
 
-                        ;; Check for circular dependencies.
-                        (when (and id (member id path :test #'equal))
-                          (error "Circular dependency for ID ~S detected in path ~S" id path))
+             ;; any other list (including style plists like (:BORDER T ...)) is **data**
+             ((listp spec) spec)
 
-                        (if (registered-dsl-component-p type)
-                            ;; This is a component that needs to be resolved.
-                            (progn
-                              (unless id (error "Component ~S requires an :id" type))
-                              (setf resolved-something t)
-                              (let* ((klass (get-component-class-for-dsl-type type))
-                                     (instance (make-instance klass))
-                                     (view (elmtui.ui.api:view instance app-state :id-path new-path :children children)))
-                                ;; The resolved view is wrapped to preserve the component's identity and props.
-                                `(,type ,@props :resolved-view ,(process-node view new-path))))
-
-                            ;; This is a standard element (e.g., :BOX, :TEXT).
-                            (let ((resolved-children (remove nil (mapcar (lambda (c) (process-node c new-path)) children) :test #'equalp)))
-                              (cond
-                                ;; Shorthand for content: (:TEXT "hello") -> (:TEXT :content "hello")
-                                ((and (null (cdr tail)) (stringp (car tail)))
-                                 `(,type :content ,(car tail)))
-                                ;; Retain children only if there are any.
-                                (resolved-children
-                                 `(,type ,@props :children ,(if (= 1 (length resolved-children)) (car resolved-children) resolved-children)))
-                                ;; No children, just props.
-                                (t `(,type ,@props)))))))))
-                 (t spec))))
+             (t spec))))
       (values (process-node dsl-spec '()) resolved-something))))
+;; == end/resolve.lisp ==
+;; == end/resolve.lisp ==
 
 (defun dsl->ui-node (dsl-spec app-state)
   (let ((spec (if (listp dsl-spec)

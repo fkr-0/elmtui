@@ -47,9 +47,9 @@
     (let ((dsl '(:column :class "p-2" :children ((:text "x") (:text "y"))))
           (app-state nil))
       (is (equalp
-           '(:column :class "p-2" :children ((:text "x") (:text "y")))
+           '(:column :class "p-2" :children ((:text :content "x") (:text :content "y")))
            (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state))))
-    (let ((dsl '(:column :class "p-2" :children ((:text :content "x") (:text :content "y"))))
+    (let ((dsl '(:column :class "p-2" :children ((:text  "x") (:text :content "y"))))
           (app-state nil))
       (is (equalp
            '(:column
@@ -115,7 +115,7 @@
              ;; (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))))
              (is (equalp '(:container :id :main :children
                            ((:row :children
-                             ((:counter :id :ctr :resolved-view (:text "0"))))
+                             ((:counter :id :ctr :resolved-view (:text :content "0"))))
                             (:text :content "bye")))
                          (elmtui.view.dsl::render-dsl-to-resolved-tree dsl app-state)))))
       (clear-dsl-component-registry))))

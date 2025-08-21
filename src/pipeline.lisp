@@ -138,9 +138,12 @@
   (let* ((view-fn (ctx-view-fn app-ctx)) ; assuming :state holds the model and view-fn
          (model (ctx-state app-ctx))
          (dsl (funcall view-fn model)))
-    (log:info "PIPELINE: Processing tree with DSL root: ~A" (first dsl))
+    (log:info "PIPELINE: Processing tree with DSL root: ~A" dsl)
     (setf (ctx-laid-out-tree app-ctx)
           (make-laid-out-tree
            :root
-           (elmtui.view.tree-transforms:process-tree dsl :ctx app-ctx :root-rect (ctx-viewport-rect app-ctx))))
+           (elmtui.view.tree-transforms:process-tree
+            dsl
+            :ctx app-ctx
+            :root-rect (ctx-viewport-rect app-ctx))))
     app-ctx))
