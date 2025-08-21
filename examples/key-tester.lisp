@@ -108,6 +108,7 @@
       (t
        (log-info "Key Tester App received unhandled message: ~S" message)
        (make-update-result)))))
+
 ;; (ELMTUI.VIEW.DSL:RENDER-DSL-TO-RESOLVED-TREE
 ;;  (:ROOT-VIEWPORT :ID :KEY-TESTER-ROOT :INITIAL-TERMINAL-DIMENSIONS #1=(1 1) :INITIAL-CURSOR-POS #1# :CHILDREN
 ;;                  (:CONTAINER :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT :FOCUSABLE T :STYLE (:BORDER T :DIRECTION :COLUMN :WIDTH :AUTO :HEIGHT :AUTO :MIN-WIDTH 40 :MIN-HEIGHT 8 ...) :CHILDREN ((:TEXT :CONTENT "Elm TUI Key Tester") (:TEXT :CONTENT "Input: j") (:TEXT :CONTENT "Echo:  (:|j|)") (:TEXT :CONTENT "Press 'q' to quit. Try Backspace and Escape.")))
@@ -117,7 +118,6 @@
 ;;                                  :STYLESHEET NIL
 ;;                                  :VIEWPORT-RECT #<ELMTUI.VIEW.GEO:RECTANGLE Pos:#<POS X:0 Y:0> Size:#<SIZE W:95 H:41>> :DSL-TREE NIL :RAW-TREE NIL :STYLED-TREE NIL :ATOMIC-TREE NIL
 ;;                                  :LAID-OUT-TREE NIL :
-;;                                  FRONT-BUFFER #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:VIRTUAL-TERMINAL-BUFFER :WIDTH 95 :HEIGHT 41 :CELLS #2A((#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) (#S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) #S(ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL :CHAR #  :STYLE NIL) ...) ...) :DEFAULT-STYLE NIL :LOCK #<SB-THREAD:MUTEX "virtual-buffer-lock" free owner=0>) :BACK-BUFFER NIL :BACKEND #S(ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-INSTANCE :FD 11 :STREAM #<SB-SYS:FD-STREAM for "file /dev/tty" {120697DBA3}> :ORIGINAL-TERMIOS #<SB-POSIX:TERMIOS {120705FB63}> :CURRENT-TERMIOS #<SB-POSIX:TERMIOS {120692EF93}> :WIDTH 95 :HEIGHT 41 :CURSOR-START-COL 1 :CURSOR-START-ROW 41 :CURSOR-VISIBLE-P T :CURSOR-ROW 41 :CURSOR-COL 1 :CURRENT-STYLE #S(ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE :FG-COLOR NIL :BG-COLOR NIL :BOLD NIL :ITALIC NIL :UNDERLINE NIL :FAINT NIL :BLINK NIL :INVERSE NIL :STRIKE NIL :INVISIBLE NIL))
 ;;                                  ))
 (defun key-tester-view (app-state &key root-id)
   "Renders the application's UI based on the current state."
@@ -129,12 +129,14 @@
       :id :key-tester-widget
       :keymap-id :key-tester-example-context ; Link to our keymap context
       :focusable t
-      :style (:border t :direction :column :width :auto :height :auto
-              :min-width 40 :min-height 8 :display :block
+      :style (:border t :flex-direction :column :width :auto :height :auto
+              :display :flex
+              :align-items :flex-start
+              :justify-content :flex-start
+              :min-width 40 :min-height 8
               :margin 1
               :border-style :solid :border-width 1
-              :fg-color (128 128 128)
-              )
+              :fg-color (128 128 128))
       :children ((:text
                   :content "Elm TUI Key Tester")
                  (:text :content
@@ -175,30 +177,66 @@
 ;;        (elmtui.tea-state.transactions:apply-patches elmtui.app::app-state
 ;;                                                     elmtui.app::patches)
 ;;        (values elmtui.app::app-state elmtui.app::commands))))
-;; (let ((tutu (elmtui.contracts:make-app-context
-;;              :view-fn 'wrapped-view-key-tester-app
-;;              :state (elmtui.tea-state.api:make-state
-;;                      `(:component ,(make-key-tester)))
-;;              :stylesheet nil
-;;              :viewport-rect (elmtui.view.geo:make-rectangle
-;;                              :pos (elmtui.view.geo:make-pos :x 0 :y 0)
-;;                              :size (elmtui.view.geo:make-size :w 95 :h 41))
-;;              :dsl-tree nil
-;;              :raw-tree nil
-;;              :styled-tree nil
-;;              :atomic-tree nil
-;;              :laid-out-tree nil
-;;              :front-buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
-;;                             95 41)
-;;              :backend nil ;; (elmtui.platform.backend.terminal:make-terminal-instance)
-;;              ))
-;;       (t2 (elmtui.pipeline:full-view-pipeline tutu)))
+;; (let* ((tutu (elmtui.contracts:make-app-context
+;;               :view-fn 'wrapped-view-key-tester-app
+;;               :state (elmtui.tea-state.api:make-state
+;;                       `(:component ,(make-key-tester)))
+;;               :stylesheet nil
+;;               ;; :root-rect (elmtui.view.geo:make-rectangle
+;;               ;;                 :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+;;               ;;                 :size (elmtui.view.geo:make-size :w 95 :h 41))
+;;               :viewport-rect (elmtui.view.geo:make-rectangle
+;;                               :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+;;                               :size (elmtui.view.geo:make-size :w 95 :h 41))
+;;               :dsl-tree nil
+;;               :raw-tree nil
+;;               :styled-tree nil
+;;               :atomic-tree nil
+;;               :laid-out-tree nil
+;;               :front-buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
+;;                              95 41)
+;;               :backend nil ;; (elmtui.platform.backend.terminal:make-terminal-instance)
+;;               ))
+;;        (t2 (elmtui.pipeline:full-view-pipeline tutu)))
 
-;;   (log-info (elmtui.platform.backend.common.virtual-buffer:print-buffer-to-string
-;;    (elmtui.contracts:ctx-back-buffer t2)))
+;;   (log-info (str:trim (elmtui.platform.backend.common.virtual-buffer:print-buffer-to-string
+;;                        (elmtui.contracts:ctx-front-buffer t2))))
+;;   (log-info (str:trim (elmtui.platform.backend.common.virtual-buffer:print-buffer-to-string
+;;                        (elmtui.contracts:ctx-back-buffer t2))))
 ;;   t2)
 
-
+;; (let ((dsl '(:ROOT-VIEWPORT :ID :KEY-TESTER-ROOT :INITIAL-TERMINAL-DIMENSIONS (1 1)
+;;              :INITIAL-CURSOR-POS (1 1) :CHILDREN
+;;              (:CONTAINER :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT
+;;                          :FOCUSABLE T :STYLE
+;;               (:BORDER T :FLEX-DIRECTION :COLUMN :WIDTH :AUTO :HEIGHT :AUTO :MIN-WIDTH 40
+;;                :MIN-HEIGHT 8 :DISPLAY :FLEX :MARGIN 1 :BORDER-STYLE :SOLID :BORDER-WIDTH 1
+;;                :FG-COLOR (128 128 128))
+;;               :CHILDREN
+;;               ((:TEXT :CONTENT "Elm TUI Key Tester") (:TEXT :CONTENT "Input: ")
+;;                (:TEXT :CONTENT "Echo:  ")
+;;                (:TEXT :CONTENT "Press 'q' to quit. Try Backspace and Escape."))))))
+;;   (elmtui.view.dsl:render-dsl-to-resolved-tree
+;;    dsl (elmtui.tea-state.api:make-state
+;;         `(:component ,(make-key-tester)))))
+;; ==>
+;; (:ROOT-VIEWPORT :ID :KEY-TESTER-ROOT :INITIAL-TERMINAL-DIMENSIONS (1 1)
+;;  :INITIAL-CURSOR-POS (1 1) :RESOLVED-VIEW
+;;  (:VIEWPORT :ID :ROOT-VIEWPORT-KEY-TESTER-ROOT :STYLE
+;;   (:WIDTH NIL :HEIGHT NIL :OFFSET-X 0 :OFFSET-Y 0 :SCROLL-X 0 :SCROLL-Y 0)
+;;   :RESOLVED-VIEW
+;;   (:CONTAINER :ID #:VIEWPORT-CONTAINER-862 :STYLE
+;;    (:WIDTH 80 :HEIGHT 24 :OFFSET-X 0 :OFFSET-Y 0) :CHILDREN
+;;    (:CONTAINER :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT
+;;     :FOCUSABLE T :STYLE
+;;     (:BORDER :CHILDREN
+;;      (T :FLEX-DIRECTION :COLUMN :WIDTH :AUTO :HEIGHT :AUTO :MIN-WIDTH 40
+;;       :MIN-HEIGHT 8 :DISPLAY :FLEX :MARGIN 1 :BORDER-STYLE :SOLID :BORDER-WIDTH
+;;       1 :FG-COLOR (128 128 128)))
+;;     :CHILDREN
+;;     ((:TEXT :CONTENT "Elm TUI Key Tester") (:TEXT :CONTENT "Input: ")
+;;      (:TEXT :CONTENT "Echo:  ")
+;;      (:TEXT :CONTENT "Press 'q' to quit. Try Backspace and Escape."))))))
 ;;   (elmtui.view.tree-transforms:process-tree
 ;;    (elmtui.view.dsl:render-dsl-to-resolved-tree
 ;;     (key-tester-view (initialize-app-state-key-tester-app)
@@ -210,3 +248,76 @@
 
 ;; (key-tester-view )
 ;; (elmtui.tea-state:make-application-state)
+;; == tests/flex-smoke.lisp ==
+;; expected x positions: content-x, content-x+10+gap, content-x+10+gap+5+gap
+;; expected y position: content-y (align-items defaults to :stretch, but heights fixed)
+;; == end/flex-smoke.lisp ==
+;;; == elmtui/tests/flex-smoke.lisp ==
+;;; quick smoke test exercising the API from your files (no DSL macros needed)
+;; (in-package :cl-user)
+
+(defun make-box (&key id w h)
+  (make-instance 'elmtui.view.base-elements:container-element
+                 :id id
+                 :style (list :width w :height h)))
+
+;; (defun flex-smoke-run ()
+;;   "Return list of (id x y w h) for child rectangles."
+;; (let* ((root (make-instance 'elmtui.view.base-elements:container-element
+;;                             :id :root
+;;                             :style '(:display :flex :flex-direction :row
+;;                                      :padding-top 1 :padding-left 1
+;;                                      :gap 2)))
+;;        (c1 (make-box :id :a :w 10 :h 3))
+;;        (c2 (make-box :id :b :w 5  :h 3))
+;;        (c3 (make-box :id :c :w 7  :h 3))
+;;        (_  (setf (elmtui.view.element:el/children root) (list c1 c2 c3)))
+;;        (parent (elmtui.view.geo:make-rectangle
+;;                 :pos  (elmtui.view.geo:make-pos :x 0 :y 0)
+;;                 :size (elmtui.view.geo:make-size :w 40 :h 10)))
+;;        (laid (elmtui.view.base-elements:compute-layout root parent)))
+;;   (declare (ignore _))
+;;   (mapcar (lambda (n)
+;;             (let* ((r (elmtui.view.element:el/layout-rect n)))
+;;               (list (elmtui.view.element:el/id n)
+;;                     (elmtui.view.geo:x r)
+;;                     (elmtui.view.geo:y r)
+;;                     (elmtui.view.geo:w r)
+;;                     (elmtui.view.geo:h r))))
+;;           (elmtui.view.element:el/children laid)))
+
+;; expected (with padding-left=1, gap=2):
+;;   :a at x=content-x=1
+;;   :b at x=1 + 10 + 2 = 13
+;;   :c at x=13 + 5 + 2 = 20
+;; y for all should be content-y=1
+;;; == end/flex-smoke.lisp ==
+                                        ; == tests/tree-transforms-smoke.lisp ==
+;; (let* ((root (make-instance 'elmtui.view.base-elements:container-element
+;;                             :id :root
+;;                             :style '(:display :flex :flex-direction :row
+;;                                      :padding-left 1 :gap 2
+;;                                      )))
+;;        (a (make-instance 'elmtui.view.base-elements:container-element
+;;                          :id :a :style '(:width 4 :height 2)))
+;;        (b (make-instance 'elmtui.view.base-elements:container-element
+;;                          :id :b :style '(:width 5 :height 2))))
+;;   (setf (elmtui.view.element:el/children root) (list a b))
+;;   (let* ((vp (elmtui.view.geo:make-rectangle
+;;               :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+;;               :size (elmtui.view.geo:make-size :w 20 :h 6)))
+;;          (laid (elmtui.view.tree-transforms:process-tree
+;;                 root
+;;                 :ctx (elmtui.contracts:make-app-context :viewport-rect vp)
+;;                 :root-rect vp)))
+;;     (list (elmtui.view.geo:x (elmtui.view.element:el/layout-rect a))
+;;           (elmtui.view.geo:y (elmtui.view.element:el/layout-rect a))
+;;           (elmtui.view.geo:w (elmtui.view.element:el/layout-rect a))
+;;           (elmtui.view.geo:h (elmtui.view.element:el/layout-rect a))
+;;           (elmtui.view.geo:x (elmtui.view.element:el/layout-rect b))
+;;           (elmtui.view.geo:y (elmtui.view.element:el/layout-rect b))
+;;           (elmtui.view.geo:w (elmtui.view.element:el/layout-rect b))
+;;           (elmtui.view.geo:h (elmtui.view.element:el/layout-rect b))
+;;           (elmtui.view.element:el/styles laid))))
+;; expected => (1 7)   ; 1 padding-left, then 4 width + 2 gap
+;; == end/tree-transforms-smoke.lisp ==

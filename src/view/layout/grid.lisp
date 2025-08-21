@@ -1,7 +1,7 @@
 (uiop:define-package :elmtui.view.layout.grid
   (:use :cl)
   (:nicknames :et.grid)
-  (:import-from :elmtui.view.base-elements
+  (:import-from :elmtui.view.base-elements #:copy-element
                 #:base-element #:element-children #:element-style #:element-id #:element-layout)
   (:import-from :elmtui.view.element :el/styles-of #:el/layout-rect)
   (:import-from :elmtui.view.api
@@ -10,11 +10,13 @@
                 #:rectangle #:pos #:size #:h #:w #:x #:y
                 #:make-rectangle #:make-pos #:make-size #:copy-rectangle)
   (:import-from :elmtui.view.layout.size-utils
+                #:compute-layout
+                #:content-rect-of ;; #:%copy-el
                 #:measure-node-intrinsic-size)
   (:import-from :elmtui.utils #:ensure-list)
   (:import-from :str #:split #:trim)
   (:export
-   #:layout-grid-container-impl))
+   #:compute-grid-layout))
 
 (in-package :elmtui.view.layout.grid)
 
@@ -158,15 +160,15 @@
   (let ((k (or (kw val) default)))
     (or (and (member k '(:start :end :center :stretch)) k) default)))
 
-(defun %copy-el (el &key children)
-  (let* ((class (class-of el))
-         (new   (make-instance class)))
-    (dolist (slot (sb-mop:class-slots (class-of el)))
-      (let ((name (sb-mop:slot-definition-name slot)))
-        (when (slot-boundp el name)
-          (setf (slot-value new name) (slot-value el name)))))
-    (when children (setf (element-children new) children))
-    new))
+;; (defun %copy-el (el &key children)
+;;   (let* ((class (class-of el))
+;;          (new   (make-instance class)))
+;;     (dolist (slot (sb-mop:class-slots (class-of el)))
+;;       (let ((name (sb-mop:slot-definition-name slot)))
+;;         (when (slot-boundp el name)
+;;           (setf (slot-value new name) (slot-value el name)))))
+;;     (when children (setf (element-children new) children))
+;;     new))
 
 (defun perform-track-sizing-iteration (col-tracks row-tracks grid-items available-width available-height col-gap row-gap)
   (dolist (track col-tracks) (setf (grid-track-min-contribution track) 0.0 (grid-track-max-contribution track) 0.0 (grid-track-items track) nil))
@@ -294,7 +296,7 @@
       (:stretch (setf (y final-rect) (y grid-area-rect)) (setf (h final-rect) area-h)))
     final-rect))
 
-(defmethod layout-grid-container-impl (grid-container-node available-rect)
+(defmethod compute-grid-layout (grid-container-node available-rect)
   (unless (and grid-container-node (typep grid-container-node 'base-element))
     (error "layout-grid-container requires a base-element."))
   (unless (typep available-rect 'rectangle)
@@ -398,7 +400,7 @@
                    (let* ((laid (layout-node item grid-area-rect container-styles))
                           (child-rect (element-layout laid))
                           (final (align-item-in-area laid child-rect grid-area-rect align justify)))
-                     (setf (element-layout laid) final)
+                     (setf (elmtui.view.element:el/layout-rect laid) final)
                      (push laid out-children))))))
             (let* ((total-cols (+ (reduce #'+ final-col-sizes) (* (max 0 (1- (length final-col-sizes))) col-gap)))
                    (total-rows (+ (reduce #'+ final-row-sizes) (* (max 0 (1- (length final-row-sizes))) row-gap)))
@@ -406,8 +408,12 @@
                            (w container-content-rect)))
                    (ch (or (and (eq (el/styles-of grid-container-node :height :auto) :auto) total-rows)
                            (h container-content-rect)))
-                   (new (%copy-el grid-container-node :children (nreverse out-children))))
+                   (new (copy-element grid-container-node )))
+              (setf (elmtui.view.element:el/children new) (nreverse out-children))
               (setf (elmtui.view.element:el/layout-rect new)
                     (make-rectangle :pos (make-pos :x (x container-content-rect) :y (y container-content-rect))
-                                    :size (make-size :w cw :h ch)))
+                                    :size (make-size :w
+                                                     (floor cw) :h (floor ch))))
               new)))))))
+(defmethod compute-layout ((style (eql :grid)) node rect &key &allow-other-keys)
+  (compute-grid-layout node rect))

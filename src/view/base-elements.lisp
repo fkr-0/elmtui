@@ -17,12 +17,14 @@
    #:base-element #:element-id #:element-children
    ;; Concrete element classes & their main readers
    #:base-dsl-error
-   #:container-element #:container-layout #:container-style #:container-classes
+   #:container-element
    #:element-layout-rect #:element-content-model
    #:element-children #:element-id #:element-style
    #:text-element      #:text-content   #:text-wrap #:text-align #:text-color
    #:separator-element #:separator-orientation #:separator-thickness
    #:spacer-element    #:spacer-width  #:spacer-height
+
+   #:copy-element
    ;; Traversal helpers
    #:to-dsl #:dsl->objects #:map-elements #:find-elements-by-type
    #:base-dsl-p #:element-type-p #:valid-property-p #:validate-base-dsl
@@ -32,11 +34,12 @@
    #:make-dsl-element #:update-dsl-element
    #:find-elements-by-type #:find-element-by-id #:map-dsl-elements
    #:describe-element-type #:validate-dsl-tree #:dsl-statistics
+   #:element-class
    #:element-layout
+   #:element-size
    #:set-element-layout
    #:rect=
    #:compute-layout
-   #:layout-element
    ))
 
 (in-package :elmtui.view.base-elements)
@@ -197,6 +200,13 @@
        :accessor element-id
        :initform nil
        :type (or null keyword))
+   (size :initarg :size
+         :accessor element-size
+         :initform nil
+         :type (or null size)) ;; size is a size with width and height
+   ;; (padding :initarg :padding :initform 0 :type fixnum)
+   ;; (margin  :initarg :margin  :initform 0 :type fixnum)
+   ;; (gap     :initarg :gap     :initform 0 :type fixnum)
    (layout-rect :initarg :layout-rect
                 :accessor element-layout-rect
                 :initform nil
@@ -205,6 +215,10 @@
              :accessor element-children
              :initform nil
              :type list)
+   (classes :initarg :classes
+            :accessor element-classes
+            :initform nil
+            :type (or null list)) ;; list of strings or keywords
    (style :initarg :style
           :accessor element-style
           :initform nil ;;(elmtui.style-lib.style-set::make-style-set)
@@ -258,12 +272,12 @@
 (defun element-props (el) (%props el))
 (defun (setf element-props) (plist el) (setf (%props el) plist))
 
-(defun element-size (el) (getf (%props el) :size))
-(defun (setf element-size) (val el)
-  (setf (getf (%props el) :size) val))
 
-(defun (setf element-layout) (val el)
-  (setf (getf (%props el) :layout) val))
+;; (defun (setf element-size) (val el)
+;;   (setf (getf (%props el) :size) val))
+
+;; (defun (setf element-layout) (val el)
+;;   (setf (getf (%props el) :layout) val))
 
 (defun element-dirty-p (el) (getf (%props el) :dirty))
 (defun (setf element-dirty-p) (flag el)
@@ -287,40 +301,37 @@
 
 ;;; -- Container --------------------------------------------------
 (defclass container-element (base-element)
-  ((layout :initarg :layout :accessor container-layout :initform :vertical
-           :type keyword)
-   (style  :initarg :style  :accessor container-style  :initform nil)
-   (classes  :initarg :classes  :accessor container-classes  :initform nil)
-   (padding :initarg :padding :initform 0 :type fixnum)
-   (margin  :initarg :margin  :initform 0 :type fixnum)
-   (gap     :initarg :gap     :initform 0 :type fixnum))
+  ;; ((layout :initarg :layout :accessor container-layout :initform :vertical
+  ;;          :type keyword)
+  ;; (style  :initarg :style  :accessor container-style  :initform nil)
+  ;; (classes  :initarg :classes  :accessor container-classes  :initform nil)
+  ()
   (:documentation "Generic layout container holding *children*.  All
   sizing / spacing attributes are purely declarative.") )
-(defmethod element-style ((el container-element))
-  (container-style el))
-(defmethod (setf element-style) (val (el container-element))
-  (setf (container-style el) val))
+;; (defmethod element-style ((el container-element))
+;;   (container-style el))
+;; (defmethod (setf element-style) (val (el container-element))
+;;   (setf (container-style el) val))
 
 ;; Shallow copy that preserves *all slot values* unless overridden.
-(defun copy-element-like (el &key children style)
-  (let* ((class (class-of el))
-         (copy (make-instance class)))
-    ;; copy all bound slots
-    (dolist (slot (sb-mop:class-slots (class-of el)))
-      (let* ((name (sb-mop:slot-definition-name slot)))
-        (when (slot-boundp el name)
-          (setf (slot-value copy name) (slot-value el name)))))
-    ;; apply overrides
-    (when children (setf (slot-value copy 'children) children))
-    (when (%slot-exists-p class 'style)
-      (when (eq style :keep) (setf style (element-style el)))
-      (when style (setf (element-style copy) style)))
-    copy))
 
 (defun %slot-exists-p (class slot-name)
   (find slot-name (mapcar #'sb-mop:slot-definition-name
                           (sb-mop:class-slots class))
         :test #'eq))
+
+;; (defun %copy-el (el &key children style props)
+;;   (let* ((class (class-of el))
+;;          (new-props (if props props (element-props el)))
+;;          (new (make-instance class)))
+;;     (dolist (slot (sb-mop:class-slots class))
+;;       (let ((name (sb-mop:slot-definition-name slot)))
+;;         (when (slot-boundp el name)
+;;           (setf (slot-value new name) (slot-value el name)))))
+;;     (when children (setf (element-children new) children))
+;;     (when style (setf (element-style new) style))
+;;     (setf (element-props new) new-props)
+;;     new))
 
 (defmethod element-type ((e container-element)) :container)
 (%register-element-class :container 'container-element)
@@ -330,19 +341,17 @@
 (defmethod validate-element ((c container-element) &optional context)
   (declare (ignore context))
   ;; Ensure GAP / PADDING / MARGIN are non-negative
-  (dolist (slot '(padding margin gap))
-    (unless (>= (slot-value c slot) 0)
-      (error "~A must be non-negative (got ~A)" slot (slot-value c slot)))))
+  ;; (dolist (slot '(padding margin gap))
+  ;;   (unless (>= (slot-value c slot) 0)
+  ;;     (error "~A must be non-negative (got ~A)" slot (slot-value c slot))))
+  )
 
 (defmethod to-dsl ((c container-element))
   (list :container
         :id (element-id c)
-        :layout (container-layout c)
-        :style (convert-style-plist-to-dsl (container-style c))
-        :classes (container-classes c)
-        :padding (slot-value c 'padding)
-        :margin  (slot-value c 'margin)
-        :gap     (slot-value c 'gap)
+        :layout (element-layout-rect c)
+        :style (convert-style-plist-to-dsl (element-style c))
+        :classes (element-classes c)
         :children (mapcar #'to-dsl (element-children c))))
 
 ;;; -- Text -------------------------------------------------------
@@ -402,7 +411,9 @@
 (defmethod to-dsl ((s string)) s)
 (defmethod to-dsl ((n number)) n)
 (defmethod to-dsl ((o null)) o)
-(defmethod to-dsl ((s symbol)) s)
+(defmethod to-dsl ((s symbol))
+  (if (keywordp s)
+      s (intern (string-upcase (symbol-name s)) :keyword)))
 (defmethod to-dsl ((l list)) l)
 
 
@@ -787,10 +798,11 @@
       (make-instance cls))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun slot-keywords (cls)
-    "Return the list of initarg keywords for CLS."
-    (mapcar #'slot-definition-name (class-direct-slots (class-of cls))))
   )
+(defun slot-keywords (cls)
+  "Return the list of initarg keywords for CLS."
+  (mapcar #'slot-definition-name (class-direct-slots (class-of cls))))
+
 (defun slot-initargs (type-kw)
   "Return the list of initargs for the class corresponding to TYPE-KW.
 
@@ -1166,8 +1178,8 @@
 
 ;; (make-instance 'text-element :content "dud")
 
-;; (validate-BASE-DSL '(:BUTTON :text "Click Me"))
-;; (make-instance 'button-element :text "Click Me")
+;; (validate-BASE-DSL '(:BUTTON :content "Click Me"))
+;; (make-instance 'button-element :content "Click Me")
 
 
 
@@ -1314,10 +1326,13 @@
        (<= (abs (- (h a) (h b))) epsilon)))
 
 (defun element-layout (node)
+  (error "element-layout: not implemented for ~S" node)
   (element-layout-rect node))
 
 (defun set-element-layout (node rect)
-  (setf (element-layout-rect node) rect))
+  (error "element-layout: not implemented for ~S ~S" node rect)
+  ;; (setf (element-layout-rect node) rect)
+  )
 
 (defun %num-or-nil (v)
   (and (numberp v) (>= v 0) v))
@@ -1342,18 +1357,18 @@
                   (t *layout-fallback-root-size*))))
        (elmtui.view.geo:make-rectangle :pos (make-pos :x 0 :y 0) :size sz)))))
 
+;; (defun compute-layout (node &optional parent-rect parent-style-set)
+;;   "Layout NODE inside PARENT-RECT if provided, otherwise infer a reasonable parent.
+;; Returns the final layout rectangle."
+
+;;   (let* ((parent (infer-parent-rect node parent-rect))
+;;          (laid   (layout-node node parent parent-style-set))
+;;          (rect   (element-layout-rect laid)))
+;;     (unless (typep rect 'rectangle)
+;;       (error "compute-layout: node did not produce a rectangle: ~S" laid))
+;;     rect))
+
 (defun compute-layout (node &optional parent-rect parent-style-set)
-  "Layout NODE inside PARENT-RECT if provided, otherwise infer a reasonable parent.
-Returns the final layout rectangle."
-
-  (let* ((parent (infer-parent-rect node parent-rect))
-         (laid   (layout-node node parent parent-style-set))
-         (rect   (element-layout-rect laid)))
-    (unless (typep rect 'rectangle)
-      (error "compute-layout: node did not produce a rectangle: ~S" laid))
-    rect))
-
-(defun layout-element (node &optional parent-rect parent-style-set)
   "Idempotent layout: if the resulting rect matches, return NODE; else return LAID."
 
   (let* ((parent (infer-parent-rect node parent-rect))
@@ -1364,12 +1379,26 @@ Returns the final layout rectangle."
         node
         laid)))
 
-(defmethod ui-node-type ((node elmtui.view.base-elements:base-element))
-  (class-name (class-of node)))
+;; (defmethod ui-node-type ((node elmtui.view.base-elements:base-element))
+;;   (class-name (class-of node)))
 
-(defmethod ui-node-props ((node elmtui.view.base-elements:base-element))
-  (list :id (elmtui.view.base-elements:element-id node)
-        :style (elmtui.view.base-elements:element-style node)))
+;; (defmethod ui-node-props ((node elmtui.view.base-elements:base-element))
+;;   (list :id (elmtui.view.base-elements:element-id node)
+;;         :style (elmtui.view.base-elements:element-style node)))
 
-(defmethod ui-node-children ((node elmtui.view.base-elements:base-element))
-  (elmtui.view.base-elements:element-children node))
+;; (defmethod ui-node-children ((node elmtui.view.base-elements:base-element))
+;;   (elmtui.view.base-elements:element-children node))
+(defmethod copy-element ((node base-element))
+  "Create a shallow copy of NODE, preserving its type and properties."
+  (let ((new-node (make-instance (class-of node))))
+    (setf (element-id new-node) (element-id node))
+    (setf (element-classes new-node) (element-classes node))
+    (setf (element-style new-node) (copy-list (element-style node)))
+    (setf (element-children new-node) (copy-list (element-children node)))
+    (setf (element-layout-rect new-node) (when (element-layout-rect node)
+                                           (elmtui.view.geo:make-rectangle
+                                            :pos (make-pos :x (x (element-layout-rect node))
+                                                           :y (y (element-layout-rect node)))
+                                            :size (make-size :w (w (element-layout-rect node))
+                                                             :h (h (element-layout-rect node))))))
+    new-node))

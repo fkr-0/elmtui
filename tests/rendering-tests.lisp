@@ -24,7 +24,7 @@
   (let* ((buffer (make-virtual-buffer 10 10))
          (node (make-instance 'container-element
                               :style '(:bg-color :red))))
-    (setf (element-layout node)
+    (setf (elmtui.view.element:el/layout-rect node)
           (make-rectangle :pos (make-pos :x 0 :y 0)
                           :size (make-size :w 5 :h 5)))
     (render-laid-out-tree-to-buffer node :buffer buffer)
@@ -36,8 +36,8 @@
   (let* ((buffer (make-virtual-buffer 10 10))
          (node (make-instance 'text-element
                               :content "Hello"
-                              :style '(:color :blue :attributes (:bold)))))
-    (setf (element-layout node)
+                              :style '(:fg-color :blue :attributes (:bold)))))
+    (setf (elmtui.view.element:el/layout-rect node)
           (make-rectangle :pos (make-pos :x 1 :y 1)
                           :size (make-size :w 5 :h 1)))
     (render-laid-out-tree-to-buffer node :buffer buffer)
@@ -50,8 +50,8 @@
 (test render-border-style
   (let* ((buffer (make-virtual-buffer 10 10))
          (node (make-instance 'container-element
-                              :style '(:border-style :solid :border-color :green))))
-    (setf (element-layout node)
+                              :style '(:border-style :solid :border t :fg-color :green))))
+    (setf (elmtui.view.element:el/layout-rect node)
           (make-rectangle :pos (make-pos :x 1 :y 1)
                           :size (make-size :w 8 :h 8)))
     (render-laid-out-tree-to-buffer node :buffer buffer)

@@ -2,27 +2,32 @@
 (uiop:define-package :elmtui.view.element
   (:use :cl)
   (:import-from :elmtui.view.base-elements
-   :base-element :element-children :element-props
+   :base-element :element-children :element-props #:element-layout-rect
+   :element-props :element-content #:text-content #:text-element
+   #:element-size
                 :element-style :element-type :element-id)
   (:import-from :elmtui.view.geo
-   :rectangle)
+   :rectangle #:make-size)
   (:export
    ;; predicates
    #:element-p
    ;; core getters
    #:el/children #:el/props #:el/styles #:el/type #:el/id
-   #:el/layout-rect #:el/display
+   #:el/layout-rect #:el/display #:el/content #:el/size
    ;; setters
    ;; helpers
    #:ensure-element
    #:with-element
    #:el/styles-of
+   #:intrinsic-size-of
    ))
 
 (in-package :elmtui.view.element)
 
 (defgeneric element-p (x))
 
+(defgeneric intrinsic-size-of (node parent-content-rect)
+  (:documentation "Return a SIZE for NODE based on its content (text length, etc.)."))
 (defgeneric el/children (el))
 (defgeneric el/props    (el))
 (defgeneric el/styles   (el))
@@ -46,20 +51,55 @@
 (defmethod element-p ((x base-element)) t)
 (defmethod ensure-element ((x base-element)) x)
 
+(defmethod el/size ((el base-element)) (element-size el))
+(defmethod (setf el/size) (x (el base-element)) (setf (element-size el) x))
+(defmethod (setf el/size) ((wh list) (el base-element))
+  (if (= 2 (length wh))
+      (setf (element-size el) (make-size :w (first wh) :h (second wh)))
+      (error "Expected a list of two elements for size, got ~A" wh)))
 (defmethod el/children ((el base-element)) (element-children el))
+(defmethod (setf el/children) (x (el base-element)) (setf (element-children el) x))
 (defmethod el/props    ((el base-element)) (element-props el))
 (defmethod el/styles   ((el base-element)) (elmtui.view.base-elements:element-style el))
+(defmethod (setf el/styles) (x (el base-element))
+  (setf (elmtui.view.base-elements:element-style el) x))
+(defmethod el/styles-of   ((el list) style &optional default)
+  (getf el style default))
+(defmethod  (setf el/styles-of)   (x (el list) style)
+  (setf (getf el style) x))
 (defmethod el/styles-of   ((el base-element) style &optional default)
   (getf (elmtui.view.base-elements:element-style el) style default))
+(defmethod  (setf el/styles-of)   (x (el base-element) style)
+  (setf (getf (elmtui.view.base-elements:element-style el) style) x))
 (defmethod el/type     ((el base-element)) (element-type el))
 (defmethod el/id       ((el base-element)) (element-id el))
+(let ((a nil))(setf (getf a :dud) :b) a)
+(defmethod el/content       ((el text-element)) (elmtui.view.base-elements:text-content el))
+(defmethod el/content       ((el base-element)) nil)
 
+(defmethod (setf el/content) (txt (el text-element))
+  (setf (elmtui.view.base-elements:text-content el) txt))
 (defmethod el/layout-rect ((el base-element))
   (elmtui.view.base-elements:element-layout-rect el))
+
 (defmethod (setf el/layout-rect) ((rect rectangle) (el base-element))
+  (setf (elmtui.view.base-elements:element-layout-rect el) rect))
+(defmethod (setf el/layout-rect) ((rect rectangle) (el text-element))
   (setf (elmtui.view.base-elements:element-layout-rect el) rect))
 
 (defmethod el/display ((el base-element))
   ;; style wins; default :block
   (or (getf (element-style el) :display) :block))
 ;; == end/element-base-impl.lisp ==
+
+
+(defmethod intrinsic-size-of ((node text-element) parent-content-rect)
+  "Very simple intrinsic: width = line length, height = 1 (no wrap yet)."
+  (declare (ignore parent-content-rect))
+  (let* ((s (or (el/content node) "")))
+    (make-size :w (length (princ-to-string s)) :h 1)))
+
+(defmethod intrinsic-size-of ((node base-element) parent-content-rect)
+  "Default intrinsic for non-text leaves: zero unless overridden."
+  (declare (ignore parent-content-rect node))
+  (make-size :w 0 :h 0))
