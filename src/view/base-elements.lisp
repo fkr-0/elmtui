@@ -250,7 +250,21 @@
   "Initialize a base element instance. This method is called
     automatically when creating a new instance of a base element."
   ;; (call-next-method obj)
-  (validate-element obj))
+  (when (boundp '*validate-on-init*)
+    (when *validate-on-init*
+      (validate-element obj))))
+
+(defparameter *validate-on-init* nil
+  "When true, validate-element runs in initialize-instance. Default NIL to avoid
+side-effects during metaobject introspection and prototype construction.")
+
+(defun make-instance-validated (class &rest initargs)
+  "Construct an instance of CLASS with INITARGS, then run validate-element once.
+Avoids running validation during initialize-instance to keep control over timing."
+  (let ((*validate-on-init* nil))
+    (let ((obj (apply #'make-instance class initargs)))
+      (validate-element obj)
+      obj)))
 
 (defmethod validate-element ((e base-element) &optional context)
   "Minimal validation for base elements. Subclasses should override
@@ -799,27 +813,30 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   )
-(defun slot-keywords (cls)
-  "Return the list of initarg keywords for CLS."
-  (mapcar #'slot-definition-name (class-direct-slots (class-of cls))))
+(defun slot-keywords (class)
+  "Return the list of slot names for CLASS (a class metaobject)."
+  (mapcar #'sb-mop:slot-definition-name (sb-mop:class-direct-slots class)))
+
+(defun %class-of-type (type-kw)
+  "Resolve TYPE-KW to its CLOS class metaobject, or NIL if unknown.
+Avoids instantiating objects to introspect their slots."
+  (let* ((cls-sym (element-class type-kw)))
+    (and cls-sym (find-class cls-sym nil))))
 
 (defun slot-initargs (type-kw)
-  "Return the list of initargs for the class corresponding to TYPE-KW.
+  "Return the list of initarg keywords for the class corresponding to TYPE-KW.
 
-  This is a list of keywords that can be used to initialize an element.
-  Arguments:
-  - TYPE-KW: a keyword representing the element type (e.g. :container, :text).
-
-  Returns:
-  A list of keywords that can be used as initargs for the class.
-
-  Example:
-  (slot-initargs :container) =>
-  (:id :children :style :class :layout :padding :margin :gap)"
-  (mapcar
-   (lambda (x) (car (sb-mop:slot-definition-initargs x)))
-   (sb-mop::class-slots
-    (find-class (element-class type-kw)))))
+This function does not instantiate objects (to avoid triggering validation hooks).
+It inspects the class metaobject directly to collect supported initargs."
+  (let ((class (%class-of-type type-kw)))
+    (when class
+      ;; Ensure class metaobject is finalized before slot introspection
+      (ignore-errors (sb-mop:finalize-inheritance class))
+      (remove-duplicates
+       (mapcan (lambda (slot-def)
+                 (copy-list (sb-mop:slot-definition-initargs slot-def)))
+               (sb-mop:class-slots class))
+       :test #'equal))))
 
 (defmethod base-element-has-initarg ((base-element-kw symbol) (property symbol))
   "Check if BASE-ELEMENT-KW has PROPERTY as an initarg."
@@ -983,7 +1000,7 @@
   ;;   ttt)
   (let* ((cls (element-class (first element))))
     (if cls
-        (let ((obj (apply #'make-instance cls (rest element))))
+        (let ((obj (apply #'make-instance-validated cls (rest element))))
           ;; (log-info "Expanding ~A in ~A" (element-id obj) context)
           ;; recurse into children
           (let ((kids (slot-value obj 'children)))
@@ -1036,7 +1053,7 @@
   (let
       ((cls (element-class type)))
     (if cls
-        (apply #'make-instance cls properties)
+        (apply #'make-instance-validated cls properties)
         ;; fall back to legacy
         (list* type properties))))
 
