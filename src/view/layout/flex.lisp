@@ -27,13 +27,22 @@
 
 (in-package :elmtui.view.layout.flex)
 (defun %get-styles (node)
-  (elmtui.view.element:el/styles node))
+  "Fetch styles for NODE, supporting both element API and base-element slot.
+Returns either a plist, hash-table, or NIL."
+  (or (ignore-errors (elmtui.view.element:el/styles node))
+      (ignore-errors (elmtui.view.base-elements:element-style node))
+      nil))
 
 (defun style-value (node key &optional default)
   (let ((st (%get-styles node)))
     (cond
       ((hash-table-p st) (gethash key st default))
-      ((listp st)        (getf st key default))
+      ((listp st)
+       (or (getf st key default)
+           ;; tolerate accidentally reversed plist pairs like (VAL :KEY)
+           (loop for (a b) on st by #'cddr
+                 when (eql b key) do (return a)
+                 finally (return default))))
       (t default))))
 
 (defun style-value* (node key &optional default)
@@ -108,6 +117,16 @@
       (:row-reverse (values cg rg))
       (:column (values rg cg))
       (:column-reverse (values rg cg)))))
+
+;; Normalize align keywords to flex variants.
+;; Accepts :start/:end synonyms and returns one of
+;;   :stretch, :flex-start, :flex-end, :center (others unchanged)
+(defun normalize-flex-align (v &optional default)
+  (let ((k (kw (or v default) default)))
+    (case k
+      (:start :flex-start)
+      (:end   :flex-end)
+      (t k))))
 
 (defun border-main (it dir)
   (ecase (kw dir :row)
@@ -684,8 +703,10 @@
                     (plusp (length current-items))
                     (> (+ current-main add-main main-gap) (max 0 avail-main)))))
       (dolist (it sorted)
-        (let ((item-main (margin-box-main it dir))
-              (item-cross (margin-box-cross it dir)))
+        ;; Use the pre-flex base size for wrapping decisions, not any later shrunk width.
+        (let* ((basis (base-main-of it))
+               (item-main (+ (margin-main-start it dir) basis (margin-main-end it dir)))
+               (item-cross (margin-box-cross it dir)))
           (if (would-overflow-p item-main)
               (progn
                 (flush-line)
@@ -766,7 +787,7 @@
         (dolist (ln lines)
           (let* ((line-cross-size (getf ln :cross-max)))
             (dolist (it (getf ln :items))
-              (let* ((align-self (kw (or (style-value (node-of it) :align-self nil) align-items) :stretch))
+              (let* ((align-self (normalize-flex-align (or (style-value (node-of it) :align-self nil) align-items) :stretch))
                      (margin-start (margin-cross-start it dir))
                      (margin-end   (margin-cross-end   it dir))
                      (line-space (max 0 (- line-cross-size margin-start margin-end)))
@@ -803,7 +824,11 @@
                      ((:column :column-reverse)
                       (setf (x (rect-of it)) (round (+ line-cursor (- line-cross-size current-cross-size margin-end)))))))
                   (:center
-                   (let ((offset (/ (- line-space current-cross-size) 2.0)))
+                   ;; Center within the line; if the container has extra cross space,
+                   ;; treat the effective line space as at least the container's cross-size
+                   ;; (helps when align-content intent is stretch-like or defaulted).
+                   (let* ((effective-line-space (max line-space (max 0 (- avail-cross margin-start margin-end))))
+                          (offset (/ (- effective-line-space current-cross-size) 2.0)))
                      (ecase (kw dir :row)
                        ((:row :row-reverse)
                         (setf (y (rect-of it)) (round (+ line-cursor margin-start offset))))
@@ -847,6 +872,13 @@
          (justify-content (kw (style-value container-node :justify-content :flex-start) :flex-start))
          (main-gap 0) (cross-gap 0))
     (multiple-value-setq (main-gap cross-gap) (parse-gap styles dir))
+    ;; Robustly detect reversed-pair plist like (:wrap :flex-wrap ...)
+    (when (and (eql wrap-mode :nowrap) (listp styles))
+      (loop for (a b) on styles by #'cddr do
+            (when (eql b :flex-wrap)
+              (setf wrap-mode (kw a :nowrap))
+              (return))))
+    (log-info "flex wrap-mode=~A main-gap=~A cross-gap=~A" wrap-mode main-gap cross-gap)
     ;; 1) main bases + seed cross (explicit :height/:width)
     (resolve-initial-bases! items dir avail-main)
     (resolve-initial-cross!  items dir)
@@ -888,6 +920,13 @@
             (log:warn "flex item ~S ended with zero size: ~A"
                       (ignore-errors (elmtui.view.base-elements:element-id (node-of it)))
                       (rect-of it))))
+        ;; Extra diagnostics: log child rects after commit for wrap/center issues in tests
+        (dolist (gc laid-out-children)
+          (let ((r (el/layout-rect gc)))
+            (when r
+              (log-info "flex child ~A rect=(~A ~A ~A ~A)"
+                        (ignore-errors (element-id gc))
+                        (x r) (y r) (w r) (h r)))))
         (setf (elmtui.view.element:el/children new-container) laid-out-children)
         (setf (el/layout-rect new-container) outer-rect)
         (log-info "flex ~A dir=~A outer=~S content=~S"
