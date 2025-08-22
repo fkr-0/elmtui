@@ -26,6 +26,8 @@
                              (:file "dsl-resolve-tests")
                              (:file "helpers-tests")
                              (:file "flex-tests")
+                             (:file "flex-layout-tests2")
+                             (:file "grid-layout-tests2")
                              (:file "update-dsl-tests")
                              (:file "update-dsl-appstate-tests"))))
   :perform (test-op (op c) (symbol-call :elmtui.tests :run-all-tests)))
