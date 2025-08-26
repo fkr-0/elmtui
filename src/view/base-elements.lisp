@@ -645,7 +645,7 @@ Avoids running validation during initialize-instance to keep control over timing
   "Recursively converts a style DSL (plist) back to a plist of objects by applying DSL->OBJECTS to its values."
   (when style-dsl
     (loop for (k v) on style-dsl by #'cddr
-          append (list k (dsl->objects v)))))
+          append (list k v))))
 
 (defun dsl->objects (dsl)
   "Translate an Elm-TUI style DSL (a plist/tree of keywords) into
@@ -712,7 +712,7 @@ Avoids running validation during initialize-instance to keep control over timing
                                              (cond
                                                ((eq k :style) (convert-style-dsl-to-plist v))
                                                ((eq k :item-style) (convert-style-dsl-to-plist v))
-                                               ((eq k :color) (dsl->objects v)) ; Color might be a keyword or a complex object
+                                               ((eq k :color) v) ; Color might be a keyword or a complex object
                                                (t (dsl->objects v))))))) ; Recursively convert other values
 
                  ;; ------------------------------------------------------------------

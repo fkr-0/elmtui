@@ -10,10 +10,8 @@
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.app.api #:get-component-instance)
   (:import-from :elmtui.ui.api #:update)
-  (:import-from :elmtui.style-lib.rule #:defrule)
-  (:import-from :elmtui.style-lib.sheet #:defstylesheet)
-  (:import-from :elmtui.style-lib.styles #:rgb)
-  (:import-from :elmtui.style-lib.selector #:cls> #:type>)
+  (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
+  (:import-from :cl-styles.selector #:cls> #:type>)
   (:import-from :elmtui.core.event-types #:key-event)
   (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
   (:export
@@ -38,13 +36,11 @@
     (:violet "violet-stripe" (238 130 238)))
   "List of colors and their corresponding class names for stripes.")
 
-(defun generate-stripe-rules-forms ()
-  "Generates a list of (defrule ...) forms for stripes."
-  (loop for (color-name class-name rgb-vals) in rainbow-colors-with-names
-        collect `(defrule (cls> ,class-name)
-                   :bg-color ,(rgb rgb-vals)
-                   :width 2
-                   :height :fill)))
+;; (defun generate-stripe-rules-forms ()
+;;   (loop for (color-name class-name rgb-vals) in rainbow-colors-with-names
+;;         collect `(defrule (cls> ,class-name)
+;;                    :bg-color ,(rgb (first (last (list rgb-vals))))
+;;                    :width 2 :height :fill)))
 
 ;; Define the stylesheet for the rainbow app
 (defparameter rainbow-stylesheet
@@ -55,62 +51,16 @@
       :flex-direction :row
       :width :fill
       :height :fill)
-    (DEFRULE (CLS> "red-stripe")
-      :BG-COLOR
-      (list 255 0 0)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
-    (DEFRULE (CLS> "pink-stripe")
-      :BG-COLOR
-      (list 255 192 203)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
-    (DEFRULE (CLS> "orange-stripe")
-      :BG-COLOR
-      (list 255 165 0)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
-    (DEFRULE (CLS> "yellow-stripe")
-      :BG-COLOR
-      (list 255 255 0)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
-    (DEFRULE (CLS> "green-stripe")
-      :BG-COLOR
-      (list 0 255 0)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
-    (DEFRULE (CLS> "blue-stripe")
-      :BG-COLOR
-      (list 0 0 255)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
-    (DEFRULE (CLS> "indigo-stripe")
-      :BG-COLOR
-      (list 75 0 130)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
-    (DEFRULE (CLS> "violet-stripe")
-      :BG-COLOR
-      (list 238 130 238)
-      :WIDTH
-      1
-      :HEIGHT
-      1)
+    (defrule (cls> "red-stripe")
+      :bg-color (rgb 255 0 0)
+      :width 1 :height 1)
+    (defrule (cls> "pink-stripe") :bg-color (rgb 255 192 203) :width 1 :height 1)
+    (defrule (cls> "orange-stripe") :bg-color (rgb 255 165 0) :width 1 :height 1)
+    (defrule (cls> "yellow-stripe") :bg-color (rgb 255 255 0) :width 1 :height 1)
+    (defrule (cls> "green-stripe") :bg-color (rgb 0 255 0) :width 1 :height 1)
+    (defrule (cls> "blue-stripe") :bg-color (rgb 0 0 255) :width 1 :height 1)
+    (defrule (cls> "indigo-stripe") :bg-color (rgb 75 0 130) :width 1 :height 1)
+    (defrule (cls> "violet-stripe") :bg-color (rgb 238 130 238) :width 1 :height 1)
     ;; Generate individual stripe rules
     ;; (generate-stripe-rules-forms)
     )
@@ -173,8 +123,8 @@
                        `(:container
                          :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
                          :classes (,class-name)
-                         :style ,(append (list :fg-color (rgb rgb-val)
-                                               :bg-color (rgb rgb-val))
+                         :style ,(append (list :fg-color (apply #'rgb rgb-val)
+                                               :bg-color (apply #'rgb rgb-val))
                                          stripe-style)
                          :children nil)))))
 

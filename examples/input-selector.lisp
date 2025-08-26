@@ -5,8 +5,7 @@
                 #:widget-focused-p #:defwidget-view)
   (:import-from :elmtui.view.styled #:make-styled-node)
   (:import-from :elmtui.runtime #:def-elm-app #:run-app)
-  (:import-from :elmtui.style-lib.rule #:defrule)
-  (:import-from :elmtui.style-lib.sheet #:defstylesheet)
+  (:import-from :cl-styles.api #:defrule #:defstylesheet)
   (:import-from :elmtui.state.update #:defupdate)
   (:export
    :main
@@ -19,11 +18,11 @@
 ;;;--------------------------------------------------------------
 (defstylesheet input-selector-stylesheet
   (defrule ".selector-container"
-    :background-color (elmtui.style-lib.styles:rgb '(25 25 25))
+    :background-color (cl-styles.api:rgb 25 25 25)
     :color (elmtui.style-lib.styles:rgb '(200 200 200)))
   
   (defrule ".input-field"
-    :background-color (elmtui.style-lib.styles:rgb '(50 50 50))
+    :background-color (cl-styles.api:rgb 50 50 50)
     :color (elmtui.style-lib.styles:rgb '(255 255 255))
     :padding 1
     :height 1)
@@ -34,14 +33,14 @@
     :height 1)
   
   (defrule ".selected-item"
-    :background-color (elmtui.style-lib.styles:rgb '(50 100 150))
+    :background-color (cl-styles.api:rgb 50 100 150)
     :color (elmtui.style-lib.styles:rgb '(255 255 255))
     :padding-left 1
     :padding-right 1
     :height 1)
   
   (defrule ".status-bar"
-    :background-color (elmtui.style-lib.styles:rgb '(50 50 50))
+    :background-color (cl-styles.api:rgb 50 50 50)
     :color (elmtui.style-lib.styles:rgb '(255 255 255))
     :padding 1
     :height 1))

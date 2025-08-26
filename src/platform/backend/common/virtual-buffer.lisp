@@ -121,7 +121,7 @@ that is: at this point already a character with a style."
                            ((listp style) style) ; Keep as plist for now
                            (t (error "Unsupported style type: ~A" (type-of style))))))
     (%make-buffer-cell :char char
-                       :style (if (null processed-style) nil 
+                       :style (if (null processed-style) nil
                                   (if (typep processed-style 'terminal-style)
                                       processed-style
                                       (deep-copy-style processed-style))))))
@@ -138,6 +138,10 @@ that is: at this point already a character with a style."
   (cells nil :type (simple-array buffer-cell (* *)))
   (default-style nil :type (or null terminal-style) :read-only t) ; Buffer-wide default style
   (lock (make-recursive-lock "virtual-buffer-lock") :read-only t))
+
+;; override tostring -> give a space truncated string representation of the buffer without styles
+;; but respecting cols,rows:
+
 
 ;;;----------------------------------------------------------------------------------;;;
 ;;; Macros                                                                           ;;;
@@ -243,11 +247,11 @@ that is: at this point already a character with a style."
          (cells (make-array (list height width) :element-type 'buffer-cell
                                                 :initial-element (default-buffer-cell))))
 
-    ;; Initialize each cell individually 
+    ;; Initialize each cell individually
     (dotimes (r height)
       (dotimes (c width)
         (setf (aref cells r c) (make-buffer-cell :char initial-char :style processed-style))))
-    
+
     (%make-virtual-terminal-buffer :width width
                                    :height height
                                    :cells cells)))
@@ -497,6 +501,21 @@ optionally including style information."
                             (when show-styles-p
                               (format s "~A" (buffer-cell-style cell)))))
                  (unless (= r (1- height)) (write-char #\Newline s)))))))
+;; (defun print-buffer-to-string (buffer)
+;;   "Returns a string representation of the buffer's characters, ignoring styles."
+;;   (with-output-to-string (s)
+;;     (dotimes (r (buffer-height buffer))
+;;       (dotimes (c (buffer-width buffer))
+;;         (let ((cell (buffer-cell-at buffer r c)))
+;;           (princ (buffer-cell-char cell) s)))
+;;       (terpri s))))
+
+;; now override
+(defmethod print-object ((buffer virtual-terminal-buffer) stream)
+  "Prints a concise representation of the buffer to STREAM."
+  (format stream "#<VIRTUAL-TERMINAL-BUFFER ~Ax~A>"
+          (buffer-width buffer)
+          (buffer-height buffer)))
 
 ;;;----------------------------------------------------------------------------------;;;
 ;;; New/Adapted Functions                                                            ;;;

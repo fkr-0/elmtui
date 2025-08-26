@@ -8,6 +8,8 @@
 (:asd "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 
 
+(:asd "cl-styles/cl-styles.asd")
+(:asd "cl-inputs/cl-inputs.asd")
 (:asd "elmtui.asd")
 (:asd "elmtui-tests.asd")
 

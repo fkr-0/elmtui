@@ -129,12 +129,12 @@
       :id :key-tester-widget
       :keymap-id :key-tester-example-context ; Link to our keymap context
       :focusable t
-      :style (:border t :flex-direction :column :width :auto :height :auto
+      :style (:border t :flex-direction :column :width :auto :height 8
               :display :flex
               :align-items :flex-start
               :justify-content :flex-start
               :min-width 40 :min-height 8
-              :margin 1
+              :margin 0
               :border-style :solid :border-width 1
               :fg-color (128 128 128))
       :children ((:text

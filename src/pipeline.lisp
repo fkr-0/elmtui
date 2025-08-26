@@ -9,13 +9,14 @@
   (:import-from :elmtui.contracts #:define-stage)
   (:import-from :elmtui.platform.backend.terminal.diff-renderer #:compute-buffer-diff #:apply-diff-to-backend)
   (:import-from :elmtui.view.geo #:w #:h #:make-rectangle)
-  (:import-from :elmtui.style-lib.api #:stylesheet)
+  ;; (:import-from :elmtui.style-lib.api #:stylesheet) ; legacy
   (:import-from :elmtui.view.core #:ui-node)
   ;; (:import-from :elmtui.view.tree-transforms #:process-tree)
   (:import-from :elmtui.view.styled #:styled-ui-node)
   (:export
    #:full-view-pipeline
    #:render-pipeline-0-to-5
+   #:pre-render-terminal-prep
    #:generate-dsl
    #:process-tree-stage
    #:render-dsl
@@ -82,6 +83,26 @@
     (setf (ctx-back-buffer ctx) rendered-buffer)
     ctx))
 
+;;; STAGE: Pre-render terminal preparation (anchoring/scroll)
+(define-stage pre-render-terminal-prep
+    (app-context app-context)
+    (ctx)
+  "Apply terminal operations prior to rendering (scroll, clear-below-cursor) based on root-viewport state."
+  (let* ((backend (ctx-backend ctx))
+         (state (ctx-state ctx))
+         ;; (rv-path (or elmtui.platform.driver::*root-viewport-id-path* nil))
+         )
+    (log-info "PIPELINE: Pre-render terminal prep with backend ~A" backend );rv-path)
+    ;; (when (and backend rv-path)
+    ;;   (let* ((st-path (append rv-path '(:state)))
+    ;;          (pending (ignore-errors (elmtui.tea-state:get-path st-path state :pending-scroll))))
+    ;;     (declare (ignore pending))
+    ;;     ;; If we had a reliable pending-scroll in state, we could read it here.
+    ;;     ;; However, the backend terminal already tracks scrolled lines; we can
+    ;;     ;; still clear below cursor when anchored below.
+    ;;     (ignore-errors (elmtui.platform.api:clear-below-cursor backend))))
+    ctx))
+
 ;; (deftransformer render-to-buffer-stage (laid-out-tree) (virtual-buffer)
 ;;                 (laid-out-tree &key viewport-rect)
 ;;   "Renders the laid-out tree to a virtual buffer."
@@ -105,6 +126,7 @@
          (origin-y 0))
     (if (and backend (open-stream-p (elmtui.platform.api:term-stream backend)))
         (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
+          (log:info "PIPELINE: Displaying buffer with diff: ~A" diff)
           (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-x origin-y)
           (elmtui.platform.api:flush-output backend)
           (setf (ctx-front-buffer ctx) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))
@@ -116,11 +138,13 @@
 ;;; Compose stages 0-5 into a pipeline for rendering without display
 (define-pipeline render-pipeline-0-to-5
   process-tree-stage
+  pre-render-terminal-prep
   render-to-buffer)
 
 ;;; Compose all stages into the full view pipeline
 (define-pipeline full-view-pipeline
   process-tree-stage
+  pre-render-terminal-prep
   render-to-buffer
   display-buffer)
 

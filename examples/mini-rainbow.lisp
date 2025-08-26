@@ -8,11 +8,7 @@
 (uiop:define-package :elmtui.examples.mini-rainbow
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.style-lib.styles #:rgb)
-  (:import-from :elmtui.style-lib.rule #:defrule)
-  (:import-from :elmtui.style-lib.sheet #:defstylesheet)
-  (:import-from :elmtui.style-lib.styles #:rgb)
-  (:import-from :elmtui.style-lib.selector #:cls> #:type>)
+  (:import-from :cl-styles.api #:rgb #:defrule #:defstylesheet #:cls> #:type>)
   (:import-from :elmtui.core.event-types #:key-event)
   (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.core.event-types #:key-event)

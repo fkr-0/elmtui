@@ -43,6 +43,9 @@
    :draw-styled-box ; New generic for detailed border drawing
    :set-cell-style
    :clear-area
+   ;; Terminal scrolling/clearing helpers (new)
+   :scroll-lines
+   :clear-below-cursor
 
    ;; Rendering
    ;; Color and Style Management

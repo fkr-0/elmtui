@@ -59,15 +59,12 @@
   (setf (elmtui.view.element:el/styles el) new-style))
 
 (defun expand-element-style (el &key ctx)
-  "Normalize style keys/values to keywords, expand style groups, and store them back.
-   IMPORTANT: Never copy to a wrong slot; write to (element-style el)."
+  "Normalize style keys/values to keywords and store them back. Style-group
+   expansion is now handled by cl-styles engine; avoid legacy macros here."
   (declare (ignore ctx))
   (let* ((raw (%get-style el))
          (canon (nreverse (%canon-style-plist raw)))
-         ;; if you rely on style-group macros, run them on the canonical plist
-         (expanded (handler-case
-                       (elmtui.style-lib.macros:expand-stylegroups canon)
-                     (error () (nreverse canon)))))
+         (expanded (nreverse canon)))
     (unless (equal raw expanded)
       (%set-style! el expanded))
     el))
@@ -208,27 +205,31 @@
                    (rect= (elmtui.view.element:el/layout-rect el) rect))
         (setf (elmtui.view.element:el/layout-rect el) rect)))
     el))
+(defun %call-layout (root parent-rect)
+  (cond
+    ((and (find-package :elmtui.view.base-elements)
+          (fboundp (intern "COMPUTE-LAYOUT" :elmtui.view.base-elements)))
+     (funcall (intern "COMPUTE-LAYOUT" :elmtui.view.base-elements) root parent-rect))
+    ((and (find-package :elmtui.view.layout)
+          (fboundp (intern "LAYOUT-NODE" :elmtui.view.layout)))
+     (funcall (intern "LAYOUT-NODE" :elmtui.view.layout) root parent-rect nil))
+    (t (error "No layout entrypoint."))))
 
 (defun layout-tree-top-down (root root-rect)
   "Top-down layout: lay out NODE in PARENT-RECT; recurse passing each CHILD'S OWN rect.
    If a child somehow has no rect after parent layout, fall back to the parent's content box once."
   (labels ((walk (node parent-rect)
-             (let* ((laid (layout-node node parent-rect nil))
-                    (rect (elmtui.view.element:el/layout-rect laid)))
-               (when (null rect)
-                 (error "layout-node did not write :layout for ~S" node))
-               (setf (elmtui.view.element:el/layout-rect node) rect)
-               (when (elmtui.view.element:el/children laid)
-                 (setf (elmtui.view.element:el/children laid)
-                       (mapcar (lambda (c)
-                                 (let ((child-rect (elmtui.view.element:el/layout-rect c)))
-                                   (unless child-rect
-                                     (log-warn "Child ~S had no rect after laying out ~S. Using parent's content-box."
-                                               c laid)
-                                     (setf child-rect (elmtui.view.layout.size-utils:content-rect-of rect laid)))
-                                   (walk c child-rect)))
-                               (elmtui.view.element:el/children laid))))
-               laid)))
+             (let* ((laid-node (%call-layout node parent-rect))
+                    (laid-rect (elmtui.view.element:el/layout-rect laid-node)))
+               (when (null laid-rect)
+                 (error "layout-node failed to assign a rect to ~S" node))
+               (log-info "Layed out ~A to ~A" node laid-rect)
+               (when (elmtui.view.element:el/children laid-node)
+                 (setf (elmtui.view.element:el/children laid-node)
+                       (mapcar (lambda (child)
+                                 (walk child laid-rect))
+                               (elmtui.view.element:el/children laid-node))))
+               laid-node)))
     (walk root root-rect)))
 
 
@@ -295,6 +296,11 @@
   "Pipeline: resolve → expand styles → measure(top-down) → layout(top-down) → mark-dirty."
   (let* ((p1 (transform-top-down #'resolve-components root :ctx ctx))
          (p2 (transform-top-down #'expand-element-style p1 :ctx ctx))
+         ;; Apply cl-styles if a stylesheet is present in ctx
+         (_ (ignore-errors
+             (let ((sheet (elmtui.contracts:ctx-stylesheet ctx)))
+               (when sheet
+                 (cl-styles.engine:apply-stylesheet-to-tree p2 sheet :return :patches)))))
          (rr (%root-rect-or-viewport p2 ctx root-rect))
          (p3 (measure-tree-top-down p2 rr))
          (p4 (layout-tree-top-down p3 rr))
