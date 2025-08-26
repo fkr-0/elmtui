@@ -28,8 +28,8 @@
 (uiop:define-package :cl-styles.rule
   (:use :cl :alexandria :cl-styles.selector :cl-styles.tokens)
   (:export
-   #:rule #:make-rule #:rule-selector #:rule-declarations #:rule-specificity
-   #:defrule #:expand-shorthands))
+   #:rule :make-rule #:rule-selector #:rule-declarations #:rule-specificity
+   :defrule #:expand-shorthands))
 
 (uiop:define-package :cl-styles.sheet
   (:use :cl :alexandria :cl-styles.rule :cl-styles.selector :cl-styles.tokens)
@@ -60,6 +60,7 @@
    #:apply-stylesheet #:apply-stylesheet-to-tree))
 
 (uiop:define-package :cl-styles.api
-  (:use :cl :cl-reexport)
+  (:use :cl :cl-styles.protocols :cl-styles.tokens :cl-styles.selector
+        :cl-styles.rule :cl-styles.sheet :cl-styles.engine :cl-styles.properties)
   (:reexport :cl-styles.protocols :cl-styles.tokens :cl-styles.selector
    :cl-styles.rule :cl-styles.sheet :cl-styles.engine :cl-styles.properties))

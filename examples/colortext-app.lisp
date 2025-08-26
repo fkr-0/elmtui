@@ -15,9 +15,7 @@
   (:import-from :elmtui.view.core #:ui-node #:make-ui-node)
   (:import-from :elmtui.core.keymap #:key-event->normalized-key #:parse-key-string #:normalized-key=)
   ;; Stylesheet and selector imports
-  (:import-from :elmtui.style-lib.sheet #:defstylesheet)
-  (:import-from :elmtui.style-lib.selector #:type> #:id> #:cls>)
-  (:import-from :elmtui.style-lib.rule #:defrule) ; Use defrule
+  (:import-from :cl-styles.api #:defstylesheet #:type> #:id> #:cls> #:defrule)
   (:export #:main #:colortext-stylesheet #:colortext-example-app))
 (in-package :elmtui.examples.colortext-app)
 

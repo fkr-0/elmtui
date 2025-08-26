@@ -23,10 +23,13 @@
 (defun %lookup-var (name vars)
   (cond
     ((hash-table-p vars) (multiple-value-bind (v p) (gethash name vars) (and p v)))
+    ((and (listp vars) (listp (car vars))) ; alist
+     (or (cdr (assoc name vars :test #'equal))
+         (cdr (assoc (if (stringp name) (intern (string-upcase name) :keyword) (string-downcase (symbol-name name))) vars :test #'equal))))
     ((listp vars) (or (getf vars name nil)
-                      ;; also try string/keyword variants
-                      (let ((alt (if (stringp name) (intern (string-upcase name) :keyword) (string-downcase (symbol-name name)))))
-                        (or (getf vars alt nil) nil))))
+                      (let ((alt (if (stringp name) (intern (string-upcase name) :keyword)
+                                   (string-downcase (symbol-name name)))))
+                        (getf vars alt nil))))
     (t nil)))
 
 (defun resolve-variables (plist vars)

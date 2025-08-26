@@ -1,4 +1,4 @@
-(in-package :asdf-user)
+(in-package :asdf)
 
 (asdf:defsystem "elmtui"
   :version      "0.1.0"
@@ -7,11 +7,12 @@
   :license      "GNU GPL, version 3"
   :source-control (:git "https://github.com/user/elmtui.git")
   :depends-on   (#:alexandria #:str #:sb-posix
-                              #:log4cl  #:slynk
+                              #:log4cl  ;; #:slynk
                               #:cl-reexport
-                              #:bordeaux-threads)
+                              #:bordeaux-threads
+                              #:cl-inputs
+                              #:cl-styles)
   :pathname "./src/"
-  :serial t
   :components (
                (:file "utils")
                ;; (:file "state/utils")
@@ -45,9 +46,9 @@
                (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
                ;; Core Modules (Load after cleve-elm, before API Layer)
                (:file "view/position") ; Load position before focus manager
-               (:file "view/api") ; Imports: cl (pure declarations)
-               (:file "view/base-elements") ;
-               (:file "view/element-protocol") ;
+               (:file "view/api")
+               (:file "view/base-elements" :depends-on ("view/api" "view/geo"))
+               (:file "view/element-protocol" :depends-on ("view/base-elements"))
 
                (:file "core/conditions")
                ;; Load state module early since focus manager needs it
@@ -146,7 +147,8 @@
                              (:file "stylable") ; Implementation details? Might depend on api.
                              (:file "styled-strings")
                              (:file "stylesheet")
-                             (:file "style-lib")))
+                             (:file "style-lib")
+                             (:file "cl-styles-adapter")))
                (:file "view/styled")
                ;; --- View / UI Dependency Resolution ---
                ;; Load core view definitions first
@@ -166,8 +168,8 @@
                 :pathname "ui/"
                 :components (
 
-                             (:file "api") ; Correct filename to load widgets.lisp
-                             (:file "defcomponent")
+                             (:file "api")
+                             (:file "defcomponent" :depends-on ("api"))
                              (:module "widgets"
                               :pathname "widgets/"
                               :serial t
@@ -195,20 +197,21 @@
                (:file "app/dsl-type-registry")
                ;; (:file "view/dsl")
                (:file "view/dsl")
-               (:file "view/layout/utils")   ; Grid depends on layout now
-               (:file "view/layout/flex")
-               (:file "view/layout/grid")   ; Grid depends on layout now
-               (:file "view/layout/core") ; Load layout before grid
-               (:file "view/reactive") ; Reactive view system
-               (:file "view/animation") ; Animation framework
-               (:file "view/tree-transforms")
+               (:file "view/layout/utils" :depends-on ("view/geo"))
+               (:file "view/layout/flex" :depends-on ("view/layout/utils"))
+               (:file "view/layout/grid" :depends-on ("view/layout/utils"))
+               (:file "view/layout/core" :depends-on ("view/layout/flex" "view/layout/grid"))
+               (:file "view/reactive")
+               (:file "view/animation")
+               (:file "view/tree-transforms" :depends-on ("view/base-elements" "view/layout/core"))
 
                ;; Styling System (Moved here as it depends on view/style-lib)
                (:module "style"
                 :serial t
                 :pathname "style/"
                 :components ((:file "core")
-                             (:file "presets")))
+                             (:file "presets")
+                             (:file "manager")))
                ;; --- End View / UI ---
 
                ;; Platform Abstraction (Moved here as it depends on view modules)
@@ -222,7 +225,7 @@
                              (:file "backend/common/utils")
                              (:file "backend/terminal/terminal")
                              (:file "backend/terminal/diff-renderer")
-                             (:file "tree-renderer" :depends-on ("backend/common/ansi-styling"))
+                             (:file "tree-renderer" :depends-on ("backend/common/ansi-styling" "backend/common/virtual-buffer"))
                              (:file "input")
                              ;; Backend Implementations
                              (:module "backend"
@@ -243,7 +246,7 @@
 
                ;; Files loaded after modules
                (:file "pipeline")
-               (:file "platform/driver" :depends-on ("app/system-events"))
+               (:file "platform/driver" :depends-on ("app/system-events" "pipeline"))
 
                ;; Development Utilities
                (:module "examples"
@@ -253,7 +256,7 @@
                              (:file "rainbow-app")
                              (:file "key-tester")
                              (:file "mini-rainbow")))
-               (:file "../dev-setup")
+               ;;(:file "../dev-setup")
                (:file "dev/dev")
                (:file "elmtui"))
   ;; Build a binary:
@@ -261,23 +264,23 @@
   :build-pathname "elmtui"
   :entry-point "elmtui:dev-main")
 
-(asdf:defsystem "elmtui/examples"
-  :author "User <user@archlinux>"
-  :license "GNU GPL, version 3"
-  :depends-on (:elmtui)
-  :components ((:module "examples"
-                :pathname "../examples/"
-                :serial t
-                :components
-                ((:file "keymap-app")
-                 (:file "boxes-app") ; Added boxes-app
-                 ;; Add other example app files here as they are updated
-                 ;; (:file "rainbow-app")
-                 ;; (:file "rainbow-app-canvas")
-                 ;; (:file "dirli")
-                 ;; (:file "colortext-app")
-                 )))
-  :description "Examples for elmtui.")
+;; (asdf:defsystem "elmtui/examples"
+;;   :author "User <user@archlinux>"
+;;   :license "GNU GPL, version 3"
+;;   :depends-on (:elmtui)
+;;   :components ((:module "examples"
+;;                 :pathname "../examples/"
+;;                 :serial t
+;;                 :components
+;;                 ((:file "keymap-app")
+;;                  (:file "boxes-app") ; Added boxes-app
+;;                  ;; Add other example app files here as they are updated
+;;                  ;; (:file "rainbow-app")
+;;                  ;; (:file "rainbow-app-canvas")
+;;                  ;; (:file "dirli")
+;;                  ;; (:file "colortext-app")
+;;                  )))
+;;   :description "Examples for elmtui.")
 
 ;; (asdf:defsystem "elmtui/tests"
 ;;   :author "User <user@archlinux>"

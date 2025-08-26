@@ -5,7 +5,7 @@
   :author "elmtui"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (#:alexandria #:uiop #:cl-reexport)
+  :depends-on (#:alexandria #:uiop)
   :serial t
   :components
   ((:file "src/packages")

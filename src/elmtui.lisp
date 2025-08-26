@@ -1,12 +1,12 @@
 (uiop:define-package :elmtui
   (:use :cl
-   :elmtui.style.core
+   
         :elmtui.style.presets )
   ;; Removed all old widget exports (:button-widget, :label-widget, :input-widget, :form-widget, :list-widget)
   (:export :dark-theme :light-theme) ; Export themes or other top-level items
   (:nicknames :elmtui)
   ;; Added re-export for all new widget packages
-  (:reexport :elmtui.style-lib
+  (:reexport 
    :elmtui.view.core
              :elmtui.platform.input
    :elmtui.platform.driver

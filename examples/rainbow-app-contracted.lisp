@@ -10,10 +10,7 @@
                 #:defupdate #:defview #:defsubscriptions
                 #:enable-contract-debugging #:validate-elm-application)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.style-lib.rule #:defrule)
-  (:import-from :elmtui.style-lib.sheet #:defstylesheet)
-  (:import-from :elmtui.style-lib.styles #:rgb)
-  (:import-from :elmtui.style-lib.selector #:cls> #:type>)
+  (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb #:cls> #:type>)
   (:import-from :elmtui.core.event-types #:key-event)
   (:import-from :elmtui.state.api #:make-update-result)
   (:export

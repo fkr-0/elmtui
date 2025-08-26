@@ -308,7 +308,6 @@
 
 
 
-
 ;; Manual destroy method for layout
 ;; (defmethod elmtui.ui.api:destroy ((self layout) app-state &key id-path)
 ;;   (let ((layout-local-state (elmtui.state.api:get-path id-path app-state ))

@@ -34,8 +34,6 @@
   (:import-from :elmtui.view.styled #:styled-ui-node #:styles)
   (:import-from :elmtui.view.core #:ui-node-props #:ui-node-type #:ui-node-children)
   (:import-from :elmtui.view.geo #:x #:y #:w #:h #:rectangle-pos)
-  (:import-from :elmtui.style-lib.api #:style-set) ; Added for typep check
-  (:import-from :elmtui.style-lib.style-set #:styles-list) ; Added for conversion
   (:import-from #:elmtui.platform.backend.common.ansi-styling
                 #:make-terminal-style #:make-termcolor #:exec-sequence
                 #:update-style! #:copy-term-style
@@ -930,61 +928,61 @@ This method should be implemented by subclasses of low-level-terminal."
   t)
 
 ;; Forward declaration
-(declaim (ftype (function (terminal-instance virtual-terminal-buffer t) t) render-ui-tree-to-buffer))
+;; (declaim (ftype (function (terminal-instance virtual-terminal-buffer t) t) render-ui-tree-to-buffer))
 
 ;; Helper function to render the UI tree to the target-buffer
 ;; This function will recursively traverse the tree and draw nodes.
-(defun render-ui-tree-to-buffer (backend target-buffer ui-node)
-  (when ui-node
-    (let* ((props (elmtui.view.api:ui-node-props ui-node))
-           (node-type (elmtui.view.api:ui-node-type ui-node))
-           (node-id (getf props :id))
-           (layout-rect (getf props :layout-rect))
-           (style-object (if (typep ui-node 'elmtui.view.styled:styled-ui-node)
-                             (elmtui.view.styled:styles ui-node)
-                             nil))
-           (node-computed-styles (cond
-                                   ((null style-object) nil)
-                                   ((typep style-object 'style-set)
-                                    (styles-list style-object))
-                                   ((listp style-object) style-object)
-                                   (t
-                                    (log:warn "render-ui-tree-to-buffer: Unexpected style object type ~A for node type ~A, ID: ~A"
-                                              (type-of style-object) node-type node-id)
-                                    nil))))
+;; (defun render-ui-tree-to-buffer (backend target-buffer ui-node)
+;;   (when ui-node
+;;     (let* ((props (elmtui.view.api:ui-node-props ui-node))
+;;            (node-type (elmtui.view.api:ui-node-type ui-node))
+;;            (node-id (getf props :id))
+;;            (layout-rect (getf props :layout-rect))
+;;            (style-object (if (typep ui-node 'elmtui.view.styled:styled-ui-node)
+;;                              (elmtui.view.styled:styles ui-node)
+;;                              nil))
+;;            (node-computed-styles (cond
+;;                                    ((null style-object) nil)
+;;                                    ((typep style-object 'style-set)
+;;                                     (styles-list style-object))
+;;                                    ((listp style-object) style-object)
+;;                                    (t
+;;                                     (log:warn "render-ui-tree-to-buffer: Unexpected style object type ~A for node type ~A, ID: ~A"
+;;                                               (type-of style-object) node-type node-id)
+;;                                     nil))))
 
-      (log:debug "OUTPUT: render-node to target-buffer - Type: ~S, ID: ~S, LayoutRect: ~S, StyleObject: ~S, ComputedStylesPlist: ~S"
-                 node-type node-id layout-rect style-object node-computed-styles)
+;;       (log:debug "OUTPUT: render-node to target-buffer - Type: ~S, ID: ~S, LayoutRect: ~S, StyleObject: ~S, ComputedStylesPlist: ~S"
+;;                  node-type node-id layout-rect style-object node-computed-styles)
 
-      (when layout-rect
-        (let ((rect-x (elmtui.view.geo:x layout-rect))
-              (rect-y (elmtui.view.geo:y layout-rect))
-              (rect-w (elmtui.view.geo:w layout-rect))
-              (rect-h (elmtui.view.geo:h layout-rect)))
+;;       (when layout-rect
+;;         (let ((rect-x (elmtui.view.geo:x layout-rect))
+;;               (rect-y (elmtui.view.geo:y layout-rect))
+;;               (rect-w (elmtui.view.geo:w layout-rect))
+;;               (rect-h (elmtui.view.geo:h layout-rect)))
 
-          (when (and rect-w rect-h (> rect-w 0) (> rect-h 0))
-            (let* ((bg-color (getf node-computed-styles :background-color))
-                   (fg-color (getf node-computed-styles :color))
-                   (cell-style-plist ()))
-              (when bg-color (setf cell-style-plist (list* :bg bg-color cell-style-plist)))
-              (when fg-color (setf cell-style-plist (list* :fg fg-color cell-style-plist)))
+;;           (when (and rect-w rect-h (> rect-w 0) (> rect-h 0))
+;;             (let* ((bg-color (getf node-computed-styles :background-color))
+;;                    (fg-color (getf node-computed-styles :color))
+;;                    (cell-style-plist ()))
+;;               (when bg-color (setf cell-style-plist (list* :bg bg-color cell-style-plist)))
+;;               (when fg-color (setf cell-style-plist (list* :fg fg-color cell-style-plist)))
 
-              (log:debug "RENDER-UI-TREE to target-buffer: Node ~S (~S), Rect (~A,~A ~Ax~A), using cell-style ~S"
-                         node-id node-type rect-x rect-y rect-w rect-h cell-style-plist)
+;;               (log:debug "RENDER-UI-TREE to target-buffer: Node ~S (~S), Rect (~A,~A ~Ax~A), using cell-style ~S"
+;;                          node-id node-type rect-x rect-y rect-w rect-h cell-style-plist)
 
-              (cond
-                ((or (eq node-type :container) (eq node-type :div))
-                 (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
-                                 :char #\Space
-                                 :style cell-style-plist))
-                ;; ((eq node-type :text-node) ; Example for text
-                ;;  (let ((text-content (getf props :text "")))
-                ;;    (draw-text-at backend target-buffer rect-y rect-x text-content :style cell-style-plist)))
-                (t
-                 (when bg-color
-                   (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
-                                   :char #\Space
-                                   :style cell-style-plist))))))))
+;;               (cond
+;;                 ((or (eq node-type :container) (eq node-type :div))
+;;                  (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
+;;                                  :char #\Space
+;;                                  :style cell-style-plist))
+;;                 ;; ((eq node-type :text-node) ; Example for text
+;;                 ;;  (let ((text-content (getf props :text "")))
+;;                 ;;    (draw-text-at backend target-buffer rect-y rect-x text-content :style cell-style-plist)))
+;;                 (t
+;;                  (when bg-color
+;;                    (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
+;;                                    :char #\Space
+;;                                    :style cell-style-plist))))))))
 
-      (dolist (child (elmtui.view.api:ui-node-children ui-node))
-        (render-ui-tree-to-buffer backend target-buffer child)))))
+;;       (dolist (child (elmtui.view.api:ui-node-children ui-node))
+;;         (render-ui-tree-to-buffer backend target-buffer child)))))

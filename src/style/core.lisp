@@ -1,14 +1,11 @@
 ;;;===============================================================
 ;;; File: src/style/core.lisp
-;;; Styling & Theming Core (elmtui.style-lib integration)
+;;; Styling Core (cl-styles integration)
 (uiop:define-package :elmtui.style.core
-  (:use :cl :elmtui.style-lib)
-  ;; (:import-from :elmtui.style-lib.style-set :default-styles)
-  (:export :style-rule)) ; Removed :apply-style
+  (:use :cl)
+  (:export))
 (in-package :elmtui.style.core)
 
-(defparameter *base-style-set* (elmtui.style-lib.api:make-style-set)
-  "The baseline style-set (elmtui.style-lib.style-set).")
-
-;; Removed apply-style function as it's redundant with
-;; elmtui.view.styled:apply-stylesheet-to-tree
+;; Placeholder module retained to keep ASDF module structure stable while
+;; migrating off the legacy style-lib. This file intentionally contains no
+;; runtime coupling to style-lib and defines no state.
