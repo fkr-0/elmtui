@@ -1,7 +1,7 @@
 (uiop:define-package :elmtui.examples.root-viewport-test-app
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.app #:defapplication #:run-application #:quit)
-  (:import-from :elmtui.style-lib.styles #:rgb)
+  (:import-from :cl-styles.api #:rgb)
   (:import-from :elmtui.state.update #:defupdate)
   (:import-from :elmtui.core.event-types #:key-event #:key-code #:key-name)
   (:import-from :elmtui.state #:make-update-result #:get-path #:application-state-plist)

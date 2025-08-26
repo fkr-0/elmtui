@@ -28,9 +28,20 @@
 (deftype anchor-type ()
   "Legal positions for the root-viewport relative to the terminal or cursor."
   '(member :top-left  :top   :top-right
-     :left      :center :right
-     :bottom-left :bottom :bottom-right
-     :below-cursor :above-cursor))
+           :left      :center :right
+           :bottom-left :bottom :bottom-right
+           :below-cursor :above-cursor
+           :tl :tc :tr :ml :mc :mr :bl :bc :br
+           :below-cursor-row :above-cursor-row))
+
+(defun normalize-anchor (a)
+  (case a
+    (:tl :top-left) (:tc :top) (:tr :top-right)
+    (:ml :left) (:mc :center) (:mr :right)
+    (:bl :bottom-left) (:bc :bottom) (:br :bottom-right)
+    (:below-cursor-row :below-cursor)
+    (:above-cursor-row :above-cursor)
+    (t a)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Class
@@ -54,7 +65,8 @@
   "Return (offset-y offset-x) for ANCHOR given viewport & terminal geometry."
   (declare (type anchor-type anchor)
     (type (integer 0 *) viewport-width viewport-height term-cols term-rows cursor-row cursor-col))
-  (ecase anchor
+  (let ((anchor (normalize-anchor anchor)))
+    (ecase anchor
     (:top-left      (values 0 0))
     (:top           (values 0 (floor (- term-cols viewport-width) 2)))
     (:top-right     (values 0 (- term-cols viewport-width)))
@@ -71,11 +83,11 @@
     (:below-cursor  (values (min (1+ cursor-row) (- term-rows viewport-height))
                       (%clamp cursor-col 0 (- term-cols viewport-width))))
     (:above-cursor  (values (%clamp (- cursor-row viewport-height) 0 (- term-rows viewport-height))
-                      (%clamp cursor-col 0 (- term-cols viewport-width))))) )
+                      (%clamp cursor-col 0 (- term-cols viewport-width)))))) )
 
 (defun compute-view-size (anchor term-cols term-rows cursor-row)
   "Return three values: width height offset-y for ANCHOR variant requiring dynamic height."
-  (ecase anchor
+  (ecase (normalize-anchor anchor)
     (:below-cursor (values term-cols (max 1 (- term-rows cursor-row 1)) 0))
     (:above-cursor (values term-cols (max 1 cursor-row) 0))
     (t             (values term-cols term-rows 0))) )
@@ -90,8 +102,8 @@
 ;;; Factory
 ;;; ---------------------------------------------------------------------------
 
-(defun make-root-viewport (id &key (anchor :below-cursor) (initial-cursor-pos '(0 . 0)))
-  (declare (ignore anchor initial-cursor-pos))
+(defun make-root-viewport (id &key (anchor :below-cursor) (initial-cursor-pos '(0 . 0)) (overflow-policy :scroll) (anchor-offset '(0 0)))
+  (declare (ignore anchor initial-cursor-pos overflow-policy anchor-offset))
   (make-instance 'root-viewport :id id))
 
 ;;; ---------------------------------------------------------------------------
@@ -104,7 +116,9 @@
                                 initial-cursor-pos
                                 initial-child-spec
                                 dsl)
-  (let* ((anchor (or (getf (getf dsl :props) :anchor) :below-cursor))
+  (let* ((anchor (normalize-anchor (or (getf (getf dsl :props) :anchor) :below-cursor)))
+          (overflow-policy (or (getf (getf dsl :props) :overflow-policy) :scroll))
+          (anchor-offset (or (getf (getf dsl :props) :anchor-offset) '(0 0)))
           (term-cols (or (first initial-terminal-dimensions) 0))
           (term-rows (or (second initial-terminal-dimensions) 0))
           (cursor-c  (or (first initial-cursor-pos) 0))
@@ -131,6 +145,8 @@
         (list (append id-path '(:state :offset-y)) offset-y)
         ;; flags/metadata
         (list (append id-path '(:state :anchor)) anchor)
+        (list (append id-path '(:state :overflow-policy)) overflow-policy)
+        (list (append id-path '(:state :anchor-offset)) anchor-offset)
         (list (append id-path '(:state :terminal-size)) (list term-cols term-rows))
         (list (append id-path '(:state :cursor-pos))  (list cursor-c cursor-r))
         (list (append id-path '(:state :size-known))  size-known)
@@ -153,10 +169,12 @@
             (anchor   (get-path (append st-path '(:anchor)) state))
             (term-size (get-path (append st-path '(:terminal-size)) state '(0 0)))
             (cursor-pos (get-path (append st-path '(:cursor-pos)) state '(0 0)))
+            (overflow-policy (get-path (append st-path '(:overflow-policy)) state :scroll))
             (width  (get-path (append st-path '(:width)) state 1))
             (height (get-path (append st-path '(:height)) state 1))
             (offset-x (get-path (append st-path '(:offset-x)) state 0))
             (offset-y (get-path (append st-path '(:offset-y)) state 0))
+            (pending-scroll nil)
             (own-patches nil))
 
       (if (listp message)
@@ -171,10 +189,19 @@
                 ;; recompute offset if we already know cursor position
                 (when (get-path (append st-path '(:pos-known)) state)
                   (multiple-value-bind (new-oy new-ox)
-                    (compute-anchor-offset anchor width height cols rows (second cursor-pos) (first cursor-pos))
+                      (compute-anchor-offset anchor width height cols rows (second cursor-pos) (first cursor-pos))
                     (setf offset-x new-ox offset-y new-oy)
                     (push (patch '(:offset-x) offset-x) own-patches)
-                    (push (patch '(:offset-y) offset-y) own-patches)))
+                    (push (patch '(:offset-y) offset-y) own-patches)
+                    ;; Overflow handling for below-cursor anchoring
+                    (when (eq (normalize-anchor anchor) :below-cursor)
+                      (let* ((rows-remaining (max 0 (- rows (1+ (second cursor-pos)))))
+                             (delta (max 0 (- height rows-remaining))))
+                        (when (> delta 0)
+                          (case overflow-policy
+                            (:scroll (setf pending-scroll (list :down delta))
+                                     (push (patch '(:pending-scroll) pending-scroll) own-patches))
+                            (:truncate (push (patch '(:height) (+ rows-remaining 0)) own-patches))))))))
                 (push (patch '(:terminal-size) term-size) own-patches)
                 (push (patch '(:width) width) own-patches)
                 (push (patch '(:height) height) own-patches)
@@ -188,7 +215,7 @@
                 ;; recompute offset if we already know size
                 (when (get-path (append st-path '(:size-known)) state)
                   (multiple-value-bind (new-oy new-ox)
-                    (compute-anchor-offset anchor width height (first term-size) (second term-size) r c)
+                      (compute-anchor-offset anchor width height (first term-size) (second term-size) r c)
                     (setf offset-x new-ox offset-y new-oy)
                     (push (patch '(:offset-x) offset-x) own-patches)
                     (push (patch '(:offset-y) offset-y) own-patches)))

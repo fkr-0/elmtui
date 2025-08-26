@@ -258,11 +258,13 @@
 (defmethod dispatch-layout (display node available-rect parent-styles)
   "Block fallback: honor available-rect for NODE."
   (declare (ignore display parent-styles))
+  (log-info "dispatch-layout BLOCK fallback for ~A available-rect=~S"
+            (class-of node)
+            (list (x available-rect) (y available-rect) (w available-rect) (h available-rect)))
   ;; keep size/pos from available-rect; do NOT synthesize child rects here
   (%commit-rect! node available-rect))
 
 
-(defgeneric dispatch-layout (display node available-rect parent-styles))
 
 (defmethod dispatch-layout ((display (eql :grid)) node available-rect parent-styles)
   (declare (ignore parent-styles))
@@ -294,24 +296,17 @@
 (defmethod layout-node (node parent-rect _ctx)
   (declare (ignore _ctx))
   (let* ((st (elmtui.view.base-elements:element-style node))
-         (display (getf st :display nil)))
-    (cond
-      ((eql display :grid)
-       (elmtui.view.layout.grid:compute-grid-layout node parent-rect))
-      ((eql display :flex)
-       (elmtui.view.layout.flex:compute-flex-layout node parent-rect st))
-      ((and (typep node 'elmtui.view.base-elements:container-element)
-            (or (getf st :flex-direction nil) (getf st :direction nil)))
-       (elmtui.view.layout.flex:compute-flex-layout node parent-rect nil))
-      ((typep node 'elmtui.view.base-elements:text-element)
-       ;; simple intrinsic text sizing: place at parent's content origin
-       (let* ((content (elmtui.view.layout.size-utils:content-rect-of parent-rect node))
-              (rect (elmtui.view.geo:make-rectangle
-                     :pos  (elmtui.view.geo:pos  content)
-                     :size (elmtui.view.geo:size content))))
-         (%commit-rect! node rect)))
-      (t
-       (dispatch-layout nil node parent-rect st)))))
+         (display (getf st :display)))
+    (log-info "layout-node ~A display=~S parent-rect=~S"
+              (element-id node) display
+              (list (x parent-rect) (y parent-rect) (w parent-rect) (h parent-rect)))
+    (case display
+      (:flex (compute-layout :flex node parent-rect :parent-styles st))
+      (:grid (compute-layout :grid node parent-rect))
+      (otherwise
+       (if (typep node 'container-element)
+           (compute-layout :flex node parent-rect)
+           (%commit-rect! node parent-rect))))))
 ;; (defmethod layout-node (node parent-rect _ctx)
 ;;   "Dispatch by :display when present; fallback: flex if direction set; text → intrinsic; else block."
 ;;   (declare (ignore _ctx))

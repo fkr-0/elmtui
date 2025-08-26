@@ -5,8 +5,7 @@
                 #:widget-focused-p #:defwidget-view)
   (:import-from :elmtui.view.styled #:make-styled-node)
   (:import-from :elmtui.runtime #:def-elm-app #:run-app)
-  (:import-from :elmtui.style-lib.rule #:defrule)
-  (:import-from :elmtui.style-lib.sheet #:defstylesheet)
+  (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
   (:import-from :elmtui.state.update #:defupdate)
   (:export
    :main
@@ -19,16 +18,16 @@
 ;;;--------------------------------------------------------------
 (defstylesheet game-of-life-stylesheet
   (defrule "cell-alive"
-    :background-color (elmtui.style-lib.styles:rgb '(0 255 0))
+    :background-color (rgb 0 255 0)
     :width 1
     :height 1)
   (defrule "cell-dead"
-    :background-color (elmtui.style-lib.styles:rgb '(0 0 0))
+    :background-color (rgb 0 0 0)
     :width 1
     :height 1)
   (defrule ".status-bar"
-    :background-color (elmtui.style-lib.styles:rgb '(50 50 50))
-    :color (elmtui.style-lib.styles:rgb '(255 255 255))
+    :background-color (rgb 50 50 50)
+    :color (rgb 255 255 255)
     :padding 1
     :height 1))
 

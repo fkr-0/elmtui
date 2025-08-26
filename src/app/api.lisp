@@ -186,10 +186,10 @@ Workflow:
          (class (gethash keyword-dsl-type *dsl-type-to-component-class*)))
     (if class
         (progn
-          (log-debug "Found component class ~S for DSL type ~S." class keyword-dsl-type)
+          ;; (log-debug "Found component class ~S for DSL type ~S." class keyword-dsl-type)
           class)
         (progn
-          (log-error "No component class registered for DSL type: ~S" keyword-dsl-type)
+          ;; (log-error "No component class registered for DSL type: ~S" keyword-dsl-type)
           ;; (error (format nil "No component class registered for DSL type: ~S" keyword-dsl-type))
           nil
           ))))
@@ -205,11 +205,13 @@ Workflow:
   (declare (type (or symbol keyword) dsl-type))
   (let ((keyword-dsl-type (intern (symbol-name dsl-type) :keyword)))
     (if (gethash keyword-dsl-type *dsl-type-to-component-class*)
-        (progn
-          (log-debug "Component class found for DSL type: ~S" keyword-dsl-type)
-          t)
-        (progn
-          (log-debug "No component class registered for DSL type: ~S" keyword-dsl-type)))))
+        t nil
+        ;; (progn
+        ;;   (log-debug "Component class found for DSL type: ~S" keyword-dsl-type)
+        ;;   t)
+        ;; (progn
+        ;;   (log-debug "No component class registered for DSL type: ~S" keyword-dsl-type))
+        )))
 
 (defun clear-dsl-component-registry ()
   "Clears the DSL component registry. Useful for testing."

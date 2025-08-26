@@ -39,7 +39,8 @@
                 #:interpret-cmd)
   (:import-from :elmtui.ui.widgets.root-viewport
                 #:root-viewport)
-  (:import-from :elmtui.style-lib.api #:stylesheet)
+  ;; (:import-from :elmtui.style-lib.api #:stylesheet) ; legacy
+  (:import-from :elmtui.style.manager #:compute-active-stylesheet)
   (:import-from :bordeaux-threads #:mailbox)
   (:import-from :cleve-elm.channel #:->)
   (:import-from :elmtui.core.event-channels #:channel-of)
@@ -123,6 +124,9 @@
 (defvar *got-initial-cursor-position* nil
   "Tracks if a :cursorpositionchanged event has been received after startup.")
 
+(defvar *last-cursor-pos* '(0 . 0)
+  "Last known cursor position as a cons (row . col). Used for anchoring.")
+
 ;;; ---------------------------------------------------------------------------
 ;;; == Application Entry Point ==
 ;;; ---------------------------------------------------------------------------
@@ -135,54 +139,9 @@
            (type keyword backend-type))
   (log:info "DRIVER: run-application called for ~S with backend ~A."
             (getf app-spec :name) backend-type)
-
-  ;; Initialize keymap system
-  (elmtui.keymaps:initialise)
-
-  ;; Create a focus manager
-  (setf *focus-manager* (make-focus-manager))
-
-  ;; Subscribe keymap processor to key events
-  (elmtui.core.loop:subscribe
-   :key-event
-   (lambda (evt)
-     (unless (elmtui.keymaps:process-key-event
-              evt
-              *focus-manager*
-              :app-state *current-app-model*
-              :dispatch-fn #'publish)
-       ;; Fallback for unhandled keys
-       (publish (list :raw-key evt)))))
-
-  ;; Initial render logic: subscribe to terminal-resized and cursorpositionchanged
-  (setf *initial-render-done* nil
-        *got-initial-terminal-resized* nil
-        *got-initial-cursor-position* nil)
-
-  (elmtui.core.loop:subscribe
-   :terminal-resized
-   (lambda (evt)
-     (log:info "DRIVER: Terminal resized event received: ~S" evt)
-     (setf *got-initial-terminal-resized* t)
-     (when (and *got-initial-terminal-resized* *got-initial-cursor-position* (not *initial-render-done*))
-       (setf *initial-render-done* t)
-       (when (and *current-app-model* *backend* *app-spec*)
-         (full-view-pipeline (make-context-from-spec *app-spec* *current-app-model* *backend*))))))
-
-  (elmtui.core.loop:subscribe
-   :cursorpositionchanged
-   (lambda (evt)
-     (log:debug "DRIVER: cursor position changed event received: ~S" evt)
-     (setf *got-initial-cursor-position* t)
-     (when (and *got-initial-terminal-resized* *got-initial-cursor-position* (not *initial-render-done*))
-       (setf *initial-render-done* t)
-       (when (and *current-app-model* *backend* *app-spec*)
-         (full-view-pipeline (make-context-from-spec *app-spec* *current-app-model* *backend*))))))
-
-  (apply #'run-app-platform
-         app-spec
-         :backend-type backend-type
-         platform-options))
+  (run-app-platform app-spec
+                    :backend-type backend-type
+                    :platform-options platform-options))
 
 
 ;;; ---------------------------------------------------------------------------
@@ -311,7 +270,7 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
      :state state
      :view-fn (getf app-spec :view-fn)
      :backend backend
-     :stylesheet (elmtui.tea-state:get-path '(:current-stylesheet) state)
+     :stylesheet (compute-active-stylesheet state)
      :viewport-rect (elmtui.view.geo:make-rectangle
                      :pos (elmtui.view.geo:make-pos :x 0 :y 0) :size (elmtui.view.geo:make-size :w w :h h))
      :front-buffer *previous-frame-buffer*)))
@@ -380,53 +339,91 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
            (type keyword backend-type)
            (type (or string null) tty-path))
   (log-info "Running RUN_APP_PLATFORM")
-  (setf *app-spec* app-spec)
-  (setf *backend* nil *input-thread* nil *stop-input-fn* nil
-        *driver-initiated-shutdown-p* nil *previous-frame-buffer* nil
-        *current-app-model* nil *root-viewport-id-path* nil
-        elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t)
-  (log-info "Globals set: *backend*, *input-thread*, *stop-input-fn*, *driver-initiated-shutdown-p*, *previous-frame-buffer*, *current-app-model*, *root-viewport-id-path*"
-            *backend* *input-thread* *stop-input-fn* *driver-initiated-shutdown-p* *previous-frame-buffer* *current-app-model* *root-viewport-id-path*)
-  (start-loop)
-  (let (;(event-loop ) ; Start the main event loop
-                                        ;(initial-model nil)
-        ;; gets
-        ;; initialized in initialize-app-model
-        (initial-commands nil))
-    ;; (declare (type list initial-commands))
+  ;; Reset all driver-level state variables at the start.
+  (setf *app-spec* app-spec
+        *backend* nil
+        *input-thread* nil
+        *stop-input-fn* nil
+        *driver-initiated-shutdown-p* nil
+        *previous-frame-buffer* nil
+        *current-app-model* nil
+        *root-viewport-id-path* nil
+        elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t
+        *initial-render-done* nil
+        *got-initial-terminal-resized* nil
+        *got-initial-cursor-position* nil
+        *focus-manager* nil)
+  (log-info "Globals reset for new application run.")
+
+  (let ((initial-commands nil))
     (unwind-protect
          (progn
+           ;; 1. Start the event loop. This sets up channels and the consumer thread.
+           (start-loop)
+           (log-info "Event loop and channels are active.")
+
+           ;; 2. Now that channels exist, set up all event subscriptions.
+           (elmtui.keymaps:initialise)
+           (setf *focus-manager* (make-focus-manager))
+           ;; (elmtui.core.loop:subscribe
+           ;;  :key-event
+           ;;  (lambda (evt)
+           ;;    (unless (elmtui.keymaps:process-key-event
+           ;;             evt *focus-manager*
+           ;;             :app-state *current-app-model*
+           ;;             :dispatch-fn #'publish)
+           ;;      (publish (list :raw-key evt)))))
+           ;; (elmtui.core.loop:subscribe
+           ;;  :terminal-resized
+           ;;  (lambda (evt)
+           ;;    (log:info "DRIVER: Terminal resized event received: ~S" evt)
+           ;;    (setf *got-initial-terminal-resized* t)
+           ;;    (when (and *current-app-model* *backend* *app-spec* (not *initial-render-done*))
+           ;;      (setf *initial-render-done* t)
+           ;;      (setf *last-ctx* (full-view-pipeline (make-context-from-spec *app-spec* *current-app-model* *backend*)))
+           ;;      (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*)))))
+           ;; (elmtui.core.loop:subscribe
+           ;;  :cursorpositionchanged
+           ;;  (lambda (evt)
+           ;;    (log:debug "DRIVER: cursor position changed event received: ~S" evt)
+           ;;    (setf *got-initial-cursor-position* t)
+           ;;    (handler-case
+           ;;        (let* ((row (getf evt :row 0)) (col (getf evt :col 0)))
+           ;;          (setf *last-cursor-pos* (cons row col)))
+           ;;      (error () (setf *last-cursor-pos* '(0 . 0))))))
+           (log-info "System event subscriptions are set up.")
+
+           ;; 3. Initialize the backend, passing the now-ready publish function.
            (setf *backend* (initialize-backend-with-publish-fn
                             backend-type
-                            tty-path ; Use tty-path from keyword args (potentially from platform-options)
+                            tty-path
                             (lambda (ev) (publish ev))))
            (unless *backend*
              (error "Failed to initialize backend ~A" backend-type))
 
+           ;; 4. Initialize the application model. This sets *app-message-processor*.
+           (multiple-value-bind (im ic) (initialize-app-model app-spec)
+             (log:debug "DRIVER: Initial model: ~S, initial commands: ~S..binding" im ic)
+             (setf *current-app-model* im)
+             (setf initial-commands ic))
+           (log-info "Application model and message processor are initialized.")
+
+           ;; 5. Start the input reader thread.
            (multiple-value-bind (thread stop-fn)
-               (start-reader *backend*
-                             :event-handler (lambda (ev) (publish ev)))
+               (start-reader *backend* :event-handler (lambda (ev) (publish ev)))
              (setf *input-thread* thread)
              (setf *stop-input-fn* stop-fn)
-             (log-info "Input thread started: ~A, stop function: ~A" *input-thread* stop-fn))
-                                        ;(multiple-value-setq (initial-model initial-commands)
-           (multiple-value-bind (im ic)
-               (initialize-app-model app-spec)
-             (log:debug "DRIVER: Initial model: ~S, initial commands: ~S..binding" im ic)
-             ;; (setf initial-model im)
-             (setf initial-commands ic))
+             (log-info "Input thread started: ~A, stop function: ~A" *input-thread* *stop-input-fn*))
+
+           ;; 6. Process any initial commands from the app's init function.
            (when initial-commands
              (process-initial-commands initial-commands app-spec))
-           ;; (send-initial-resize-message *backend* (lambda (ev) (publish ev)))
+           (log:info "Initial commands processed. Starting main wait loop.")
 
-           ;; Initial render is now handled by the first :terminal-resized event
-           ;; (render-frame app-spec initial-model *backend*)
-           ;; Wait for shutdown signal
-           (log:info "DRIVER: Initial model and commands processed. Starting app loop.")
+           ;; 7. Wait for shutdown signal.
            (loop until elmtui.core.loop::*shutdown-requested* do (sleep 0.1))
-           ;; (app-loop app-spec *backend*)
-           (log:info "DRIVER: app-loop completed, shutdown."))
+           (log:info "DRIVER: Shutdown signal received, exiting loop."))
       ;; Cleanup
       (shutdown-platform)
-      (elm-stop-loop) ; Fixed function call
+      (elm-stop-loop)
       (log:info "DRIVER: Application ~A has shut down." (getf app-spec :name)))))
