@@ -219,7 +219,7 @@
 ;;;---------------------------------------------------------------
 ;;; Backend Lifecycle
 ;;;---------------------------------------------------------------
-(defmethod initialize-backend ((backend-type (eql :terminal)) &key publish-fn (tty-path "/dev/tty") &allow-other-keys)
+(defmethod initialize-backend ((backend-type (eql :terminal)) &key publish-fn (tty-path "/dev/tty") (initial-clear t) &allow-other-keys)
   (let ((fd (sb-unix:unix-open tty-path sb-posix:o-rdwr 0)))
     ;; (unless (and fd (>= fd 0))
     ;;   (error "Could not open terminal TTY: ~A" tty-path))
@@ -258,7 +258,8 @@
 
       (setup-terminal-signal-handlers instance publish-fn)
       (send-sequence instance :cursor-hide)
-      (%force-clear-terminal-and-reset-buffers instance) ; Initial clear and buffer reset
+      (when initial-clear
+        (%force-clear-terminal-and-reset-buffers instance)) ; Optional initial clear and buffer reset
       (flush-output instance)
       instance)))
 
@@ -511,6 +512,12 @@
   (with-terminal-lock (instance)
     (decf (terminal-instance-scrolled-lines instance) lines)
     (send-sequence instance :scroll-up lines)))
+
+(defmethod elmtui.platform.api:scroll-lines ((instance terminal-instance) n)
+  (cond
+    ((> n 0) (scroll-down instance n))
+    ((< n 0) (scroll-up instance (- n)))
+    (t t)))
 
 ;;;---------------------------------------------------------------
 ;;; Drawing Primitives (draw to a specified target-buffer)

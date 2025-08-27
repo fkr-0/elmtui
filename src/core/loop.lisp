@@ -64,21 +64,21 @@ as well as the view function for the application.")
 (defun start-loop (&key (fps 60) (wait t))
   "Initialize and start the main event loop using the channel-based system."
   (declare (ignore fps wait)) ; These arguments seem to be unused currently.
-  (log-info "START-LOOP: Called. *active-event-channels* is currently ~:[NIL~;non-NIL~]."
+  (log-debug "START-LOOP: Called. *active-event-channels* is currently ~:[NIL~;non-NIL~]."
     *active-event-channels*)
   (unless *active-event-channels*
-    (log-info "START-LOOP: *active-event-channels* is NIL, initializing.")
+    (log-debug "START-LOOP: *active-event-channels* is NIL, initializing.")
     ;; standard-event-channels returns an alist ((key . channel-obj) ...).
     ;; We want *active-event-channels* to be a flat list of channel objects.
     (setf *active-event-channels*
       (mapcar #'cdr (elmtui.core.event-channels:standard-event-channels)))
-    (log-info "START-LOOP: Initialized *active-event-channels*. Channel names: ~S"
+    (log-debug "START-LOOP: Initialized *active-event-channels*. Channel names: ~S"
       (mapcar #'elmtui.core.event-channels:name *active-event-channels*)))
-  (log-info "START-LOOP: *active-event-channels* is now active. Channel-based event system activated.")
+  (log-debug "START-LOOP: *active-event-channels* is now active. Channel-based event system activated.")
 
   ;; Set the global *app-sender* to this system's publish function
   (setf elmtui.core.globals:*app-sender* #'publish)
-  (log-info "LOOP: *app-sender* set to #'elmtui.core.loop:publish (channel system)")
+    (log-debug "LOOP: *app-sender* set to #'elmtui.core.loop:publish (channel system)")
   (when (or (null *consumer-thread*)
           (and  (not *shutdown-requested*))
           (and *consumer-thread* (not (sb-thread:thread-alive-p *consumer-thread*))))
@@ -98,7 +98,7 @@ as well as the view function for the application.")
       (log-info "EVENT-CONSUMER: Starting loop. Active channels count: ~D."
         (length *active-event-channels*))
       (when (and *active-event-channels* (> (length *active-event-channels*) 0))
-        (log-info "EVENT-CONSUMER: First channel object name for consumer: ~A"
+        (log-debug "EVENT-CONSUMER: First channel object name for consumer: ~A"
           (elmtui.core.event-channels:name (first *active-event-channels*))))
       (loop
         (when *shutdown-requested*
@@ -107,7 +107,7 @@ as well as the view function for the application.")
         (log-debug "EVENT-CONSUMER: *shutdown-requested* was false, continuing loop.")
         (if (null *active-event-channels*)
           (progn
-            (log-warn "EVENT-CONSUMER: No active event channels. Sleeping briefly.")
+            (log-debug "EVENT-CONSUMER: No active event channels. Sleeping briefly.")
             (sleep 0.1)
             nil)
           (restart-case
@@ -140,12 +140,12 @@ as well as the view function for the application.")
                 (invoke-restart 'restart-loop)))
             (restart-loop ()
               :report "Restart the event loop by spawning a new consumer thread."
-              (log-info "EVENT-CONSUMER: `restart-loop` invoked. Creating new thread.")
+              (log-warn "EVENT-CONSUMER: restart-loop invoked. Creating new thread.")
               (start-loop)
               (return))))))
     ;; Cleanup form of unwind-protect
     (progn
-      (log-info "event-loop> Cleanup form unwind-protect")
+      (log-debug "event-loop> Cleanup form unwind-protect")
       (setf *shutdown-requested* t)))
   (log-info "EVENT-CONSUMER: Event consumer loop terminated."))
 

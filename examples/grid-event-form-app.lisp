@@ -9,7 +9,7 @@
   (:import-from :elmtui.view.dsl #:define-view)
   (:import-from :elmtui.view.core #:make-ui-node)
   ;; Import grid layout
-  (:import-from :elmtui.view.grid-layout
+  (:import-from :elmtui.view.layout.grid
                 #:define-grid-template
                 #:build-grid-from-template)
   ;; Import event system
@@ -23,7 +23,7 @@
   ;; Import state management
   (:import-from :elmtui.state #:defmodel #:defupdate #:defview)
   (:import-from :elmtui.state.msg #:defmsg)
-  (:import-from :elmtui.core.keymap #:make-keymap #:define-key))
+  (:import-from :elmtui.core.keymap #:keymap! #:define-key))
 
 (in-package :elmtui-grid-event-example)
 
@@ -128,7 +128,7 @@
 ;;;-----------------------------------------------------------------------------
 
 ;; Keymap for our form
-(defparameter *form-keymap* (make-keymap :name :form-keymap))
+(defparameter *form-keymap* (keymap! :form-keymap))
 
 ;; Define key bindings
 (define-key *form-keymap* :tab

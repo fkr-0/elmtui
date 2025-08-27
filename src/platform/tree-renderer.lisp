@@ -103,20 +103,38 @@
   (when (and style (> w 0) (> h 0))
     (case (element-type node)
       (:text
-       (loop with cur-x = 0 and cur-y = 0
-             for ch across (text-content node)
-             do (when (>= cur-y h) (return))
-                (let ((rr (+ y cur-y)) (cc (+ x cur-x)))
-                  (when (inside-buffer-p buffer rr cc)
-                    (let* ((existing-style (buffer-cell-style (buffer-cell-at buffer rr cc)))
-                           (new-style (copy-term-style style)))
-                      (unless (terminal-style-bg-color new-style)
-                        (setf (terminal-style-bg-color new-style) (when existing-style (terminal-style-bg-color existing-style))))
-                      (set-buffer-cell-at buffer rr cc ch new-style))))
-                (incf cur-x)
-                (when (>= cur-x w)
-                  (setq cur-x 0)
-                  (incf cur-y)))))))
+       (let* ((smap (elmtui.view.element:el/styles node))
+              (white-space (getf smap :white-space :normal)))
+         (cond
+           ;; Truncate: draw a single line clipped to width
+           ((eq white-space :nowrap)
+            (loop for i from 0 below (min (length (text-content node)) w)
+                  for ch = (aref (text-content node) i)
+                  do (let ((rr y) (cc (+ x i)))
+                       (when (inside-buffer-p buffer rr cc)
+                         (let* ((existing-style (buffer-cell-style (buffer-cell-at buffer rr cc)))
+                                (new-style (copy-term-style style)))
+                           (unless (terminal-style-bg-color new-style)
+                             (setf (terminal-style-bg-color new-style)
+                                   (when existing-style (terminal-style-bg-color existing-style))))
+                           (set-buffer-cell-at buffer rr cc ch new-style))))))
+           ;; Wrap by width into multiple rows up to h rows
+           (t
+            (loop with cur-x = 0 and cur-y = 0
+                  for ch across (text-content node)
+                  do (when (>= cur-y h) (return))
+                     (let ((rr (+ y cur-y)) (cc (+ x cur-x)))
+                       (when (inside-buffer-p buffer rr cc)
+                         (let* ((existing-style (buffer-cell-style (buffer-cell-at buffer rr cc)))
+                                (new-style (copy-term-style style)))
+                           (unless (terminal-style-bg-color new-style)
+                             (setf (terminal-style-bg-color new-style)
+                                   (when existing-style (terminal-style-bg-color existing-style))))
+                           (set-buffer-cell-at buffer rr cc ch new-style))))
+                     (incf cur-x)
+                     (when (>= cur-x w)
+                       (setq cur-x 0)
+                       (incf cur-y))))))))))
 
 (defun render-node (node buffer parent-x parent-y)
   (log-info "Rendering node ~A of type ~A, typep ~A"

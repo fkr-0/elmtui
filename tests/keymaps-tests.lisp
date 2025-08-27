@@ -11,7 +11,7 @@
                 #:parse-key-string
                 #:normalized-key->string
                 #:key-event->normalized-key
-                #:make-keymap
+                #:keymap!
                 #:add-keybinding
                 #:initialise
                 #:process-key-event
@@ -62,7 +62,7 @@
 ;;;; -----------------------------------------------------------------------
 
 (test add-and-lookup-binding
-  (let* ((km  (make-keymap :name :test-km)))
+  (let* ((km  (keymap! :test-km)))
     (add-keybinding km "F1" :target '(:dummy))
     (is (not (null (lookup km (parse-key-string "F1")))))))
 
@@ -72,8 +72,8 @@
 
 (test context-precedence
   (let* ;; two keymaps, same key → different targets
-      ((km1 (make-keymap :name :km1))
-       (km2 (make-keymap :name :km2)))
+      ((km1 (keymap! :km1))
+       (km2 (keymap! :km2)))
     (add-keybinding km1 "F2" :type :message :target '(:one))
     (add-keybinding km2 "F2" :type :message :target '(:two))
     (register-keymap :km1 km1)
