@@ -5,8 +5,9 @@
    (got      :initarg :got      :reader got)
    (where    :initarg :where    :reader where))
   (:report (lambda (c s)
-             (format s "Style contract violation at ~A: expected ~A, got ~S"
-                     (where c) (expected c) (got c)))))
+             ;; (format s "Style contract violation at ~A: expected ~A, got ~S"
+             ;;         (where c) (expected c) (got c))
+             )))
 
 (defparameter *property-registry* (make-hash-table :test 'eql))
 (defparameter *groups* (make-hash-table :test 'eql))
@@ -20,9 +21,13 @@
 
 (defmacro defproperty (name &key type enum synonyms group default doc)
   `(register-property ,name (list :type ,(if (and (consp type) (eq (car type) 'lambda))
-                                            `#',type
-                                            `',type)
-                                   :enum ',enum :synonyms ',synonyms :group ',group :default ',default :doc ,doc)))
+                                             `#',type
+                                             `',type)
+                                  :enum ',enum
+                                  :synonyms (%mk-syns ,@synonyms)
+                                  :group ',group
+                                  :default ',default
+                                  :doc ,doc)))
 
 (defun define-group (group &rest props)
   (setf (gethash group *groups*) (remove-duplicates props :test 'eql)))
@@ -56,12 +61,14 @@
 
 (defun %normalize-value (prop v)
   (let* ((def (property-definition prop))
+         (type-of-prop (getf def :type nil))
          (syns (getf def :synonyms nil))
          (vv (%ensure-keyword v)))
     (cond
       ((and syns (hash-table-p syns))
        (multiple-value-bind (m present) (gethash vv syns)
          (if present m vv)))
+      ((and (eq type-of-prop :string) (stringp v)) v)
       (t vv))))
 
 (defun %check-type (prop v)
@@ -90,15 +97,52 @@
     nv))
 
 (defun normalize-declarations (plist)
-  (let ((out (copy-list (or plist nil))))
-    (loop for (k v) on out by #'cddr do
-      (let* ((kk (%normalize-key k))
-             (vv (%normalize-value kk v)))
-        (setf (getf out kk) vv)
-        (setf (getf out k) vv)))
-    out))
+  "Normalize the keys and values in a property list (PLIST).
+
+This function ensures that all keys in the property list are normalized
+(using `%normalize-key`) and that their corresponding values are also normalized
+(using `%normalize-value`). The original keys are replaced with their normalized
+versions, and duplicate keys are avoided.
+
+Arguments:
+- PLIST: A property list where keys and values may need normalization.
+
+Returns:
+- A new property list with normalized keys and values.
+
+Example:
+  (normalize-declarations '(:MARGIN-LEFT 10 :MARGIN-RIGHT 10 :MARGIN-BOTTOM 5 :MARGIN-TOP 5
+                           :PADDING-LEFT 10 :PADDING-BOTTOM 10 :PADDING-RIGHT 10 :PADDING-TOP 10
+                           :COLOR :BLUE :PADDING 10 :MARGIN (5 10) :FONT-FAMILY \"Arial\"))
+  ;; Returns: (:MARGIN-LEFT 10 :MARGIN-RIGHT 10 :MARGIN-BOTTOM 5 :MARGIN-TOP 5
+  ;;           :PADDING-LEFT 10 :PADDING-BOTTOM 10 :PADDING-RIGHT 10 :PADDING-TOP 10
+  ;;           :COLOR :BLUE :PADDING 10 :MARGIN (5 10) :FONT-FAMILY \"Arial\")"
+  (let ((normalized-plist (copy-list (or plist nil))))
+    (loop for (key value) on normalized-plist by #'cddr do
+      (let* ((normalized-key (%normalize-key key))
+             (normalized-value (%normalize-value normalized-key value)))
+        ;; Remove the original key and set the normalized key and value
+        (remf normalized-plist key)
+        (setf (getf normalized-plist normalized-key) normalized-value)))
+    normalized-plist))
+
+;; (getf (property-definition :font-family) :type)
+;; (normalize-declarations '(:MARGIN-LEFT 10 :MARGIN-RIGHT 10 :MARGIN-BOTTOM 5 :MARGIN-TOP 5 :PADDING-LEFT
+;;                           10 :PADDING-BOTTOM 10 :PADDING-RIGHT 10 :PADDING-TOP 10 :COLOR :BLUE :PADDING
+;;                           10 :MARGIN (5 10) :FONT-FAMILY "Arial"))
 
 (defun validate-declarations (plist)
+  "Validate the types of values in a property list (PLIST) against their definitions.
+This function checks each key-value pair in the property list to ensure that
+the value conforms to the expected type defined for that property. If a value
+does not match the expected type, a `style-contract-violation` error is raised.
+
+Arguments:
+- PLIST: A property list where keys are property names and values are the corresponding values to validate.
+Returns:
+- The original property list if all values are valid.
+Raises:
+- `style-contract-violation`: If any value does not conform to the expected type for its property."
   (loop for (k v) on plist by #'cddr do
     (let* ((kk (%normalize-key k))
            (vv (%normalize-value kk v)))
@@ -147,11 +191,12 @@
 (defproperty :flex-direction :type :keyword :enum (:row :row-reverse :column :column-reverse))
 (defproperty :flex-wrap      :type :keyword :enum (:nowrap :wrap :wrap-reverse))
 (defproperty :justify-content :type :keyword :enum (:flex-start :flex-end :center :space-between :space-around :space-evenly)
-  :synonyms (%mk-syns :start :flex-start :end :flex-end))
+  :synonyms (:start :flex-start :end :flex-end))
 (defproperty :align-items    :type :keyword :enum (:stretch :flex-start :flex-end :center :baseline)
-  :synonyms (%mk-syns :start :flex-start :end :flex-end))
+  :synonyms (:start :flex-start :end :flex-end))
+
 (defproperty :align-content  :type :keyword :enum (:stretch :flex-start :flex-end :center :space-between :space-around :space-evenly)
-  :synonyms (%mk-syns :start :flex-start :end :flex-end))
+  :synonyms (:start :flex-start :end :flex-end))
 (defproperty :gap :type :number)
 (defproperty :row-gap :type :number)
 (defproperty :column-gap :type :number)

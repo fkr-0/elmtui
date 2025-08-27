@@ -129,7 +129,7 @@
       (if (typep node 'base-element)
           (let ((rect (elmtui.view.element:el/layout-rect node)))
             (log-info "Rendering node ~A at parent pos (~A, ~A) with rect ~A"
-                      (elmtui.view.element:el/id node) parent-x parent-y rect)
+                      node parent-x parent-y rect)
             (when rect
               (let ((abs-x (+ parent-x (x rect)))
                     (abs-y (+ parent-y (y rect)))

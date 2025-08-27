@@ -72,6 +72,36 @@
     (is (typep (ctx-back-buffer final-context) 'elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer)
         "The back-buffer should be a virtual-terminal-buffer.")))
 
+;; Ensure the pipeline lays out children with their own computed rects
+(test pipeline-layout-correctness-basic
+  (let* ((view
+           (lambda (model)
+             (declare (ignore model))
+             (let* ((root (make-instance 'elmtui.view.base-elements:container-element
+                                         :id :root
+                                         :style '(:display :flex :flex-direction :row :gap 1)))
+                    (a    (make-instance 'elmtui.view.base-elements:container-element :id :a :style '(:width 10 :height 3)))
+                    (b    (make-instance 'elmtui.view.base-elements:text-element      :id :b :content "hello world")))
+               (setf (elmtui.view.base-elements:element-children a) (list b))
+               (setf (elmtui.view.base-elements:element-children root) (list a))
+               root)))
+         (ctx (make-app-context
+               :state nil
+               :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
+                                              :size (make-size :w 80 :h 10))
+               :front-buffer (make-virtual-buffer 80 10)
+               :view-fn view))
+         (ctx2 (render-pipeline-0-to-5 ctx))
+         (laid (ctx-laid-out-tree ctx2))
+         (root (root laid))
+         (a    (car (elmtui.view.base-elements:element-children root)))
+         (b    (car (elmtui.view.base-elements:element-children a))))
+    (is (>= (elmtui.view.geo:w (elmtui.view.element:el/layout-rect a)) 10)
+        "Child A keeps its fixed width (lower bound), not forced to viewport.")
+    (is (<= (elmtui.view.geo:w (elmtui.view.element:el/layout-rect b))
+            (elmtui.view.geo:w (elmtui.view.element:el/layout-rect a)))
+        "Inner text width never exceeds its container's width.")))
+
 
 ;; (test pipeline-step-by-step-transformation
 ;;   "Tests each stage of the rendering pipeline individually."

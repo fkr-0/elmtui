@@ -15,6 +15,8 @@
                              (:file "application-init-tests")
                              (:file "component-init-tests")
                              (:file "rendering-pipeline-tests")
+                             (:file "dsl-props-normalization-tests")
+                             (:file "tree-transforms-layout-tests")
                              (:file "rendering-tests")
                              (:file "pipeline-contract-tests")
                              (:file "contracts-tests")
