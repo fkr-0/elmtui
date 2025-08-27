@@ -137,13 +137,13 @@
               :margin 0
               :border-style :solid :border-width 1
               :fg-color (128 128 128))
-      :children ((:text
+      :children ((:text :style (:width :fill)
                   :content "Elm TUI Key Tester")
-                 (:text :content
+                 (:text :style (:width :fill) :content
                         ,(format nil "Input: ~A" (key-tester-input component)))
-                 (:text :content
+                 (:text :style (:width :fill) :content
                         ,(format nil "Echo:  ~A" (key-tester-echo component)))
-                 (:text :content
+                 (:text :style (:width :fill) :content
                         "Press 'q' to quit. Try Backspace and Escape.")))))
 
 ;; Define the application using the modern `defapplication` macro.

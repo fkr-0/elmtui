@@ -211,7 +211,8 @@
                 :pathname "style/"
                 :components ((:file "core")
                              (:file "presets")
-                             (:file "manager")))
+                             (:file "manager")
+                             (:file "stylable-impl")))
                ;; --- End View / UI ---
 
                ;; Platform Abstraction (Moved here as it depends on view modules)

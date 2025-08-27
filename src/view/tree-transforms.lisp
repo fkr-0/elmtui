@@ -26,37 +26,48 @@
     (symbol (intern (string-upcase (symbol-name v)) :keyword))))
 
 (defun %canon-style-plist (plist)
-  "Return a new plist with keys -> keywords, and common enum values -> keywords.
-   Numeric and string values are kept intact."
-  (let ((out '()))
-    (loop for (k v) on plist by #'cddr
-          for kk = (%kw k)
-          for vv = (cond
-                     ;; map common enums to keywords
-                     ((member kk '(:display :flex-direction :direction :justify-content
-                                   :justify :align-items :align-self
-                                   :flex-wrap :position :overflow :visibility)
-                              :test #'eq)
-                      (%kw v v))
-                     ;; 'auto -> :auto
-                     ((and (member kk '(:width :height :min-width :min-height
-                                        :max-width :max-height
-                                        :flex-basis)
-                                   :test #'eq)
-                           (or (stringp v) (symbolp v)))
-                      (let ((vk (%kw v v)))
-                        (if (eq vk :AUTO) :auto v)))
-                     (t v))
-          do (setf out (list* kk vv out)))
-    (nreverse out)))
+  "Return a new plist with keys keywordized and selected enum values normalized.
+   Skips malformed leading values; only processes proper key/value pairs.
+   Do not touch structured values like color tuples (e.g., (:rgb 255 0 0))."
+  (labels ((norm-enum (x)
+             (cond ((or (null x) (numberp x) (hash-table-p x) (listp x)) x)
+                   ((or (stringp x) (symbolp x)) (%kw x x))
+                   (t x)))
+           (norm-dim (x)
+             (cond ((or (null x) (numberp x) (hash-table-p x) (listp x)) x)
+                   ((or (stringp x) (symbolp x)) (let ((vk (%kw x x))) (if (eq vk :AUTO) :auto x)))
+                   (t x))))
+    (let ((out '())
+          (cursor plist))
+      (loop while cursor do
+        (let ((k (first cursor)))
+          (cond
+            ((keywordp k)
+             (let ((v (second cursor)))
+               (let* ((kk (%kw k))
+                      (vv (cond
+                            ((member kk '(:display :flex-direction :direction :justify-content :justify :align-items :align-self :flex-wrap :position :overflow :visibility) :test #'eq)
+                             (norm-enum v))
+                            ((member kk '(:width :height :min-width :min-height :max-width :max-height :flex-basis) :test #'eq)
+                             (norm-dim v))
+                            (t v))))
+                 (setf out (nconc out (list kk vv))))
+               (setf cursor (cddr cursor))))
+            (t
+             ;; Skip stray value
+             (setf cursor (rest cursor))))))
+      out)))
 
 (defun %get-style (el)
-  "Fetch style from whichever slot your system currently uses."
-  (elmtui.view.element:el/styles el))
+  "Fetch style from protocol view first, fallback to base-element slot."
+  (or (ignore-errors (elmtui.view.element:el/styles el))
+      (ignore-errors (elmtui.view.base-elements:element-style el))
+      nil))
 
 (defun %set-style! (el new-style)
-  "Write style back consistently."
-  (setf (elmtui.view.element:el/styles el) new-style))
+  "Write style back consistently to both views."
+  (setf (elmtui.view.element:el/styles el) new-style)
+  (ignore-errors (setf (elmtui.view.base-elements:element-style el) new-style)))
 
 (defun expand-element-style (el &key ctx)
   "Normalize style keys/values to keywords and store them back. Style-group
@@ -69,6 +80,18 @@
       (%set-style! el expanded))
     el))
 
+(defun ensure-flex-display (el &key ctx)
+  "If a node declares :flex-direction but no :display, set :display :flex.
+   Helps older DSL that omit explicit display while using flex semantics."
+  (declare (ignore ctx))
+  (let* ((st (%get-style el)))
+    (when (and (listp st)
+               (getf st :flex-direction nil)
+               (null (getf st :display nil)))
+      (let ((new (nconc (copy-list st) (list :display :flex))))
+        (%set-style! el new)))
+    el))
+
 (defun transform-bottom-up (fn el &key ctx)
   (let ((kids (elmtui.view.element:el/children el)))
     (when kids
@@ -78,10 +101,11 @@
 
 (defun transform-top-down (fn el &key ctx)
   (let* ((new-el (funcall fn el :ctx ctx))
-         (kids (elmtui.view.element:el/children new-el)))
+         (_ (log-info "TD with ~A el to new el: ~A -> ~A" fn el new-el))
+         (kids (and new-el (elmtui.view.element:el/children new-el))))
     (when kids
       (setf (elmtui.view.element:el/children new-el)
-            (mapcar (lambda (c) (transform-top-down fn c :ctx ctx)) kids)))
+            (mapcar (lambda (c) (transform-top-down fn c :ctx ctx)) (remove nil kids))))
     new-el))
 
 (defun resolve-dsl (el)
@@ -92,80 +116,20 @@
     ((and (listp el) (every #'base-dsl-p el)) (mapcar #'dsl->objects el))
     (t el)))
 
-(defun measure-element (el)
-  "Compute intrinsic border-box size once (no parent needed)."
-  (let* ((measured (compute-size el))
-         (current  (elmtui.view.element:el/size el)))
-    (unless (equal current measured)
-      (setf (elmtui.view.element:el/size el) measured))
-    el))
-
-(defun layout-element (el &key ctx)
-  "Bottom-up fallback: try to use ctx viewport when available."
-  (let* ((parent (or (ctx-viewport-rect ctx)
-                     (elmtui.view.element:el/layout-rect el) ; last-known placement
-                     (make-rectangle :pos (make-pos :x 0 :y 0)
-                                     :size (make-size :w 0 :h 0))))
-         (rect (compute-layout el parent))
-         (curr (elmtui.view.element:el/layout-rect el)))
-    (unless (and curr (rect= curr rect))
-      (setf (elmtui.view.element:el/layout-rect el) rect))
-    el))
-
 (defun mark-dirty-if-changed (el)
   (when (element-changed-p el)
     (setf (element-dirty-p el) t))
   el)
 
 (defun resolve-components (node &key ctx)
-  "If NODE is a component, replace it with the tree from its view fn."
-  (resolve-dsl ;node))
-   (dsl->objects
-    (elmtui.view.dsl:dsl->ui-node
-     node
-     (elmtui.contracts:ctx-state ctx)))))
+  "Normalize NODE to object tree: if it's already a base-element tree, return it;
+   if it's DSL, resolve components and convert to objects."
+  (cond
+    ((elmtui.view.base-elements:base-element-p node) node)
+    (t
+     (elmtui.view.base-elements:dsl->objects
+      (elmtui.view.dsl:dsl->ui-node node (elmtui.contracts:ctx-state ctx))))))
 
-;; (defun expand-element-style (el &key ctx)
-;;   "Expand style-groups in-place. Do NOT change the slot name."
-;;   (declare (ignore ctx))
-;;   (let* ((old (elmtui.view.element:el/styles el))
-;;          (new (elmtui.style-lib.macros:expand-stylegroups old)))
-;;     (if (equal old new)
-;;         el
-;;         (progn
-;;           ;; prefer element-style setter; also mirror to el/styles if needed
-;;           (setf (element-style el) new)
-;;           el))))
-
-(defun pass-measure (el &key ctx)
-  (declare (ignore ctx))
-  (measure-element el))
-
-;; (defun pass-layout-bottom-up (el &key ctx)
-;;   (layout-element el :ctx ctx))
-
-;; (defun layout-tree-top-down (root root-rect)
-;;   "Top-down layout pass:
-;;    1) layout-node MUST set EL/LAYOUT-RECT for NODE given PARENT-RECT
-;;    2) recurse with EACH CHILD'S OWN RECT (preserves offsets)"
-;;   (labels
-;;       ((walk (node parent-rect)
-;;          (let* ((laid (layout-node node parent-rect nil))
-;;                 (rect (elmtui.view.element:el/layout-rect laid)))
-;;            (when (null rect)
-;;              (error "layout-node did not write :layout for ~S" node))
-;;            (when (element-children laid)
-;;              (setf (element-children laid)
-;;                    (mapcar (lambda (c)
-;;                              (let ((child-rect (elmtui.view.element:el/layout-rect c)))
-;;                                (unless child-rect
-;;                                  (log-warn "Child ~S has no layout-rect after laying out ~S. Using parent's content-box."
-;;                                            c laid)
-;;                                  (setf child-rect (content-rect-of rect laid)))
-;;                                (walk c child-rect)))
-;;                            (element-children laid))))
-;;            laid)))
-;;     (walk root root-rect)))
 
 (defun pass-dirty (el &key ctx)
   (declare (ignore ctx))
@@ -182,17 +146,6 @@
                         :size (make-size :w 0 :h 0)))))
 
 
-;; (defun expand-element-style (el &key ctx)
-;;   ;; Expand style groups *in place* without copying the wrong slot.
-;;   (declare (ignore ctx))
-;;   (let* ((old (elmtui.view.element:el/styles el))
-;;          (new (elmtui.style-lib.macros:expand-stylegroups old)))
-;;     (if (equal old new)
-;;         el
-;;         (progn
-;;           (setf (elmtui.view.base-elements:element-style el) new)
-;;           el))))
-
 (defun pass-layout-bottom-up (el &key ctx)
   ;; If someone invokes bottom-up, at least provide a real parent rect.
   (let* ((parent (or (elmtui.contracts:ctx-viewport-rect ctx)
@@ -205,51 +158,30 @@
                    (rect= (elmtui.view.element:el/layout-rect el) rect))
         (setf (elmtui.view.element:el/layout-rect el) rect)))
     el))
-(defun %call-layout (root parent-rect)
-  (cond
-    ((and (find-package :elmtui.view.base-elements)
-          (fboundp (intern "COMPUTE-LAYOUT" :elmtui.view.base-elements)))
-     (funcall (intern "COMPUTE-LAYOUT" :elmtui.view.base-elements) root parent-rect))
-    ((and (find-package :elmtui.view.layout)
-          (fboundp (intern "LAYOUT-NODE" :elmtui.view.layout)))
-     (funcall (intern "LAYOUT-NODE" :elmtui.view.layout) root parent-rect nil))
-    (t (error "No layout entrypoint."))))
 
 (defun layout-tree-top-down (root root-rect)
   "Top-down layout: lay out NODE in PARENT-RECT; recurse passing each CHILD'S OWN rect.
-   If a child somehow has no rect after parent layout, fall back to the parent's content box once."
+   Critical: each child receives its own computed rect, not the parent's rect. If a child
+   rect is missing, fall back to the parent's content box once."
   (labels ((walk (node parent-rect)
-             (let* ((laid-node (%call-layout node parent-rect))
-                    (laid-rect (elmtui.view.element:el/layout-rect laid-node)))
-               (when (null laid-rect)
+             (let* ((laid-node (elmtui.view.base-elements:compute-layout node parent-rect))
+                    (parent-rect* (elmtui.view.element:el/layout-rect laid-node)))
+               (when (null parent-rect*)
                  (error "layout-node failed to assign a rect to ~S" node))
-               (log-info "Layed out ~A to ~A" node laid-rect)
+               (log-info "Layed out ~A to ~A" node parent-rect*)
                (when (elmtui.view.element:el/children laid-node)
                  (setf (elmtui.view.element:el/children laid-node)
                        (mapcar (lambda (child)
-                                 (walk child laid-rect))
+                                 (let ((child-rect (elmtui.view.element:el/layout-rect child)))
+                                   (unless child-rect
+                                     ;; Fallback: use parent's content box for one step
+                                     (setf child-rect (elmtui.view.layout.size-utils:content-rect-of parent-rect* laid-node)))
+                                   (walk child child-rect)))
                                (elmtui.view.element:el/children laid-node))))
                laid-node)))
     (walk root root-rect)))
 
 
-;; (defun %root-rect-or-viewport (root ctx maybe-root-rect)
-;;   (or maybe-root-rect
-;;       (elmtui.contracts:ctx-viewport-rect ctx)
-;;       (elmtui.view.element:el/layout-rect root)
-;;       (elmtui.view.geo:make-rectangle
-;;        :pos  (elmtui.view.geo:make-pos :x 0 :y 0)
-;;        :size (elmtui.view.geo:make-size :w 0 :h 0))))
-
-;; (defun process-tree (root &key ctx root-rect)
-;;   "Pipeline: resolve → expand styles → measure → layout (top-down using viewport) → mark-dirty."
-;;   (let* ((p1 (transform-top-down #'resolve-components root :ctx ctx))
-;;          (p2 (transform-top-down #'expand-element-style p1 :ctx ctx))
-;;          (p3 (transform-bottom-up #'pass-measure p2 :ctx ctx))
-;;          (rr (%root-rect-or-viewport p3 ctx root-rect))
-;;          (p4 (layout-tree-top-down p3 rr))
-;;          (p5 (transform-top-down #'pass-dirty p4 :ctx ctx)))
-;;     p5))
 
 ;; 1) pick a root rect: explicitly passed, else from ctx.viewport
 (defun %root-rect-or-viewport (root ctx root-rect)
@@ -289,21 +221,42 @@
                    (setf (elmtui.view.base-elements:element-children node)
                          (mapcar (lambda (c) (walk c child-parent)) kids))))
                node)))
+    (log-info "Walking ~A" root)
     (walk root (elmtui.view.layout.flex::content-box root-rect root))))
 
 ;; 3) wire it into the pipeline before layout
 (defun process-tree (root &key ctx root-rect)
   "Pipeline: resolve → expand styles → measure(top-down) → layout(top-down) → mark-dirty."
-  (let* ((p1 (transform-top-down #'resolve-components root :ctx ctx))
-         (p2 (transform-top-down #'expand-element-style p1 :ctx ctx))
-         ;; Apply cl-styles if a stylesheet is present in ctx
-         (_ (ignore-errors
-             (let ((sheet (elmtui.contracts:ctx-stylesheet ctx)))
-               (when sheet
-                 (cl-styles.engine:apply-stylesheet-to-tree p2 sheet :return :patches)))))
-         (rr (%root-rect-or-viewport p2 ctx root-rect))
-         (p3 (measure-tree-top-down p2 rr))
-         (p4 (layout-tree-top-down p3 rr))
-         (p5 (transform-top-down #'pass-dirty p4 :ctx ctx)))
-    p5))
+  (labels ((ensure-node (x)
+             (cond
+               ((elmtui.view.base-elements:base-element-p x) x)
+               ((and (listp x)
+                     (every #'elmtui.view.base-elements:base-element-p x))
+                (first x))
+               (t x))))
+    (let* ((p1 (transform-top-down #'resolve-components root :ctx ctx))
+           (_ (log-info "Resolve components done ~A" p1))
+           (p2 (transform-top-down #'expand-element-style p1 :ctx ctx))
+           ;; Apply cl-styles if a stylesheet is present in ctx. Use :objects so
+           ;; set-computed-style is invoked and styles merge into inline.
+           (_ (log-info "expand element style 1 done ~A" p2))
+           (s (ignore-errors
+               (let ((sheet (elmtui.contracts:ctx-stylesheet ctx)))
+                 (when sheet
+                   (cl-styles.engine:apply-stylesheet-to-tree p2 sheet :return :objects))
+                 p2)))
+           (_ (log-info "apply stylesheet done ~A" p2))
+           (p2 (ensure-node p2))
+           (_ (log-info "ensure node done ~A" p2))
+           ;; Ensure styles are present on every node before layout
+           (p2 (transform-top-down #'expand-element-style p2 :ctx ctx))
+           (_ (log-info "expand element style 2 done"))
+           (p2 (transform-top-down #'ensure-flex-display p2 :ctx ctx))
+           (_ (log-info "ensure flex display done"))
+           (rr (%root-rect-or-viewport p2 ctx root-rect))
+           (p3 (measure-tree-top-down p2 rr))
+           (_ (log-info "measure tree top down done"))
+           (p4 (layout-tree-top-down p3 rr))
+           (p5 (transform-top-down #'pass-dirty p4 :ctx ctx)))
+      p5)))
 ;; == end/tree-transforms.lisp ==

@@ -2,24 +2,62 @@
 
 (defstruct rule selector declarations specificity)
 
+;; (defmacro defrule (selector &body declarations)
+;;   "Create a rule. Declarations are a plist of property/value forms.
+;; If a value is a list literal starting with a number or keyword (e.g., (1 1 0)
+;; for :flex or (0 1) for :padding), wrap it in (list ...) so it becomes data,
+;; not a function call. Values starting with a symbol (e.g., (rgb ...)) are left
+;; as-is so they evaluate."
+;;   (let ((norm-decls
+;;           (loop with out = '()
+;;                 for (k v) on declarations by #'cddr do
+;;                   (let* ((vk v)
+;;                          (wrapp (and (consp v)
+;;                                      (or (numberp (car v)) (keywordp (car v))))))
+;;                     (when wrapp
+;;                       (setf vk (cons 'list v)))
+;;                     (setf out (list* k vk out)))
+;;                 finally (return (nreverse out)))))
+;;     `(make-rule :selector (cl-styles.selector:compile-selector ,selector)
+;;                 :declarations (list ,@norm-decls)
+;;                 :specificity (cl-styles.selector:selector-specificity ,selector))))
 (defmacro defrule (selector &body declarations)
-  "Create a rule. Declarations are a plist of property/value forms.
-If a value is a list literal starting with a number or keyword (e.g., (1 1 0)
-for :flex or (0 1) for :padding), wrap it in (list ...) so it becomes data,
-not a function call. Values starting with a symbol (e.g., (rgb ...)) are left
-as-is so they evaluate."
-  (let ((norm-decls
-          (loop with out = '()
-                for (k v) on declarations by #'cddr do
-                  (let* ((vk v)
-                         (wrapp (and (consp v)
-                                     (or (numberp (car v)) (keywordp (car v))))))
-                    (when wrapp
-                      (setf vk (cons 'list v)))
-                    (setf out (list* k vk out)))
-                finally (return (nreverse out)))))
+  "Create a rule. Declarations are a property list of property/value pairs.
+
+This macro processes the declarations to ensure that list literals starting
+with a number or keyword (e.g., (1 1 0) for :flex or (0 1) for :padding) are
+wrapped in `(list ...)` so they are treated as data, not function calls.
+Values starting with a symbol (e.g., (rgb ...)) are left as-is to evaluate.
+
+Arguments:
+- SELECTOR: A CSS-like selector to which the rule applies.
+- DECLARATIONS: A property list of property/value pairs.
+
+Returns:
+- A `make-rule` form with the processed selector, declarations, and specificity.
+
+Example:
+  (defrule \".example\"
+    :color (rgb 255 0 0)
+    :padding (10 20))
+  ;; Expands to:
+  ;; (make-rule
+  ;;  :selector (cl-styles.selector:compile-selector \".example\")
+  ;;  :declarations (list :color (rgb 255 0 0) :padding (list 10 20))
+  ;;  :specificity (cl-styles.selector:selector-specificity \".example\"))"
+  (let ((processed-declarations
+          (mapcan (lambda (pair)
+                    (destructuring-bind (key value) pair
+                      (let ((processed-value
+                              (if (and (consp value)
+                                       (or (numberp (car value))
+                                           (keywordp (car value))))
+                                  `(list ,@value)
+                                  value)))
+                        (list key processed-value))))
+                  (loop for (k v) on declarations by #'cddr collect (list k v)))))
     `(make-rule :selector (cl-styles.selector:compile-selector ,selector)
-                :declarations (list ,@norm-decls)
+                :declarations (list ,@processed-declarations)
                 :specificity (cl-styles.selector:selector-specificity ,selector))))
 
 (defun %maybe (plist key)

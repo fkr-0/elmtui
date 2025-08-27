@@ -33,8 +33,8 @@
          (let* ((init-val (getf props :initial-value ; Use :initial-value from props if present
                                 (getf props :value 0))) ; Otherwise use :value from props, or default to 0
                 (reset-val (getf props :initial-value 0)) ; Reset value is always from :initial-value prop or 0
-                (component-id (id-from-path self-id-path))
-                (keymap-name (symbol-name (gensym (format nil "~A-KEYMAP-" component-id))))
+                ;; (component-id (id-from-path self-id-path))
+                ;; (keymap-name (symbol-name (gensym (format nil "~A-KEYMAP-" component-id))))
                 (keymap (list 1 2))
                 ;; (keymap (make-keymap :name keymap-name
                 ;;                      :bindings
@@ -53,14 +53,16 @@
                                         ; Not used in this simple update
            (:increment (message local-state app-state self-id-path)
                        (let ((current-value (getf local-state :value))
-                             (initial-val (getf local-state :initial-value)))
+                             ;; (initial-val (getf local-state :initial-value))
+                             )
                          (values `(:value ,(1+ current-value)) nil)))
            (:decrement (message local-state app-state self-id-path)
                        (let ((current-value (getf local-state :value))
-                             (initial-val (getf local-state :initial-value)))
+                             ;; (initial-val (getf local-state :initial-value))
+                             )
                          (values `(:value ,(1- current-value)) nil)))
            (:reset (message local-state app-state self-id-path)
-                   (let ((current-value (getf local-state :value))
+                   (let (;; (current-value (getf local-state :value))
                          (initial-val (getf local-state :initial-value)))
                      (values `(:value ,initial-val) nil)))
            ;; :otherwise clause is implicitly handled by :on-unhandled-message :log
