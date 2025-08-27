@@ -8,12 +8,12 @@
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.app.api #:find-component-by-id) 
   (:import-from :elmtui.view.dsl #:view #:element) ; Removed unused #:children #:props
-  (:import-from :elmtui.state #:state-ref #:make-update-result #:get-path)
+  (:import-from :elmtui.tea-state #:state-ref #:make-update-result #:get-path)
   (:import-from :elmtui.ui.api #:component-id #:update)
   (:import-from :elmtui.ui.widgets.label #:label)
   (:import-from :elmtui.ui.widgets.layout #:box-layout)
   (:import-from :elmtui.ui.widgets.counter #:counter)
-  (:import-from :elmtui.core.keymap #:key-event->normalized-key #:normalized-key= #:parse-key-string #:make-keymap)
+  (:import-from :elmtui.keymaps #:key-event->normalized-key #:normalized-key= #:parse-key-string #:keymap!)
   (:export #:main))
 
 (in-package :elmtui.examples.keymap-app)
@@ -25,20 +25,7 @@
 ;;; Application Definition
 ;;;--------------------------------------------------------------
 
-(defapplication keymap-example-app
-  :root-viewport-id :my-root-viewport ; Changed from :rid for clarity
-  :root-component-dsl
-  '(box-layout ; Root component DSL should be a quoted list
-    :orientation :vertical
-    :spacing 1
-    :children (list ; Explicit list for children
-               '(label :id *info-label-id*
-                 :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit.")
-               '(counter :id *counter-a-id* :value 10)))
-  :initial-state-plist (app-init)
-  :update-fn #'app-update
-  :view-fn #'app-view
-  :command-processor-fn #'(lambda (command mq state cfg) (declare (ignore command mq state cfg)) nil))
+
 
 (defun app-init ()
   "Initializes the application model."
@@ -61,9 +48,8 @@
 
 (defun app-global-keymap ()
   "Defines global keybindings for the application."
-  (make-keymap :name "app-global-keymap" ; Added name for introspection
-               :bindings 
-               `(((,(parse-key-string "C-q") . (:app-quit-requested :source :global-C-q))))))
+  (keymap! :app-global-keymap ; Added name for introspection
+    ("C-q"    :type :message :target '(:app-quit-requested :source :global-C-q) :description "First")))
 
 ;; (define-keymap *editor-keymap*
 ;;   ("C-a" :type :message :target '(:select-all) :description "Select All")
@@ -77,24 +63,23 @@
   "Defines keymaps specific to components, returned as an alist."
   ;; The type warning HASH-TABLE vs CONS is because this returns an alist,
   ;; not a single hash table. This is fine for lookup.
-  `((,*counter-a-id* . ,(make-keymap :name "counter-a-keymap" ; Added name
-                                     :bindings
-                                     `(((,(parse-key-string "+") . (:dispatch-to-component ,*counter-a-id* :increment)))
-                                       ((,(parse-key-string "=") . (:dispatch-to-component ,*counter-a-id* :increment)))
-                                       ((,(parse-key-string "-") . (:dispatch-to-component ,*counter-a-id* :decrement)))
-                                       ((,(parse-key-string "Enter") . (:dispatch-to-component ,*counter-a-id* :reset))))))))
+  (keymap! :counter-a-keymap ; Added name
+    ("+" :type :message :target `(:dispatch-to-component ,*counter-a-id* :increment) :description "incr")
+    ("-" :type :message :target `(:dispatch-to-component ,*counter-a-id* :decrement) :description "decr")
+    ("Enter" :type :message :target `(:dispatch-to-component ,*counter-a-id* :reset):description "reset")))
+
 
 (defun app-update (message app-state) ; Flipped order to convention: message, app-state
   "Main application update function."
-  (declare (ignorable message)) 
+  (declare (ignorable message))
   (let ((patches nil)
         (commands nil)
-        (msg-type (if (listp message) (first message) message))) 
+        (msg-type (if (listp message) (first message) message)))
     (case msg-type
       (:dispatch-to-component
        (let* ((target-component-id (second message))
-              (component-action (cddr message)) 
-              (component-instance (find-component-by-id app-state target-component-id))
+              (component-action (cddr message))
+              (component-instance (elmtui.app.api:get-component-instance  target-component-id app-state))
               (component-state-path (list :components target-component-id))
               (component-state (get-path component-state-path app-state )))
          (if (and component-instance component-state)
@@ -117,13 +102,27 @@
 
 (defun app-view (app-state)
   "Main application view function. Uses the elmtui.view.dsl:view macro."
-  (view box-layout (:orientation :vertical :spacing 1)
-        (element label (:id *info-label-id* 
-                        :text (get-path (list :components *info-label-id* :text) app-state )))
+  (list :layout (list :display :flex :flex-direction :row :spacing 1)
+        (list :label (list :id *info-label-id*
+                           :text (get-path (list :components *info-label-id* :text) app-state )))
         (let* ((counter-st (get-path (list :components *counter-a-id*) app-state)))
-          (element counter (:id *counter-a-id*
-                            :value (getf counter-st :value))))))
+          (list :counter (list :id *counter-a-id*
+                               :value (getf counter-st :value))))))
 
 (defun main ()
   "Run the keymap example application."
   (run-keymap-example-app)) ; Corrected to call the generated run function
+(defapplication keymap-example-app
+  :root-viewport-id :my-root-viewport ; Changed from :rid for clarity
+  :root-component-dsl
+  '(box-layout ; Root component DSL should be a quoted list
+    :orientation :vertical
+    :spacing 1
+    :children (list ; Explicit list for children
+               '(label :id *info-label-id*
+                 :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit.")
+               '(counter :id *counter-a-id* :value 10)))
+  :initial-state-plist (app-init)
+  :update-fn #'app-update
+  :view-fn #'app-view
+  :command-processor-fn #'(lambda (command mq state cfg) (declare (ignore command mq state cfg)) nil))

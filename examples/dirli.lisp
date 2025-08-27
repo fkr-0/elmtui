@@ -164,22 +164,22 @@
            (terminal-width (state-ref app-state :terminal-width))
            (terminal-height (state-ref app-state :terminal-height))
            (output-to-print (state-ref app-state :output-to-print)))
-      (vbox :id :dirli-app-root :style '(:width (:percent 100) :height (:percent 100))
-            (text :value (format nil "Current Path: ~A" current-path))
+      (vbox :id :dirli-app-root :style '(:width :fill :height :fill)
+            (text :content (format nil "Current Path: ~A" current-path))
             ;; Pass the entire app-state to view-listbox, as it might need other parts of the state
             ;; or its own sub-state which is part of app-state.
             ;; The :widget-id for view-listbox should match the ID used in init-listbox and update-listbox.
             (view-listbox app-state :widget-id :main-listbox)
-            (text :value (or status-message ""))
-            (text :value (format nil "Terminal Size: ~A x ~A" terminal-width terminal-height))
-            (text :value (or output-to-print ""))
-            (text :value "Press C-q to quit."))))
+            (text :content (or status-message ""))
+            (text :content (format nil "Terminal Size: ~A x ~A" terminal-width terminal-height))
+            (text :content (or output-to-print ""))
+            (text :content "Press C-q to quit."))))
   :root-component-dsl
   '(vbox :id :dirli-app-root
-    :style '(:width (:percent 100) :height (:percent 100))
-    (text :value "Dirli - Directory Listing Application")
+    :style '(:width :fill :height :fill)
+    (text :content "Dirli - Directory Listing Application")
     (view-listbox :widget-id :main-listbox)
-    (text :value "Press C-q to quit."))
+    (text :content "Press C-q to quit."))
   :command-processor-fn nil ; No external command processor needed for this example
   :event-translator-fn nil ; Use default event translation
   :root-viewport-id :dirli-app-root

@@ -221,16 +221,16 @@ Returns the message, or NIL on timeout / no data."
          (deadline  (when (and timeout (plusp timeout)) ; Ensure timeout is positive
                       (+ (get-internal-real-time)
                          (* timeout internal-time-units-per-second)))))
-    (log-debug :event-channels.wait "WAIT-FOR-EVENT: Starting polling loop. Timeout: ~A s. Deadline: ~A" timeout deadline)
+    (log-debug :event-channels.wait "WAIT-FOR-EVENT: Start poll. Timeout: ~A s. Deadline: ~A" timeout deadline)
     (loop named event-poll-loop
           ;; 1) scan in priority order ---------------------------------
           do (dolist (ec sorted-event-channels) ; ec is an event-channel wrapper object
                (let ((raw-channel (channel-of ec)))
                  (if (cleve-elm.channel:no-wait raw-channel :send nil) ; Use channel-of to get raw channel
                      (progn
-                       (log-info :event-channels.wait "WAIT-FOR-EVENT: Channel ~S indicated data via no-wait. Attempting receive." (name ec))
+                       (log-debug :event-channels.wait "WAIT-FOR-EVENT: Data ready on ~S; receiving." (name ec))
                        (let ((event (receive-event ec)))
-                         (log-info :event-channels.wait "WAIT-FOR-EVENT: Received event ~S from channel ~S." event (name ec))
+                         (log-debug :event-channels.wait "WAIT-FOR-EVENT: Received ~S from ~S." event (name ec))
                          (return-from event-poll-loop (values event ec))))
                      nil
                      )))
@@ -238,7 +238,7 @@ Returns the message, or NIL on timeout / no data."
           when (and deadline ; Only check deadline if it was calculated
                     (> (get-internal-real-time) deadline))
             do (progn
-                 (log-info :event-channels.wait "WAIT-FOR-EVENT: Timeout expired.")
+                 (log-debug :event-channels.wait "WAIT-FOR-EVENT: Timeout expired.")
                  (return-from event-poll-loop nil))
                ;; 3) short pause – avoids pegging a core --------------------
           do (progn

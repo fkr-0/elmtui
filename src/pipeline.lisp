@@ -42,11 +42,24 @@
     (app-context app-context)
     (ctx)
   "Generates a DSL tree from the view function and model, storing it in the context."
-  (let* ((view-fn (ctx-view-fn ctx)) ; assuming :state holds the model and view-fn
+  (let* ((view-fn (ctx-view-fn ctx))
          (model (ctx-state ctx))
          (dsl (funcall view-fn model)))
-    (setf (ctx-dsl-tree ctx) (make-dsl-tree :root dsl))
-    ctx))
+    (if (null dsl)
+        (progn
+          (log:info "PIPELINE: View returned NIL; skipping tree processing this frame.")
+          (setf (ctx-laid-out-tree ctx) nil)
+          ctx)
+        (progn
+          (setf (ctx-dsl-tree ctx) (make-dsl-tree :root dsl))
+          (setf (ctx-laid-out-tree ctx)
+                (make-laid-out-tree
+                 :root
+                 (elmtui.view.tree-transforms:process-tree
+                  dsl
+                  :ctx ctx
+                  :root-rect (ctx-viewport-rect ctx))))
+          ctx))))
 
 ;; As transformers:
 ;; STAGE 0: Generate DSL from the component's view function
@@ -76,12 +89,16 @@
     (app-context app-context)
     (ctx)
   "Renders the laid-out tree to a virtual buffer."
-  (let* ((laid-out-tree (ctx-laid-out-tree ctx))
-         (rect (ctx-viewport-rect ctx))
-         (target-buffer (make-virtual-buffer (w rect) (h rect)))
-         (rendered-buffer (render-laid-out-tree-to-buffer (list (root laid-out-tree)) :buffer target-buffer)))
-    (setf (ctx-back-buffer ctx) rendered-buffer)
-    ctx))
+  (let* ((laid-out-tree (ctx-laid-out-tree ctx)))
+    (if (null laid-out-tree)
+        (progn
+          (log:info "PIPELINE: No laid-out tree; skipping render-to-buffer.")
+          ctx)
+        (let* ((rect (ctx-viewport-rect ctx))
+               (target-buffer (make-virtual-buffer (w rect) (h rect)))
+               (rendered-buffer (render-laid-out-tree-to-buffer (list (root laid-out-tree)) :buffer target-buffer)))
+          (setf (ctx-back-buffer ctx) rendered-buffer)
+          ctx))))
 
 ;;; STAGE: Pre-render terminal preparation (anchoring/scroll)
 (define-stage pre-render-terminal-prep
@@ -124,7 +141,7 @@
          (backend (ctx-backend ctx))
          (origin-x 0)
          (origin-y 0))
-    (if (and backend (open-stream-p (elmtui.platform.api:term-stream backend)))
+    (if (and backend back-buffer (open-stream-p (elmtui.platform.api:term-stream backend)))
         (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
           (log:info "PIPELINE: Displaying buffer with diff: ~A" diff)
           (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-x origin-y)

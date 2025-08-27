@@ -1,15 +1,10 @@
 (uiop:define-package :elmtui.examples.game-of-life
   (:use :cl :alexandria :log4cl)
   (:import-from :log4cl #:log-info #:log-debug)
-  (:import-from :elmtui.ui.widgets.utils
-                #:widget-focused-p #:defwidget-view)
-  (:import-from :elmtui.view.styled #:make-styled-node)
-  (:import-from :elmtui.runtime #:def-elm-app #:run-app)
   (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
-  (:import-from :elmtui.state.update #:defupdate)
-  (:export
-   :main
-   :run-game-of-life-app))
+  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.app #:defapplication)
+  (:export #:run-game-of-life-app))
 
 (in-package :elmtui.examples.game-of-life)
 
@@ -17,19 +12,10 @@
 ;;; Stylesheet Definition 
 ;;;--------------------------------------------------------------
 (defstylesheet game-of-life-stylesheet
-  (defrule "cell-alive"
-    :background-color (rgb 0 255 0)
-    :width 1
-    :height 1)
-  (defrule "cell-dead"
-    :background-color (rgb 0 0 0)
-    :width 1
-    :height 1)
-  (defrule ".status-bar"
-    :background-color (rgb 50 50 50)
-    :color (rgb 255 255 255)
-    :padding 1
-    :height 1))
+  (defrule ("cell-alive") :background-color (rgb 0 255 0) :width 1 :height 1)
+  (defrule ("cell-dead")  :background-color (rgb 0 0 0)   :width 1 :height 1)
+  (defrule ("status-bar") :background-color (rgb 50 50 50) :color (rgb 255 255 255)
+           :padding 1 :height 1))
 
 ;;;--------------------------------------------------------------
 ;;; Game of Life Logic
@@ -85,170 +71,107 @@
 ;;; Application Definition
 ;;;--------------------------------------------------------------
 
-(defun app-init ()
-  "Initializes the application model."
-  (multiple-value-bind (width height)
-      (elmtui.platform.api:get-terminal-dimensions)
-    (let ((grid-width (max 10 (- width 2)))
-          (grid-height (max 10 (- height 2))))
-      (values
-       ;; Initial application state
-       (list :current-stylesheet game-of-life-stylesheet
-             :grid (get-glider-pattern)
-             :generation 0
-             :running t
-             :speed 5 ; updates per second
-             :last-update-time (get-internal-real-time)
-             :should-quit nil)
-       ;; No initial commands
-       nil))))
+(defun %initial-state ()
+  (list :current-stylesheet game-of-life-stylesheet
+        :grid (get-glider-pattern)
+        :generation 0
+        :running t
+        :speed 5
+        :hue 0
+        :last-update-time (get-internal-real-time)
+        :should-quit nil))
 
-(defupdate app-update (app-state message)
-  "Handles updates to the application state based on messages."
-  (let ((grid (getf app-state :grid))
-        (generation (getf app-state :generation))
-        (running (getf app-state :running))
-        (speed (getf app-state :speed))
-        (last-update-time (getf app-state :last-update-time))
-        (current-time (get-internal-real-time)))
-    
-    (cond
-      ;; Handle tick messages for simulation updates
-      ((eq message :tick)
-       (if running
-           (let ((time-delta (/ (- current-time last-update-time) 
-                                internal-time-units-per-second)))
-             (if (>= time-delta (/ 1 speed))
-                 (values (list :grid (next-generation grid)
-                               :generation (1+ generation)
-                               :last-update-time current-time)
-                         '((:delay 0.05 :tick)))
-                 (values nil '((:delay 0.05 :tick)))))
-           (values nil '((:delay 0.2 :tick)))))
-      
-      ;; Toggle running state with space
-      ((and (listp message) (eq (first message) :key-event)
-            (char= (third message) #\Space))
-       (values (list :running (not running)) nil))
-      
-      ;; Increase speed with '+'
-      ((and (listp message) (eq (first message) :key-event)
-            (char= (third message) #\+))
-       (values (list :speed (min 20 (+ speed 1))) nil))
-      
-      ;; Decrease speed with '-'
-      ((and (listp message) (eq (first message) :key-event)
-            (char= (third message) #\-))
-       (values (list :speed (max 1 (- speed 1))) nil))
-      
-      ;; Reset with 'r'
-      ((and (listp message) (eq (first message) :key-event)
-            (char= (third message) #\r))
-       (multiple-value-bind (width height)
-           (elmtui.platform.api:get-terminal-dimensions)
-         (let ((grid-width (max 10 (- width 2)))
-               (grid-height (max 10 (- height 2))))
-           (values (list :grid (make-random-grid grid-width grid-height)
-                         :generation 0)
-                   nil))))
-      
-      ;; Quit with 'q'
-      ((and (listp message) (eq (first message) :key-event)
-            (char= (third message) #\q))
-       (values (list :should-quit t) nil))
-      
-      ;; Handle struct-based key events
-      ((typep message 'elmtui.core.event-types:key-event)
-       (let ((key (elmtui.core.event-types:key-event-key message))
-             (char (elmtui.core.event-types:key-event-char message)))
-         (cond
-           ((char= char #\Space)
-            (values (list :running (not running)) nil))
-           ((char= char #\+)
-            (values (list :speed (min 20 (+ speed 1))) nil))
-           ((char= char #\-)
-            (values (list :speed (max 1 (- speed 1))) nil))
-           ((char= char #\r)
-            (multiple-value-bind (width height)
-                (elmtui.platform.api:get-terminal-dimensions)
-              (let ((grid-width (max 10 (- width 2)))
-                    (grid-height (max 10 (- height 2))))
-                (values (list :grid (make-random-grid grid-width grid-height)
-                              :generation 0)
-                        nil))))
-           ((char= char #\q)
-            (values (list :should-quit t) nil))
-           (t (values nil nil)))))
-      
-      ;; Default: no state change
-      (t (values nil (when (not (getf app-state :should-quit)) 
-                       '((:delay 0.05 :tick))))))))
+(defun app-update (message app-state)
+  "Updates model -> update-result."
+  (let ((grid (state-ref app-state :grid))
+        (generation (state-ref app-state :generation))
+        (running (state-ref app-state :running))
+        (speed (state-ref app-state :speed))
+        (hue (state-ref app-state :hue))
+        (last-update-time (state-ref app-state :last-update-time))
+        (now (get-internal-real-time)))
+    (labels ((ret (&key patch commands)
+               (make-update-result :patches patch :commands commands)))
+      (cond
+        ((eq message :tick)
+         (if running
+             (let ((dt (/ (- now last-update-time) internal-time-units-per-second)))
+               (if (>= dt (/ 1 speed))
+                   (ret :patch `((:grid ,(next-generation grid))
+                                 (:generation ,(1+ generation))
+                                 (:hue ,(mod (+ hue 10) 360))
+                                 (:last-update-time ,now))
+                        :commands (list (elmtui.view.reactive:next-frame-cmd :fps (max 1 (* 2 speed)) :message :tick)))
+                   (ret :commands (list (elmtui.view.reactive:next-frame-cmd :fps (max 1 (* 2 speed)) :message :tick)))))
+             (ret :commands (list (elmtui.view.reactive:next-frame-cmd :fps 5 :message :tick)))))
+        ((and (listp message) (eq (first message) :key-event))
+         (let ((ch (third message)))
+           (cond
+             ((char= ch #\Space) (ret :patch `((:running ,(not running)))))
+             ((char= ch #\+)      (ret :patch `((:speed ,(min 20 (1+ speed))))))
+             ((char= ch #\-)      (ret :patch `((:speed ,(max 1 (1- speed))))))
+             ((char= ch #\r)      (ret :patch '((:grid NIL) (:generation 0))) ; reset to be handled below
+              )
+             ((char= ch #\q)      (ret :patch '((:should-quit t))))
+             (t (ret)))))
+        ((typep message 'elmtui.core.event-types:key-event)
+         (let ((ch (elmtui.core.event-types:key-event-char message)))
+           (cond
+             ((char= ch #\Space) (ret :patch `((:running ,(not running)))))
+             ((char= ch #\+)      (ret :patch `((:speed ,(min 20 (1+ speed))))))
+             ((char= ch #\-)      (ret :patch `((:speed ,(max 1 (1- speed))))))
+             ((char= ch #\r)      (ret :patch `((:grid ,(get-glider-pattern)) (:generation 0))))
+             ((char= ch #\q)      (ret :patch '((:should-quit t))))
+             (t (ret)))))
+        (t (ret :commands (unless (state-ref app-state :should-quit)
+                             (list (elmtui.view.reactive:next-frame-cmd :fps (max 1 (* 2 speed)) :message :tick)))))))))
 
-(defun game-of-life-view (app-state dispatch-fn)
-  "Renders the Game of Life grid and status bar."
-  (let ((grid (getf app-state :grid))
-        (generation (getf app-state :generation))
-        (running (getf app-state :running))
-        (speed (getf app-state :speed)))
-    
-    (multiple-value-bind (term-width term-height)
-        (elmtui.platform.api:get-terminal-dimensions)
-      
-      (let* ((grid-height (array-dimension grid 0))
-             (grid-width (array-dimension grid 1))
-             (status-text (format nil " Gen: ~A | ~A | Speed: ~A | Space: Toggle | +/-: Speed | r: Reset | q: Quit"
-                                  generation
-                                  (if running "Running" "Paused")
-                                  speed)))
-        
-        ;; Main container
-        (make-styled-node
-         :type :container
-         :props (list :id :game-of-life-container
-                      :direction :vertical
-                      :height :fill
-                      :width :fill)
-         :children 
-         (list
-          ;; Grid display
-          (make-styled-node
-           :type :container
-           :props (list :id :grid-container
-                        :direction :vertical
-                        :height (- term-height 1)  ; Leave space for status bar
-                        :width term-width)
-           :children
-           (loop for y below grid-height collect
-                (make-styled-node
-                 :type :container
-                 :props (list :id (intern (format nil "ROW-~A" y) :keyword)
-                              :direction :horizontal)
-                 :children
-                 (loop for x below grid-width collect
-                      (make-styled-node
-                       :type :container
-                       :props (list :id (intern (format nil "CELL-~A-~A" y x) :keyword)
-                                    :classes (if (= (aref grid y x) 1)
-                                               "cell-alive"
-                                               "cell-dead"))
-                       :children nil)))))
-          
-          ;; Status bar
-          (make-styled-node
-           :type :text
-           :props (list :id :status-bar
-                        :classes "status-bar"
-                        :text status-text))))))))
+(defun game-of-life-view (app-state)
+  (flet ((hsv->rgb (h s v)
+           (let* ((h (/ (mod h 360) 60.0))
+                  (c (* v s))
+                  (x (* c (- 1 (abs (- (mod h 2) 1)))))
+                  (m (- v c))
+                  (r-g-b (cond
+                           ((< h 1) (list c x 0))
+                           ((< h 2) (list x c 0))
+                           ((< h 3) (list 0 c x))
+                           ((< h 4) (list 0 x c))
+                           ((< h 5) (list x 0 c))
+                           (t        (list c 0 x)))) )
+             (mapcar (lambda (p) (round (* 255 (+ p m)))) r-g-b))))
+  (let* ((grid (state-ref app-state :grid))
+         (h (array-dimension grid 0))
+         (w (array-dimension grid 1))
+         (generation (state-ref app-state :generation))
+         (running (state-ref app-state :running))
+         (speed (state-ref app-state :speed))
+         (hue (state-ref app-state :hue))
+         (status (format nil "Gen: ~A | ~A | Speed: ~A | Space: Toggle | +/-: Speed | r: Reset | q: Quit"
+                         generation (if running "Running" "Paused") speed)))
+    `(:container :id :gol-root :style (:display :flex :flex-direction :column :width :fill :height :fill)
+      :children
+      ((:container :id :grid :style (:display :flex :flex-direction :column :width :fill :height :fill)
+         :children ,(loop for y below h collect
+                          `(:container :id ,(intern (format nil "ROW-~A" y) :keyword)
+                            :style (:display :flex :flex-direction :row)
+                            :children ,(loop for x below w collect
+                                             (let ((alive (eql 1 (aref grid y x))))
+                                               (if alive
+                                                   (let ((rgb (hsv->rgb hue 1.0 1.0)))
+                                                     `(:container :id ,(intern (format nil "CELL-~A-~A" y x) :keyword)
+                                                       :style (:bg-color ,rgb :width 1 :height 1)))
+                                                   `(:container :id ,(intern (format nil "CELL-~A-~A" y x) :keyword)
+                                                     :classes ("cell-dead"))))))))
+       (:text :id :status :classes ("status-bar") :content ,status)))))
 
-(def-elm-app game-of-life-app
-  :init #'app-init
-  :update #'app-update
-  :view #'game-of-life-view)
-
-(defun main ()
-  "Run the Game of Life application."
-  (elmtui.runtime:run-app :app-name 'game-of-life-app))
+(defapplication game-of-life-app
+  :root-viewport-id :gol-root-vp
+  :initial-state-plist (%initial-state)
+  :root-component-dsl '(:layout :id :gol-root)
+  :update-fn 'app-update
+  :view-fn 'game-of-life-view
+  :subscriptions-fn (lambda (_model) (declare (ignore _model)) nil))
 
 (defun run-game-of-life-app ()
-  "Run the Game of Life application."
-  (main))
+  (log-info "Game of Life app registered. Launch via your runner (e.g., run.sh)."))

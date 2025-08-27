@@ -25,7 +25,12 @@
    #:view-invalidated-p
    #:invalidate-view
    #:register-view-dependency
-   #:make-view-task))
+   #:make-view-task
+   ;; Animation helpers exposed for TEA-driven ticks
+   #:create-animation
+   #:process-animations
+   #:linear-easing #:ease-in #:ease-out #:ease-in-out #:bounce #:elastic
+   #:next-frame-cmd))
 (in-package :elmtui.view.reactive)
 
 ;;;-----------------------------------------------------------------------------
@@ -302,3 +307,28 @@
              (funcall (animation-complete-fn animation)))
            (remhash id *animations*)))))
    *animations*))
+
+;;; Easing helpers
+(defun linear-easing (x) x)
+(defun ease-in (x &optional (power 2)) (expt x power))
+(defun ease-out (x &optional (power 2)) (- 1 (expt (- 1 x) power)))
+(defun ease-in-out (x &optional (power 2))
+  (cond
+    ((< x 0.5) (* 0.5 (expt (* 2 x) power)))
+    (t (- 1 (* 0.5 (expt (* 2 (- 1 x)) power))))))
+(defun bounce (x)
+  (let ((t2 (- 1 x)))
+    (- 1 (* t2 t2 (+ 2.75 (* t2 t2 2.5))))))
+(defun elastic (x)
+  (let ((p 0.3)
+        (s (* 0.3 0.25)))
+    (- (* (expt 2 (* -10 x)) (sin (/ (* (- x s) 2 pi) p))) 0.0001)))
+
+;;; TEA-tick helper: schedule a message after 1/fps seconds
+(defun next-frame-cmd (&key (fps 60) (message :animation-tick))
+  "Return a command that asynchronously sleeps for 1/FPS seconds, then emits MESSAGE.
+   Use via (nconc commands (list (reactive:next-frame-cmd :fps 60 :message :tick)))."
+  (let ((interval (/ 1.0 (max 1 fps))))
+    (elmtui.core.async:cmd-async
+     (lambda (_progress) (declare (ignore _progress)) (sleep interval) :ok)
+     :on-complete (lambda (_res) (declare (ignore _res)) message))))

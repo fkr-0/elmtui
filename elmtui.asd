@@ -111,12 +111,13 @@
                              ;;               (:file "registry")
                              ;;               (:file "defaults")
                              ;;               (:file "event-integration")))
-                             (:module "focus"
-                              :pathname "focus/"
-                              :serial t
-                              :components ((:file "manager")))
+                             ;; (:module "focus"
+                             ;;  :pathname "focus/"
+                             ;;  :serial t
+                             ;;  :components ((:file "manager")))
                              ;; (:file "keymap-system")
                                         ; Main entry point for keyboard/focus system
+                             (:file "focus")
                              (:file "loop")))
                ;; ================= API LAYER =================
                ;; These API files define the public interface for each module
@@ -202,7 +203,6 @@
                (:file "view/layout/grid" :depends-on ("view/layout/utils"))
                (:file "view/layout/core" :depends-on ("view/layout/flex" "view/layout/grid"))
                (:file "view/reactive")
-               (:file "view/animation")
                (:file "view/tree-transforms" :depends-on ("view/base-elements" "view/layout/core"))
 
                ;; Styling System (Moved here as it depends on view/style-lib)
@@ -256,6 +256,7 @@
                 :components (
                              (:file "rainbow-app")
                              (:file "key-tester")
+                             (:file "focus-simple")
                              (:file "mini-rainbow")))
                ;;(:file "../dev-setup")
                (:file "dev/dev")

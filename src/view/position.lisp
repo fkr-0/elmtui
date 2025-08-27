@@ -24,7 +24,7 @@
    #:element-position-center-x
    #:element-position-center-y
    #:copy-element-position
-   
+
    ;; Grid coordinate structures and accessors
    #:element-grid-coordinates
    #:make-element-grid-coordinates
@@ -33,7 +33,7 @@
    #:element-grid-coordinates-row-span
    #:element-grid-coordinates-col-span
    #:copy-element-grid-coordinates
-   
+
    ;; Position operations
    #:position-contains-p
    #:positions-overlap-p
@@ -134,13 +134,13 @@ Returns an element-position struct or nil if position is not available."))
   "Default implementation for getting element position from properties.
 Override this for specific element types as needed."
   (let ((props (when (listp element) (second element))))
-    (when (and (listp props) 
-               (getf props :x) 
-               (getf props :y) 
-               (getf props :width) 
+    (when (and (listp props)
+               (getf props :x)
+               (getf props :y)
+               (getf props :width)
                (getf props :height))
-      (make-element-position 
-       :x (getf props :x) 
+      (make-element-position
+       :x (getf props :x)
        :y (getf props :y)
        :width (getf props :width)
        :height (getf props :height)))))
@@ -200,7 +200,7 @@ direction: One of :up, :down, :left, :right
 Returns: The nearest element in that direction or nil if none found"
   (let ((from-pos (element-position from-element)))
     (unless from-pos (return-from find-nearest-in-direction nil))
-    
+
     (let ((candidates nil))
       ;; Filter elements that are in the specified direction
       (dolist (el elements)
@@ -211,7 +211,7 @@ Returns: The nearest element in that direction or nil if none found"
                 (when (eq actual-dir direction)
                   (let ((dist (position-distance from-pos el-pos)))
                     (push (cons el dist) candidates))))))))
-      
+
       ;; Return the closest one
       (when candidates
         (caar (sort candidates #'< :key #'cdr))))))
