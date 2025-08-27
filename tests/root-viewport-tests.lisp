@@ -9,7 +9,7 @@
   (:import-from :elmtui.ui.api
                 #:init #:update #:view #:id-from-path #:get-path)
   (:import-from :elmtui.app.api #:get-component-instance)
-  (:import-from :elmtui.state #:application-state-plist) ; For accessing state in a structured way
+  (:import-from :elmtui.tea-state #:application-state-plist) ; For accessing state in a structured way
   (:import-from :elmtui.core.event-types #:key-event) ; For :terminal-resized structure
   (:shadowing-import-from :elmtui.ui.widgets.root-viewport ;; Ensure we are testing the correct compute functions
                           #:compute-anchor-offset #:compute-view-size))
@@ -67,9 +67,9 @@
       (check :bottom-right (- term-h vp-h) (- term-w vp-w))
       ;; Cursor-relative
       (check :below-cursor (min (1+ cur-r) (- term-h vp-h))
-                           (max 0 (min cur-c (- term-w vp-w))))
+             (max 0 (min cur-c (- term-w vp-w))))
       (check :above-cursor (max 0 (- cur-r vp-h))
-                           (max 0 (min cur-c (- term-w vp-w))))
+             (max 0 (min cur-c (- term-w vp-w))))
       ))
 
   ;; Test edge cases for cursor-relative positioning
@@ -160,17 +160,17 @@
                 (is (= (getf state-plist :initial-cursor-row) cur-r) "State :initial-cursor-row incorrect for anchor ~A" anchor)
                 (is (= (getf state-plist :initial-cursor-col) cur-c) "State :initial-cursor-col incorrect for anchor ~A" anchor)))))
 
-          (let ((child-patch (find-patch patches (append id-path '(:child)))))
-            (is-true child-patch "Child patch missing for anchor ~A" anchor)
-            (is (equal (get-patch-value child-patch) child-spec) "Child patch incorrect for anchor ~A" anchor))))
+        (let ((child-patch (find-patch patches (append id-path '(:child)))))
+          (is-true child-patch "Child patch missing for anchor ~A" anchor)
+          (is (equal (get-patch-value child-patch) child-spec) "Child patch incorrect for anchor ~A" anchor))))
 
-      (let* ((rvp (make-root-viewport id :anchor :center :initial-cursor-pos cursor-pos))
-             (patches (init rvp :id-path id-path
-                                :initial-terminal-dimensions term-dims
-                                :initial-cursor-pos cursor-pos
-                                :anchor :center)))
-        (is (null (find-patch patches (append id-path '(:child))))
-            "Child patch should be absent when :initial-child-spec is not provided")))))
+    (let* ((rvp (make-root-viewport id :anchor :center :initial-cursor-pos cursor-pos))
+           (patches (init rvp :id-path id-path
+                              :initial-terminal-dimensions term-dims
+                              :initial-cursor-pos cursor-pos
+                              :anchor :center)))
+      (is (null (find-patch patches (append id-path '(:child))))
+          "Child patch should be absent when :initial-child-spec is not provided"))))
 
 ;;; Mock child component for testing update delegation
 (defclass mock-child-component (elmtui.ui.api:component)
@@ -204,9 +204,9 @@
              (second patch))
            (setup-initial-state (anchor term-dims cur-pos)
              (let* ((init-patches (init rvp :id-path id-path
-                                           :initial-terminal-dimensions term-dims
-                                           :initial-cursor-pos cur-pos
-                                           :anchor anchor))
+                                            :initial-terminal-dimensions term-dims
+                                            :initial-cursor-pos cur-pos
+                                            :anchor anchor))
                     (app-state (make-hash-table :test 'equal)))
                (dolist (patch init-patches)
                  (setf (gethash (first patch) app-state) (second patch)))

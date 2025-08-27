@@ -175,7 +175,7 @@ Returns either a plist, hash-table, or NIL."
      (border-cross it dir)
      (margin-cross-end it dir)))
 
-(defun resolve-initial-bases! (items dir avail-main)
+(defun resolve-initial-bases! (items dir avail-main avail-cross)
   (dolist (it items)
     (progn
       (log-info "it ~A dir ~A mb-main ~A"
@@ -191,7 +191,13 @@ Returns either a plist, hash-table, or NIL."
                             0)))
                      ((eq spec :auto)
                       (multiple-value-bind (minw maxw minh maxh)
-                          (measure-node-intrinsic-size node avail-main avail-main)
+                          (measure-node-intrinsic-size node
+                                                       (ecase (kw dir :row)
+                                                         ((:row :row-reverse) avail-main)
+                                                         ((:column :column-reverse) avail-cross))
+                                                       (ecase (kw dir :row)
+                                                         ((:row :row-reverse) avail-cross)
+                                                         ((:column :column-reverse) avail-main)))
                         (declare (ignore maxw maxh))
                         (ecase (kw dir :row)
                           ((:row :row-reverse)
@@ -596,10 +602,49 @@ Returns either a plist, hash-table, or NIL."
                      (ignore-errors (element-style container-node))))
          (dir (kw (style-value container-node :flex-direction :row) :row))
          (wrap-mode (kw (style-value container-node :flex-wrap :nowrap) :nowrap))
+         ;; Start with the rect provided by parent or existing layout
          (outer-rect (or given-rect
                          (el/layout-rect container-node)
                          (make-rectangle :pos (make-pos :x 0 :y 0)
                                          :size (make-size :w 0 :h 0))))
+         ;; Adjust container's own border-box size to honor explicit width/height
+         ;; and clamp to min/max. Do NOT shrink :auto to min-content; keep the size
+         ;; provided by the parent unless an explicit width/height is set.
+         (sw (style-value container-node :width  :auto))
+         (sh (style-value container-node :height :auto))
+         (minw (or (style-value container-node :min-width  0) 0))
+         (maxw (or (style-value container-node :max-width  most-positive-fixnum) most-positive-fixnum))
+         (minh (or (style-value container-node :min-height 0) 0))
+         (maxh (or (style-value container-node :max-height most-positive-fixnum) most-positive-fixnum))
+         (base-w (w outer-rect))
+         (base-h (h outer-rect))
+         (base-w (cond
+                   ((numberp sw) sw)
+                   ((and (stringp sw)
+                         (> (length sw) 1)
+                         (char= #\% (char sw (1- (length sw)))))
+                    (let ((pct (ignore-errors (parse-integer sw :end (1- (length sw))))))
+                      (if (numberp pct)
+                          (* (/ pct 100.0d0) (max 0 (w outer-rect)))
+                          base-w)))
+                   ((eql sw :fill) (w outer-rect))
+                   (t base-w)))
+         (base-h (cond
+                   ((numberp sh) sh)
+                   ((and (stringp sh)
+                         (> (length sh) 1)
+                         (char= #\% (char sh (1- (length sh)))))
+                    (let ((pct (ignore-errors (parse-integer sh :end (1- (length sh))))))
+                      (if (numberp pct)
+                          (* (/ pct 100.0d0) (max 0 (h outer-rect)))
+                          base-h)))
+                   ((eql sh :fill) (h outer-rect))
+                   (t base-h)))
+         (base-w (max minw (min base-w maxw)))
+         (base-h (max minh (min base-h maxh)))
+         (outer-rect (make-rectangle
+                      :pos  (make-pos :x (x outer-rect) :y (y outer-rect))
+                      :size (make-size :w (round base-w) :h (round base-h))))
          (content-rect (content-box outer-rect container-node))
          (content-x (x content-rect))
          (content-y (y content-rect))
@@ -633,7 +678,7 @@ Returns either a plist, hash-table, or NIL."
           (setf wrap-mode (kw a :nowrap))
           (return))))
     (log-info "flex wrap-mode=~A main-gap=~A cross-gap=~A" wrap-mode main-gap cross-gap)
-    (resolve-initial-bases! items dir avail-main)
+    (resolve-initial-bases! items dir avail-main avail-cross)
     (resolve-initial-cross!  items dir avail-cross)
     (let ((lines (collect-lines items dir avail-main main-gap wrap-mode)))
       (dolist (ln lines)

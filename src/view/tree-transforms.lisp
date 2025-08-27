@@ -101,7 +101,7 @@
 
 (defun transform-top-down (fn el &key ctx)
   (let* ((new-el (funcall fn el :ctx ctx))
-         (_ (log-info "TD with ~A el to new el: ~A -> ~A" fn el new-el))
+         ;; (_ (log-info "TD with ~A el to new el: ~A -> ~A" fn el new-el))
          (kids (and new-el (elmtui.view.element:el/children new-el))))
     (when kids
       (setf (elmtui.view.element:el/children new-el)
@@ -235,27 +235,27 @@
                 (first x))
                (t x))))
     (let* ((p1 (transform-top-down #'resolve-components root :ctx ctx))
-           (_ (log-info "Resolve components done ~A" p1))
+           ;; (_ (log-info "Resolve components done ~A" p1))
            (p2 (transform-top-down #'expand-element-style p1 :ctx ctx))
            ;; Apply cl-styles if a stylesheet is present in ctx. Use :objects so
            ;; set-computed-style is invoked and styles merge into inline.
-           (_ (log-info "expand element style 1 done ~A" p2))
-           (s (ignore-errors
-               (let ((sheet (elmtui.contracts:ctx-stylesheet ctx)))
-                 (when sheet
-                   (cl-styles.engine:apply-stylesheet-to-tree p2 sheet :return :objects))
-                 p2)))
-           (_ (log-info "apply stylesheet done ~A" p2))
-           (p2 (ensure-node p2))
-           (_ (log-info "ensure node done ~A" p2))
+           ;; (_ (log-info "expand element style 1 done ~A" p2))
+           (p2 (progn
+                 (ignore-errors
+                  (let ((sheet (elmtui.contracts:ctx-stylesheet ctx)))
+                    (when sheet
+                      (cl-styles.engine:apply-stylesheet-to-tree p2 sheet :return :objects))
+                    p2))
+                 (ensure-node p2)))
+           ;; (_ (log-info "ensure node done ~A" p2))
            ;; Ensure styles are present on every node before layout
            (p2 (transform-top-down #'expand-element-style p2 :ctx ctx))
-           (_ (log-info "expand element style 2 done"))
+           ;; (_ (log-info "expand element style 2 done"))
            (p2 (transform-top-down #'ensure-flex-display p2 :ctx ctx))
-           (_ (log-info "ensure flex display done"))
+           ;; (_ (log-info "ensure flex display done"))
            (rr (%root-rect-or-viewport p2 ctx root-rect))
            (p3 (measure-tree-top-down p2 rr))
-           (_ (log-info "measure tree top down done"))
+           ;; (_ (log-info "measure tree top down done"))
            (p4 (layout-tree-top-down p3 rr))
            (p5 (transform-top-down #'pass-dirty p4 :ctx ctx)))
       p5)))

@@ -127,6 +127,45 @@
 (defvar *last-cursor-pos* '(0 . 0)
   "Last known cursor position as a cons (row . col). Used for anchoring.")
 
+;; Bootstrap buffering for early system events before the real processor is ready
+(defvar *real-app-message-processor* nil)
+(defvar *bootstrap-event-queue* nil)
+
+(defun %driver-bootstrap-processor (msg)
+  "Temporary app-message processor used during bootstrap. Buffers events until
+  the real processor is installed and both initial terminal-resized and
+  cursor-position events have been observed."
+  (log-info "Bootstrap processor received message: ~A" msg)
+  (handler-case
+      (progn
+        ;; Track readiness flags from system messages
+        (when (and (listp msg))
+          (let ((tag (first msg)))
+            (cond
+              ((eq tag :terminalresized)
+               (progn
+                 (setf *got-initial-terminal-resized* t)
+                 (log-info "Init term set") ))
+              ((eq tag :cursorpositionchanged)
+
+               (progn
+                 (setf *got-initial-cursor-position* t)
+                 (log-info "Init term set") )))))
+
+        ;; Buffer the message
+        (push msg *bootstrap-event-queue*)
+
+        ;; If the real processor is installed and both signals observed, flush
+        (when (and *real-app-message-processor*
+                   *got-initial-terminal-resized*
+                   *got-initial-cursor-position*)
+          (let ((events (nreverse *bootstrap-event-queue*)))
+            (setf *bootstrap-event-queue* nil)
+            (dolist (e events)
+              (funcall *real-app-message-processor* e)))))
+    (error (e)
+      (log-error "Bootstrap processor error: ~A" e))))
+
 ;;; ---------------------------------------------------------------------------
 ;;; == Application Entry Point ==
 ;;; ---------------------------------------------------------------------------
@@ -148,7 +187,7 @@
 ;;; == Backend Initialization Utilities ==
 ;;; ---------------------------------------------------------------------------
 
-(defun initialize-backend-with-publish-fn (BACKEND-TYPE TTY-PATH PUBLISH-FN)
+(defun initialize-backend-with-publish-fn (BACKEND-TYPE TTY-PATH PUBLISH-FN &key (initial-clear t))
   "Initialize the backend with a publish function.
   Arguments:
     BACKEND-TYPE (keyword): The backend type, e.g., :terminal.
@@ -164,7 +203,7 @@
   (declare (type keyword backend-type)
            (type (or string null) tty-path)
            (type function publish-fn))
-  (elmtui.platform.api:initialize-backend backend-type :publish-fn publish-fn :tty-path tty-path))
+  (elmtui.platform.api:initialize-backend backend-type :publish-fn publish-fn :tty-path tty-path :initial-clear initial-clear))
 
 ;;; ---------------------------------------------------------------------------
 ;;; == Application State Bootstrap ==
@@ -220,17 +259,50 @@
                         (log:info "DRIVER: :should-quit flag is true in model. Setting *shutdown-requested*.")
                         (setf elmtui.core.loop::*shutdown-requested* t))
                       ;; Process commands if a command processor is present
-                      (when cmd-proc-fn
-                        (dolist (c commands)
-                          (funcall cmd-proc-fn c message-queue next-model app-cfg-for-cmd)))
-                      ;; If not shutting down, update rendering context and previous frame buffer
+                      ;; Execute :render commands synchronously before view
+                      (let ((render-cmds (remove-if-not (lambda (c) (and (consp c) (eq (car c) :render))) commands))
+                            (other-cmds  (remove-if (lambda (c) (and (consp c) (eq (car c) :render))) commands)))
+                        (dolist (rc render-cmds)
+                          (ignore-errors (execute-render-command rc *backend*)))
+                        ;; Process remaining commands via app's command processor
+                        (when cmd-proc-fn
+                          (dolist (c other-cmds)
+                            (funcall cmd-proc-fn c message-queue next-model app-cfg-for-cmd))))
+                      ;; If not shutting down, update rendering context and previous frame buffer.
+                      ;; Gate the very first render until we know both terminal size and cursor position.
                       (unless elmtui.core.loop::*shutdown-requested*
-                        (log-info "DRIVER: view next-model")
+                        (log-info "DRIVER: Rendering frame.")
                         (let ((ctx (make-context-from-spec app-spec next-model *backend*)))
                           (setf *last-ctx* (full-view-pipeline ctx))
                           (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*)))))))))
       (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
       (values initial-model initial-cmds))))
+
+;;; Helper: execute :render commands synchronously prior to view
+(defun execute-render-command (cmd backend)
+  "Execute a :render command against BACKEND. Format examples:
+   (:render :clear rect)
+   (:render :scroll n)
+   (:render :set-cursor row col)"
+  (handler-case
+      (let ((op (second cmd))
+            (arg1 (third cmd))
+            (arg2 (fourth cmd)))
+        (case op
+          (:clear
+           (elmtui.platform.api:clear-screen backend arg1));:from :cursor :direction :down)))
+          (:scroll
+           (elmtui.platform.api:scroll backend (or arg1 -1)))
+          ;; (:scroll-up
+          ;;   (elmtui.platform.api:scroll backend (or arg1 1)))
+          ;; (:clear-above-cursor
+          ;;   (elmtui.platform.api:clear-screen backend arg1))
+          (:set-cursor
+           (elmtui.platform.api:set-cursor-position backend (or arg1 1) (or arg2 1)))
+          (otherwise (log-warn "Unknown :render op ~S" op))))
+    (error (e) (log-warn "Render command failed: ~A" e))))
+                                        ;(log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
+                                        ;(values initial-model initial-cmds))))
 
 (defun process-initial-commands (cmds app-spec)
   "Process a list of initial commands for an application, using an app-specific processor if available.
@@ -362,6 +434,13 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
            (start-loop)
            (log-info "Event loop and channels are active.")
 
+           ;; 1a. Install bootstrap app-message processor to buffer early events
+           (setf elmtui.core.globals:*app-message-processor* #'%driver-bootstrap-processor)
+           (setf *real-app-message-processor* nil
+                 *bootstrap-event-queue* nil
+                 *got-initial-terminal-resized* nil
+                 *got-initial-cursor-position* nil)
+
            ;; 2. Now that channels exist, set up all event subscriptions.
            (elmtui.keymaps:initialise)
            (setf *focus-manager* (make-focus-manager))
@@ -397,7 +476,8 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
            (setf *backend* (initialize-backend-with-publish-fn
                             backend-type
                             tty-path
-                            (lambda (ev) (publish ev))))
+                            (lambda (ev) (publish ev))
+                            :initial-clear nil))
            (unless *backend*
              (error "Failed to initialize backend ~A" backend-type))
 
@@ -407,6 +487,16 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
              (setf *current-app-model* im)
              (setf initial-commands ic))
            (log-info "Application model and message processor are initialized.")
+
+           ;; 4a. Install the real app-message processor by wrapping the one set in initialize-app-model
+           ;;     We capture it and leave the bootstrap shim in place to drain the queue safely.
+           (let ((real-proc elmtui.core.globals:*app-message-processor*))
+             ;; Install real processor now
+             (setf elmtui.core.globals:*app-message-processor* real-proc)
+             ;; Replay buffered events in order, then clear the bootstrap queue
+             (let ((events (nreverse *bootstrap-event-queue*)))
+               (setf *bootstrap-event-queue* nil)
+               (dolist (e events) (ignore-errors (funcall real-proc e)))))
 
            ;; 5. Start the input reader thread.
            (multiple-value-bind (thread stop-fn)

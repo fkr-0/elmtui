@@ -4,7 +4,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.counter
   (:use :cl :alexandria)
-  ;; (:import-from :elmtui.core.keymap #:make-keymap #:parse-key-string)
+  (:import-from :elmtui.keymaps #:keymap!)
   (:import-from :elmtui.view.core #:ui-node)
   (:import-from :elmtui.ui.defcomponent #:defcomponent)
   (:import-from :elmtui.ui.api
@@ -35,14 +35,15 @@
                 (reset-val (getf props :initial-value 0)) ; Reset value is always from :initial-value prop or 0
                 ;; (component-id (id-from-path self-id-path))
                 ;; (keymap-name (symbol-name (gensym (format nil "~A-KEYMAP-" component-id))))
-                (keymap (list 1 2))
-                ;; (keymap (make-keymap :name keymap-name
-                ;;                      :bindings
-                ;;                      `(((,(parse-key-string "+") . (:increment))
-                ;;                         (,(parse-key-string "=") . (:increment)) ; Alias for +
-                ;;                         (,(parse-key-string "-") . (:decrement))
-                ;;                         (,(parse-key-string "Enter") . (:reset))))))
-                )
+                (keymap (keymap! :keymap-name
+                          ;; `(,(parse-key-string "+") . (:increment))
+                          ;;    (,(parse-key-string "=") . (:increment)) ; Alias for +
+                          ;;    (,(parse-key-string "-") . (:decrement))
+                          ;;    (,(parse-key-string "Enter") . (:reset))))))
+                          ("+" :type :message :target `(:dispatch-to-component ,self-id-path :increment) :description "incr +")
+                          ("=" :type :message :target `(:dispatch-to-component ,self-id-path :increment) :description "incr =")
+                          ( "-" :type :message :target `(:dispatch-to-component ,self-id-path :decrement) :description "decr")
+                          ("Enter" :type :message :target `(:dispatch-to-component ,self-id-path :reset):description "reset"))))
            (values `(:value ,init-val
                      :initial-value ,reset-val
                      :active-keymap ,keymap)

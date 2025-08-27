@@ -78,7 +78,9 @@
    :supports-mouse-p
 
    ;; Raw Access (Escape Hatch)
-   :get-native-handle))
+   :get-native-handle
+   :scroll
+   :set-cursor-position))
 
 (in-package :elmtui.platform.api)
 ;;; ===================================================================
@@ -197,3 +199,9 @@ This is useful for ensuring thread safety when accessing shared resources."
      (unwind-protect
           (progn ,@body)
        (release-lock ,l))))
+
+(defgeneric scroll (backend n)
+  (:documentation "Scroll the terminal display by N lines. Positive N scrolls down, negative N scrolls up."))
+
+(defgeneric set-cursor-position (backend x y)
+  (:documentation "Set the cursor position to (X, Y) on the terminal."))
