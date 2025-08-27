@@ -47,17 +47,38 @@ Combinators sum child/descendant parts."
                (t '(0 0 0)))))
     (score sel)))
 
-(defun compile-selector (sel) sel) ;; identity for now
+(defun compile-selector (sel)
+  "Compile a selector from a CSS-like string or return SEL if already compiled.
+For now, we use identity. In the future, we might want to parse strings, e.g.
+\"div#main.content.active\"."
+  sel) ;; identity for now
 
 (defun %in-list-p (x seq)
   (when seq (some (lambda (y) (or (eql x y)
                                   (and (symbolp x) (symbolp y) (string= (symbol-name x) (symbol-name y)))
                                   (and (stringp x) (stringp y) (string= x y)))) seq)))
+(defgeneric selector-value-eql (a b)
+  (:documentation "Return true if selector values A and B are equal.")
+  (:method ((a null) (b null)) t)
+  (:method ((a null) b) nil)
+  (:method (a (b null)) nil)
+  (:method ((a symbol) (b symbol)) (string= (symbol-name a) (symbol-name b)))
+  (:method ((a string) (b string)) (string= a b))
+  (:method ((a string) (b symbol)) (string= (string-upcase a) (symbol-name b)))
+  (:method ((a symbol) (b string)) (string= (symbol-name a) (string-upcase b)))
+  (:method ((a number) (b number)) (eql a b))
+  (:method ((a list) (b list))
+    (and (= (length a) (length b))
+         (every #'(lambda (x y) (selector-value-eql x y)) a b)))
+  (:method (a b) nil))
 
 (defun %match-simple (s obj)
   (case (car s)
-    (:type  (eql (second s) (stylable-type obj)))
-    (:id    (let ((sid (stylable-id obj))) (or (eql sid (second s)) (and (stringp sid) (string= sid (second s))))))
+    (:type  (selector-value-eql (second s)
+                                (stylable-type obj)))
+    (:id    (selector-value-eql (second s)
+                                (stylable-id obj)))
+                                        ; (let ((sid (stylable-id obj))) (or (eql sid (second s)) (and (stringp sid) (string= sid (second s))))))
     (:class (let ((classes (stylable-classes obj))) (every (lambda (c) (%in-list-p c classes)) (cdr s))))
     (:attr  (destructuring-bind (k v) (list (second s) (third s))
               (let* ((attrs (stylable-attributes obj))

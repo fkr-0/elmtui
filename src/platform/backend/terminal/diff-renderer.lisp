@@ -230,7 +230,9 @@ Optimizes by batching contiguous character updates with the same style."
                   (let ((char (buffer-cell-char back-cell))
                         (style (buffer-cell-style back-cell)))
                     (if current-batch
-                        (if (and (char/= char #\Null) (equal style (getf current-batch :style)) (= c (+ (getf current-batch :start-col) (length (getf current-batch :chars)))))
+                        (if (and (char/= char #\Null)
+                                 (equal style (getf current-batch :style))
+                                 (= c (+ (getf current-batch :start-col) (length (getf current-batch :chars)))))
                             (setf (getf current-batch :chars) (concatenate 'string (getf current-batch :chars) (string char)))
                             (progn
                               (push current-batch diff-ops)

@@ -23,7 +23,7 @@
    #:text-element      #:text-content   #:text-wrap #:text-align #:text-color
    #:separator-element #:separator-orientation #:separator-thickness
    #:spacer-element    #:spacer-width  #:spacer-height
-
+   #:base-element-p
    #:copy-element
    ;; Traversal helpers
    #:to-dsl #:dsl->objects #:map-elements #:find-elements-by-type
@@ -246,6 +246,11 @@
   (print-unreadable-object (obj stream :type t :identity t)
     (format stream "~@[id: ~A~]" (element-id obj))))
 
+
+
+(defparameter *validate-on-init* nil
+  "When true, validate-element runs in initialize-instance. Default NIL to avoid
+side-effects during metaobject introspection and prototype construction.")
 (defmethod initialize-instance :after ((obj base-element) &key)
   "Initialize a base element instance. This method is called
     automatically when creating a new instance of a base element."
@@ -253,11 +258,6 @@
   (when (boundp '*validate-on-init*)
     (when *validate-on-init*
       (validate-element obj))))
-
-(defparameter *validate-on-init* nil
-  "When true, validate-element runs in initialize-instance. Default NIL to avoid
-side-effects during metaobject introspection and prototype construction.")
-
 (defun make-instance-validated (class &rest initargs)
   "Construct an instance of CLASS with INITARGS, then run validate-element once.
 Avoids running validation during initialize-instance to keep control over timing."
@@ -663,14 +663,20 @@ Avoids running validation during initialize-instance to keep control over timing
                    ((listp d) d)
                    (t (list d))))
            (normalize-dsl-props (props)
-             (let ((res nil))
-               (loop while props
-                     do (let ((key (pop props)))
-                          (push key res)
-                          (if (or (not props) (keywordp (car props)))
-                              (push t res)
-                              (push (pop props) res))))
-               (nreverse res))))
+             "Normalize top-level DSL props into a proper plist of key/value pairs.
+              Do not invent boolean T for keyword-valued properties (e.g., :id :foo).
+              Require explicit values and signal on odd-length tails."
+             (let ((res '()) (cursor props))
+               (loop
+                 (when (null cursor) (return))
+                 (let ((k (pop cursor)))
+                   (unless (keywordp k)
+                     (error "Expected keyword property, got ~S in DSL tail ~S" k props))
+                   (when (null cursor)
+                     (error "Property ~S is missing a value in DSL tail ~S" k props))
+                   (let ((v (pop cursor)))
+                     (setf res (nconc res (list k v))))))
+               res)))
 
     (cond
       ;; ------------------------------------------------------------------
@@ -1333,9 +1339,13 @@ It inspects the class metaobject directly to collect supported initargs."
 (defparameter *layout-fallback-root-size*
   ;; sensible default for headless calls (e.g., tests / tree-transforms)
   (make-size :w 80 :h 24)
-  "Used when no parent rectangle or styled width/height can be inferred.")
+  "Default parent content size used when nothing else is available.
+   This only applies when a node is laid out without a parent-rect and has no
+   styled absolute :width/:height. For real layout, a concrete parent-rect is
+   always preferred.")
 
 (defun rect= (a b &key (epsilon 0))
+  "Return true when rectangles A and B are equal within EPSILON tolerance."
   (and (typep a 'rectangle) (typep b 'rectangle)
        (<= (abs (- (x a) (x b))) epsilon)
        (<= (abs (- (y a) (y b))) epsilon)
@@ -1355,24 +1365,33 @@ It inspects the class metaobject directly to collect supported initargs."
   (and (numberp v) (>= v 0) v))
 
 (defun infer-parent-rect (node maybe-rect)
-  "Best-effort: prefer MAYBE-RECT; else node’s current :layout-rect;
-   else styled :width/:height; else *layout-fallback-root-size*."
-  (cond
-    ;; 1) explicit rect provided
-    ((typep maybe-rect 'rectangle) maybe-rect)
-    ;; 2) node already carries a rect (e.g., earlier pass)
-    ((typep (element-layout-rect node) 'rectangle)
-     (element-layout-rect node))
-    ((typep (getf (ui-node-props node) :layout-rect) 'rectangle)
-     (getf (ui-node-props node) :layout-rect))
-    ;; 3) styled absolute width/height (numbers only) → make a parent rect at (0,0)
-    (t
-     (let* ((w* (%num-or-nil (getf (element-style node) :width nil)))
-            (h* (%num-or-nil (getf (element-style node) :height nil)))
-            (sz (cond
-                  ((and w* h*) (make-size :w w* :h h*))
-                  (t *layout-fallback-root-size*))))
-       (elmtui.view.geo:make-rectangle :pos (make-pos :x 0 :y 0) :size sz)))))
+  "Best-effort parent rectangle for NODE when no explicit rect is provided.
+   Priority:
+   1) MAYBE-RECT if it is a rectangle
+   2) NODE’s current :layout-rect (if any)
+   3) An absolute styled :width/:height (numbers only) combined into a rect at (0,0)
+   4) *layout-fallback-root-size*
+
+   Note: This is only used by helper entrypoints that are called without a concrete
+   parent rect; the normal pipeline should pass down parent rects explicitly."
+  (let ((result (cond
+                  ;; 1) explicit rect provided
+                  ((typep maybe-rect 'rectangle) maybe-rect)
+                  ;; 2) node already carries a rect (e.g., earlier pass)
+                  ((typep (element-layout-rect node) 'rectangle)
+                   (element-layout-rect node))
+                  ((typep (getf (ui-node-props node) :layout-rect) 'rectangle)
+                   (getf (ui-node-props node) :layout-rect))
+                  ;; 3) styled absolute width/height (numbers only) → make a parent rect at (0,0)
+                  (t
+                   (let* ((w* (%num-or-nil (getf (element-style node) :width nil)))
+                          (h* (%num-or-nil (getf (element-style node) :height nil)))
+                          (sz (cond
+                                ((and w* h*) (make-size :w w* :h h*))
+                                (t *layout-fallback-root-size*))))
+                     (elmtui.view.geo:make-rectangle :pos (make-pos :x 0 :y 0) :size sz))))))
+    (log-info "infering parent rect resulted in ~A" result)
+    result))
 
 ;; (defun compute-layout (node &optional parent-rect parent-style-set)
 ;;   "Layout NODE inside PARENT-RECT if provided, otherwise infer a reasonable parent.

@@ -34,9 +34,10 @@
 (uiop:define-package :cl-styles.sheet
   (:use :cl :alexandria :cl-styles.rule :cl-styles.selector :cl-styles.tokens)
   (:export
-   #:stylesheet #:make-stylesheet #:stylesheet-rules #:stylesheet-variables
-   #:stylesheet-namespace
-   #:defstylesheet #:compile-stylesheet #:merge-stylesheets #:with-variables))
+   #:stylesheet #:make-stylesheet #:stylesheet-rules #:stylesheet-variables #:stylesheet-namespace
+   #:compiled-stylesheet #:compiled-stylesheet-ruleset #:compiled-stylesheet-variables
+   #:style-engine #:stylesheet #:patches #:dirty
+   #:defstylesheet))
 
 
 

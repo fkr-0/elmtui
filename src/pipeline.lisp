@@ -89,7 +89,7 @@
     (ctx)
   "Apply terminal operations prior to rendering (scroll, clear-below-cursor) based on root-viewport state."
   (let* ((backend (ctx-backend ctx))
-         (state (ctx-state ctx))
+         ;; (state (ctx-state ctx))
          ;; (rv-path (or elmtui.platform.driver::*root-viewport-id-path* nil))
          )
     (log-info "PIPELINE: Pre-render terminal prep with backend ~A" backend );rv-path)

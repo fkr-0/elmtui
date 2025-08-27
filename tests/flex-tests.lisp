@@ -270,7 +270,6 @@
 ;;   (let* ((st (element-style node)))
 ;;     (setf (element-style node) (append kvs st)))
 ;;   node)
-
 (defun %box (&key id (w nil) (h nil) (styles nil))
   "Simple container-element with optional fixed width/height and extra styles."
   (let ((node (make-instance 'container-element
@@ -281,6 +280,7 @@
     (when h (push :height (element-style node))
           (push h (element-style node)))
     node))
+
 
 (defun %rect->list (node)
   (let* ((r (%layout-rect-of node)))

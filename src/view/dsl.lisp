@@ -143,7 +143,7 @@
                                               children))))))))
 
              ;; any other list (including style plists like (:BORDER T ...)) is **data**
-             ((listp spec) spec)
+             ;; ((listp spec) spec)
 
              (t spec))))
       (values (process-node dsl-spec '()) resolved-something))))
