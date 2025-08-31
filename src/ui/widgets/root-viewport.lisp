@@ -3,7 +3,8 @@
   (:use :cl #:log4cl
         :elmtui.ui.api
    :elmtui.ui.widgets.viewport)
-  (:import-from :elmtui.utils :ensure-list)
+  (:import-from :elmtui.utils :ensure-list :get-path :set-path)
+  (:import-from :elmtui.update-dsl :with-cycle :cmd> :state> :cstate>)
   (:import-from :elmtui.tea-state :state-ref)
   (:import-from :elmtui.tea-state.msg
                 #:msg-data #:msg-type)
@@ -97,8 +98,8 @@
          (pos-c 0))
     (labels
         ((set-top-left (y x)
-           (setf off-y (%clamp y 0 (max 0 (- term-rows h))))
-           off-x (%clamp x 0 (max 0 (- term-cols w))))
+           (setf off-y (%clamp y 0 (max 0 (- term-rows h)))
+                 off-x (%clamp x 0 (max 0 (- term-cols w)))))
          (centered (full minus) (floor (- full minus) 2)))
       (ecase anc
         ;; fixed anchoring against screen bounds
@@ -164,34 +165,40 @@
 
 (defmethod elmtui.ui.api:init ((component root-viewport)
                                &key id-path
-                                 initial-terminal-dimensions
-                                 initial-cursor-pos
                                  initial-child-spec
                                  dsl)
-  (let* ((props (getf dsl :props))
-         (anchor (normalize-anchor (or (getf props :anchor) :below-cursor)))
-         (overflow-policy (or (getf props :overflow-policy) :scroll)) ; :scroll | :truncate
-         (term-cols (or (first initial-terminal-dimensions) 0))
-         (term-rows (or (second initial-terminal-dimensions) 0))
-         (cursor-c  (or (first initial-cursor-pos) 0))
-         (cursor-r  (or (second initial-cursor-pos) 0))
-         (size-known (and (> term-cols 0) (> term-rows 0)))
-         (pos-known  (and (> cursor-c 0)  (> cursor-r 0)))
+  ;; Accept DSL either as (:root-viewport ...props...) or a plain plist of props.
+  (let* ((plist (if (and (consp dsl) (keywordp (first dsl)) (eq (first dsl) :root-viewport))
+                    (rest dsl)
+                    dsl))
+         (style (getf plist :style))
+         ;; Prefer top-level :anchor/:overflow-policy when present; else fall back to :style's.
+         (anchor (normalize-anchor (or (getf plist :anchor)
+                                       (and style (getf style :anchor))
+                                       :top-left)))
+         (overflow-policy (or (getf plist :overflow-policy)
+                              (and style (getf style :overflow-policy))
+                              :scroll)) ; :scroll | :truncate
+         ;; (term-cols (or (first initial-terminal-dimensions) 0))
+         ;; (term-rows (or (second initial-terminal-dimensions) 0))
+         ;; (cursor-c  (or (first initial-cursor-pos) 0))
+         ;; (cursor-r  (or (second initial-cursor-pos) 0))
          ;; default dims until we know both
-         (desired-w (if size-known term-cols 1))
-         (desired-h (if size-known term-rows 1))
-         (oy 0) (ox 0) (ap (cons 0 0)) (growth :bottom-right) (eff (cons desired-w desired-h)))
-    (when (and size-known pos-known)
-      (multiple-value-setq (oy ox ap growth eff)
-        (compute-anchor-solution anchor desired-w desired-h
-                                 term-cols term-rows
-                                 cursor-r cursor-c)))
+         ;; (desired-w nil)
+         ;; (desired-h nil)
+         (oy 0) (ox 0) (ap (cons 0 0)) (growth :bottom-right) ;; (eff (cons desired-w desired-h))
+         )
+    ;; (when (and size-known pos-known)
+    ;;   (multiple-value-setq (oy ox ap growth eff)
+    ;;     (compute-anchor-solution anchor desired-w desired-h
+    ;;                              term-cols term-rows
+    ;;                              cursor-r cursor-c)))
     (values component
             (list
              (list (append id-path '(:type)) :root-viewport)
              ;; geometry
-             (list (append id-path '(:state :width))  (car eff))
-             (list (append id-path '(:state :height)) (cdr eff))
+             ;; (list (append id-path '(:state :width))  (car eff))
+             ;; (list (append id-path '(:state :height)) (cdr eff))
              (list (append id-path '(:state :offset-x)) ox)
              (list (append id-path '(:state :offset-y)) oy)
              ;; anchor meta
@@ -199,11 +206,9 @@
              (list (append id-path '(:state :anchor-pos)) ap)         ; (row . col)
              (list (append id-path '(:state :anchor-growth)) growth)  ; anchor-growth-type
              ;; env info
-             (list (append id-path '(:state :terminal-size)) (list term-cols term-rows))
-             (list (append id-path '(:state :cursor-pos))  (list cursor-c cursor-r))
-             (list (append id-path '(:state :initial-cursor-pos)))    ; filled on first known
-             (list (append id-path '(:state :size-known))  size-known)
-             (list (append id-path '(:state :pos-known))   pos-known)
+             (list (append id-path '(:state :initial-cursor-pos)) nil) ; placeholder; set on first known
+             ;; (list (append id-path '(:state :size-known))  size-known)
+             ;; (list (append id-path '(:state :pos-known))   pos-known)
              ;; policies / book-keeping
              (list (append id-path '(:state :overflow-policy)) overflow-policy)
              (list (append id-path '(:state :issued-scroll-net)) 0)
@@ -218,25 +223,29 @@
 ;;; ---------------------------------------------------------------------------
 
 (defun %recompute-anchoring (st-path state &optional (log? t))
-  "Recompute offsets, anchor-pos, growth given current state."
+  "Recompute offsets, anchor-pos, growth given current state.
+ST-PATH points at the :state subtree (i.e., ends with :state)."
   (let* ((anchor (get-path (append st-path '(:anchor)) state))
-         (term-size (get-path (append st-path '(:terminal-size)) state '(0 0)))
-         (cursor-pos (get-path (append st-path '(:cursor-pos)) state '(0 0)))
-         (width  (get-path (append st-path '(:width)) state 1))
-         (height (get-path (append st-path '(:height)) state 1)))
+         (term-size (or (get-path (append st-path '(:terminal-size)) state) '(0 0)))
+         (cursor-pos (or (get-path (append st-path '(:cursor-pos)) state) '(0 0)))
+         (width  (or (get-path (append st-path '(:width)) state) 1))
+         (height (or (get-path (append st-path '(:height)) state) 1)))
     ;; In :manual mode we do NOT recompute placement; we only clamp to bounds.
     (when (eq (normalize-anchor anchor) :manual)
-      (let* ((ox (get-path (append st-path '(:offset-x)) state 0))
-             (oy (get-path (append st-path '(:offset-y)) state 0))
+      ;; Note: historical quirk — stored offsets may be labelled as
+      ;; :offset-x (col) and :offset-y (row). Treat row from :offset-y and col from :offset-x.
+      (let* ((ox (or (get-path (append st-path '(:offset-y)) state) 0))   ; column from :offset-y
+             (oy (or (get-path (append st-path '(:offset-x)) state) 0))   ; row from :offset-x
              (cols (first term-size)) (rows (second term-size))
-             (cx (%clamp ox 0 (max 0 (- rows height))))
-             (cy (%clamp oy 0 (max 0 (- cols width))))
-             (ap (cons cx cy))
+             ;; Clamp offsets to screen bounds: X against columns/width, Y against rows/height
+             (new-ox (%clamp ox 0 (max 0 (- cols width))))
+             (new-oy (%clamp oy 0 (max 0 (- rows height))))
+             (ap (cons new-oy new-ox))
              (growth (or (get-path (append st-path '(:anchor-growth)) state) :bottom-right)))
         (when log?
           (log-debug "root-viewport: manual anchor → keep off(~a,~a) ap(~a.~a) grow=~a size(~a×~a)"
-                     cx cy (car ap) (cdr ap) growth width height))
-        (return-from %recompute-anchoring (values cx cy ap growth (cons width height)))))
+                     new-oy new-ox (car ap) (cdr ap) growth width height))
+        (return-from %recompute-anchoring (values new-oy new-ox ap growth (cons width height)))))
     (multiple-value-bind (oy ox ap growth eff)
         (compute-anchor-solution anchor width height
                                  (first term-size) (second term-size)
@@ -251,251 +260,287 @@
    scroll or truncate. Returns two values: patches, commands."
   (declare (ignore new-oy new-ox))
   (let* ((anchor (normalize-anchor (get-path (append st-path '(:anchor)) state)))
-         (term-size (get-path (append st-path '(:terminal-size)) state '(0 0)))
-         (cursor-pos (get-path (append st-path '(:cursor-pos)) state '(0 0)))
-         (height (get-path (append st-path '(:height)) state 1))
-         (issued (get-path (append st-path '(:issued-scroll-net)) state 0))
+         (term-size (or (get-path (append st-path '(:terminal-size)) state) '(0 0)))
+         (cursor-pos (or (get-path (append st-path '(:cursor-pos)) state) '(0 0)))
+         (height (or (get-path (append st-path '(:height)) state) 1))
+         (issued (or (get-path (append st-path '(:issued-scroll-net)) state) 0))
          ;; (cols (first term-size))
          (rows (second term-size))
          ;; (c (first cursor-pos))
          (r (second cursor-pos))
          (patches nil) (commands nil))
-    (labels ((scroll! (dir n)
-               (push `(:render ,(if (eql dir :down) :scroll-down :scroll-up) ,n) commands)
-               (setf issued (if (eql dir :down) (+ issued n) (- issued n)))
-               (push (list (append st-path '(:issued-scroll-net)) issued) patches))
-             (truncate! (h)
-               (push (list (append st-path '(:height)) h) patches)))
+    (labels ((emit-scroll (dir n)
+               (when (> n 0)
+                 (ecase dir
+                   (:down (push `(:render :scroll-down ,n) commands)
+                    (setf issued (+ issued n)))
+                   (:up   (push `(:render :scroll-up ,n)   commands)
+                    (setf issued (- issued n))))
+                 (push (list (append st-path '(:issued-scroll-net)) issued) patches)))
+             (truncate-height (new-h)
+               ;; (declare (ignore cols c))
+               (when (/= (max 1 new-h) height)
+                 (push (list (append st-path '(:height)) (max 1 new-h)) patches))))
+      ;; (declare (ignore cols c))
       (case anchor
         (:below-cursor
+         ;; rows strictly below cursor (after the cursor line)
          (let* ((rows-remaining (max 0 (- rows (1+ r))))
-                (excess (max 0 (- height rows-remaining))))
+                (needed (max 0 (- height 1)))
+                (excess (max 0 (- needed rows-remaining))))
+           (log-info "root-viewport: below-cursor rows-remaining=~a needed=~a excess=~a"
+                     rows-remaining needed excess)
            (when (> excess 0)
              (case overflow-policy
-               (:scroll   (scroll! :down excess))
-               (:truncate (truncate! rows-remaining))))))
+               (:scroll   (emit-scroll :down excess))
+               (:truncate (truncate-height (min height (1+ rows-remaining))))))))
         (:above-cursor
          (let* ((rows-available (max 0 r))
                 (excess (max 0 (- height rows-available))))
+           (log-info "root-viewport: above-cursor rows-available=~a needed=~a excess=~a"
+                     rows-available height excess)
            (when (> excess 0)
              (case overflow-policy
-               (:scroll   (scroll! :up excess))
-               (:truncate (truncate! rows-available))))))
-        ;; (otherwise
-        ;;  ;; screen-anchored → nothing vertical to enforce here
-        ;;  ;; (declare (ignore cols rows c r new-oy new-ox))
-        ;;  )
-        )
+               (:scroll   (emit-scroll :up excess))
+               (:truncate (truncate-height (min height rows-available)))))))
+        (otherwise
+         ;; screen-anchored: no vertical overflow handling here
+         t))
       (values patches commands))))
 
+
 (defmethod elmtui.ui.api:update ((component root-viewport) message state &key id-path)
-  (flet ((patch (subkey value) `(,(append id-path subkey) ,value)))
-    (let* ((st-path (append id-path '(:state)))
-           (anchor   (get-path (append st-path '(:anchor)) state))
-           (overflow-policy (get-path (append st-path '(:overflow-policy)) state :scroll))
-           (size-known (get-path (append st-path '(:size-known)) state))
-           (pos-known  (get-path (append st-path '(:pos-known)) state))
-           (issued-scroll-net (get-path (append st-path '(:issued-scroll-net)) state 0))
-           (own-patches nil)
-           (commands nil))
+  (log-info "root-viewport: update id-path=~a message=~a"
+            id-path message)
 
-      (labels
-          (;; (ready? () (and size-known pos-known))
-           (ensure-initial-cursor! ()
-             (unless (get-path (append st-path '(:initial-cursor-pos)) state)
-               (let ((cp (get-path (append st-path '(:cursor-pos)) state)))
-                 (push (patch '(:state :initial-cursor-pos) cp) own-patches)))))
-        (when (listp message)
-          (or (case (msg-type message)
-                ;; --- terminal resized ------------------------------------------------
-                (:terminalresized
-                 (let* ((cols (msg-data message :width))
-                        (rows (msg-data message :height)))
-                   (when (and cols rows (> cols 0) (> rows 0))
-                     (push (patch '(:state :terminal-size) (list cols rows)) own-patches)
-                     (push (patch '(:state :size-known) t) own-patches)
-                     (if (eq (normalize-anchor anchor) :manual)
-                         ;; Manual: do not recompute; only clamp current offsets to fit.
-                         (let* ((width  (get-path (append st-path '(:width)) state 1))
-                                (height (get-path (append st-path '(:height)) state 1))
-                                (ox (get-path (append st-path '(:offset-x)) state 0))
-                                (oy (get-path (append st-path '(:offset-y)) state 0))
-                                (cx (%clamp ox 0 (max 0 (- rows height))))
-                                (cy (%clamp oy 0 (max 0 (- cols width)))))
-                           (when (or (/= cx ox) (/= cy oy))
-                             (push (patch '(:state :offset-x) cx) own-patches)
-                             (push (patch '(:state :offset-y) cy) own-patches))
-                           ;; anchor-pos in manual = top-left
-                           (push (patch '(:state :anchor-pos) (cons cx cy)) own-patches)
-                           ;; keep existing :anchor-growth or set default if missing
-                           (unless (get-path (append st-path '(:anchor-growth)) state)
-                             (push (patch '(:state :anchor-growth) :bottom-right) own-patches)))
-                         ;; Non-manual: full recompute + overflow
-                         (multiple-value-bind (oy ox ap growth eff) (%recompute-anchoring st-path state)
-                           (declare (ignore eff))
-                           (push (patch '(:state :offset-x) ox) own-patches)
-                           (push (patch '(:state :offset-y) oy) own-patches)
-                           (push (patch '(:state :anchor-pos) ap) own-patches)
-                           (push (patch '(:state :anchor-growth) growth) own-patches)
-                           (multiple-value-bind (ov-patches ov-cmds)
-                               (%apply-overflow-y st-path state overflow-policy oy ox)
-                             (setf own-patches (nconc own-patches ov-patches))
-                             (setf commands (nconc commands ov-cmds)))))
-                     (when (and pos-known (not (get-path (append st-path '(:first-ready-done)) state)))
-                       (push (patch '(:state :first-ready-done) t) own-patches)
-                       (case (normalize-anchor anchor)
-                         (:below-cursor (push '(:render :clear-below-cursor) commands))
-                         (:above-cursor (push '(:render :clear-above-cursor) commands))
-                         (otherwise nil))))))
+  (multiple-value-bind (_new-state patches commands)
+      (elmtui.update-dsl:with-cycle (ctx state :component-path id-path)
+        (flet ((patch (subkey value) `(,(append id-path subkey) ,value)))
+          (let* ((st-path (append id-path '(:state)))
+                 (anchor   (cstate> :anchor))
+                 (overflow-policy (cstate> :overflow-policy :scroll))
+                 ;; (pos-known (cstate> :cursor-pos))
+                 ;; (size-known  (cstate> :terminal-size))
+                 (issued-scroll-net (cstate> :issued-scroll-net 0))
+                 (own-patches nil)
+                 (commands nil))
 
-                ;; --- cursor moved ----------------------------------------------------
-                (:cursorpositionchanged
-                 (let ((c (msg-data message :col))
-                       (r (msg-data message :row)))
-                   (when (and c r (> c 0) (> r 0))
-                     (push (patch '(:state :cursor-pos) (list c r)) own-patches)
-                     (push (patch '(:state :pos-known) t) own-patches)
-                     (ensure-initial-cursor!)
-                     (when size-known
-                       (if (eq (normalize-anchor anchor) :manual)
-                           ;; manual: ignore cursor for placement
-                           (progn)
-                           (multiple-value-bind (oy ox ap growth eff) (%recompute-anchoring st-path state)
-                             (declare (ignore eff))
-                             (push (patch '(:state :offset-x) ox) own-patches)
-                             (push (patch '(:state :offset-y) oy) own-patches)
-                             (push (patch '(:state :anchor-pos) ap) own-patches)
-                             (push (patch '(:state :anchor-growth) growth) own-patches)
-                             (multiple-value-bind (ov-patches ov-cmds)
-                                 (%apply-overflow-y st-path state overflow-policy oy ox)
-                               (setf own-patches (nconc own-patches ov-patches))
-                               (setf commands (nconc commands ov-cmds))))))
-                     (when (and size-known (not (get-path (append st-path '(:first-ready-done)) state)))
-                       (push (patch '(:state :first-ready-done) t) own-patches)
-                       (case (normalize-anchor anchor)
-                         (:below-cursor (push '(:render :clear-below-cursor) commands))
-                         (:above-cursor (push '(:render :clear-above-cursor) commands))
-                         (otherwise nil))))))
-                ;; --- manual anchoring controls -------------------------------------
-                (:anchor-move
-                 ;; Move manual anchor by dx (cols) / dy (rows)
-                 (when (eq (normalize-anchor anchor) :manual)
-                   (let* ((dx (or (msg-data message :dx) 0))
-                          (dy (or (msg-data message :dy) 0))
-                          (cols (first (get-path (append st-path '(:terminal-size)) state '(0 0))))
-                          (rows (second (get-path (append st-path '(:terminal-size)) state '(0 0))))
-                          (w (get-path (append st-path '(:width)) state 1))
-                          (h (get-path (append st-path '(:height)) state 1))
-                          (ox (get-path (append st-path '(:offset-x)) state 0))
-                          (oy (get-path (append st-path '(:offset-y)) state 0))
-                          (new-ox (%clamp (+ ox dy) 0 (max 0 (- rows h))))
-                          (new-oy (%clamp (+ oy dx) 0 (max 0 (- cols w)))))
-                     (push (patch '(:state :offset-x) new-ox) own-patches)
-                     (push (patch '(:state :offset-y) new-oy) own-patches)
-                     ;; anchor-pos (manual) = top-left
-                     (push (patch '(:state :anchor-pos) (cons new-ox new-oy)) own-patches)
-                     ;; keep or seed growth
-                     (unless (get-path (append st-path '(:anchor-growth)) state)
-                       (push (patch '(:state :anchor-growth) :bottom-right) own-patches)))))
-                (:anchor-set-position
-                 ;; Set manual anchor absolute top-left (row/col)
-                 (when (eq (normalize-anchor anchor) :manual)
-                   (let* ((row (msg-data message :row))
-                          (col (msg-data message :col))
-                          (cols (first (get-path (append st-path '(:terminal-size)) state '(0 0))))
-                          (rows (second (get-path (append st-path '(:terminal-size)) state '(0 0))))
-                          (w (get-path (append st-path '(:width)) state 1))
-                          (h (get-path (append st-path '(:height)) state 1))
-                          (new-ox (%clamp (or row 0) 0 (max 0 (- rows h))))
-                          (new-oy (%clamp (or col 0) 0 (max 0 (- cols w)))))
-                     (push (patch '(:state :offset-x) new-ox) own-patches)
-                     (push (patch '(:state :offset-y) new-oy) own-patches)
-                     (push (patch '(:state :anchor-pos) (cons new-ox new-oy)) own-patches)
-                     (unless (get-path (append st-path '(:anchor-growth)) state)
-                       (push (patch '(:state :anchor-growth) :bottom-right) own-patches)))))
+            (labels
+                (;; (ready? () (and size-known pos-known))
+                 (ensure-initial-cursor! (x y)
+                   (unless (cstate> :initial-cursor-pos)
+                     (setf (cstate> :initial-cursor-pos) (list x y)))))
+              ;; (setf (cstate> :sef) :bc)
+                                        ;(let ((cp (cstate> :cursor-pos)))
+              ;; (push (patch '(:state :initial-cursor-pos) cp) own-patches)
+              (when (listp message)
+                (or (case (msg-type message)
+                      ;; --- terminal resized ------------------------------------------------
+                      (:terminalresized
+                       (let* ((cols (msg-data message :width))
+                              (rows (msg-data message :height)))
+                         (when (and cols rows (> cols 0) (> rows 0))
+                           (setf (cstate> :terminal-size) (list cols rows))
+                           (if (eq (normalize-anchor anchor) :manual)
+                               ;; Manual: do not recompute; only clamp current offsets to fit.
+                               (let* ((width  (cstate> :width 1))
+                                      (height (cstate> :height 1))
+                                      (ox (cstate> :offset-x 0))
+                                      (oy (cstate> :offset-y 0))
+                                      (cx (%clamp ox 0 (max 0 (- rows height))))
+                                      (cy (%clamp oy 0 (max 0 (- cols width)))))
+                                 (when (or (/= cx ox) (/= cy oy))
+                                   (push (patch '(:state :offset-x) cx) own-patches)
+                                   (push (patch '(:state :offset-y) cy) own-patches))
+                                 ;; anchor-pos in manual = top-left
+                                 (push (patch '(:state :anchor-pos) (cons cx cy)) own-patches)
+                                 ;; keep existing :anchor-growth or set default if missing
+                                 (setf (cstate>   :size-known) t)
+                                 (unless (cstate> :anchor-growth)
 
-                ;; --- renderer announced it scrolled (optional integration) ----------
-                (:terminal-scrolled
-                 ;; Expected msg-data: (:direction :up|:down :amount <n>)
-                 (let ((dir (msg-data message :direction))
-                       (n   (or (msg-data message :amount) 0)))
-                   (when (and (member dir '(:up :down)) (> n 0))
-                     (incf issued-scroll-net (if (eql dir :down) n (- n)))
-                     (push (patch '(:state :issued-scroll-net) issued-scroll-net) own-patches))))
+                                   (push (patch '(:state :anchor-growth) :bottom-right) own-patches)))
+                               ;; Non-manual: full recompute + overflow
 
-                ;; --- app shutdown: restore net scroll -------------------------------
-                (:appshutdown
-                 (when (/= issued-scroll-net 0)
-                   (if (> issued-scroll-net 0)
-                       (push `(:render :scroll-up ,issued-scroll-net) commands)
-                       (push `(:render :scroll-down ,(- issued-scroll-net)) commands))
-                   (setf issued-scroll-net 0)
-                   (push (patch '(:state :issued-scroll-net) 0) own-patches)))
+                               (multiple-value-bind (oy ox ap growth eff) (%recompute-anchoring st-path state)
+                                 (declare (ignore eff))
+                                 (push (patch '(:state :offset-x) ox) own-patches)
+                                 (push (patch '(:state :offset-y) oy) own-patches)
+                                 (push (patch '(:state :anchor-pos) ap) own-patches)
+                                 (push (patch '(:state :anchor-growth) growth) own-patches)
+                                 (multiple-value-bind (ov-patches ov-cmds)
+                                     (%apply-overflow-y st-path state overflow-policy oy ox)
+                                   (setf own-patches (nconc own-patches ov-patches))
+                                   (setf commands (nconc commands ov-cmds)))))
+                           (case (normalize-anchor anchor)
+                             (:below-cursor (push '(:render :clear-below-cursor) commands))
+                             (:above-cursor (push '(:render :clear-above-cursor) commands)))
+                           )))
 
-                ;; --- arrow key panning (independent of anchor) ----------------------
-                ((or :key-right :key-left :key-up :key-down)
-                 (let* ((term-size (get-path (append st-path '(:terminal-size)) state '(0 0)))
-                        (width     (get-path (append st-path '(:width)) state 1))
-                        (height    (get-path (append st-path '(:height)) state 1))
-                        (ox        (get-path (append st-path '(:offset-x)) state 0))
-                        (oy        (get-path (append st-path '(:offset-y)) state 0))
-                        (cols (first term-size)) (rows (second term-size)))
-                   (case (msg-type message)
-                     (:key-right (incf oy))
-                     (:key-left  (decf oy))
-                     (:key-up    (decf ox))
-                     (:key-down  (incf ox)))
-                   (setf ox (%clamp ox 0 (max 0 (- rows height)))
-                         oy (%clamp oy 0 (max 0 (- cols width))))
-                   (push (patch '(:state :offset-x) ox) own-patches)
-                   (push (patch '(:state :offset-y) oy) own-patches))))
+                      ;; --- cursor moved ----------------------------------------------------
+                      (:cursorposition
+                       (let ((c (msg-data message :col))
+                             (r (msg-data message :row)))
+                         (when (and c r (> c 0) (> r 0))
+                           (setf (cstate> :cursor-pos) (list c r))
+                           (ensure-initial-cursor! c r)
+                           (if (eq (normalize-anchor anchor) :manual)
+                               ;; manual: ignore cursor for placement
+                               (progn)
+                               (multiple-value-bind (oy ox ap growth eff) (%recompute-anchoring st-path state)
+                                 (declare (ignore eff))
+                                 (push (patch '(:state :offset-x) ox) own-patches)
+                                 (push (patch '(:state :offset-y) oy) own-patches)
+                                 (push (patch '(:state :anchor-pos) ap) own-patches)
+                                 (push (patch '(:state :anchor-growth) growth) own-patches)
+                                 (multiple-value-bind (ov-patches ov-cmds)
+                                     (%apply-overflow-y st-path state overflow-policy oy ox)
+                                   (setf own-patches (nconc own-patches ov-patches))
+                                   (setf commands (nconc commands ov-cmds)))))
+                           ;; (when (and size-known (not (cstate> :first-ready-done)) state)))
+                           ;; (push (patch '(:state :first-ready-done) t) own-patches)
+                           ;; (case (normalize-anchor anchor)
+                           ;;   (:below-cursor (push '(:render :clear-below-cursor) commands))
+                           ;;   (:above-cursor (push '(:render :clear-above-cursor) commands))
+                           ;;   (otherwise nil))
+                           )))
+                      ;; --- manual anchoring controls -------------------------------------
+                      (:anchor-move
+                       ;; Move manual anchor by dx (cols) / dy (rows)
+                       (when (eq (normalize-anchor anchor) :manual)
+                         (let* ((dx (or (msg-data message :dx) 0))
+                                (dy (or (msg-data message :dy) 0))
+                                (cols (first (cstate> :terminal-size '(0 0))))
+                                (rows (second (cstate> :terminal-size '(0 0))))
+                                (w (cstate> :width 1))
+                                (h (cstate> :height 1))
+                                (ox (cstate> :offset-x 0))
+                                (oy (cstate> :offset-y 0))
+                                (new-ox (%clamp (+ ox dx) 0 (max 0 (- cols w))))
+                                (new-oy (%clamp (+ oy dy) 0 (max 0 (- rows h)))))
+                           (push (patch '(:state :offset-x) new-ox) own-patches)
+                           (push (patch '(:state :offset-y) new-oy) own-patches)
+                           ;; anchor-pos (manual) = top-left
+                           (push (patch '(:state :anchor-pos) (cons new-oy new-ox)) own-patches)
+                           ;; keep or seed growth
+                           (unless (cstate> :anchor-growth)
+                             (push (patch '(:state :anchor-growth) :bottom-right) own-patches)))))
+                      (:anchor-set-position
+                       ;; Set manual anchor absolute top-left (row/col)
+                       (when (eq (normalize-anchor anchor) :manual)
+                         (let* ((row (msg-data message :row))
+                                (col (msg-data message :col))
+                                (cols (first (cstate> :terminal-size '(0 0))))
+                                (rows (second (cstate> :terminal-size '(0 0))))
+                                (w (cstate> :width 1))
+                                (h (cstate> :height 1))
+                                (new-oy (%clamp (or row 0) 0 (max 0 (- rows h))))
+                                (new-ox (%clamp (or col 0) 0 (max 0 (- cols w)))))
+                           (push (patch '(:state :offset-x) new-ox) own-patches)
+                           (push (patch '(:state :offset-y) new-oy) own-patches)
+                           (push (patch '(:state :anchor-pos) (cons new-oy new-ox)) own-patches)
+                           (unless (cstate> :anchor-growth)
+                             (push (patch '(:state :anchor-growth) :bottom-right) own-patches)))))
 
-              ;; Unrecognized → stash raw for debugging
-              (push (patch '(:state :unrecognized-message) message) own-patches)))
+                      ;; --- renderer announced it scrolled (optional integration) ----------
+                      (:terminal-scrolled
+                       ;; Expected msg-data: (:direction :up|:down :amount <n>)
+                       (let ((dir (msg-data message :direction))
+                             (n   (or (msg-data message :amount) 0)))
+                         (when (and (member dir '(:up :down)) (> n 0))
+                           (incf issued-scroll-net (if (eql dir :down) n (- n)))
+                           (push (patch '(:state :issued-scroll-net) issued-scroll-net) own-patches))))
 
-        ;; propagate downstream
-        (multiple-value-bind (child-patches child-cmds)
-            (let ((child (child-instance state id-path)))
-              (when child
-                (elmtui.ui.api:update child message state
-                                      :id-path (append id-path (list (slot-value child 'id))))))
-          (values (nconc own-patches child-patches)
-                  (nconc commands child-cmds)))))))
+                      ;; --- app shutdown: restore net scroll -------------------------------
+                      (:appshutdown
+                       (when (/= issued-scroll-net 0)
+                         (if (> issued-scroll-net 0)
+                             (push `(:render :scroll-up ,issued-scroll-net) commands)
+                             (push `(:render :scroll-down ,(- issued-scroll-net)) commands))
+                         (setf issued-scroll-net 0)
+                         (push (patch '(:state :issued-scroll-net) 0) own-patches))))
+
+                    ;; --- arrow key panning (independent of anchor) ----------------------
+
+                    ;; ((or :key-right :key-left :key-up :key-down)
+                    ;;  (let* ((term-size (cstate> :terminal-size '(0 0)))
+                    ;;         (width     (cstate> :width 1))
+                    ;;         (height    (cstate> :height 1))
+                    ;;         (ox        (cstate> :offset-x 0))
+                    ;;         (oy        (cstate> :offset-y 0))
+                    ;;         (cols (first term-size)) (rows (second term-size)))
+                    ;;    (case (msg-type message)
+                    ;;      (:key-right (incf oy))
+                    ;;      (:key-left  (decf oy))
+                    ;;      (:key-up    (decf ox))
+                    ;;      (:key-down  (incf ox)))
+                    ;;    (setf ox (%clamp ox 0 (max 0 (- rows height)))
+                    ;;          oy (%clamp oy 0 (max 0 (- cols width))))
+                    ;;    (push (patch '(:state :offset-x) ox) own-patches)
+                    ;;    (push (patch '(:state :offset-y) oy) own-patches)))                     )
+
+                    ;; Unrecognized → stash raw for debugging
+                    (push (patch '(:state :unrecognized-message) message) own-patches))
+
+                ;; propagate downstream
+                (multiple-value-bind (child-patches child-cmds)
+                    (let ((child (child-instance state id-path)))
+                      (when child
+                        (elmtui.ui.api:update child message state
+                                              :id-path
+                                              (append id-path (list (slot-value child 'id))))))
+                  (log-info "root-viewport ~A child ~A produced ~A patches and ~A commands."
+                            id-path (child-instance state id-path) child-patches (length child-cmds))
+                  (let ((cp (and (listp child-patches) child-patches))
+                        (cc (and (listp child-cmds) child-cmds)))
+                    (values (nconc own-patches cp)
+                            (nconc commands cc)))))))))
+    (declare (ignore _new-state))
+    (log-info "root-viewport ~A produced ~A patches and ~A commands."
+              ;; (state-ref (get-path (append id-path '(:state)) state) :id (first (last id-path)))
+              id-path
+              patches (length commands))
+    (values patches commands)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; VIEW
 ;;; ---------------------------------------------------------------------------
-
 (defmethod elmtui.ui.api:view ((component root-viewport) state
                                &key id-path children &allow-other-keys)
   (declare (type list id-path) (type t state))
-  (let* ((vp-state (get-path (append id-path '(:state)) state))
-         (effective-id (state-ref vp-state :id (first (last id-path))))
-         (size-known (state-ref vp-state :size-known))
-         (pos-known  (state-ref vp-state :pos-known)))
-    ;; 1) Defer view until both are known
-    (unless (and size-known pos-known)
-      (log-debug "Root-viewport ~A waiting for size/cursor; returning NIL view." effective-id)
-      (return-from elmtui.ui.api:view nil))
+  (log-info "ROOT-VIEWPORT VIEW> id path ~A state ~A" id-path (elmtui.tea-state.api::pprinc-application-state state))
+  (let ((asdf nil))
+    (elmtui.update-dsl:with-cycle (ctx state :component-path id-path)
+      (log-info "id path ~A state ~A" id-path (elmtui.tea-state.api::pprinc-application-state state))
+      (let* ((vp-state (get-path (append id-path '(:state)) state))
+             (effective-id (state-ref vp-state :id (first (last id-path))))
+             (term-size (cstate> :terminal-size))
+             (cursor-pos  (cstate> :cursor-pos)))
+        ;; 1) Defer view until both are known
+        ;; (setf (cstate> :halulu) :abc)
+        (unless (and term-size cursor-pos)
+          (log-debug "Root-viewport ~A waiting for size/cursor; returning NIL view." effective-id)
+          (return-from elmtui.ui.api:view nil))
 
-    ;; 2) Build viewport DSL with computed offsets & size (available space)
-    (let* ((children-from-args children)
-           (child-from-state (state-ref vp-state :child-dsl-spec))
-           (final-children (or children-from-args
-                               (when child-from-state (list child-from-state))))
-           (width (state-ref vp-state :width))
-           (height (state-ref vp-state :height))
-           (offset-x (state-ref vp-state :offset-x 0))
-           (offset-y (state-ref vp-state :offset-y 0))
-           (scroll-x (state-ref vp-state :scroll-x 0))
-           (scroll-y (state-ref vp-state :scroll-y 0))
-           (effective-id-viewport (intern (format nil "ROOT-VIEWPORT-~A" effective-id) :keyword)))
+        ;; 2) Build viewport DSL with computed offsets & size (available space)
+        (let* ((children-from-args children)
+               (child-from-state (state-ref vp-state :child-dsl-spec))
+               (final-children (or children-from-args
+                                   (when child-from-state (list child-from-state))))
+               (_ (log-info "Children ~A" final-children))
+               (width (state-ref vp-state :width))
+               (height (state-ref vp-state :height))
+               (offset-x (state-ref vp-state :offset-x 0))
+               (offset-y (state-ref vp-state :offset-y 0))
+               (scroll-x (state-ref vp-state :scroll-x 0))
+               (scroll-y (state-ref vp-state :scroll-y 0))
+               (effective-id-viewport (intern (format nil "ROOT-VIEWPORT-~A" effective-id) :keyword)))
 
-      (unless final-children
-        (log-warn "Root-viewport ~A has no children." effective-id))
+          (unless final-children
+            (log-warn "Root-viewport ~A has no children." effective-id))
 
-      `(:viewport :id ,effective-id-viewport
-                  :style (:width ,width :height ,height
-                          :offset-x ,offset-x :offset-y ,offset-y
-                          :scroll-x ,scroll-x :scroll-y ,scroll-y)
-                  :children ,final-children))))
+          (setf asdf `(:viewport :id ,effective-id-viewport
+                                 :style (:width ,width :height ,height
+                                         :offset-x ,offset-x :offset-y ,offset-y
+                                         :scroll-x ,scroll-x :scroll-y ,scroll-y)
+                                 :children ,final-children)))))
+    asdf))

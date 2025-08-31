@@ -166,7 +166,7 @@
   display-buffer)
 
 (define-stage process-tree-stage
-    (app-context app-context)
+    (t app-context)
     (app-ctx )
   ;; NOTE: this stage *replaces* the following former steps in your common pipeline:
   ;;   - in-tree DSL resolution (plist -> objects) if it ran there
@@ -176,6 +176,9 @@
   ;;   - bottom-up layout
   ;;   - dirty flag marking
 
+  ;; Be defensive: only operate on a valid app-context; otherwise propagate unchanged
+  (unless (typep app-ctx 'elmtui.contracts:app-context)
+    (return-from process-tree-stage app-ctx))
   (let* ((view-fn (ctx-view-fn app-ctx)) ; assuming :state holds the model and view-fn
          (model (ctx-state app-ctx))
          (dsl (funcall view-fn model)))

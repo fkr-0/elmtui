@@ -11,15 +11,17 @@
 :sources
 (:implicit-file :type :file-system :system-files ("elmtui-tests.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui.asd"))
+(:implicit-file :type :file-system :system-files ("cl-state/cl-state.asd"))
+(:implicit-file :type :file-system :system-files ("cl-events/cl-events.asd"))
 (:implicit-file :type :file-system :system-files ("cl-inputs/cl-inputs.asd"))
 (:implicit-file :type :file-system :system-files ("cl-styles/cl-styles.asd"))
+(:implicit-file :type :file-system :system-files ("../cl-fzy/cl-fzy.asd"))
 (:implicit-file :type :file-system :system-files
  ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"))
 (:implicit-vcs :type :vcs :projects
  (("sly-quicklisp" :github :path "joaotavora/sly-quicklisp")))
 (:implicit-vcs :type :vcs :projects
  (("sly-asdf" :github :path "mmgeorge/sly-asdf")))
-(:implicit-vcs :type :vcs :projects (("cl-fzy" :github :path "fkr-0/cl-fzy")))
 (:implicit-vcs :type :vcs :projects
  (("asdf-viz" :github :path "guicho271828/asdf-viz")))
 (:implicit-vcs :type :vcs :projects (("fiveam" :github :path "lispci/fiveam")))
@@ -43,16 +45,17 @@
 (:system :name "log4cl" :source "quicklisp")
 (:project :name "sly-quicklisp" :branch "master" :source :implicit-vcs)
 (:project :name "sly-asdf" :branch "master" :source :implicit-vcs)
-(:project :name "cl-fzy" :commit "fbb8c8a0c3c5c2f62a21895592f6ac6032d1135c"
- :source :implicit-vcs)
 (:project :name "asdf-viz" :branch "master" :source :implicit-vcs)
 (:project :name "fiveam" :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379"
  :source :implicit-vcs)
 (:project :name "sly" :branch "master" :source :implicit-vcs)
 (:asd-file :name "elmtui-tests.asd")
 (:asd-file :name "elmtui.asd")
+(:asd-file :name "cl-state/cl-state.asd")
+(:asd-file :name "cl-events/cl-events.asd")
 (:asd-file :name "cl-inputs/cl-inputs.asd")
 (:asd-file :name "cl-styles/cl-styles.asd")
+(:asd-file :name "../cl-fzy/cl-fzy.asd")
 (:asd-file :name "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 
 
@@ -61,6 +64,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :releases
+("../cl-fzy/cl-fzy.asd" :version :newest :source :implicit-file :systems nil)
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd" :version :newest
  :source :implicit-file :systems ("quicklisp"))
 ("alexandria" :version "2024-10-12" :source "quicklisp" :systems ("alexandria"))
@@ -75,14 +79,16 @@
 ("cl-change-case" :version "2025-06-22" :source "quicklisp" :systems
  ("cl-change-case"))
 ("cl-dot" :version "2024-10-12" :source "quicklisp" :systems ("cl-dot"))
-("cl-fzy" :version (:commit "fbb8c8a0c3c5c2f62a21895592f6ac6032d1135c") :source
- :implicit-vcs :systems ("cl-fzy" "cl-fzy-tests"))
+("cl-events/cl-events.asd" :version :newest :source :implicit-file :systems
+ ("cl-events"))
 ("cl-inputs/cl-inputs.asd" :version :newest :source :implicit-file :systems
  ("cl-inputs" "cl-inputs/tests"))
 ("cl-ppcre" :version "2025-06-22" :source "quicklisp" :systems
  ("cl-ppcre" "cl-ppcre-unicode"))
 ("cl-reexport" :version "2021-02-28" :source "quicklisp" :systems
  ("cl-reexport"))
+("cl-state/cl-state.asd" :version :newest :source :implicit-file :systems
+ ("cl-state"))
 ("cl-str" :version "2025-06-22" :source "quicklisp" :systems ("str"))
 ("cl-styles/cl-styles.asd" :version :newest :source :implicit-file :systems
  ("cl-styles" "cl-styles/tests"))
@@ -139,6 +145,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :reverse-dependencies
+("../cl-fzy/cl-fzy.asd" (t (:asd-file :name "../cl-fzy/cl-fzy.asd")))
+
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"
  ((:system :name "slynk-quicklisp") (:system :name "quicklisp"))
  (t
@@ -152,8 +160,10 @@
  ((:system :name "fiveam") (:system :name "alexandria"))
  ((:system :name "elmtui") (:system :name "alexandria"))
  ((:system :name "cl-styles") (:system :name "alexandria"))
+ ((:system :name "cl-state") (:system :name "alexandria"))
  ((:system :name "cl-reexport") (:system :name "alexandria"))
  ((:system :name "cl-inputs") (:system :name "alexandria"))
+ ((:system :name "cl-events") (:system :name "alexandria"))
  ((:system :name "bordeaux-threads") (:system :name "alexandria"))
  (t (:system :name "alexandria" :source "quicklisp")))
 
@@ -170,16 +180,16 @@
  ((:system :name "log4cl") (:system :name "bordeaux-threads"))
  ((:system :name "elmtui") (:system :name "bordeaux-threads"))
  ((:system :name "cl-inputs") (:system :name "bordeaux-threads"))
+ ((:system :name "cl-events") (:system :name "bordeaux-threads"))
  (t (:system :name "bordeaux-threads")))
 
 ("cl-change-case" ((:system :name "str") (:system :name "cl-change-case")))
 
 ("cl-dot" ((:system :name "asdf-viz") (:system :name "cl-dot")))
 
-("cl-fzy" ((:system :name "cl-fzy-tests") (:system :name "cl-fzy"))
- (t
-  (:project :name "cl-fzy" :commit "fbb8c8a0c3c5c2f62a21895592f6ac6032d1135c"
-   :source :implicit-vcs)))
+("cl-events/cl-events.asd"
+ ((:system :name "elmtui") (:system :name "cl-events"))
+ (t (:asd-file :name "cl-events/cl-events.asd")))
 
 ("cl-inputs/cl-inputs.asd"
  ((:system :name "elmtui") (:system :name "cl-inputs"))
@@ -196,6 +206,9 @@
 
 ("cl-reexport" ((:system :name "elmtui") (:system :name "cl-reexport"))
  (t (:system :name "cl-reexport" :source "quicklisp")))
+
+("cl-state/cl-state.asd" ((:system :name "elmtui") (:system :name "cl-state"))
+ (t (:asd-file :name "cl-state/cl-state.asd")))
 
 ("cl-str" ((:system :name "elmtui") (:system :name "str"))
  (t (:system :name "str" :source "quicklisp")))
@@ -221,7 +234,6 @@
  ((:system :name "elmtui-tests") (:system :name "fiveam"))
  ((:system :name "cl-styles/tests") (:system :name "fiveam"))
  ((:system :name "cl-inputs/tests") (:system :name "fiveam"))
- ((:system :name "cl-fzy-tests") (:system :name "fiveam"))
  (t
   (:project :name "fiveam" :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379"
    :source :implicit-vcs)))

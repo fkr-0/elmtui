@@ -97,9 +97,11 @@
 (defun render-dsl-to-resolved-tree (dsl-spec app-state)
   "Resolve DSL to a tree. Only recurse into *children*. Prop values are opaque data.
    Treat a list as a DSL node only if its head keyword is a *known* DSL tag."
+  (log-info "Resolving DSL: ~S" dsl-spec)
   (let ((resolved-something nil))
     (labels
         ((process-node (spec path &key (in-children-p nil))
+           (log-info "Processing node: ~S (path ~S, in-children-p ~A)" spec path in-children-p)
            (cond
              ;; atoms pass through
              ((atom spec) spec)
@@ -113,7 +115,7 @@
                    (keywordp (first spec))
                    (or (and (fboundp 'registered-dsl-component-p)
                             (ignore-errors (registered-dsl-component-p (first spec))))
-                       (element-class (first spec))))
+                       (element-class (first spec)))) ;; (element-class :root-viewport)
               (destructuring-bind (type &rest tail) spec
                 ;; shorthand (:TEXT "hello")
                 (when (and (= (length tail) 1) (stringp (first tail)))
@@ -135,6 +137,7 @@
                                                                :id-path new-path
                                                                :children children))
                                  (rv       (process-node view new-path :in-children-p nil)))
+                            (log-info "Resolved component ~S at path ~S to ~S" type new-path rv)
                             (%emit-node type (append props (list :resolved-view rv)) nil)))
                         ;; normal element → recurse only into CHILDREN
                         (%emit-node type props
@@ -157,9 +160,11 @@
     (loop for i from 1 to 10
           do (multiple-value-bind (next-dsl resolved-p)
                  (render-dsl-to-resolved-tree spec app-state)
+               (log-info "DSL resolution iteration ~A: ~A resolved-p ~A next-dsl ~a" i spec resolved-p next-dsl)
                (setf spec (if (listp next-dsl)
                               (getf (cdr next-dsl) :resolved-view next-dsl)
                               next-dsl))
+               (log-info "DSL resolution iteration ~A: ~A resolved-p ~A" i spec resolved-p)
                (unless resolved-p (return)))
           finally (when (> i 9) (warn "DSL resolution took more than 10 iterations.")))
     (elmtui.view.base-elements:dsl->objects spec)))

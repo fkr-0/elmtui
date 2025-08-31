@@ -32,7 +32,6 @@
                 #:make-key-event)
   (:import-from #:elmtui.platform.api #:term-w #:term-h #:term-style #:term-stream)
   (:import-from :elmtui.view.styled #:styled-ui-node #:styles)
-  (:import-from :elmtui.view.core #:ui-node-props #:ui-node-type #:ui-node-children)
   (:import-from :elmtui.view.geo #:x #:y #:w #:h #:rectangle-pos)
   (:import-from #:elmtui.platform.backend.common.ansi-styling
                 #:make-terminal-style #:make-termcolor #:exec-sequence
@@ -52,7 +51,7 @@
                 #:ansi-fg-color-seq #:ansi-bg-color-seq
                 #:ansi-attr-seq)
   (:import-from :elmtui.app.system-events #:make-terminalresized-systemevent
-                #:make-cursorpositionchanged-systemevent)
+                #:make-cursorposition-systemevent)
 
   ;; (:import-from #:elmtui.platform.canvas
   ;;               #:canvas
@@ -242,6 +241,9 @@
               (terminal-instance-cursor-start-col instance) (or w 0)
               (terminal-instance-cursor-col instance) (or w 0))
 
+        (log:info "TERMINAL: Publishing initial dimensions W:~A H:~A" w h)
+        (funcall publish-fn (make-cursorposition-systemevent
+                             :col w :row h))
         (log:info "TERMINAL: Initial cursor position set to row ~A, col ~A" h w))
       (multiple-value-bind (w h) (get-screen-dimensions instance)
         (setf (terminal-instance-width instance) w
@@ -249,8 +251,8 @@
         ;; The initial resize event is now sent by the driver after the app
         ;; model and message processor are fully initialized.
         ;; (when publish-fn
-        ;;   (log:info "TERMINAL: Publishing initial dimensions W:~A H:~A" w h)
-        ;;   (funcall publish-fn `(:terminal-resized :new-dimensions (,w . ,h))))
+        (log:info "TERMINAL: Publishing initial dimensions W:~A H:~A" w h)
+        (funcall publish-fn (make-terminalresized-systemevent :width w :height h))
         (let ((front (make-virtual-buffer w h))
               (back (make-virtual-buffer w h)))
           (setf (terminal-instance-front-buffer instance) front
@@ -392,10 +394,7 @@
                       (let ((parsed-h (parse-integer (first parts)))
                             (parsed-w (parse-integer (second parts))))
                         (log:info "Parsed dimensions: W=~A, H=~A from ~S" parsed-w parsed-h response-str)
-                        (let ((publish-fn (terminal-instance-publish-fn instance)))
-                          (when publish-fn
-                            (funcall publish-fn (elmtui.app.system-events:make-cursorpositionchanged-systemevent
-                                                 :col parsed-w :row parsed-h))))
+
                         (return-from get-cursor-position (values parsed-w parsed-h)))
                       (log:warn "Could not parse dimensions from report parts: ~S (original: ~S)" parts response-str)))
                 (log:warn "Malformed cursor report: ~S. ESC:~S, [:~S, R:~S" response-str esc-pos bracket-pos r-pos)))
@@ -895,25 +894,6 @@ This method should be implemented by subclasses of low-level-terminal."
         (parse-input-bytes-to-message buffer)
         nil))) ; Should not happen if first-char was read
 
-;; (defmethod poll-input-event ((instance terminal-instance) &key timeout)
-;;   (let ((stream (terminal-instance-stream instance)) (buffer (terminal-instance-input-buffer instance)) (start-time (get-internal-real-time)))
-;;     (with-terminal-lock (instance) (setf (fill-pointer buffer) 0))
-;;     (loop
-;;       (let ((char (if (zerop (fill-pointer buffer))
-;;                       (if timeout (read-char stream nil :eof (if (= timeout 0) :nonblock-peek)) (read-char stream nil :eof))
-;;                       (read-char-nonblock stream))))
-;;         (cond
-;;           ((eq char :eof) (return nil))
-;;           ((eq char :nonblock-peek) (return nil))
-;;           ((null char) (if (plusp (fill-pointer buffer)) (return (parse-input-bytes-to-message buffer))
-;;                            (if (and timeout (> timeout 0) (> (/ (- (get-internal-real-time) start-time) internal-time-units-per-second) timeout))
-;;                                (return nil))))
-;;           (t (with-terminal-lock (instance) (vector-push-extend (char-code char) buffer))))
-;;         (when (plusp (fill-pointer buffer))
-;;           (when (= (aref buffer 0) #o33)
-;;             (loop for i from 1 to 7 for next-char = (read-char-nonblock stream) while next-char
-;;                   do (with-terminal-lock (instance) (vector-push-extend (char-code next-char) buffer))))
-;;           (return (parse-input-bytes-to-message buffer)))))))
 
 (defmethod peek-input-event ((instance terminal-instance))
   (warn "peek-input-event not reliably implemented for terminal backend.") nil)
@@ -933,63 +913,3 @@ This method should be implemented by subclasses of low-level-terminal."
 (defmethod set-input-mode ((instance terminal-instance) mode)
   (declare (ignore mode)) ; Raw mode is handled by initialize/shutdown.
   t)
-
-;; Forward declaration
-;; (declaim (ftype (function (terminal-instance virtual-terminal-buffer t) t) render-ui-tree-to-buffer))
-
-;; Helper function to render the UI tree to the target-buffer
-;; This function will recursively traverse the tree and draw nodes.
-;; (defun render-ui-tree-to-buffer (backend target-buffer ui-node)
-;;   (when ui-node
-;;     (let* ((props (elmtui.view.api:ui-node-props ui-node))
-;;            (node-type (elmtui.view.api:ui-node-type ui-node))
-;;            (node-id (getf props :id))
-;;            (layout-rect (getf props :layout-rect))
-;;            (style-object (if (typep ui-node 'elmtui.view.styled:styled-ui-node)
-;;                              (elmtui.view.styled:styles ui-node)
-;;                              nil))
-;;            (node-computed-styles (cond
-;;                                    ((null style-object) nil)
-;;                                    ((typep style-object 'style-set)
-;;                                     (styles-list style-object))
-;;                                    ((listp style-object) style-object)
-;;                                    (t
-;;                                     (log:warn "render-ui-tree-to-buffer: Unexpected style object type ~A for node type ~A, ID: ~A"
-;;                                               (type-of style-object) node-type node-id)
-;;                                     nil))))
-
-;;       (log:debug "OUTPUT: render-node to target-buffer - Type: ~S, ID: ~S, LayoutRect: ~S, StyleObject: ~S, ComputedStylesPlist: ~S"
-;;                  node-type node-id layout-rect style-object node-computed-styles)
-
-;;       (when layout-rect
-;;         (let ((rect-x (elmtui.view.geo:x layout-rect))
-;;               (rect-y (elmtui.view.geo:y layout-rect))
-;;               (rect-w (elmtui.view.geo:w layout-rect))
-;;               (rect-h (elmtui.view.geo:h layout-rect)))
-
-;;           (when (and rect-w rect-h (> rect-w 0) (> rect-h 0))
-;;             (let* ((bg-color (getf node-computed-styles :background-color))
-;;                    (fg-color (getf node-computed-styles :color))
-;;                    (cell-style-plist ()))
-;;               (when bg-color (setf cell-style-plist (list* :bg bg-color cell-style-plist)))
-;;               (when fg-color (setf cell-style-plist (list* :fg fg-color cell-style-plist)))
-
-;;               (log:debug "RENDER-UI-TREE to target-buffer: Node ~S (~S), Rect (~A,~A ~Ax~A), using cell-style ~S"
-;;                          node-id node-type rect-x rect-y rect-w rect-h cell-style-plist)
-
-;;               (cond
-;;                 ((or (eq node-type :container) (eq node-type :div))
-;;                  (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
-;;                                  :char #\Space
-;;                                  :style cell-style-plist))
-;;                 ;; ((eq node-type :text-node) ; Example for text
-;;                 ;;  (let ((text-content (getf props :text "")))
-;;                 ;;    (draw-text-at backend target-buffer rect-y rect-x text-content :style cell-style-plist)))
-;;                 (t
-;;                  (when bg-color
-;;                    (fill-rectangle backend target-buffer rect-y rect-x rect-h rect-w
-;;                                    :char #\Space
-;;                                    :style cell-style-plist))))))))
-
-;;       (dolist (child (elmtui.view.api:ui-node-children ui-node))
-;;         (render-ui-tree-to-buffer backend target-buffer child)))))

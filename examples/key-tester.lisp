@@ -138,7 +138,7 @@
               :border-style :solid :border-width 1
               :fg-color (128 128 128))
       :children ((:text :style (:width :fill)
-                  :content "Elm TUI Key Tester")
+                        :content "Elm TUI Key Tester")
                  (:text :style (:width :fill) :content
                         ,(format nil "Input: ~A" (key-tester-input component)))
                  (:text :style (:width :fill) :content
