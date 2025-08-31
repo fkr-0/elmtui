@@ -3,10 +3,10 @@
   (:export #:SystemEvent
            #:make-appshutdown-systemevent
            #:make-terminalresized-systemevent
-           #:make-cursorpositionchanged-systemevent))
+           #:make-cursorposition-systemevent))
 
 (in-package :elmtui.app.system-events)
 (defmsg SystemEvent (:docstring "Core system-level events.")
         AppShutdown
         (TerminalResized :width integer :height integer)
-        (CursorPositionChanged :col integer :row integer))
+        (CursorPosition :col integer :row integer))

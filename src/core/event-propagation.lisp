@@ -5,7 +5,7 @@
 (uiop:define-package :elmtui.core.event-propagation
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn)
-  (:import-from :elmtui.view.api #:stylable-id #:styled-ui-node)
+  (:import-from :cl-styles.api  #:stylable-id)
   (:import-from :elmtui.core.event-types
                 #:mouse-event
                 #:ui-event
@@ -99,65 +99,66 @@
   (log-debug "Event ~A in phase ~A ignored by nil node" event phase)
   nil)
 
-(defmethod handle-event ((node styled-ui-node) event phase)
-  "Default event handler implementation for UI nodes."
-  ;; By default, delegate to more specific handlers based on phase
-  (case phase
-    (:capture (handle-capture-event node event))
-    (:target 
-     ;; For target phase, try to find a specific handler based on event type
-     (let ((handler (get-event-handler node event)))
-       (if handler
-           (funcall handler node event)
-           (log-debug "No specific handler for event ~A on target ~A" 
-                      (ui-event-type event) (stylable-id node)))))
-    (:bubble (handle-bubble-event node event))
-    (otherwise 
-     (log-warn "Unknown event phase: ~A" phase)
-     nil)))
+;; (defmethod handle-event ((node styled-ui-node) event phase)
+;;   "Default event handler implementation for UI nodes."
+;;   ;; By default, delegate to more specific handlers based on phase
+;;   (case phase
+;;     (:capture (handle-capture-event node event))
+;;     (:target
+;;      ;; For target phase, try to find a specific handler based on event type
+;;      (let ((handler (get-event-handler node event)))
+;;        (if handler
+;;            (funcall handler node event)
+;;            (log-debug "No specific handler for event ~A on target ~A"
+;;                       (ui-event-type event) (stylable-id node)))))
+;;     (:bubble (handle-bubble-event node event))
+;;     (otherwise
+;;      (log-warn "Unknown event phase: ~A" phase)
+;;      nil)))
 
 (defgeneric handle-capture-event (node event)
   (:documentation "Handles an event in the capturing phase."))
 
-(defmethod handle-capture-event ((node styled-ui-node) event)
-  "Default implementation for capture phase."
-  ;; Default implementation does nothing during capture
-  (log-debug "Capture phase for event ~A on node ~A" 
-             (ui-event-type event) (stylable-id node))
-  nil)
+;; (defmethod handle-capture-event ((node styled-ui-node) event)
+;;   "Default implementation for capture phase."
+;;   ;; Default implementation does nothing during capture
+;;   (log-debug "Capture phase for event ~A on node ~A"
+;;              (ui-event-type event) (stylable-id node))
+;;   nil)
 
 (defgeneric handle-bubble-event (node event)
   (:documentation "Handles an event in the bubbling phase."))
 
-(defmethod handle-bubble-event ((node styled-ui-node) event)
-  "Default implementation for bubble phase."
-  ;; Default implementation does nothing during bubble
-  (log-debug "Bubble phase for event ~A on node ~A" 
-             (ui-event-type event) (stylable-id node))
-  nil)
+;; (defmethod handle-bubble-event ((node styled-ui-node) event)
+;;   "Default implementation for bubble phase."
+;;   ;; Default implementation does nothing during bubble
+;;   (log-debug "Bubble phase for event ~A on node ~A"
+;;              (ui-event-type event) (stylable-id node))
+;;   nil)
 
-(defun get-event-handler (node event)
-  "Returns a function that can handle the specific event type for this node.
-   Looks for an :ON-<EVENT-TYPE> property in the node's 'properties' slot
-   (assumed to be a plist) that holds a function."
-  (when (and node event (typep node 'styled-ui-node))
-    (let* ((event-type (ui-event-type event)) ; e.g., :CLICK
-           (handler-key (when event-type
-                          (intern (concatenate 'string "ON-" (symbol-name event-type)) :keyword)))) ; e.g., :ON-CLICK
-      (when handler-key
-        ;; Assuming 'properties' is a slot in styled-ui-node that holds a plist of event handlers and other props.
-        (if (slot-exists-p node 'properties)
-            (let ((handler-fn (getf (slot-value node 'properties) handler-key)))
-              (when (functionp handler-fn)
-                handler-fn))
-            (progn
-              (log-warn "Node ~A of type ~A does not have a 'properties' slot. Cannot find handler for ~A."
-                        (if (ignore-errors (stylable-id node)) ; Check if stylable-id is safe to call
-                            (stylable-id node)
-                            "UNKNOWN-ID")
-                        (type-of node)
-                        handler-key)
-              nil))))))
+;; (defun get-event-handler (node event)
+;;   "Returns a function that can handle the specific event type for this node.
+;;    Looks for an :ON-<EVENT-TYPE> property in the node's 'properties' slot
+;;    (assumed to be a plist) that holds a function."
+;;   ;; (when (and node event (typep node 'styled-ui-node))
+;;   ;;   (let* ((event-type (ui-event-type event)) ; e.g., :CLICK
+;;   ;;          (handler-key (when event-type
+;;   ;;                         (intern (concatenate 'string "ON-" (symbol-name event-type)) :keyword)))) ; e.g., :ON-CLICK
+;;   ;;     (when handler-key
+;;   ;;       ;; Assuming 'properties' is a slot in styled-ui-node that holds a plist of event handlers and other props.
+;;   ;;       (if (slot-exists-p node 'properties)
+;;   ;;           (let ((handler-fn (getf (slot-value node 'properties) handler-key)))
+;;   ;;             (when (functionp handler-fn)
+;;   ;;               handler-fn))
+;;   ;;           (progn
+;;   ;;             (log-warn "Node ~A of type ~A does not have a 'properties' slot. Cannot find handler for ~A."
+;;   ;;                       (if (ignore-errors (stylable-id node)) ; Check if stylable-id is safe to call
+;;   ;;                           (stylable-id node)
+;;   ;;                           "UNKNOWN-ID")
+;;   ;;                       (type-of node)
+;;   ;;                       handler-key)
+;;   ;;             nil)))))
+;;   )
 
 ;;;-----------------------------------------------------------------------------
 ;;; Event Dispatch

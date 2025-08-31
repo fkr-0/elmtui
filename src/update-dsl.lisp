@@ -99,7 +99,9 @@
                                         ;               #:when-let)
   (:use #:cl)
   (:import-from :elmtui.utils #:as)
+  (:import-from :log4cl #:log-info)
   (:export
+   #:to-list
    #:state-get
    #:state-set
    #:state-observe
@@ -136,11 +138,42 @@ Side-effects: None (pure data struct).
   (path nil :type list)
   (value nil :type t))
 
+(defmethod to-list ((p patch))
+  "Convert PATCH struct to a list of (path value)."
+  (list (patch-path p) (patch-value p)))
+
 (defgeneric state-observe (state key fn)
   (:documentation
    "Generic function to observe changes in STATE at KEY.
    Calls FN with old and new values when KEY changes.
-   STATE can be an application-state or a plist.")
+   STATE can be an application-state or a plist.
+
+  ARGS:
+    STATE - The application state or plist to observe.
+    KEY   - The key to observe for changes.
+    FN    - A function of two arguments (old-value new-value) called on changes.
+  RETURNS:
+    Updated STATE with the observer registered (if supported).
+  SIDE-EFFECTS:
+    Registers FN to be called on changes to KEY in STATE.
+  NOTE:
+    This is a no-op for plist states, as they do not support observers.
+    Application-state support must be implemented separately.
+    FN should handle its own errors to avoid disrupting state changes.
+
+    EXAMPLE:
+        (state-observe app-state :counter
+(lambda (old new)
+                         (format t \"Counter changed from ~A to ~A~%\" old new)))
+    => Registers an observer on :counter in app-state. When :counter changes,
+       the lambda is called with the old and new values, this happens by nature
+       asynchronously, as soon as the patch is applied and the state updated.
+       The handler FN is executed asynchronously and may enqueue further messages
+       into the event loop.")
+  (:method ((state list) key fn)
+    "No-op for plist STATE, as plists do not support observers."
+    (declare (ignore key fn))
+    state)
 
   (:method ((state t) key fn)
     (declare (ignore key fn))
@@ -160,6 +193,16 @@ Side-effects: None (pure data struct).
               (state-get value (cdr path) default))))
     )
   (:method ((state list) path &optional default)
+    (state-get state (list path) default))
+  (:method ((state hash-table) (path list) &optional default)
+    "Get value from a hash-table STATE at PATH, returning DEFAULT if not found."
+    (if (null path)
+        state
+        (let ((value (gethash (car path) state default)))
+          (if (= 1 (length path))
+              (or value default)
+              (state-get value (cdr path) default)))))
+  (:method ((state hash-table) path &optional default)
     (state-get state (list path) default))
   (:method ((state t) path &optional default)
     (declare (ignore default))
@@ -310,21 +353,32 @@ Side-effects: None (pure data struct).
      2. A list of patches recorded during the update.
      3. A list of commands registered during the update.
    The application state is the final state after all mutations, and is exactly the
-   same by reference as the one passed in INITIAL-APP-STATE."
+   same by reference as the one passed in INITIAL-APP-STATE.
+
+   EXAMPLE USAGE:
+     (with-cycle (ctx initial-state :component-path '(:my-component))
+       (setf (state> :counter) (+ (state> :counter 0) 1))
+       (cmd> (lambda () (format t \"Counter incremented~%\"))))
+     => Returns three values: new-state, patches, commands."
   (let ((ctx-var (gensym "CTX")))              ; one real lexical var
     `(let ((,ctx-var (make-cycle-context
                       :app-state      ,initial-app-state
                       :component-path (if (listp ,component-path)
-                                          ,component-path
-                                          (list ,component-path)))))
-       (format t "Cycle context: ~A" ,ctx-var)
+                                          (if (eq :components (car ,component-path))
+                                              ,component-path
+                                              (progn
+                                                (push :components ,component-path)
+                                                ,component-path))
+                                          (list :components ,component-path)))))
+       (log-info "Cycle context: ~A Component-Path" ,ctx-var)
        ;; Alias BOTH symbols to that one var
        (symbol-macrolet ((,ctx-sym ,ctx-var)   ; pleasant short name for caller
                          (elmtui.update-dsl.api::ctx ,ctx-var))
          (values
           (progn ,@body
                  (cycle-context-app-state ,ctx-var))
-          (nreverse (cycle-context-patches  ,ctx-var))
+          (mapcar #'to-list
+                  (nreverse (cycle-context-patches  ,ctx-var)))
           (nreverse (cycle-context-commands ,ctx-var)))))))
 
 (defmacro with-read-only-cycle ((ctx-sym initial-app-state &key component-path)

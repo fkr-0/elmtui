@@ -101,7 +101,7 @@
 
 (defun transform-top-down (fn el &key ctx)
   (let* ((new-el (funcall fn el :ctx ctx))
-         ;; (_ (log-info "TD with ~A el to new el: ~A -> ~A" fn el new-el))
+         (_ (log-info "TD with ~A el to new el: ~A -> ~A" fn el new-el))
          (kids (and new-el (elmtui.view.element:el/children new-el))))
     (when kids
       (setf (elmtui.view.element:el/children new-el)
@@ -124,6 +124,7 @@
 (defun resolve-components (node &key ctx)
   "Normalize NODE to object tree: if it's already a base-element tree, return it;
    if it's DSL, resolve components and convert to objects."
+  (log-info "Resolving components for ~A" node)
   (cond
     ((elmtui.view.base-elements:base-element-p node) node)
     (t
@@ -234,6 +235,7 @@
                      (every #'elmtui.view.base-elements:base-element-p x))
                 (first x))
                (t x))))
+    (log-info "Processing tree root: ~A with ctx ~A and root-rect ~A" root ctx root-rect)
     (let* ((p1 (transform-top-down #'resolve-components root :ctx ctx))
            ;; (_ (log-info "Resolve components done ~A" p1))
            (p2 (transform-top-down #'expand-element-style p1 :ctx ctx))

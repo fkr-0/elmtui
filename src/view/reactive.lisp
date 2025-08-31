@@ -77,31 +77,53 @@
 
     ;; Return the view
     view))
-
 (defun invalidate-view (view)
   "Marks a reactive view as needing to be re-rendered.
-   Schedules a render with debouncing to avoid thrashing."
+   Returns a command to schedule a render with debouncing."
   (check-type view reactive-view)
 
   ;; Mark as invalidated
   (setf (view-invalidated-p view) t)
 
-  ;; Send invalidation message to the view's channel
-  (let ((channel (view-update-channel view)))
-    ;; Only send if not already debouncing
-    (when (not (view-debounce-timer view))
-      (setf (view-debounce-timer view) t)
-      ;; Schedule actual send with debouncing
-      (let ((view-id (view-id view)))
-        (log:debug "Invalidating reactive view: ~A" view-id)
-        (cmd-async
-         (lambda ()
-           ;; Wait for debounce period
-           (sleep (/ *view-invalidation-debounce* 1000.0))
-           ;; Send update message
-           (channel-put! channel :render)
-           ;; Reset debounce timer
-           (setf (view-debounce-timer view) nil)))))))
+  ;; Only return a command if not already debouncing
+  (unless (view-debounce-timer view)
+    (setf (view-debounce-timer view) t)
+    ;; Return a command to handle the debounce and send the update
+    (let ((view-id (view-id view))
+          (channel (view-update-channel view)))
+      (log:debug "Invalidating reactive view: ~A" view-id)
+      (elmtui.core.async:cmd-async
+       (lambda ()
+         ;; Wait for debounce period
+         (sleep (/ *view-invalidation-debounce* 1000.0))
+         ;; Send update message
+         (channel-put! channel :render)
+         ;; Reset debounce timer
+         (setf (view-debounce-timer view) nil))))))
+;; (defun invalidate-view (view)
+;;   "Marks a reactive view as needing to be re-rendered.
+;;    Schedules a render with debouncing to avoid thrashing."
+;;   (check-type view reactive-view)
+
+;;   ;; Mark as invalidated
+;;   (setf (view-invalidated-p view) t)
+
+;;   ;; Send invalidation message to the view's channel
+;;   (let ((channel (view-update-channel view)))
+;;     ;; Only send if not already debouncing
+;;     (when (not (view-debounce-timer view))
+;;       (setf (view-debounce-timer view) t)
+;;       ;; Schedule actual send with debouncing
+;;       (let ((view-id (view-id view)))
+;;         (log:debug "Invalidating reactive view: ~A" view-id)
+;;         (cmd-async
+;;          (lambda ()
+;;            ;; Wait for debounce period
+;;            (sleep (/ *view-invalidation-debounce* 1000.0))
+;;            ;; Send update message
+;;            (channel-put! channel :render)
+;;            ;; Reset debounce timer
+;;            (setf (view-debounce-timer view) nil)))))))
 
 (defun register-view-dependency (view state-path)
   "Registers a state path that the view depends on.

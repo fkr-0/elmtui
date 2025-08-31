@@ -71,8 +71,9 @@
 
   (defun maybe-wrap-with-root-viewport (dsl
                                         &key (root-id :root-viewport)
-                                          (term-size  '(1 1))
-                                          (cursor-pos '(1 1)))
+                                          ;; (term-size  '(1 1))
+                                          ;; (cursor-pos '(1 1))
+                                          )
     "Return DSL guaranteed to contain a :ROOT-VIEWPORT node even if DSL
    arrives quoted (i.e. (QUOTE …) or '…).
 
@@ -92,8 +93,8 @@ DSL cases handled:
     (labels ((%wrap (inner)
                `(:root-viewport
                  :id ,root-id
-                 :initial-terminal-dimensions ,term-size
-                 :initial-cursor-pos          ,cursor-pos
+                 ;; :initial-terminal-dimensions ,term-size
+                 ;; :initial-cursor-pos          ,cursor-pos
                  :children                    ,inner)))
       (cond
         ;; ───────────────────────────────────────────────────────────────
@@ -102,9 +103,9 @@ DSL cases handled:
         ((and (consp dsl) (eq (first dsl) 'quote))
          (let* ((inner   (second dsl))
                 (rewrote (maybe-wrap-with-root-viewport inner
-                                                        :root-id root-id
-                                                        :term-size term-size
-                                                        :cursor-pos cursor-pos)))
+                                                        :root-id root-id)))
+                                        ;:term-size term-size
+                                        ;:cursor-pos cursor-pos
            `(quote ,rewrote)))
 
         ;; ───────────────────────────────────────────────────────────────

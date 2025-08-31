@@ -347,17 +347,19 @@ Useful for ensuring path segments are keywords."
     (hash-table
      (multiple-value-bind (val presentp) (gethash key container)
        (if presentp val default)))
-    ;; treat *any* proper list as a plist first and fall back to alist
+    ;; Proper list: prefer plist semantics; only try alist when elements are conses
     (null default)
     (list
-     (if (= 0 (length container))
-         default
-         (let ((plist-val (getf container key :+|not-found|+)))
-           (if (not (eq plist-val :+|not-found|+))
-               plist-val
-               (let ((pair (assoc key container :test #'equal)))
-                 (if pair (cdr pair) default))))))
-
+     (cond
+       ((= 0 (length container)) default)
+       ((consp (first container))
+        (let ((pair (assoc key container :test #'equal)))
+          (if pair (cdr pair) default)))
+       (t
+        (let ((plist-val (getf container key :+|not-found|+)))
+          (if (not (eq plist-val :+|not-found|+))
+              plist-val
+              default)))))
     ))
 
 (defun %plist-set (plist key value)

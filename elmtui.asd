@@ -11,12 +11,15 @@
                               #:cl-reexport
                               #:bordeaux-threads
                               #:cl-inputs
-                              #:cl-styles)
+                              #:cl-styles
+                              #:cl-events
+                              #:cl-state)
   :pathname "./src/"
   :components (
                (:file "utils")
                ;; (:file "state/utils")
                (:file "tea-state/msg")
+               (:file "app/system-events")
 
                (:file "contracts")
                (:file "core/logging")
@@ -43,7 +46,7 @@
                              (:file "clevelib")))
 
                (:file "view/geo")
-               (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
+               ;; (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
                ;; Core Modules (Load after cleve-elm, before API Layer)
                (:file "view/position") ; Load position before focus manager
                (:file "view/api")
@@ -63,7 +66,6 @@
                              (:file "model")
                              (:file "core")))
                (:file "update-dsl")
-               (:file "app/system-events")
                ;; (:module "state"
                ;;  :pathname "state/"
                ;;  :serial t
@@ -131,25 +133,25 @@
 
 
                (:file "view/core")
-               (:module "view/style-lib"
-                :pathname "view/style-lib/"
-                :serial t
-                :components (
-                             (:file "util")
-                             (:file "types")
-                             (:file "styles")
-                             (:file "style-set")
-                             (:file "macros")
-                             (:file "selector")
-                             (:file "properties")
+               ;; (:module "view/style-lib"
+               ;;  :pathname "view/style-lib/"
+               ;;  :serial t
+               ;;  :components (
+               ;;               (:file "util")
+               ;;               (:file "types")
+               ;;               (:file "styles")
+               ;;               (:file "style-set")
+               ;;               (:file "macros")
+               ;;               (:file "selector")
+               ;;               (:file "properties")
 
-                             ;; Selector implementations moved after view/styled
-                             (:file "rule")
-                             (:file "stylable") ; Implementation details? Might depend on api.
-                             (:file "styled-strings")
-                             (:file "stylesheet")
-                             (:file "style-lib")
-                             (:file "cl-styles-adapter")))
+               ;;               ;; Selector implementations moved after view/styled
+               ;;               (:file "rule")
+               ;;               (:file "stylable") ; Implementation details? Might depend on api.
+               ;;               (:file "styled-strings")
+               ;;               (:file "stylesheet")
+               ;;               (:file "style-lib")
+               ;;               (:file "cl-styles-adapter")))
                (:file "view/styled")
                ;; --- View / UI Dependency Resolution ---
                ;; Load core view definitions first

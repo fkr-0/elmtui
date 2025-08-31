@@ -141,3 +141,25 @@ and commands to be executed."
     (if (typep app-data 'hash-table)
         (let ((hash-table-data app-data))
           (elmtui.utils:get-path hash-table-data components-path )))))
+
+(defun pprinc-application-state (state)
+  "Pretty print the application state."
+  (labels ((-tabl-to-str (tabl &optional (level 0))
+             (loop for key being the hash-keys of tabl
+                   collect (cons key
+                                 (let ((value (gethash key tabl)))
+                                   (if (hash-table-p value)
+                                       (progn
+                                         (incf level 1)
+                                         (let ((v (format nil "~A</H~A>"
+                                                          (format nil "~&~%~A<H~A>~A"
+                                                                  (str:repeat level  " ")
+                                                                  level
+                                                                  (-tabl-to-str value))
+                                                          (- level 0))))
+                                           (decf level 1)
+                                           v))
+                                       (format nil "~A" value)))))))
+    (let ((data (-tabl-to-str  (application-state-data state))))
+      ;; Correct FTYPE declarations for application-state constructor with proper keyword parameters
+      (format nil "~&~% ~A~%Data:~%~A~%" (format nil "~&Application State:~%") data))))
