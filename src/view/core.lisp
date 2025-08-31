@@ -10,8 +10,6 @@
                 :ui-node-type :ui-node-props :ui-node-children)
   (:export
    ;; Core Types
-   :ui-node :ui-node-p :make-ui-node :copy-ui-node
-   :ui-node-type :ui-node-props :ui-node-children
    ;; View Definition
    :defview :with-view-context
    ;; Node Creation DSL
@@ -31,73 +29,73 @@
 ;;; UI Node Definition & Operations
 ;;;-----------------------------------------------------------------------------
 
-(defclass ui-node ()
-  ((type :initarg :type :accessor ui-node-type :initform 'base :type symbol)
-   (props :initarg :props :accessor ui-node-props :initform nil :type list)
-   (children :initarg :children :accessor ui-node-children :initform nil :type list))
-  (:documentation "Intermediate tree node: type, props, children.
-    Contract: type (:text|:container|:vbox|:hbox|:widget), props plist, children list."))
+;; (defclass ui-node ()
+;;   ((type :initarg :type :accessor ui-node-type :initform 'base :type symbol)
+;;    (props :initarg :props :accessor ui-node-props :initform nil :type list)
+;;    (children :initarg :children :accessor ui-node-children :initform nil :type list))
+;;   (:documentation "Intermediate tree node: type, props, children.
+;;     Contract: type (:text|:container|:vbox|:hbox|:widget), props plist, children list."))
 
-(defmethod ui-node-p ((n ui-node)) t)
-;; Define the predicate function
+;; (defmethod ui-node-p ((n ui-node)) t)
+;; ;; Define the predicate function
 
 
-(defun make-ui-node (&key type props children)
-  "Create a new ui-node with validation."
-  (check-type type symbol)
-  (check-type props list)
-  (check-type children list)
-  (assert (evenp (length props)) (props) "Props must be a valid property list")
-  ;; Ensure ui-node-p is defined before this assertion runs
-  (assert (every #'ui-node-p children) (children) (format nil "Children must be ui-nodes: ~A~%" children))
-  ;; Use make-instance instead of undefined %make-ui-node
-  (make-instance 'ui-node :type type :props props :children children))
+;; (defun make-ui-node (&key type props children)
+;;   "Create a new ui-node with validation."
+;;   (check-type type symbol)
+;;   (check-type props list)
+;;   (check-type children list)
+;;   (assert (evenp (length props)) (props) "Props must be a valid property list")
+;;   ;; Ensure ui-node-p is defined before this assertion runs
+;;   (assert (every #'ui-node-p children) (children) (format nil "Children must be ui-nodes: ~A~%" children))
+;;   ;; Use make-instance instead of undefined %make-ui-node
+;;   (make-instance 'ui-node :type type :props props :children children))
 
-(defun copy-ui-node (node &key type props children)
-  "Create a copy of NODE with optional overrides."
-  (make-ui-node
-   :type (or type (ui-node-type node))
-   :props (or props (copy-list (ui-node-props node)))
-   :children (or children (copy-list (ui-node-children node)))))
+;; (defun copy-ui-node (node &key type props children)
+;;   "Create a copy of NODE with optional overrides."
+;;   (make-ui-node
+;;    :type (or type (ui-node-type node))
+;;    :props (or props (copy-list (ui-node-props node)))
+;;    :children (or children (copy-list (ui-node-children node)))))
 
-(defmethod ui-node-type ((object list))
-  (error "ui-node-type was called with a list as an argument: ~S.
-This function expects a single ui-node instance.
-Please check the call site." object))
+;; (defmethod ui-node-type ((object list))
+;;   (error "ui-node-type was called with a list as an argument: ~S.
+;; This function expects a single ui-node instance.
+;; Please check the call site." object))
 
-;;;-----------------------------------------------------------------------------
-;;; Property Operations
-;;;-----------------------------------------------------------------------------
+;; ;;;-----------------------------------------------------------------------------
+;; ;;; Property Operations
+;; ;;;-----------------------------------------------------------------------------
 
-(defun get-prop (node key &optional default)
-  "Get property value from node's props."
-  (getf (ui-node-props node) key default))
+;; (defun get-prop (node key &optional default)
+;;   "Get property value from node's props."
+;;   (getf (ui-node-props node) key default))
 
-(defun set-prop (node key value)
-  "Set property value in node's props, returning a new node."
-  (let ((new-props (copy-list (ui-node-props node))))
-    (setf (getf new-props key) value)
-    (copy-ui-node node :props new-props)))
+;; (defun set-prop (node key value)
+;;   "Set property value in node's props, returning a new node."
+;;   (let ((new-props (copy-list (ui-node-props node))))
+;;     (setf (getf new-props key) value)
+;;     (copy-ui-node node :props new-props)))
 
-(defun has-prop-p (node key)
-  "Check if node has the specified property."
-  (and (member key (ui-node-props node)) t))
+;; (defun has-prop-p (node key)
+;;   "Check if node has the specified property."
+;;   (and (member key (ui-node-props node)) t))
 
-(defun remove-prop (node key)
-  "Remove property from node's props, returning a new node."
-  (let ((new-props (copy-list (ui-node-props node))))
-    (remf new-props key)
-    (copy-ui-node node :props new-props)))
+;; (defun remove-prop (node key)
+;;   "Remove property from node's props, returning a new node."
+;;   (let ((new-props (copy-list (ui-node-props node))))
+;;     (remf new-props key)
+;;     (copy-ui-node node :props new-props)))
 
-(defun merge-props (base-props &rest prop-lists)
-  "Merge multiple property lists, later values override earlier ones."
-  (loop with result = (copy-list base-props)
-        for props in prop-lists do
-          (loop for (key value) on props by #'cddr
-                do (setf (getf result key) value))
-        finally (return result)))
+;; (defun merge-props (base-props &rest prop-lists)
+;;   "Merge multiple property lists, later values override earlier ones."
+;;   (loop with result = (copy-list base-props)
+;;         for props in prop-lists do
+;;           (loop for (key value) on props by #'cddr
+;;                 do (setf (getf result key) value))
+;;         finally (return result)))
 
-;;;-----------------------------------------------------------------------------
+;; ;;;-----------------------------------------------------------------------------
 ;;; Node Creation DSL
 ;;;-----------------------------------------------------------------------------
 
@@ -130,11 +128,11 @@ Please check the call site." object))
                      :children children))))
 
 ;; Define standard node creators
-(define-node-creator container :container)
-(define-node-creator text :text)
-(define-node-creator vbox :vbox)
-(define-node-creator hbox :hbox)
-(define-node-creator widget :widget)
+;; (define-node-creator container :container)
+;; (define-node-creator text :text)
+;; (define-node-creator vbox :vbox)
+;; (define-node-creator hbox :hbox)
+;; (define-node-creator widget :widget)
 
 ;;;-----------------------------------------------------------------------------
 ;;; View Definition & Composition
@@ -149,13 +147,13 @@ Please check the call site." object))
        (with-view-context ()
          ,@body))))
 
-(defun update-props (node fn)
-  "Update node's props using function FN, returning a new node."
-  (copy-ui-node node :props (funcall fn (ui-node-props node))))
+;; (defun update-props (node fn)
+;;   "Update node's props using function FN, returning a new node."
+;;   (copy-ui-node node :props (funcall fn (ui-node-props node))))
 
-(defun update-children (node fn)
-  "Update node's children using function FN, returning a new node."
-  (copy-ui-node node :children (funcall fn (ui-node-children node))))
+;; (defun update-children (node fn)
+;;   "Update node's children using function FN, returning a new node."
+;;   (copy-ui-node node :children (funcall fn (ui-node-children node))))
 
 (defmacro with-props ((&rest props) node)
   "Add or override properties on NODE."
@@ -188,11 +186,11 @@ Please check the call site." object))
 ;;; Accessibility Support
 ;;;-----------------------------------------------------------------------------
 
-(defun accessible-p (node)
-  "Check if node has required accessibility attributes."
-  (or (get-prop node :aria-label)
-      (get-prop node :aria-labelledby)
-      (get-prop node :aria-describedby)))
+;; (defun accessible-p (node)
+;;   "Check if node has required accessibility attributes."
+;;   (or (get-prop node :aria-label)
+;;       (get-prop node :aria-labelledby)
+;;       (get-prop node :aria-describedby)))
 
 (defmacro with-aria ((&rest aria-props) node)
   "Add ARIA attributes to NODE."

@@ -14,7 +14,6 @@
 
 (uiop:define-package #:elmtui.view.api
   (:use #:cl)
-  (:import-from #:elmtui.style-lib.api :styles :stylable)
   (:export
    ;; Transformation generics
    #:render-view
@@ -26,16 +25,8 @@
    #:diff-buffer
    #:apply-diff
    #:stylable-id
-   #:ui-node-type
-   #:layout-node
-   #:ui-node-props
-   #:ui-node-children
    ;; Abstract node classes
-   #:ui-node
-   #:styled-ui-node
-   #:atomic-ui-node
-   #:ui-node-p
-   #:laid-out-ui-node))
+   ))
 
 (in-package #:elmtui.view.api)
 
@@ -340,53 +331,3 @@ These nodes may still be declarative/high-level."))
 ;; These typically rely on slot-accessors provided by the 'stylable' class
 ;; If 'stylable' defines accessors like (stylable-id (node stylable)), etc.,
 ;; then explicit method definitions here might only be needed for customization.
-(defgeneric stylable-id (node)
-  (:documentation "Return the ID of the styled node."))
-
-(defmethod stylable-id ((node styled-ui-node))
-  (and (slot-boundp node 'props)
-       (getf (slot-value node 'props) :id))) ; Inherit ID from ui-node props
-
-(defmethod stylable-id ((node ui-node))
-  (error (format nil "stylable-id called on plain ui-node (~A%). Returning NIL." node)))
-
-(defmethod ui-node-p ((object styled-ui-node))
-  t) ; Inherit from ui-node-p
-
-(defmethod ui-node-type ((node styled-ui-node))
-  (and (slot-boundp node 'type)
-       (slot-value node 'type))) ; Inherit type from ui-node
-                                        ;
-(defmethod ui-node-props ((node styled-ui-node))
-  (and (slot-boundp node 'props)
-       (slot-value node 'props))) ; Inherit props from ui-node
-(defmethod ui-node-children ((node styled-ui-node))
-  (and (slot-boundp node 'children)
-       (slot-value node 'children)))
-
-
-(defmethod ui-node-children ((node null))
-  nil)
-
-
-(defclass atomic-ui-node (styled-ui-node)
-  ()
-  (:documentation
-   "UI node lowered to the *atomic* language understood by the layout engine.
-Allowed TYPEs: :drawable-content, :layout, :viewport, …"))
-
-(defclass laid-out-ui-node (atomic-ui-node)
-  ((layout-rect
-    :initarg :layout-rect
-    :accessor laid-out-ui-node-layout-rect
-    :type list        ;; (x y w h) or RECT struct
-    :documentation "Absolute rectangle in terminal cells."))
-  (:documentation
-   "Atomic UI node after absolute geometry has been assigned."))
-
-(defmethod initialize-instance :after ((node laid-out-ui-node) &key)
-  (check-type (laid-out-ui-node-layout-rect node) list)) ; Assuming (x y w h) list for now
-
-;;; -----------------------------------------------------------------------
-;;; END OF FILE
-;;; -----------------------------------------------------------------------

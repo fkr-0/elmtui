@@ -55,7 +55,7 @@ PATH is a list of keywords like (:app :rv :state :width)."
 (test view-gates-until-ready
   (let* ((id-path '(:app :rv))
          (rv (make-root-viewport :rv))
-         (dsl '(:root-viewport :props (:anchor :below-cursor)))
+         (dsl '(:root-viewport :anchor :below-cursor))
          (state nil))
     (multiple-value-bind (component patches)
         (init rv :id-path id-path

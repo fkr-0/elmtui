@@ -1055,12 +1055,13 @@
 ;;                 (abc &key state view-fn)
 ;;   (make-dsl-tree :root (funcall view-fn state)))
 (defmacro define-pipeline (name &rest stage-fns)
-  "Compose STAGE-FNS into a single function that threads a context plist through them."
+  "Compose STAGE-FNS into a single function that threads a context through them."
   (let ((context (gensym "CONTEXT")))
     `(defun ,name (,context)
-       (let ((current-context ,context))
-         (dolist (stage-fn ',stage-fns current-context)
-           (setf current-context (funcall stage-fn current-context)))))))
+       (reduce (lambda (ctx fn)
+                 (funcall fn ctx))
+               ',stage-fns
+               :initial-value ,context))))
 ;; (defmacro define-pipeline (name &rest stage-fns)
 ;;   "Compose STAGE-FNS into a single function that threads a context plist through them."
 ;;   (let ((context (gensym "CONTEXT")))

@@ -95,6 +95,7 @@
 
 (defun apply-patches (app patches)
   "Given patches = ((key new) …), do (state-set…) for each."
+  (log-info "Applying patches: ~A" patches)
   (with-transaction (app :name :apply-patches)
     (dolist (p patches)
       (state-set app (first p) (second p)))

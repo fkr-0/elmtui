@@ -265,6 +265,7 @@
 ;;     (log-info "Initialized components from DSL: ~A: " dsl)
 ;;     (log-info "patches: ~A: " patches)
 ;;     (values patches commands)))
+
 (defun initialize-components-from-dsl (dsl)
   "Recursively traverses a component DSL, instantiates components,
    and returns the accumulated patches and commands."

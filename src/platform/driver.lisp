@@ -273,8 +273,16 @@
                       (unless elmtui.core.loop::*shutdown-requested*
                         (log-info "DRIVER: Rendering frame.")
                         (let ((ctx (make-context-from-spec app-spec next-model *backend*)))
-                          (setf *last-ctx* (full-view-pipeline ctx))
-                          (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*)))))))))
+                          (handler-case
+                              (progn
+                                (setf *last-ctx* (full-view-pipeline ctx))
+                                (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*)))
+                            (elmtui.contracts:pipeline-contract-violation (e)
+                              (log:error "DRIVER: Pipeline contract violation ~A; keeping previous ctx." e)
+                              (setf *last-ctx* (or *last-ctx* ctx)))
+                            (error (e)
+                              (log:error "DRIVER: Pipeline error ~A; keeping previous ctx." e)
+                              (setf *last-ctx* (or *last-ctx* ctx)))))))))))
       (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
       (values initial-model initial-cmds))))
 
@@ -495,8 +503,9 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
              (setf elmtui.core.globals:*app-message-processor* real-proc)
              ;; Replay buffered events in order, then clear the bootstrap queue
              (let ((events (nreverse *bootstrap-event-queue*)))
-               (setf *bootstrap-event-queue* nil)
-               (dolist (e events) (ignore-errors (funcall real-proc e)))))
+
+               (dolist (e events) (ignore-errors (funcall real-proc e)))
+               (setf *bootstrap-event-queue* nil)))
 
            ;; 5. Start the input reader thread.
            (multiple-value-bind (thread stop-fn)

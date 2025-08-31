@@ -11,17 +11,17 @@
    :ui-node :make-ui-node :copy-ui-node
                 :ui-node-type :ui-node-props :ui-node-children :node-type)
   ;; Import relevant symbols from elmtui.style-lib API and implementation details
-  (:import-from :elmtui.style-lib.api
+  (:import-from :cl-styles.api
                 #:stylable #:stylable-id #:classes #:parents-of #:styles #:dirty #:dirty-p
                 #:make-style-set ; Ensure make-style-set is available
 
                 #:stylesheet-rules ; For checking if stylesheet is empty, if needed
                 #:style-set #:stylesheet-name)
   ;; Import default style set, value-of, and copy-set from style-set package
-  (:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set #:set-style
-                #:merge-sets!) ; Added merge-sets! for inline styles
+                                        ;(:import-from :elmtui.style-lib.style-set #:*default-style-set* #:value-of #:copy-set #:set-style
+  ;; #:merge-sets!) ; Added merge-sets! for inline styles
   ;; Import query-stylesheet from sheet package
-  (:import-from :elmtui.style-lib.sheet #:query-stylesheet)
+                                        ;(:import-from :elmtui.style-lib.sheet #:query-stylesheet)
   (:import-from #:elmtui.utils #:split-props/children #:as)
   (:import-from #:elmtui.view.base-elements
                 #:base-element
@@ -204,18 +204,18 @@
 ;;           (loop for child in (ui-node-children node) ; Iterate original children
 ;;                 collect (apply-stylesheet-to-tree child stylesheet new-node)))
 ;; new-node))
-(defmethod apply-stylesheet-to-tree ((node base-element) stylesheet &optional parent)
-  (log:debug "STYLED: apply-stylesheet-to-tree for base-element - Type: ~S, ID: ~S. Converting to styled-ui-node. Parent ID: ~S"
-             (element-type node) (element-id node) (if parent (ignore-errors (stylable-id parent)) "NIL_PARENT"))
+;; (defmethod apply-stylesheet-to-tree ((node base-element) stylesheet &optional parent)
+;;   (log:debug "STYLED: apply-stylesheet-to-tree for base-element - Type: ~S, ID: ~S. Converting to styled-ui-node. Parent ID: ~S"
+;;              (element-type node) (element-id node) (if parent (ignore-errors (stylable-id parent)) "NIL_PARENT"))
 
-  ;; Convert base element to styled-ui-node
-  (let* ((styled-node (dsl-properties node))
-         (styled-children (mapcar (lambda (child)
-                                    (apply-stylesheet-to-tree child stylesheet node))
-                                  (element-children node))))
-    ;; Set the children and return the new styled node
-    (setf (ui-node-children styled-node) styled-children)
-    (apply-stylesheet-to-tree styled-node stylesheet parent)))
+;;   ;; Convert base element to styled-ui-node
+;;   (let* ((styled-node (dsl-properties node))
+;;          (styled-children (mapcar (lambda (child)
+;;                                     (apply-stylesheet-to-tree child stylesheet node))
+;;                                   (element-children node))))
+;;     ;; Set the children and return the new styled node
+;;     (setf (ui-node-children styled-node) styled-children)
+;;     (apply-stylesheet-to-tree styled-node stylesheet parent)))
 
 ;; (defmethod apply-stylesheet-to-tree ((node ui-node) stylesheet &optional parent)
 ;;   "Handle plain ui-nodes by converting them first, then applying styles. Returns a new styled node.
@@ -237,15 +237,15 @@
 ;;     ;; Now, call apply-stylesheet-to-tree on this new styled-node.
 ;;     (apply-stylesheet-to-tree styled-node stylesheet parent)))
 
-(defmethod apply-stylesheet-to-tree ((node null) stylesheet &optional parent)
-  "Base case for recursion: nil node returns nil."
-  (declare (ignore stylesheet parent))
-  nil)
+;; (defmethod apply-stylesheet-to-tree ((node null) stylesheet &optional parent)
+;;   "Base case for recursion: nil node returns nil."
+;;   (declare (ignore stylesheet parent))
+;;   nil)
 
-(defmethod apply-stylesheet-to-tree ((node t) stylesheet &optional parent)
-  "Catch-all for non-list, non-ui-node data (e.g., strings, numbers)."
-  (declare (ignore stylesheet parent))
-  node)
+;; (defmethod apply-stylesheet-to-tree ((node t) stylesheet &optional parent)
+;;   "Catch-all for non-list, non-ui-node data (e.g., strings, numbers)."
+;;   (declare (ignore stylesheet parent))
+;;   node)
 
 ;;;-----------------------------------------------------------------------------
 ;;; Style Value Access Helper

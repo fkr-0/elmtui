@@ -8,8 +8,11 @@
 (:asd "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 
 
+(:asd "../cl-fzy/cl-fzy.asd")
 (:asd "cl-styles/cl-styles.asd")
 (:asd "cl-inputs/cl-inputs.asd")
+(:asd "cl-events/cl-events.asd")
+(:asd "cl-state/cl-state.asd")
 (:asd "elmtui.asd")
 (:asd "elmtui-tests.asd")
 
@@ -22,9 +25,9 @@
  :path "guicho271828/asdf-viz"
  :branch "master")
 
-(:github "cl-fzy"
- :path "fkr-0/cl-fzy"
- :commit "fbb8c8a0c3c5c2f62a21895592f6ac6032d1135c")
+;; (:github "cl-fzy"
+;;  :path "fkr-0/cl-fzy"
+;;  :commit "fbb8c8a0c3c5c2f62a21895592f6ac6032d1135c")
 
 
 

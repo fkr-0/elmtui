@@ -130,6 +130,7 @@ It stores the ID of its child component in app-state under :child."))
     (values patches commands)))
 
 (defmethod view ((component viewport) (state elmtui.tea-state:application-state) &key id-path (children nil) &allow-other-keys)
+  (log-info "View Viewport> rendering component at path ~S with children ~S" id-path children)
   (let* ((viewport-component-registration (get-path id-path state )) ; Get the whole registration for this viewport component
          (viewport-attrs (getf viewport-component-registration :state)) ; Get the :state sub-plist with width, height, offsets
          ;; (child-id (getf viewport-component-registration :child-id))
