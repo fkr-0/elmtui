@@ -1,6 +1,11 @@
 (uiop:define-package :elmtui.tests.rendering-pipeline
   (:use :cl :fiveam :elmtui.contracts :elmtui.pipeline)
   (:import-from :elmtui.view.core #:ui-node-p)
+  (:import-from :cl-styles.selector #:cls> #:type> #:id>)
+  (:import-from :elmtui.app #:defapplication)
+  (:import-from #:cl-styles.rule #:defrule)
+  (:import-from #:cl-styles.sheet #:defstylesheet)
+  (:import-from #:cl-styles.tokens #:rgb)
   (:import-from :elmtui.view.styled #:styled-ui-node-p)
   (:import-from :elmtui.pipeline
                 #:generate-dsl)
@@ -10,10 +15,15 @@
   (:import-from :elmtui.platform.backend.common.virtual-buffer
                 #:virtual-terminal-buffer-p
                 #:make-virtual-buffer)
-  (:import-from :elmtui.examples.rainbow-app
+  (:import-from :elmtui.tests.rainbow
                 #:rainbow-content-view
-                #:rainbow-stylesheet))
+                #:rainbow-stylesheet
+                #:initialize-app-state-rainbow-example-app)
+  )
 (in-package :elmtui.tests.rendering-pipeline)
+;;;--------------------------------------------------------------
+;;; Stylesheet Definition
+;;;--------------------------------------------------------------
 
 (def-suite rendering-pipeline-suite
   :in elmtui.tests:elmtui-test
@@ -37,7 +47,7 @@
   "Helper to create a default context for pipeline tests."
   (declare (ignorable width height))
   (multiple-value-bind (app-state commands)
-      (elmtui.examples.rainbow-app:initialize-app-state-rainbow-example-app
+      (initialize-app-state-rainbow-example-app
        :initial-terminal-dimensions (list 80 24)
        :initial-cursor-position (list 0 0))
     (declare (ignore commands))
@@ -47,7 +57,7 @@
                      :size (make-size :h 24 :w 80) ;;width :h height)
                      :pos (make-pos :x 0 :y 0))
      :front-buffer (make-virtual-buffer 80 24)
-     :view-fn #'elmtui.examples.rainbow-app:rainbow-content-view
+     :view-fn #'rainbow-content-view
      :backend nil)
     ;; app-state
     ))

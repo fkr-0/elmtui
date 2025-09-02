@@ -179,13 +179,6 @@
          (overflow-policy (or (getf plist :overflow-policy)
                               (and style (getf style :overflow-policy))
                               :scroll)) ; :scroll | :truncate
-         ;; (term-cols (or (first initial-terminal-dimensions) 0))
-         ;; (term-rows (or (second initial-terminal-dimensions) 0))
-         ;; (cursor-c  (or (first initial-cursor-pos) 0))
-         ;; (cursor-r  (or (second initial-cursor-pos) 0))
-         ;; default dims until we know both
-         ;; (desired-w nil)
-         ;; (desired-h nil)
          (oy 0) (ox 0) (ap (cons 0 0)) (growth :bottom-right) ;; (eff (cons desired-w desired-h))
          )
     ;; (when (and size-known pos-known)
@@ -507,10 +500,10 @@ ST-PATH points at the :state subtree (i.e., ends with :state)."
 (defmethod elmtui.ui.api:view ((component root-viewport) state
                                &key id-path children &allow-other-keys)
   (declare (type list id-path) (type t state))
-  (log-info "ROOT-VIEWPORT VIEW> id path ~A state ~A" id-path (elmtui.tea-state.api::pprinc-application-state state))
+  ;; (log-info "ROOT-VIEWPORT VIEW> id path ~A state ~A" id-path (elmtui.tea-state.api::pprinc-application-state state))
   (let ((asdf nil))
     (elmtui.update-dsl:with-cycle (ctx state :component-path id-path)
-      (log-info "id path ~A state ~A" id-path (elmtui.tea-state.api::pprinc-application-state state))
+      ;; (log-info "id path ~A state ~A" id-path (elmtui.tea-state.api::pprinc-application-state state))
       (let* ((vp-state (get-path (append id-path '(:state)) state))
              (effective-id (state-ref vp-state :id (first (last id-path))))
              (term-size (cstate> :terminal-size))
@@ -526,7 +519,7 @@ ST-PATH points at the :state subtree (i.e., ends with :state)."
                (child-from-state (state-ref vp-state :child-dsl-spec))
                (final-children (or children-from-args
                                    (when child-from-state (list child-from-state))))
-               (_ (log-info "Children ~A" final-children))
+               ;; (_ (log-info "Children ~A" final-children))
                (width (state-ref vp-state :width))
                (height (state-ref vp-state :height))
                (offset-x (state-ref vp-state :offset-x 0))
@@ -544,3 +537,4 @@ ST-PATH points at the :state subtree (i.e., ends with :state)."
                                          :scroll-x ,scroll-x :scroll-y ,scroll-y)
                                  :children ,final-children)))))
     asdf))
+

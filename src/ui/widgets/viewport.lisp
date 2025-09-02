@@ -30,7 +30,7 @@ It stores the ID of its child component in app-state under :child."))
 ;;;---------------------------------------------------------------
 ;;; Component API Implementation (New TEA-aligned)
 ;;;---------------------------------------------------------------
-(defmethod init ((component viewport) &key id-path initial-width initial-height initial-offset-x initial-offset-y initial-child-spec dsl &allow-other-keys)
+(defmethod init ((component viewport) &key id-path initial-width initial-height initial-offset-x initial-offset-y initial-child-spec dsl clipping scroll-x scroll-y &allow-other-keys)
   (let ((component-id (id-from-path id-path))
         (child-patches nil)
         (child-commands nil)
@@ -66,6 +66,9 @@ It stores the ID of its child component in app-state under :child."))
                                                :height ,initial-height
                                                :offset-x ,(or initial-offset-x 0)
                                                :offset-y ,(or initial-offset-y 0)
+                                               :scroll-x ,(or scroll-x 0)
+                                               :scroll-y ,(or scroll-y 0)
+                                               :clipping ,(and clipping t)
                                                :dsl ,dsl)
                                        ;; Store child ID directly under the viewport's component state
                                        :child-id ,child-id
@@ -115,6 +118,13 @@ It stores the ID of its child component in app-state under :child."))
        (destructuring-bind (new-width new-height) (cdr message)
          (push (make-state-patch (append viewport-attrs-path '(:width)) new-width) patches)
          (push (make-state-patch (append viewport-attrs-path '(:height)) new-height) patches)))
+      ((cons (eql :set-clipping))
+       (let ((flag (cadr message)))
+         (push (make-state-patch (append viewport-attrs-path '(:clipping)) (and flag t)) patches)))
+      ((cons (eql :scroll-by))
+       (destructuring-bind (dx dy) (cdr message)
+         (push (make-state-patch (append viewport-attrs-path '(:scroll-x)) (lambda (x) (+ (or x 0) dx))) patches)
+         (push (make-state-patch (append viewport-attrs-path '(:scroll-y)) (lambda (y) (+ (or y 0) dy))) patches)))
       (t
        ;; Propagate to child if it exists
        (let* ((child-id (get-path state (append viewport-component-state-path '(:child-id))))) ; Get child-id from viewport's state
@@ -145,7 +155,10 @@ It stores the ID of its child component in app-state under :child."))
           :style `(:width ,(getf viewport-attrs :width 80)
                    :height ,(getf viewport-attrs :height 24)
                    :offset-x ,(getf viewport-attrs :offset-x 0)
-                   :offset-y ,(getf viewport-attrs :offset-y 0))
+                   :offset-y ,(getf viewport-attrs :offset-y 0)
+                   :scroll-x ,(getf viewport-attrs :scroll-x 0)
+                   :scroll-y ,(getf viewport-attrs :scroll-y 0)
+                   :overflow ,(if (getf viewport-attrs :clipping) :hidden :visible))
 
           :children final-children
           ;; (cond

@@ -20,50 +20,6 @@
 
 
 
-;; == elmtui/view/dsl/resolve.lisp ==
-;; robust DSL resolver:
-;; - never descends into property values (e.g. :style stays intact)
-;; - :resolved-view is attached as a PROP, not under :children
-;; - only lists that are *explicit children* are treated as DSL sibling bags
-
-;; (defun split-props/children (args)
-;;   (let ((props '()) (cursor args))
-;;     (loop while (and cursor (keywordp (first cursor)))
-;;           do (let ((key (pop cursor)))
-;;                (when (null cursor) (error "Property list for ~S is missing a value." key))
-;;                (push key props)
-;;                (push (pop cursor) props)))
-;;     (setf props (nreverse props))
-;;     (let* ((positional cursor)
-;;            (explicit (getf props :children)))
-;;       (values (if explicit (alexandria:remove-from-plist props :children) props)
-;;               (if explicit explicit (copy-tree positional))))))
-;; (defun split-props/children (args)
-;;   "Split the DSL tail into (values PROPS CHILDREN).
-;;    PROPS is a plist of *top-level* k/v pairs with any top-level :children removed.
-;;    CHILDREN is either the explicit :children value or the tail starting at the first
-;;    non-keyword (positional children)."
-;;   (let ((props '())
-;;         (children nil)
-;;         (cursor args))
-;;     (loop
-;;       (when (null cursor) (return))
-;;       (let ((k (first cursor)))
-;;         (cond
-;;           ((keywordp k)
-;;            (when (null (rest cursor))
-;;              (error "Property list for ~S is missing a value." k))
-;;            (let ((v (second cursor)))
-;;              (if (eq k :children)
-;;                  (setf children v)
-;;                  (setf props (nconc props (list k v)))))
-;;            (setf cursor (cddr cursor)))
-;;           (t
-;;            ;; First non-keyword → the remainder are positional children.
-;;            (setf children cursor
-;;                  cursor   nil)))))
-;;     (values props (copy-tree children))))
-
 (defun split-props/children (args)
   "Split top-level tail into (values PROPS CHILDREN), without touching prop values.
    CHILDREN is either the explicit :children value, or the positional tail
@@ -137,7 +93,6 @@
                                                                :id-path new-path
                                                                :children children))
                                  (rv       (process-node view new-path :in-children-p nil)))
-                            (log-info "Resolved component ~S at path ~S to ~S" type new-path rv)
                             (%emit-node type (append props (list :resolved-view rv)) nil)))
                         ;; normal element → recurse only into CHILDREN
                         (%emit-node type props
@@ -160,11 +115,9 @@
     (loop for i from 1 to 10
           do (multiple-value-bind (next-dsl resolved-p)
                  (render-dsl-to-resolved-tree spec app-state)
-               (log-info "DSL resolution iteration ~A: ~A resolved-p ~A next-dsl ~a" i spec resolved-p next-dsl)
                (setf spec (if (listp next-dsl)
                               (getf (cdr next-dsl) :resolved-view next-dsl)
                               next-dsl))
-               (log-info "DSL resolution iteration ~A: ~A resolved-p ~A" i spec resolved-p)
                (unless resolved-p (return)))
           finally (when (> i 9) (warn "DSL resolution took more than 10 iterations.")))
     (elmtui.view.base-elements:dsl->objects spec)))

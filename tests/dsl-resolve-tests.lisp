@@ -15,9 +15,10 @@
   (:import-from :elmtui.platform.backend.common.virtual-buffer
                 #:virtual-terminal-buffer-p
                 #:make-virtual-buffer)
-  (:import-from :elmtui.examples.rainbow-app
+  (:import-from :elmtui.tests.rainbow
                 #:rainbow-content-view
-                #:rainbow-stylesheet))
+                #:rainbow-stylesheet
+                #:initialize-app-state-rainbow-example-app))
 (in-package :elmtui.tests.view.dsl)
 
 

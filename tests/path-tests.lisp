@@ -18,10 +18,10 @@
                 #:make-pos)
   (:import-from :elmtui.platform.backend.common.virtual-buffer
                 #:virtual-terminal-buffer-p
-                #:make-virtual-buffer)
-  (:import-from :elmtui.examples.rainbow-app
-                #:rainbow-content-view
-                #:rainbow-stylesheet))
+                #:make-virtual-buffer))
+;; (:import-from :elmtui.examples.rainbow-app
+;;               #:rainbow-content-view
+;;               #:rainbow-stylesheet))
 (in-package :elmtui.tests.path)
 
 (def-suite path-suite

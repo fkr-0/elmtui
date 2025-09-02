@@ -4,8 +4,8 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.button-enhanced
   (:use :cl :alexandria)
-  (:import-from :elmtui.view.dsl.base 
-                #:validate-base-dsl #:expand-base-dsl #:make-dsl-element)
+  (:import-from :elmtui.view.dsl 
+                #:dsl->ui-node)
   (:import-from :elmtui.state.model
                 #:defmodel-contracted #:defpatch #:deftransaction #:make-state-patch #:apply-state-patches)
   (:import-from :elmtui.contracts
@@ -25,6 +25,13 @@
    #:button))
 
 (in-package :elmtui.ui.widgets.button-enhanced)
+
+;; Lightweight shims for DSL helpers
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (unless (fboundp 'validate-base-dsl)
+    (defun validate-base-dsl (dsl) dsl))
+  (unless (fboundp 'expand-base-dsl)
+    (defun expand-base-dsl (dsl) dsl)))
 
 ;;;--------------------------------------------------------------
 ;;; Button Message Schema

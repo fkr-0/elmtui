@@ -101,7 +101,7 @@
 
 (defun transform-top-down (fn el &key ctx)
   (let* ((new-el (funcall fn el :ctx ctx))
-         (_ (log-info "TD with ~A el to new el: ~A -> ~A" fn el new-el))
+         ;; (_ (log-info "TD with ~A el to new el: ~A -> ~A" fn el new-el))
          (kids (and new-el (elmtui.view.element:el/children new-el))))
     (when kids
       (setf (elmtui.view.element:el/children new-el)

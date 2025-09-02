@@ -9,6 +9,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :sources
+(:implicit-file :type :file-system :system-files ("elmtui-examples.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui-tests.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui.asd"))
 (:implicit-file :type :file-system :system-files ("cl-state/cl-state.asd"))
@@ -49,6 +50,7 @@
 (:project :name "fiveam" :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379"
  :source :implicit-vcs)
 (:project :name "sly" :branch "master" :source :implicit-vcs)
+(:asd-file :name "elmtui-examples.asd")
 (:asd-file :name "elmtui-tests.asd")
 (:asd-file :name "elmtui.asd")
 (:asd-file :name "cl-state/cl-state.asd")
@@ -64,7 +66,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :releases
-("../cl-fzy/cl-fzy.asd" :version :newest :source :implicit-file :systems nil)
+("../cl-fzy/cl-fzy.asd" :version :newest :source :implicit-file :systems
+ ("cl-fzy"))
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd" :version :newest
  :source :implicit-file :systems ("quicklisp"))
 ("alexandria" :version "2024-10-12" :source "quicklisp" :systems ("alexandria"))
@@ -95,6 +98,8 @@
 ("cl-unicode" :version "2024-10-12" :source "quicklisp" :systems ("cl-unicode"))
 ("closer-mop" :version "2025-06-22" :source "quicklisp" :systems ("closer-mop"))
 ("dissect" :version "2024-10-12" :source "quicklisp" :systems ("dissect"))
+("elmtui-examples.asd" :version :newest :source :implicit-file :systems
+ ("elmtui-examples" "elmtui-examples/legacy"))
 ("elmtui-tests.asd" :version :newest :source :implicit-file :systems
  ("elmtui-tests"))
 ("elmtui.asd" :version :newest :source :implicit-file :systems ("elmtui"))
@@ -145,7 +150,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :reverse-dependencies
-("../cl-fzy/cl-fzy.asd" (t (:asd-file :name "../cl-fzy/cl-fzy.asd")))
+("../cl-fzy/cl-fzy.asd"
+ ((:system :name "elmtui-examples") (:system :name "cl-fzy"))
+ (t (:asd-file :name "../cl-fzy/cl-fzy.asd")))
 
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"
  ((:system :name "slynk-quicklisp") (:system :name "quicklisp"))
@@ -204,8 +211,7 @@
  ((:system :name "cl-change-case") (:system :name "cl-ppcre"))
  ((:system :name "cl-change-case") (:system :name "cl-ppcre-unicode")))
 
-("cl-reexport" ((:system :name "elmtui") (:system :name "cl-reexport"))
- (t (:system :name "cl-reexport" :source "quicklisp")))
+("cl-reexport" (t (:system :name "cl-reexport" :source "quicklisp")))
 
 ("cl-state/cl-state.asd" ((:system :name "elmtui") (:system :name "cl-state"))
  (t (:asd-file :name "cl-state/cl-state.asd")))
@@ -225,9 +231,13 @@
 
 ("dissect" ((:system :name "rove") (:system :name "dissect")))
 
+("elmtui-examples.asd" (t (:asd-file :name "elmtui-examples.asd")))
+
 ("elmtui-tests.asd" (t (:asd-file :name "elmtui-tests.asd")))
 
 ("elmtui.asd" ((:system :name "elmtui-tests") (:system :name "elmtui"))
+ ((:system :name "elmtui-examples/legacy") (:system :name "elmtui"))
+ ((:system :name "elmtui-examples") (:system :name "elmtui"))
  (t (:asd-file :name "elmtui.asd")))
 
 ("fiveam" ((:system :name "fiveam/test") (:system :name "fiveam"))

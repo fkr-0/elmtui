@@ -65,7 +65,7 @@ The counter indicates the number of items in the queue.")
   (print-unreadable-object (queue stream :type t :identity t)
     (format stream "Q[~A]" (counter queue))))
 
-(declaim (ftype (function () priority-queue) make-queue make-priority-queue))
+                                        ;(declaim (ftype (function () priority-queue) make-queue make-priority-queue))
 (defun make-queue ()
   "Create a new priority queue."
   (make-instance 'priority-queue))

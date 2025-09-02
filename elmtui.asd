@@ -8,7 +8,6 @@
   :source-control (:git "https://github.com/user/elmtui.git")
   :depends-on   (#:alexandria #:str #:sb-posix
                               #:log4cl  ;; #:slynk
-                              #:cl-reexport
                               #:bordeaux-threads
                               #:cl-inputs
                               #:cl-styles
@@ -252,14 +251,6 @@
                (:file "platform/driver" :depends-on ("app/system-events" "pipeline"))
 
                ;; Development Utilities
-               (:module "examples"
-                :serial t
-                :pathname "../examples/"
-                :components (
-                             (:file "rainbow-app")
-                             (:file "key-tester")
-                             (:file "focus-simple")
-                             (:file "mini-rainbow")))
                ;;(:file "../dev-setup")
                (:file "dev/dev")
                (:file "elmtui"))
@@ -268,38 +259,3 @@
   :build-pathname "elmtui"
   :entry-point "elmtui:dev-main")
 
-;; (asdf:defsystem "elmtui/examples"
-;;   :author "User <user@archlinux>"
-;;   :license "GNU GPL, version 3"
-;;   :depends-on (:elmtui)
-;;   :components ((:module "examples"
-;;                 :pathname "../examples/"
-;;                 :serial t
-;;                 :components
-;;                 ((:file "keymap-app")
-;;                  (:file "boxes-app") ; Added boxes-app
-;;                  ;; Add other example app files here as they are updated
-;;                  ;; (:file "rainbow-app")
-;;                  ;; (:file "rainbow-app-canvas")
-;;                  ;; (:file "dirli")
-;;                  ;; (:file "colortext-app")
-;;                  )))
-;;   :description "Examples for elmtui.")
-
-;; (asdf:defsystem "elmtui/tests"
-;;   :author "User <user@archlinux>"
-;;   :license "GNU GPL, version 3"
-;;   :depends-on (:elmtui :fiveam :alexandria)
-;;   :components ((:module "tests"
-;;                 :serial t ; Ensure tests run in a defined order if necessary, or remove if not.
-;;                 :components
-;;                 ((:file "elmtui-tests")
-;;                  (:file "application-init-tests")
-;;                  (:file "component-init-tests")
-;;                  ;; (:file "flex-layout-tests")
-;;                  ;; (:file "grid-layout-engine-tests")
-;;                  ;; (:file "tree-renderer-tests") ; Added tree-renderer tests
-;;                  ;; Add other test files here
-;;                  )))
-;;   :description "Test suite for elmtui."
-;;   :perform (test-op (op c) (symbol-call :fiveam :run! c)))
