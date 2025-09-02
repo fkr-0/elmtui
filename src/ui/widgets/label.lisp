@@ -17,7 +17,10 @@
    (text "Label" :type string :documentation "The text content of the label."
                  :initarg :text :accessor label-text)
    (for nil :type (or null string symbol) :documentation "The ID of the component this label is for."
-            :initarg :for :accessor label-for))
+            :initarg :for :accessor label-for)
+   ;; Lightweight accessibility support inspired by enhanced widget
+   (aria-label nil :type (or null string) :documentation "Screen-reader label override."
+               :initarg :aria-label))
   (:documentation "A text label widget, refactored to the new defcomponent style.")
   (:on-unhandled-message :log) ; Or :no-op if strictly static
 
@@ -27,7 +30,8 @@
          ;; default initarg processing. This inline :init can still override or supplement.
          ;; Here, we allow :initial-text and :initial-for as aliases from props.
          (values `(:text ,(getf props :text (getf props :initial-text "Label"))
-                   :for ,(getf props :for (getf props :initial-for nil)))
+                   :for ,(getf props :for (getf props :initial-for nil))
+                   :aria-label ,(getf props :aria-label))
                  nil))
 
   (:update (message local-state app-state self-id-path)
@@ -43,9 +47,11 @@
          (let* ((component-id (id-from-path self-id-path))
                 (text (getf local-state :text "Label"))
                 (for-target (getf local-state :for))
+                (aria-label (getf local-state :aria-label))
                 (props `(:id ,component-id
                          :text-content ,text
                          :aria-role "label"
+                         ,@(when aria-label `(:aria-label ,aria-label))
                          ,@(when for-target `(:label-for ,for-target)))))
            (list :drawable-content
                  :type :drawable-content

@@ -15,6 +15,7 @@
 (:asd "cl-state/cl-state.asd")
 (:asd "elmtui.asd")
 (:asd "elmtui-tests.asd")
+(:asd "elmtui-examples.asd")
 
 (:github "sly" :path "joaotavora/sly" :branch "master")
 ;; (:github "slynk" :path "joaotavora/sly" :commit "63131ef965d8ff3a6b79cc7aff8e8f5fc1a82aec")

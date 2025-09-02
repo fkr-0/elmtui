@@ -191,18 +191,9 @@
            (keywordp (key-event-key event))
            (null (key-event-key event)))))
 
-;; (defun key-event-char (event)
-;;   "Returns the character representation of the key-event."
-;;   (if (characterp (key-event-key event))
-;;       (key-event-key event)
-;;       (case (key-event-key event)
-;;         (:enter #\Return)
-;;         (:space #\Space)
-;;         (:tab #\Tab)
-;;         (:backspace #\Backspace)
-;;         (:delete #\Delete)
-;;         ;; Add more mappings as needed
-;;         (t nil))))
+;; NOTE: key-event struct includes a slot `char` with accessor KEY-EVENT-CHAR.
+;; If you need a derived character from the `key` keyword, provide a separate
+;; utility (e.g., KEY-EVENT-PRIMARY-CHAR) to avoid clobbering the accessor.
 
 (defun normalize-key-event (platform-event)
   "Converts platform-specific keyboard event to a standardized key-event.

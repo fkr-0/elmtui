@@ -13,7 +13,7 @@
   (:import-from :elmtui.ui.widgets.label #:label)
   (:import-from :elmtui.ui.widgets.layout #:box-layout)
   (:import-from :elmtui.ui.widgets.counter #:counter)
-  (:import-from :elmtui.keymaps #:key-event->normalized-key #:normalized-key= #:parse-key-string #:keymap!)
+  (:import-from :elmtui.keymaps #:keymap! #:add-keybinding)
   (:export #:main))
 
 (in-package :elmtui.examples.keymap-app)
@@ -41,15 +41,8 @@
     :focus-manager (:current-focus-id ,*counter-a-id*
                     :focusable-elements (,*counter-a-id*))
     :should-quit nil
-    :global-keymap ,(app-global-keymap)
     ;; This is where component-specific keymaps are stored for this app.
-    ;; The focus system should look these up.
     :component-keymaps ,(app-component-keymaps)))
-
-(defun app-global-keymap ()
-  "Defines global keybindings for the application."
-  (keymap! :app-global-keymap ; Added name for introspection
-    ("C-q"    :type :message :target '(:app-quit-requested :source :global-C-q) :description "First")))
 
 ;; (define-keymap *editor-keymap*
 ;;   ("C-a" :type :message :target '(:select-all) :description "Select All")
@@ -60,13 +53,12 @@
 ;;   ("C-y" :type :message :target '(:redo) :description "Redo"))
 
 (defun app-component-keymaps ()
-  "Defines keymaps specific to components, returned as an alist."
-  ;; The type warning HASH-TABLE vs CONS is because this returns an alist,
-  ;; not a single hash table. This is fine for lookup.
-  (keymap! :counter-a-keymap ; Added name
-    ("+" :type :message :target `(:dispatch-to-component ,*counter-a-id* :increment) :description "incr")
-    ("-" :type :message :target `(:dispatch-to-component ,*counter-a-id* :decrement) :description "decr")
-    ("Enter" :type :message :target `(:dispatch-to-component ,*counter-a-id* :reset):description "reset")))
+  "Defines keymaps specific to components, returned as an alist (id . keymap)."
+  (let ((km (keymap! :counter-a-keymap)))
+    (add-keybinding km "+"    :type :message :target `(:dispatch-to-component ,*counter-a-id* :increment) :description "incr")
+    (add-keybinding km "-"    :type :message :target `(:dispatch-to-component ,*counter-a-id* :decrement) :description "decr")
+    (add-keybinding km "Enter" :type :message :target `(:dispatch-to-component ,*counter-a-id* :reset)     :description "reset")
+    (list (cons *counter-a-id* km))))
 
 
 (defun app-update (message app-state) ; Flipped order to convention: message, app-state

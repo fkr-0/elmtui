@@ -117,6 +117,8 @@
    #:parse-key-string
    #:key-event->normalized-key
    #:normalized-key->string
+   #:normalized-key-key
+   #:normalized-key-modifiers
    ;; keymap helpers
    #:define-keymap
    #:add-keybinding
@@ -131,10 +133,13 @@
    #:keymap-context-parent
    #:keymap-context-keymaps
    #:keymap-context-name
+   #:keymap-bindings
+   #:keymap-context
    #:activate-context
    #:deactivate-context
    #:current-context
    #:lookup-binding
+   #:lookup-binding-in
    #:lookup
    ;; event handling
    #:process-key-event
@@ -196,7 +201,11 @@
 ;;; ------------------------------------------------------------------------
 
 (defstruct key-sequence (keys nil :type list))
-(defstruct sequence-state (current nil) (timer nil) (timeout 1000))
+(defstruct sequence-state
+  (current nil)
+  (timer nil)
+  (timeout 1000)                ; milliseconds
+  (last-tick 0))                ; internal time units
 
 (defgeneric normalized-key= (a b))
 (defmethod normalized-key= ((a normalized-key) (b normalized-key))
@@ -295,6 +304,10 @@ If no special mapping exists, returns SYM unchanged."
 (defmethod (setf lookup) (binding (km keymap) (key normalized-key))
   (setf (gethash (normalized-key->string key) (keymap-bindings km)) binding))
 
+(defmethod (setf lookup) (binding (km keymap) (key key-sequence))
+  (let ((key-str (mapconcat #'normalized-key->string (key-sequence-keys key) " ")))
+    (setf (gethash key-str (keymap-bindings km)) binding)))
+
 (defun add-keybinding (km key-string &key type target description)
   (let* ((parts (str:split key-string " "))
          (key   (if (> (length parts) 1)
@@ -306,10 +319,10 @@ If no special mapping exists, returns SYM unchanged."
 
 (defun remove-keybinding (km key-string)
   (let* ((parts (str:split key-string " "))
-         (key   (if (> (length parts) 1)
-                    (make-key-sequence :keys (mapcar #'parse-key-string parts))
-                    (parse-key-string key-string))))
-    (remhash key (keymap-bindings km))))
+         (key-str (if (> (length parts) 1)
+                      (mapconcat #'normalized-key->string (mapcar #'parse-key-string parts) " ")
+                      (normalized-key->string (parse-key-string key-string)))))
+    (remhash key-str (keymap-bindings km))))
 
 ;;; --- DSL ------------------------------------------------------------------
 
@@ -476,6 +489,17 @@ If a keymap name is not found in the registry, an error is raised."
                       thereis (lookup km nk))
         when b return b))
 
+(defun lookup-binding-in (context nk &key (include-parents t))
+  "Lookup a binding starting at CONTEXT. If INCLUDE-PARENTS is true,
+walk up parent contexts; otherwise only search CONTEXT's keymaps."
+  (labels ((collect (ctx)
+             (when ctx
+               (or (loop for km in (%collect-keymaps ctx)
+                         thereis (lookup km nk))
+                   (and include-parents
+                        (collect (keymap-context-parent ctx)))))))
+    (collect context)))
+
 ;;; ------------------------------------------------------------------------
 ;;; 5.  Default Keymaps  &  Actions (stubs)
 ;;; ------------------------------------------------------------------------
@@ -547,11 +571,21 @@ If a keymap name is not found in the registry, an error is raised."
 
 (defun %reset-seq () (setf (sequence-state-current *sequence-state*) nil))
 
+(defun %now-ms ()
+  (truncate (* 1000 (/ (coerce (get-internal-real-time) 'double-float)
+                       internal-time-units-per-second))))
+
 (defun %update-seq (nk)
-  (let ((curr (sequence-state-current *sequence-state*)))
-    (setf (sequence-state-current *sequence-state*)
-          (make-key-sequence :keys (append (and curr (key-sequence-keys curr))
-                                           (list nk))))))
+  (let* ((now (%now-ms))
+         (last (sequence-state-last-tick *sequence-state*))
+         (expired (and (> last 0)
+                       (> (- now last) (sequence-state-timeout *sequence-state*))))
+         (curr (and (not expired) (sequence-state-current *sequence-state*)))
+         (new-seq (make-key-sequence :keys (append (and curr (key-sequence-keys curr))
+                                                  (list nk)))))
+    (setf (sequence-state-last-tick *sequence-state*) now
+          (sequence-state-current *sequence-state*) new-seq)
+    new-seq))
 
 (defun %handle-binding (binding app)
   (ecase (getf binding :type)
@@ -559,19 +593,22 @@ If a keymap name is not found in the registry, an error is raised."
     (:message (%dispatch-msg (getf binding :target) app))))
 
 (defun %maybe-handle-sequence (nk app)
-  "Return T if event consumed."
+  "Return T if event consumed. Uses string keys for sequence storage."
   (let* ((seq (%update-seq nk))
          (bind (lookup-binding seq)))
     (cond
       (bind (%handle-binding bind app) (%reset-seq) t)
-      ((some (lambda (km)
-               (dolist (k (loop for key being the hash-keys of (keymap-bindings km)
-                                when (listp key) collect key))
-                 (when (seq-prefix-p seq (make-key-sequence :keys k)) (return t))))
-             (mapcar #'resolve-keymap-reference (keymap-context-keymaps (current-context))))
-       ;; prefix: wait for more keys
-       t)
-      (t (%reset-seq) nil))))
+      (t
+       (let* ((seq-str (mapconcat #'normalized-key->string (key-sequence-keys seq) " "))
+              (prefix (concatenate 'string seq-str " ")))
+         (if (some (lambda (km)
+                     (loop for k being the hash-keys of (keymap-bindings km)
+                           thereis (and (stringp k)
+                                        (> (length k) (length seq-str))
+                                        (str:starts-with? prefix k))))
+                   (mapcar #'resolve-keymap-reference (keymap-context-keymaps (current-context))))
+             t
+             (progn (%reset-seq) nil)))))))
 
 (defun process-key-event (evt focus-manager &key app-state (handle-sequences t) dispatch-fn)
   "Main dispatcher – converts EVT to NORMALIZED-KEY, runs registry lookup.
@@ -629,6 +666,7 @@ If a keymap name is not found in the registry, an error is raised."
               (loop for k being the hash-keys of (keymap-bindings km)
                       using (hash-value v)
                     collect (list :key (typecase k
+                                         (string k)
                                          (normalized-key (normalized-key->string k))
                                          (list (mapconcat #'normalized-key->string k " "))
                                          (t (prin1-to-string k)))

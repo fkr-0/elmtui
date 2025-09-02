@@ -10,6 +10,8 @@
   :components ((:module "tests"
                 :serial t
                 :components ((:file "elmtui-tests")
+                             (:file "focus-simple-test")
+                             (:file "rainbow-test")
                              (:file "defcomponent-tests")
                              (:file "keymaps-tests")
                              (:file "application-init-tests")

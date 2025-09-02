@@ -1,6 +1,6 @@
 (uiop:define-package :elmtui.tests.focus-keymaps-example
   (:use :cl :fiveam)
-  (:import-from :elmtui.examples.focus-simple #:run-focus-simple)
+  (:import-from :elmtui.tests.focus-simple-tests #:run-focus-simple)
   (:import-from :elmtui.core.event-types #:make-key-event)
   (:import-from :elmtui.keymaps #:process-key-event)
   (:export #:run-focus-keymaps-example-tests))
@@ -11,7 +11,7 @@
 (in-suite focus/keymaps/example)
 
 (test tab-moves-focus-and-enter-activates-buttons
-  (let* ((app-state (funcall (intern "%INITIAL-STATE" :elmtui.examples.focus-simple)))
+  (let* ((app-state (funcall (intern "%INITIAL-STATE" :elmtui.tests.examples.focus-simple)))
          (dispatched '())
          (dispatch (lambda (msg) (push msg dispatched))))
     ;; Initially focus on listbox; Tab should dispatch :focus-next

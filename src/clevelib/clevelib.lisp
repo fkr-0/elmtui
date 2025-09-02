@@ -1,7 +1,7 @@
 (in-package :cl-user)
 (uiop:define-package :cleve-elm
   (:nicknames :cleve)
-  (:use :cl :cl-reexport :log4cl)
+  (:use :cl :log4cl)
   (:shadow log4cl:layout)
   (:import-from :log4cl :log-error :log-info :log-debug )
   (:import-from :cleve-elm.message :message )
