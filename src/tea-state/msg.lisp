@@ -121,9 +121,6 @@
          ,@(loop for (spec . vdef) in zipped
                  collect
                  (let* ((ctor  (variant-definition-constructor-name vdef))
-                        (pred  ;; (intern
-                          (sb-int:symbolicate (format nil "~A-P" (symbol-name (variant-definition-name vdef)))) ;; *package*)
-                          )
                         (args  (variant-definition-args vdef))
                         ;; Extract the raw variant name from the spec.  If
                         ;; SPEC is a list (VariantName ...), take the first
@@ -164,15 +161,27 @@
                       (list ,vkey
                             ,@(mapcan (lambda (p) (list (second p) (first p))) params)))
                    ;; create -p function to test on the variant
-                   ;; `(defun ,pred (msg)
-                   ;;    ,(format nil "Predicate for ~A variant of ~A." raw-name `,name)
-                   ;;    (and (listp msg)
-                   ;;         (keywordp (car msg))
-                   ;;         (eq (car msg) ',vkey)))
                    ;; export ctor and pred
                    ;; `(export ',ctor ,*package*)
                    ;; `(export ',pred ,*package*)
-                   )))
+                   ))
+
+         ,@(loop for (spec . vdef) in zipped
+                 collect
+                 (let* ((raw-name (if (consp spec) (first spec) spec))
+                        (vkey (%variant-name-to-keyword raw-name))
+
+                        (pred
+                          (sb-int:symbolicate
+                           (format nil "~A-~A-P"
+                                   (symbol-name
+                                    (variant-definition-name vdef))
+                                   (symbol-name `,name)))))
+                   `(defun ,pred (msg)
+                      ,(format nil "Predicate for ~A variant of ~A." raw-name `,name)
+                      (and (listp msg)
+                           (keywordp (car msg))
+                           (eq (car msg) ',vkey))))))
        ;; ──────────────── schema registration ────────────────
        (eval-when (:load-toplevel :execute)
          (let* ((load-variants
@@ -214,10 +223,10 @@
   (car msg))
 
 
-(defmsg SnAppMsg (:docstring "Main application messages")
-        (ActivateUser :user-id integer))
+;; (defmsg SnAppMsg (:docstring "Main application messages")
+;;         (ActivateUser :user-id integer))
 
-;; Example AppMsg definition including Focus messages
+;; ;; Example AppMsg definition including Focus messages
 (defmsg AppMsg (:docstring "Main application messages")
         ;; Counter Example Messages
         IncrementCounter

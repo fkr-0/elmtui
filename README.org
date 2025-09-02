@@ -8,6 +8,8 @@
 
 ElmTUI is a terminal UI framework for Common Lisp inspired by the Elm Architecture. It provides a pure functional approach to building terminal user interfaces with a clean separation of concerns through Model-View-Update pattern.
 
+See docs/USER_GUIDE.md for the end‑user guide covering app structure, keymaps, focus, running, and packaging.
+
 ** Features
 
 - *Pure Functional Architecture*: Clear separation of state, view, and update logic

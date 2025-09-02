@@ -4,8 +4,8 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.viewport-enhanced
   (:use :cl :alexandria)
-  (:import-from :elmtui.view.dsl.base
-                #:validate-base-dsl #:expand-base-dsl #:make-dsl-element)
+  (:import-from :elmtui.view.dsl
+                #:dsl->ui-node)
   (:import-from :elmtui.state.model
                 #:defmodel-contracted #:defpatch #:deftransaction #:make-state-patch)
   (:import-from :elmtui.contracts
@@ -22,6 +22,13 @@
    #:scroll-viewport #:resize-viewport #:set-viewport-child))
 
 (in-package :elmtui.ui.widgets.viewport-enhanced)
+
+;; Lightweight shims if advanced DSL helpers are unavailable in this repo
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (unless (fboundp 'validate-base-dsl)
+    (defun validate-base-dsl (dsl) dsl))
+  (unless (fboundp 'expand-base-dsl)
+    (defun expand-base-dsl (dsl) dsl)))
 
 ;;;--------------------------------------------------------------
 ;;; Enhanced Viewport State Model

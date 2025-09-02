@@ -449,39 +449,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
 
 
 
-;;; ---------------------------------------------------------------------------
-;;; ❼ Convenience runner – quick manual demo
-;;; ---------------------------------------------------------------------------
-
-(defparameter *dummy-root-dsl*
-  '(elmtui.ui.widgets.label:label :id :root-label :text "Hello"))
-
-(defun my-update-fn (msg state)
-  (declare (ignore state msg))
-  ;; (format t "Update called with message: ~A~%" msg)
-  (make-instance 'elmtui.tea-state:update-result))
-
-(defun my-view-fn (state)
-  (declare (ignore state))
-  (list :components
-        (list :root-viewport :id :rv
-                             :initial-terminal-dimensions (list 80 24)
-                             :initial-cursor-position (list 0 0)
-                             :initial-child-spec *dummy-root-dsl*)))
-
-(defapplication my-test-app
-  :root-component-dsl *dummy-root-dsl*
-  :initial-state-plist (list :some-initial-state t)
-  :update-fn (lambda (m s) (my-update-fn m s))
-  :view-fn   'my-view-fn
-  :subscriptions-fn (lambda (model)
-                      (declare (ignore model))
-                      ;; (format t "Subs called~%")
-                      nil)
-  :root-viewport-id :rv-myid)
-;; (initialize-app-state-my-test-app
-;;   :initial-terminal-dimensions (list 80 24)
-;;   :initial-cursor-position (list 0 0))
+;;; Inline demo definitions removed to reduce load time.
 
 (defvar *application-modules* (make-hash-table :test 'eq)
   "A registry for application modules defined with defmodule.")

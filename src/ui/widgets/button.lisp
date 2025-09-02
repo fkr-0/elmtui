@@ -22,7 +22,13 @@
                      :initarg :on-click-msg :accessor button-on-click-msg)
    (disabled nil :type (or null boolean) :documentation "Whether the button is disabled."
                  :initarg :disabled :accessor button-disabled-p)
-   (focused nil :type (or boolean null ) :documentation "Whether the button currently has focus."))
+   (focused nil :type (or boolean null ) :documentation "Whether the button currently has focus.")
+   ;; Lightweight enhanced features
+   (variant :default :type keyword :documentation "Visual variant (e.g., :default, :primary).")
+   (size :medium :type keyword :documentation "Visual size (e.g., :small, :medium, :large).")
+   (aria-label nil :type (or null string) :documentation "Screen-reader label override.")
+   (tooltip nil :type (or null string) :documentation "Tooltip text.")
+   )
   (:documentation "A clickable button widget, refactored to the new defcomponent style.")
   (:on-unhandled-message :log)
 
@@ -33,9 +39,16 @@
          ;; This inline :init can still override or supplement.
          ;; Here, we allow :initial-label, :initial-on-click-msg, :initial-disabled as aliases from props.
          (values `(:label ,(getf props :label (getf props :initial-label "Button"))
-                   :on-click-msg ,(getf props :on-click-msg (getf props :initial-on-click-msg nil))
+                   ;; Allow :action as alias for on-click-msg
+                   :on-click-msg ,(or (getf props :on-click-msg)
+                                      (getf props :initial-on-click-msg)
+                                      (getf props :action))
                    :disabled ,(getf props :disabled (getf props :initial-disabled nil))
-                   :focused nil) ; Focused state always starts as nil
+                   :focused nil ; Focused state always starts as nil
+                   :variant ,(getf props :variant :default)
+                   :size ,(getf props :size :medium)
+                   :aria-label ,(getf props :aria-label)
+                   :tooltip ,(getf props :tooltip))
                  nil)) ; No initial commands
 
   (:update (message local-state app-state self-id-path)
@@ -60,10 +73,16 @@
                 (label (getf local-state :label))
                 (disabled (getf local-state :disabled))
                 (focused (getf local-state :focused))
+                (variant (getf local-state :variant :default))
+                (size (getf local-state :size :medium))
+                (aria-label (getf local-state :aria-label))
+                (tooltip (getf local-state :tooltip))
                 (base-class "button")
+                (variant-class (format nil "button-variant-~(~a~)" variant))
+                (size-class (format nil "button-size-~(~a~)" size))
                 (disabled-class (when disabled "button-disabled"))
                 (focused-class (when focused "button-focused"))
-                (all-classes (remove nil (list base-class disabled-class focused-class))))
+                (all-classes (remove nil (list base-class variant-class size-class disabled-class focused-class))))
            (list :container
                  ;; :type :button ; This type is used by the renderer/event handler
                  :props (list :id component-id
@@ -74,7 +93,9 @@
                               :on-click (unless disabled '(:button-click))
                               :class (format nil "~{~A~^ ~}" all-classes)
                               :aria-role "button"
-                              :aria-disabled (if disabled "true" "false"))
+                              :aria-disabled (if disabled "true" "false")
+                              :aria-label aria-label
+                              :title tooltip)
                  :children nil))))
 
 ;; To make a button instance:
