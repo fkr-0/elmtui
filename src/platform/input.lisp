@@ -3,17 +3,18 @@
 ;;; Platform Input Adapter
 (uiop:define-package :elmtui.platform.input
   (:use :cl
-   :elmtui.core.loop ; Ensure this is present if elmtui.core.loop:publish was used directly, though now it will be passed in
-   )
+    :elmtui.core.loop ; Ensure this is present if elmtui.core.loop:publish was used directly, though now it will be passed in
+    )
   (:import-from :log4cl #:log-debug #:log-warn #:log-info) ; Added log-info
   (:import-from :elmtui.core.threads
-                #:with-interruptable-signal #:cond-message)
+    #:with-interruptable-signal #:cond-message)
   (:import-from :elmtui.platform.api
-                #:poll-input-event)
+    #:poll-input-event)
   (:import-from :elmtui.tea-state.msg #:make-focusprevious-appmsg #:make-focusnext-appmsg)
   (:export :start-reader
-   :stop-reader
-           :request-stop-input-reader)) ; Assuming request-stop-input-reader might be a default name
+    :stop-reader
+    :request-stop-input-reader)) ; Assuming request-stop-input-reader might be a default name
+
 (in-package :elmtui.platform.input)
 
 ;; Default name for the function to stop the input reader thread.
@@ -43,22 +44,22 @@ Returns:
         (when event
           (log:debug "INPUT: poll-input-event returned: ~S" event)
           (if (typep event 'elmtui.core.event-types:key-event)
-              (let* ((key (elmtui.core.event-types:key-event-key event))
-                     (modifiers (elmtui.core.event-types:key-event-modifiers event)))
-                (cond
-                  ((and (eq key :tab) (member :shift modifiers :test #'eq))
-                   (log:debug "INPUT: Publishing make-focus-previous-app-msg for Shift+Tab via event-handler")
-                   (funcall event-handler (make-focusprevious-appmsg)))
-                  ((eq key :tab)
-                   (log:debug "INPUT: Publishing make-focus-next-app-msg for Tab via event-handler")
-                   (funcall event-handler (make-focusnext-appmsg)))
-                  (t
-                   (log:debug "INPUT: Publishing key-event struct via event-handler: ~S" event)
-                   (funcall event-handler event)
-                   (setf ret-val (format nil "Last event: ~a" event))))) ; Publish original key-event struct
-              (progn ; Event is not a key-event struct
-                (log:info "INPUT: Publishing non-key-event struct via event-handler: ~S" event)
-                (funcall event-handler event)))) ; Publish other event types
+            (let* ((key (elmtui.core.event-types:key-event-key event))
+                    (modifiers (elmtui.core.event-types:key-event-modifiers event)))
+              (cond
+                ((and (eq key :tab) (member :shift modifiers :test #'eq))
+                  (log:debug "INPUT: Publishing make-focus-previous-app-msg for Shift+Tab via event-handler")
+                  (funcall event-handler (make-focusprevious-appmsg)))
+                ((eq key :tab)
+                  (log:debug "INPUT: Publishing make-focus-next-app-msg for Tab via event-handler")
+                  (funcall event-handler (make-focusnext-appmsg)))
+                (t
+                  (log:debug "INPUT: Publishing key-event struct via event-handler: ~S" event)
+                  (funcall event-handler event)
+                  (setf ret-val (format nil "Last event: ~a" event))))) ; Publish original key-event struct
+            (progn ; Event is not a key-event struct
+              (log:info "INPUT: Publishing non-key-event struct via event-handler: ~S" event)
+              (funcall event-handler event)))) ; Publish other event types
         (sb-thread:thread-yield)))))
 
 ;; Return a function that can be called to stop the reader
@@ -79,21 +80,21 @@ Returns:
   (declare (ignorable thread-handle))
 
   (if (symbolp stop-signal-function)
-      ;; Handle case where a symbol was passed
-      (if (fboundp stop-signal-function)
-          (progn
-            (log:info "INPUT: Calling stop-signal-function (symbol): ~S" stop-signal-function)
-            (funcall (symbol-function stop-signal-function))
-            t)
-          (progn
-            (log:warn "INPUT: stop-reader: Provided stop-signal-function symbol '~A' is not fboundp." stop-signal-function)
-            nil))
-      ;; Handle case where a function object was passed
-      (if (functionp stop-signal-function)
-          (progn
-            (log:info "INPUT: Calling stop-signal-function (function object)")
-            (funcall stop-signal-function)
-            t)
-          (progn
-            (log:warn "INPUT: stop-reader: Provided stop-signal-function is neither a symbol nor a function: ~A" stop-signal-function)
-            nil))))
+    ;; Handle case where a symbol was passed
+    (if (fboundp stop-signal-function)
+      (progn
+        (log:info "INPUT: Calling stop-signal-function (symbol): ~S" stop-signal-function)
+        (funcall (symbol-function stop-signal-function))
+        t)
+      (progn
+        (log:warn "INPUT: stop-reader: Provided stop-signal-function symbol '~A' is not fboundp." stop-signal-function)
+        nil))
+    ;; Handle case where a function object was passed
+    (if (functionp stop-signal-function)
+      (progn
+        (log:info "INPUT: Calling stop-signal-function (function object)")
+        (funcall stop-signal-function)
+        t)
+      (progn
+        (log:warn "INPUT: stop-reader: Provided stop-signal-function is neither a symbol nor a function: ~A" stop-signal-function)
+        nil))))

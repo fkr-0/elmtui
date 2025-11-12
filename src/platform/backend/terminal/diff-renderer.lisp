@@ -245,7 +245,7 @@ Optimizes by batching contiguous character updates with the same style."
           (when current-batch
             (push current-batch diff-ops)
             (incf (rendering-stats-diff-batches-created *current-rendering-stats*))))))
-    (log-info "BUFFER DIFF: Cells compared - Equal: ~A, Different: ~A" equal-count diff-count)
+    ;; (log-info "BUFFER DIFF: Cells compared - Equal: ~A, Different: ~A" equal-count diff-count)
     (log-info "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
     ;; (log-info "BUFFER DIFF: Final diff-ops: ~A" diff-ops)
     (log-info "RENDERING STATS (diff): Compared=~A, Changed=~A, Batches=~A, FullRedraws=~A"
