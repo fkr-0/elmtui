@@ -40,6 +40,15 @@ This document outlines the current development tasks, priorities, and ongoing wo
 
 ## Recently Completed Tasks
 
+*   **Task ID/Link:** Architectural Review Documentation Updates
+    *   **Description:** Created and updated comprehensive documentation based on architectural review findings for Elmtui's app creation & configuration system. This includes new guides for architecture, component lifecycle, state management, application patterns, and developer onboarding.
+    *   **Completed Date:** 2025-09-02
+    *   **Notes:** See [`docs/architecture/app-creation-configuration.md`](../architecture/app-creation-configuration.md), [`docs/modules/ui/component-lifecycle.md`](../modules/ui/component-lifecycle.md), [`docs/modules/tea-state/state-transactions.md`](../modules/tea-state/state-transactions.md), [`docs/modules/app/application-patterns.md`](../modules/app/application-patterns.md), and [`docs/dev-guides/creating-applications.md`](../dev-guides/creating-applications.md) for details. Updated [`changelog.md`](../maintenance/changelog.md) accordingly.
+*   **Task ID/Link:** fzy-picker Example Application Documentation and Fixes Summary
+    *   **Description:** Documented comprehensive fixes applied to the fzy-picker example application, including application structure corrections, state management improvements, cl-fzy integration fixes, and runtime corrections. Created complete documentation with current status, known issues, and architectural lessons learned.
+    *   **Completed Date:** 2025-09-02
+    *   **Notes:** Created [`docs/examples/fzy-picker.md`](../examples/fzy-picker.md) with full documentation of code structure improvements, troubleshooting guide, and integration patterns. Updated [`changelog.md`](../maintenance/changelog.log) with detailed fix summary. Application structure now follows proper Elmtui patterns, though dependency and threading issues remain unresolved.
+
 *   **Task ID/Link:** Comprehensive Dependency Analysis and API Refactoring Plan
     *   **Description:** Created thorough analysis of module dependencies and designed comprehensive 5-phase plan to establish clean API boundaries and reduce tight coupling in Elmtui architecture.
     *   **Completed Date:** 2025-06-19

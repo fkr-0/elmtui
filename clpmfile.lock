@@ -181,7 +181,9 @@
  (t (:system :name "asdf-package-system" :source "quicklisp")))
 
 ("asdf-viz"
- (t (:project :name "asdf-viz" :branch "master" :source :implicit-vcs)))
+ (t
+  (:project :name "asdf-viz" :commit "33e5c97295b8284dca69128023359b21563a926d"
+   :source :implicit-vcs)))
 
 ("bordeaux-threads" ((:system :name "rove") (:system :name "bordeaux-threads"))
  ((:system :name "log4cl") (:system :name "bordeaux-threads"))
@@ -281,17 +283,23 @@
  ((:system :name "slynk-quicklisp") (:system :name "slynk"))
  ((:system :name "slynk-asdf") (:system :name "slynk"))
  (t (:system :name "slynk"))
- (t (:project :name "sly" :branch "master" :source :implicit-vcs)))
+ (t
+  (:project :name "sly" :commit "63131ef965d8ff3a6b79cc7aff8e8f5fc1a82aec"
+   :source :implicit-vcs)))
 
 ("sly-asdf"
  ((:system :name "inferred-test") (:system :name "inferred-test/main"))
  ((:system :name "asdf-test/tests/main") (:system :name "asdf-test/main"))
  ((:system :name "asdf-test/tests") (:system :name "asdf-test/tests/main"))
  ((:system :name "asdf-test") (:system :name "asdf-test/main"))
- (t (:project :name "sly-asdf" :branch "master" :source :implicit-vcs)))
+ (t
+  (:project :name "sly-asdf" :commit "6f9d751469bb82530db1673c22e7437ca6c95f45"
+   :source :implicit-vcs)))
 
 ("sly-quicklisp"
- (t (:project :name "sly-quicklisp" :branch "master" :source :implicit-vcs)))
+ (t
+  (:project :name "sly-quicklisp" :commit
+   "34c73d43dd9066262387c626c17a9b486db07b2d" :source :implicit-vcs)))
 
 ("trivia" ((:system :name "type-i") (:system :name "trivia.trivial"))
  ((:system :name "trivia.trivial") (:system :name "trivia.level2"))

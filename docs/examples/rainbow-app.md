@@ -2,7 +2,7 @@
 # AI Metadata Tags
 ai_keywords: [Rainbow Example, defapplication, run-application, stylesheet, flexbox, Elmtui Example, colored stripes]
 ai_contexts: [usage, example, implementation]
-ai_relations: ["../modules/app/overview.md", "../modules/app/implementation.md", "../modules/view/overview.md"]
+ai_relations: ["./fzy-picker.md", "../modules/app/overview.md", "../modules/app/implementation.md", "../modules/view/overview.md"]
 ---
 
 # Rainbow Example Application

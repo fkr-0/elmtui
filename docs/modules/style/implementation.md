@@ -1,50 +1,19 @@
----
-ai_keywords: [style, implementation, theming, styling, elmtui, module]
-ai_contexts: [module-implementation]
-ai_relations: [overview.md]
----
+# Style Module — Implementation
 
-# Style Module Implementation
-
-**AI-IMPORTANCE:** High
-
-**Purpose:**  
-Details the implementation of the style and theming system in Elmtui, including architecture, key functions, and extension points.
-
-## Contents
-
-- Architecture Overview
-- Key Data Structures
-- Core Functions and Algorithms
-- Integration with Other Modules
-- Extensibility and Customization
-- References
+<!-- Existing content above -->
 
 ---
 
-## Architecture Overview
+## ⚠️ Submodule Coverage & Refactoring Status
 
-Describe the internal structure of the style module, including how style rules are parsed, stored, and applied.
+**NOTE:**  
+This implementation doc does **not** explicitly cover the `cl-styles` submodule.  
+- Dedicated implementation documentation for `cl-styles` is missing.
+- Refactoring/migration status for `cl-styles` is not tracked here and should be added.
+- Related files: If style-related docs exist elsewhere, they do not fully represent the submodule.
 
-## Key Data Structures
+**TODO:**  
+- Add explicit `cl-styles` submodule implementation documentation.
+- Track refactoring/migration status for `cl-styles`.
 
-- List and explain the main data structures (e.g., style maps, theme objects).
-
-## Core Functions and Algorithms
-
-- Document the primary functions for style resolution, inheritance, and application.
-
-## Integration with Other Modules
-
-- Explain how the style module interacts with `view`, `ui`, and rendering systems.
-
-## Extensibility and Customization
-
-- Describe extension points for user-defined styles and future enhancements.
-
-## References
-
-- [`overview.md`](overview.md)
-- [`docs/architecture/core-concepts.md`](../../architecture/core-concepts.md)
-
-**AI-CONTEXT-END**
+---

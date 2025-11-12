@@ -143,7 +143,7 @@
          (origin-y 0))
     (if (and backend back-buffer (open-stream-p (elmtui.platform.api:term-stream backend)))
         (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
-          (log:info "PIPELINE: Displaying buffer with diff: ~A" diff)
+          (log:info "PIPELINE: Displaying buffer with diff: ~A" (length diff))
           (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-x origin-y)
           (elmtui.platform.api:flush-output backend)
           (setf (ctx-front-buffer ctx) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))

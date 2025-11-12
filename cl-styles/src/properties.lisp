@@ -2,11 +2,11 @@
 
 (define-condition style-contract-violation (error)
   ((expected :initarg :expected :reader expected)
-   (got      :initarg :got      :reader got)
-   (where    :initarg :where    :reader where))
+    (got      :initarg :got      :reader got)
+    (where    :initarg :where    :reader where))
   (:report (lambda (c s)
-             ;; (format s "Style contract violation at ~A: expected ~A, got ~S"
-             ;;         (where c) (expected c) (got c))
+             (format s "Style contract violation at ~A: expected ~A, got ~S"
+               (where c) (expected c) (got c))
              )))
 
 (defparameter *property-registry* (make-hash-table :test 'eql))
@@ -21,13 +21,13 @@
 
 (defmacro defproperty (name &key type enum synonyms group default doc)
   `(register-property ,name (list :type ,(if (and (consp type) (eq (car type) 'lambda))
-                                             `#',type
-                                             `',type)
-                                  :enum ',enum
-                                  :synonyms (%mk-syns ,@synonyms)
-                                  :group ',group
-                                  :default ',default
-                                  :doc ,doc)))
+                                           `#',type
+                                           `',type)
+                              :enum ',enum
+                              :synonyms (%mk-syns ,@synonyms)
+                              :group ',group
+                              :default ',default
+                              :doc ,doc)))
 
 (defun define-group (group &rest props)
   (setf (gethash group *groups*) (remove-duplicates props :test 'eql)))
@@ -61,21 +61,21 @@
 
 (defun %normalize-value (prop v)
   (let* ((def (property-definition prop))
-         (type-of-prop (getf def :type nil))
-         (syns (getf def :synonyms nil))
-         (vv (%ensure-keyword v)))
+          (type-of-prop (getf def :type nil))
+          (syns (getf def :synonyms nil))
+          (vv (%ensure-keyword v)))
     (cond
       ((and syns (hash-table-p syns))
-       (multiple-value-bind (m present) (gethash vv syns)
-         (if present m vv)))
+        (multiple-value-bind (m present) (gethash vv syns)
+          (if present m vv)))
       ((and (eq type-of-prop :string) (stringp v)) v)
       (t vv))))
 
 (defun %check-type (prop v)
   (let* ((def (property-definition prop))
-         (type (getf def :type nil))
-         (enum (getf def :enum nil))
-         (nv (%normalize-value prop v)))
+          (type (getf def :type nil))
+          (enum (getf def :enum nil))
+          (nv (%normalize-value prop v)))
     (flet ((fail (expected)
              (error 'style-contract-violation :expected expected :got nv :where prop)))
       (when enum
@@ -84,15 +84,15 @@
       (when type
         (cond
           ((keywordp type)
-           (case type
-             (:keyword (unless (%keyword-p nv) (fail :keyword)))
-             (:number  (unless (%number-p nv)  (fail :number)))
-             (:length  (unless (%length-p nv)  (fail :length)))
-             (:string  (unless (%string-p nv)  (fail :string)))
-             (t (error "Unknown keyword property type: ~A" type))))
+            (case type
+              (:keyword (unless (%keyword-p nv) (fail :keyword)))
+              (:number  (unless (%number-p nv)  (fail :number)))
+              (:length  (unless (%length-p nv)  (fail :length)))
+              (:string  (unless (%string-p nv)  (fail :string)))
+              (t (error "Unknown keyword property type: ~A" type))))
           ((functionp type)
-           (unless (funcall type nv)
-             (fail type)))
+            (unless (funcall type nv)
+              (fail type)))
           (t (error "Invalid type specifier: ~A" type)))))
     nv))
 
@@ -120,7 +120,7 @@ Example:
   (let ((normalized-plist (copy-list (or plist nil))))
     (loop for (key value) on normalized-plist by #'cddr do
       (let* ((normalized-key (%normalize-key key))
-             (normalized-value (%normalize-value normalized-key value)))
+              (normalized-value (%normalize-value normalized-key value)))
         ;; Remove the original key and set the normalized key and value
         (remf normalized-plist key)
         (setf (getf normalized-plist normalized-key) normalized-value)))
@@ -145,7 +145,7 @@ Raises:
 - `style-contract-violation`: If any value does not conform to the expected type for its property."
   (loop for (k v) on plist by #'cddr do
     (let* ((kk (%normalize-key k))
-           (vv (%normalize-value kk v)))
+            (vv (%normalize-value kk v)))
       (when (property-definition kk)
         (%check-type kk vv))))
   plist)
@@ -160,9 +160,9 @@ Raises:
 (define-group :margin  :margin  :margin-top  :margin-right  :margin-bottom  :margin-left)
 (define-group :border  :border :border-width :border-top-width :border-right-width :border-bottom-width :border-left-width)
 (apply #'define-group :box
-       (append (properties-for-group :padding)
-               (properties-for-group :margin)
-               (properties-for-group :border)))
+  (append (properties-for-group :padding)
+    (properties-for-group :margin)
+    (properties-for-group :border)))
 
 ;; layout groups
 (define-group :flex :display :flex-direction :flex-wrap :justify-content :align-items :align-content :gap :row-gap :column-gap :order :flex-grow :flex-shrink :flex-basis)

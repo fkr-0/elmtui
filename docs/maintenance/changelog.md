@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **fzy-picker Example Application Structure Fixes (2025-09-02):**
+  - Fixed [`defapplication`](../modules/app/overview.md) pattern alignment with working examples
+  - Corrected root component DSL structure (`:container` vs `:layout`)
+  - Replaced direct `getf` calls with proper [`state-ref`](../modules/state/overview.md) API usage
+  - Fixed patch structure format and [`make-update-result`](../modules/state/overview.md) usage patterns
+  - Replaced private cl-fzy API calls (`cl-fzy::`) with public functions
+  - Implemented proper cl-fzy object initialization and comprehensive key event handling
+  - Added proper error handling, quit functionality, and navigation features
+  - **Note**: Application still has dependency and threading issues preventing full functionality
 - Added defensive method for [`stylable-id`](../../src/view/api.lisp) on `ui-node` to prevent method errors.
 - Normalized `styled-tree` in [`render-frame`](../../src/platform/driver.lisp) to always be a list, preventing type errors when the view root is a single node.
 - The render pipeline now distinguishes between an empty UI tree (treated as a valid "no-op" and logged as such, with frame rendering skipped) and all other cases where the rendered canvas is NIL (treated as errors, logged, and the application is halted). This aligns with Elm/TEA and Elmtui philosophy: empty UI is not an error, but unexpected NIL from rendering is a bug and must be surfaced.
@@ -19,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Added
+*   **Architectural Review Documentation Updates (2025-09-02):**
+    *   Created [`docs/architecture/app-creation-configuration.md`](../architecture/app-creation-configuration.md) providing a comprehensive integration guide for `defcomponent`, `defmodel`, and `defapplication`.
+    *   Created [`docs/modules/ui/component-lifecycle.md`](../modules/ui/component-lifecycle.md) completing the component lifecycle documentation, including the cleanup phase, inheritance, and state management.
+    *   Created [`docs/modules/tea-state/state-transactions.md`](../modules/tea-state/state-transactions.md) offering a practical guide to the state transaction system with examples and performance considerations.
+    *   Created [`docs/modules/app/application-patterns.md`](../modules/app/application-patterns.md) documenting best practices for app configuration, message routing, platform integration, and performance optimization.
+    *   Created [`docs/dev-guides/creating-applications.md`](../dev-guides/creating-applications.md) as a step-by-step developer onboarding guide for the core Elmtui systems.
+    *   Addressed critical API inconsistencies, message handling fragmentation, error handling variance, and developer experience issues through updated documentation.
+*   **fzy-picker Example Documentation (2025-09-02):**
+    *   Created [`docs/examples/fzy-picker.md`](../examples/fzy-picker.md) documenting the fzy-picker example application fixes and current status
+    *   Comprehensive documentation of code structure improvements, state management corrections, and cl-fzy integration fixes
+    *   Clear status indicators for completed fixes and known remaining issues (dependency and threading problems)
+    *   Architecture lessons learned and troubleshooting guide for common development issues
+    *   Integration with broader Elmtui documentation structure with proper AI metadata and cross-references
 *   **Comprehensive Documentation Review (2025-06-27):**
     *   Systematically reviewed all module overview and implementation documents for accuracy, metadata, and AI marker compliance.
     *   Validated consistency across architecture, module, and navigation docs.
