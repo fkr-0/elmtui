@@ -2,7 +2,7 @@
 ;;; A thorough example demonstrating how to integrate a legacy, functional
 ;;; component with the modern defapplication framework, including keymaps
 ;;; and focus management, following the recommended "Central Gateway" architecture.
-(uiop:define-package :elmtui.examples.key-tester
+(uiop:define-package :elmtui-examples.key-tester
   (:use :cl )
 
   (:import-from #:log4cl
@@ -43,7 +43,7 @@
    #:%fake-key-event
    #:run))
 
-(in-package :elmtui.examples.key-tester)
+(in-package :elmtui-examples.key-tester)
 
 ;;; ----------------------------------------------------------------------
 ;;; Keymap Integration Layer (Strategy A: Central Gateway)
