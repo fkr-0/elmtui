@@ -87,73 +87,87 @@
 
   "Stylesheet for the rainbow application.")
 (defun app-update (message app-state)
-  (declare (ignore message app-state))
-  ;; (if (typep message 'key-event)
-  ;;     (make-update-result :patches '((:should-quit . t)))
-  ;;     (make-update-result))
-  (make-update-result)
-  )
+  (cond
+    ((typep message 'key-event)
+      (let* ((current (state-ref app-state :orientation :row))
+              (next (if (eq current :row) :column :row)))
+        (make-update-result :patches `(((:orientation) ,next)))))
+    (t
+      (make-update-result))))
 
 (defun view (app-state)
-  (declare (ignore app-state))
-  `(:container
-    :id :main
-    :style (:box :ascii :width :auto :height 34 :display :block
-            :fg-color ,`(,(random 256) ,(random 256) ,(random 256))
-                                        ; :bg-color ,`(,(random 256) ,(random 256) ,(random 256))
-            :display :flex :flex-direction :column
-            :padding 0
-            :margin 0
-            :spacing 0
-            :gap 0
-            :border-style :double :border-width 1 )
-    :children
-    ,(loop for i from 0 below 7
-           collect
-           `(:container
-             :id ,(intern (format nil "ROW-~D" i) :keyword)
-             :style (:box :ascii
-                                        ;:min-height :auto
-                     :height 3
-                     :min-height 3
-                     :width :fill
-                     :min-width 3
-                     :border-style :ascii :border-width 1
-                     :display :flex :flex-direction :row
-                     :bg-color ,`(,(random 256) ,(random 256) ,(random 256))
-                     :fg-color ,`(,(random 256) ,(random 256) ,(random 256)))
-             :children
-             ,(loop for j from 0 below 7
-                    collect
-                    `(:container
-                      :id ,(intern (format nil "CELL-~D-~D" i j) :keyword)
-                      :style (:width 1 :height 1
+  (let* ((orientation (state-ref app-state :orientation :row))
+          (row-major (eq orientation :row)))
+    `(:container
+       :id :main
+       :style (:box :ascii :width :auto :height 34 :display :block
+                :fg-color ,`(,(random 256) ,(random 256) ,(random 256))
+                :display :flex :flex-direction ,(if row-major :column :row)
+                :padding 0 :margin 0 :spacing 0 :gap 0
+                :border-style :double :border-width 1 )
+       :children
+       ,(if row-major
+          (loop for i from 0 below 7
+            collect
+            `(:container
+               :id ,(intern (format nil "ROW-~D" i) :keyword)
+               :style (:box :ascii
+                        :height 3 :min-height 3
+                        :width :fill :min-width 3
+                        :border-style :ascii :border-width 1
+                        :display :flex :flex-direction :row
+                        :bg-color ,`(,(random 256) ,(random 256) ,(random 256))
+                        :fg-color ,`(,(random 256) ,(random 256) ,(random 256)))
+               :children
+               ,(loop for j from 0 below 7
+                  collect
+                  `(:container
+                     :id ,(intern (format nil "CELL-~D-~D" i j) :keyword)
+                     :style (:width 1 :height 1
                               :min-width 1
                               :min-height 1
                               :display :flex :flex-direction :column
-                              ;; :display :block
-                              ;; :border-style :double :border-width 1
-                              ;; :box :ascii
-                                        ;:min-height 0
                               :fg-color ,`(,(random 256) ,(random 256) ,(random 256))
-                              :bg-color ,`(,(random 256) ,(random 256) ,(random 256)))))))))
+                              :bg-color ,`(,(random 256) ,(random 256) ,(random 256))))))))
+       (loop for j from 0 below 7
+         collect
+         `(:container
+            :id ,(intern (format nil "COL-~D" j) :keyword)
+            :style (:box :ascii
+                     :width 3 :min-width 3
+                     :height :fill :min-height 3
+                     :border-style :ascii :border-width 1
+                     :display :flex :flex-direction :column
+                     :bg-color ,`(,(random 256) ,(random 256) ,(random 256))
+                     :fg-color ,`(,(random 256) ,(random 256) ,(random 256)))
+            :children
+            ,(loop for i from 0 below 7
+               collect
+               `(:container
+                  :id ,(intern (format nil "CELL-~D-~D" i j) :keyword)
+                  :style (:width 1 :height 1
+                           :min-width 1
+                           :min-height 1
+                           :display :flex :flex-direction :row
+                           :fg-color ,`(,(random 256) ,(random 256) ,(random 256))
+                           :bg-color ,`(,(random 256) ,(random 256) ,(random 256))))))))))
 
 (defapplication mini-rainbow
   :root-component-dsl
   `(:root-viewport
-    :initial-terminal-dimensions (1 1)
-    :initial-cursor-pos (1 1)
-    :id :root
-    :anchor :below-cursor
-    :child-dsl-spec (:view ,(view nil)))
+     :initial-terminal-dimensions (1 1)
+     :initial-cursor-pos (1 1)
+     :id :root
+     :anchor :below-cursor
+     :child-dsl-spec (:view nil))
   :update-fn 'app-update
   ;; :stylesheet rainbow-stylesheet
   :view-fn #'view
   :root-viewport-id :root
   :initial-state-plist (list :current-stylesheet rainbow-stylesheet
-                             :should-quit nil
-                             :orientation :row
-                             :switch-count 0))
+                         :should-quit nil
+                         :orientation :row
+                         :switch-count 0))
 
 ;; (defun run-mini-rainbow ()
 ;;   "Run the mini-rainbow example."

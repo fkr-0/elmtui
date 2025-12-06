@@ -138,9 +138,10 @@ as well as the view function for the application.")
                              (log-debug "EVENT-CONSUMER: wait-for-event timed out or returned nil event.")))
                      (error (e)
                        (log-error "EVENT-CONSUMER: Error during event polling: ~A. Invoking restart." e)
-                       ;; (setf *shutdown-requested* nil)
-                       (invoke-debugger e)
-                       (invoke-restart 'restart-loop)))
+                       ;; prevent hard hang on shutdown: mark and exit loop
+                       (setf *shutdown-requested* t)
+                       (log-error "EVENT-CONSUMER: Error during polling; setting shutdown-requested. ~A" e)
+                       (return)))
                  (restart-loop ()
                    :report "Restart the event loop by spawning a new consumer thread."
                    (log-warn "EVENT-CONSUMER: restart-loop invoked. Creating new thread.")
@@ -410,7 +411,7 @@ as well as the view function for the application.")
 Returns T on success, NIL on drop. Safe after shutdown."
   (when (or *shutdown-requested*
             (null event))                         ;; early sanity
-    (log-warn "PUBLISH: refusing because of shutdown or NIL event: ~S" event)
+    ;; Silently drop - logging here can cause deadlock
     (return-from publish nil))
 
   ;; 1. Normalise target name → always a keyword
@@ -429,15 +430,13 @@ Returns T on success, NIL on drop. Safe after shutdown."
                  :key #'elmtui.core.event-channels:name
                  :test #'eql)))                  ;; eql safer for mixed symbols/keywords
     (unless channel-obj
-      (log-warn "PUBLISH: Target channel ~S not found. Drop ~S"
-                effective-target-name event)
+      ;; Silently drop - logging here can cause deadlock
       (return-from publish nil))
 
     (let ((the-channel (elmtui.core.event-channels:channel-of channel-obj)))
       (unless (and the-channel
                    (not (cleve-elm.channel:channel-closed the-channel)))
-        (log-warn "PUBLISH: Channel ~S closed. Drop ~S"
-                  effective-target-name event)
+        ;; Silently drop - logging here can cause deadlock
         (return-from publish nil))
 
       ;; Wrap event if necessary
@@ -451,11 +450,10 @@ Returns T on success, NIL on drop. Safe after shutdown."
         (handler-case
             (progn
               (cleve-elm.channel:-> the-channel event*)
-              (log-info "PUBLISH: sent to ~S: ~S" effective-target-name event*)
+              ;; Log outside of the critical section to avoid deadlock with Log4CL
               t)                                 ;; success
           (error (e)
-            (log-error "PUBLISH: failed to enqueue ~S to ~S: ~A"
-                       event* effective-target-name e)
+            ;; Log outside of the critical section to avoid deadlock with Log4CL
             nil))))))
 ;; (defun publish (event &key target-channel-name)
 ;;   "Publish an event to a specified or default event channel. Safe to call after shutdown."

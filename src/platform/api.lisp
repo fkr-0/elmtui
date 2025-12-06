@@ -12,75 +12,79 @@
   (:use :cl)
   (:import-from #:elmtui.utils #:plistp)
   (:export
-   :lockable
-   :lock-of
-   :with-lock
-   :acquire-lock
-   :release-lock
-   ;; Backend Lifecycle
-   :initialize-backend
-   :shutdown-backend
-   :backend-name
-   :backend-version
+    :lockable
+    :lock-of
+    :with-lock
+    :acquire-lock
+    :release-lock
+    ;; Backend Lifecycle
+    :initialize-backend
+    :shutdown-backend
+    :backend-name
+    :backend-version
 
-   ;; Display & Screen Management
-   :get-screen-dimensions
-   :clear-screen
-   :with-terminal-output
-   :flush-output
-   :set-cursor-visibility
-   :set-cursor-position
-   :get-cursor-position
-   :hide-cursor
-   :show-cursor
-   :handle-backend-resize ; New
+    ;; Display & Screen Management
+    :get-screen-dimensions
+    :clear-screen
+    :with-terminal-output
+    :flush-output
+    :set-cursor-visibility
+    :set-cursor-position
+    :get-cursor-position
+    :hide-cursor
+    :show-cursor
+    :handle-backend-resize ; New
 
-   ;; Drawing Primitives
-   :draw-text-at
-   :draw-char-at
-   :fill-rectangle
-   :draw-box-outline
-   :draw-styled-box ; New generic for detailed border drawing
-   :set-cell-style
-   :clear-area
-   ;; Terminal scrolling/clearing helpers (new)
-   :scroll-lines
-   :clear-below-cursor
+    ;; Drawing Primitives
+    :draw-text-at
+    :draw-char-at
+    :fill-rectangle
+    :draw-box-outline
+    :draw-styled-box ; New generic for detailed border drawing
+    :set-cell-style
+    :clear-area
+    ;; Terminal scrolling/clearing helpers (new)
+    :scroll-lines
+    :clear-below-cursor
 
-   ;; Rendering
-   ;; Color and Style Management
-   :make-color
-   :make-style
-   :apply-style
-   :default-foreground-color
-   :default-background-color
-   :supports-truecolor-p
-   :max-colors
+    ;; Rendering
+    ;; Color and Style Management
+    :make-color
+    :make-style
+    :apply-style
+    :default-foreground-color
+    :default-background-color
+    :supports-truecolor-p
+    :max-colors
 
-   ;; Terminal Instance Accessors (Generic)
-   :term-w
-   :term-h
-   :term-stream
-   :term-style
-   ;; (setf term-w) and (setf term-h) are made available by exporting :term-w and :term-h
-   ;; and defining the (setf ...) generic functions. No need for explicit (setf ...) in :export.
+    ;; Terminal Instance Accessors (Generic)
+    :term-w
+    :term-h
+    :term-stream
+    :term-style
+    ;; (setf term-w) and (setf term-h) are made available by exporting :term-w and :term-h
+    ;; and defining the (setf ...) generic functions. No need for explicit (setf ...) in :export.
 
-   ;; Input Handling
-   :poll-input-event
-   :peek-input-event
-   :enable-mouse-support
-   :disable-mouse-support
-   :set-input-mode ; e.g., :raw, :cooked
+    ;; Input Handling
+    :poll-input-event
+    :peek-input-event
+    :enable-mouse-support
+    :disable-mouse-support
+    :set-input-mode ; e.g., :raw, :cooked
 
-   ;; Capability Querying
-   :query-feature
-   :supports-unicode-p
-   :supports-mouse-p
+    ;; Additional Backend Input Helpers
+    :backend-input-device
+    :backend-input-source
 
-   ;; Raw Access (Escape Hatch)
-   :get-native-handle
-   :scroll
-   :set-cursor-position))
+    ;; Capability Querying
+    :query-feature
+    :supports-unicode-p
+    :supports-mouse-p
+
+    ;; Raw Access (Escape Hatch)
+    :get-native-handle
+    :scroll
+    :set-cursor-position))
 
 (in-package :elmtui.platform.api)
 ;;; ===================================================================
@@ -138,17 +142,17 @@
 
 (defclass lockable ()
   ((lock :initarg :lock
-         :initform (bt:make-recursive-lock)
-         :accessor lock-of ; Changed from accessor to reader to prevent direct (setf lock-of)
-         :type bt:recursive-lock)
-   (lock-owner :initarg :lock-owner
-               :initform nil
-               :accessor lock-owner
-               :type t) ; Can be any thread object or T for generic owner
-   (lock-owner-count :initarg :lock-owner-count
-                     :initform 0
-                     :accessor lock-owner-count
-                     :type unsigned-byte)))
+     :initform (bt:make-recursive-lock)
+     :accessor lock-of ; Changed from accessor to reader to prevent direct (setf lock-of)
+     :type bt:recursive-lock)
+    (lock-owner :initarg :lock-owner
+      :initform nil
+      :accessor lock-owner
+      :type t) ; Can be any thread object or T for generic owner
+    (lock-owner-count :initarg :lock-owner-count
+      :initform 0
+      :accessor lock-owner-count
+      :type unsigned-byte)))
 
 ;;; ===================================================================
 ;;; IMPLEMENTATION SECTION
@@ -164,13 +168,13 @@ the current thread."
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (let ((current-thread (bt:current-thread)))
     (with-slots (lock lock-owner lock-owner-count)
-        l
+      l
       (bt:acquire-lock lock t) ; Ensure the lock is acquired before checking owner
       (if (eq lock-owner current-thread)
-          (incf (the fixnum lock-owner-count))
-          (progn
-            (setf lock-owner current-thread)
-            (setf lock-owner-count 1)))))
+        (incf (the fixnum lock-owner-count))
+        (progn
+          (setf lock-owner current-thread)
+          (setf lock-owner-count 1)))))
   l) ; Return the lockable object
 
 (defmethod release-lock ((l lockable))
@@ -179,14 +183,14 @@ lock count. Otherwise, release the lock and set the lock owner to nil."
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (let ((current-thread (bt:current-thread)))
     (with-slots (lock lock-owner lock-owner-count)
-        l
+      l
       (when (eq lock-owner current-thread)
         (if (> (the fixnum lock-owner-count) 1)
-            (decf (the fixnum lock-owner-count))
-            (progn
-              (setf lock-owner nil)
-              (setf lock-owner-count 0)
-              (bt:release-lock lock)))))))
+          (decf (the fixnum lock-owner-count))
+          (progn
+            (setf lock-owner nil)
+            (setf lock-owner-count 0)
+            (bt:release-lock lock)))))))
 
 (defmacro with-lock ((l) &body body)
   "Execute BODY with the lock of LOCKABLE L acquired.
@@ -197,11 +201,26 @@ This is useful for ensuring thread safety when accessing shared resources."
   `(progn
      (acquire-lock ,l)
      (unwind-protect
-          (progn ,@body)
+       (progn ,@body)
        (release-lock ,l))))
 
 (defgeneric scroll (backend n)
   (:documentation "Scroll the terminal display by N lines. Positive N scrolls down, negative N scrolls up."))
 
+(defgeneric clear-below-cursor (backend)
+  (:documentation "Clear all content from the cursor position to the end of the screen."))
+
 (defgeneric set-cursor-position (backend x y)
   (:documentation "Set the cursor position to (X, Y) on the terminal."))
+
+(defgeneric backend-input-device (backend)
+  (:documentation "Return the underlying cl-inputs device used for reading input, or NIL if the backend does not expose one."))
+
+(defmethod backend-input-device ((backend t))
+  nil)
+
+(defgeneric backend-input-source (backend)
+  (:documentation "Return the cl-inputs input source that the backend created, if any."))
+
+(defmethod backend-input-source ((backend t))
+  nil)

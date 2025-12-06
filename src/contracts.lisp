@@ -1,58 +1,58 @@
 (uiop:define-package :elmtui.contracts
   (:use :cl)
   (:import-from :elmtui.tea-state.msg
-                #:message-variant-p #:*message-schemas* #:message-schema)
+    #:message-variant-p #:*message-schemas* #:message-schema)
   (:export
-   ;; transform macros
-   #:deftransform
-   #:deftransformer
+    ;; transform macros
+    #:deftransform
+    #:deftransformer
 
-   ;; Structs constructors and accessors
-   #:make-app-context #:app-context
-   #:ctx-state #:ctx-viewport-rect
-   #:ctx-view-fn
-   #:ctx-stylesheet
-   #:ctx-dsl-tree #:ctx-raw-tree
-   #:ctx-styled-tree #:ctx-atomic-tree
-   #:ctx-laid-out-tree #:ctx-front-buffer
-   #:ctx-backend #:ctx-back-buffer
-   ;; trees
-   #:dsl-tree #:raw-tree #:styled-tree
-   #:atomic-tree #:laid-out-tree
-   ;; tree constructors
-   #:make-dsl-tree #:make-raw-tree
-   #:make-styled-tree #:make-atomic-tree
-   #:make-laid-out-tree
+    ;; Structs constructors and accessors
+    #:make-app-context #:app-context
+    #:ctx-state #:ctx-viewport-rect
+    #:ctx-view-fn
+    #:ctx-stylesheet
+    #:ctx-dsl-tree #:ctx-raw-tree
+    #:ctx-styled-tree #:ctx-atomic-tree
+    #:ctx-laid-out-tree #:ctx-front-buffer
+    #:ctx-backend #:ctx-back-buffer
+    ;; trees
+    #:dsl-tree #:raw-tree #:styled-tree
+    #:atomic-tree #:laid-out-tree
+    ;; tree constructors
+    #:make-dsl-tree #:make-raw-tree
+    #:make-styled-tree #:make-atomic-tree
+    #:make-laid-out-tree
 
-   ;; Tree root accessors
-   #:root
-   ;; Core contract macros
-   #:defupdate-ctr #:defview #:defsubscriptions
-   ;; Enhanced update macros with message type support
-   #:defupdate-typed #:defupdate-flexible #:defupdate-hybrid
-   ;; Contract validation
-   #:validate-update-result #:validate-model #:validate-commands
-   #:validate-dsl #:validate-subscriptions #:validate-message
-   ;; Message validation
-   #:validate-typed-message #:validate-flexible-message
-   #:validate-hybrid-message #:validate-strict-message
-   #:message-contract-violation
-   ;; Error conditions
-   #:contract-violation #:update-contract-violation
-   #:view-contract-violation #:subscription-contract-violation
-   #:pipeline-contract-violation
-   ;; Error conditions readers
-   #:cv-function-name #:cv-expected-type #:cv-actual-value
-   #:cv-context
-   #:violation-stage #:violation-expected #:violation-got
-   ;; Development utilities
-   #:enable-contract-debugging #:trace-contracts
-   #:contract-summary #:analyze-message-usage #:suggest-message-schema
-   #:validate-elm-application
-   ;; Stage pipeline contracts
-   #:define-stage #:define-pipeline
-   ;; Subscription utilities
-   #:subscription #:make-subscription #:subscription-p))
+    ;; Tree root accessors
+    #:root
+    ;; Core contract macros
+    #:defupdate-ctr #:defview #:defsubscriptions
+    ;; Enhanced update macros with message type support
+    #:defupdate-typed #:defupdate-flexible #:defupdate-hybrid
+    ;; Contract validation
+    #:validate-update-result #:validate-model #:validate-commands
+    #:validate-dsl #:validate-subscriptions #:validate-message
+    ;; Message validation
+    #:validate-typed-message #:validate-flexible-message
+    #:validate-hybrid-message #:validate-strict-message
+    #:message-contract-violation
+    ;; Error conditions
+    #:contract-violation #:update-contract-violation
+    #:view-contract-violation #:subscription-contract-violation
+    #:pipeline-contract-violation
+    ;; Error conditions readers
+    #:cv-function-name #:cv-expected-type #:cv-actual-value
+    #:cv-context
+    #:violation-stage #:violation-expected #:violation-got
+    ;; Development utilities
+    #:enable-contract-debugging #:trace-contracts
+    #:contract-summary #:analyze-message-usage #:suggest-message-schema
+    #:validate-elm-application
+    ;; Stage pipeline contracts
+    #:define-stage #:define-pipeline
+    ;; Subscription utilities
+    #:subscription #:make-subscription #:subscription-p))
 
 (in-package #:elmtui.contracts)
 ;;;--------------------------------------------------------------
@@ -60,8 +60,8 @@
 ;;;--------------------------------------------------------------
 
 (defstruct (app-context
-            (:conc-name ctx-)
-            (:constructor make-app-context (&key state viewport-rect
+             (:conc-name ctx-)
+             (:constructor make-app-context (&key state viewport-rect
                                               dsl-tree raw-tree styled-tree
                                               view-fn stylesheet
                                               atomic-tree laid-out-tree
@@ -187,16 +187,16 @@
 (defmacro deftransform (name (in-type) (out-type) (arg) &body body)
   "Define a pure transformer and an App-Context plumbing stage."
   (let* ((fun-name   name)
-         ;; 1.  AUTO-GENERATED STAGE NAME  -------------------------------
-         (stage-name (intern (format nil "~A-STAGE" (string-upcase (symbol-name name)))
-                             *package*))
-         ;; 2.  SYMBOLS FOR ACCESSORS (CTX-DSL-TREE, CTX-RAW-TREE, …) ---
-         (in-acc  (intern (format nil "CTX-~A" (string-upcase (symbol-name in-type)))
-                          *package*))
-         (out-acc (intern (format nil "CTX-~A" (string-upcase (symbol-name out-type)))
-                          *package*))
-         ;; 3.  GENSYM’D CTX VARIABLE ------------------------------------
-         (ctx-var  (gensym "CTX")))
+          ;; 1.  AUTO-GENERATED STAGE NAME  -------------------------------
+          (stage-name (intern (format nil "~A-STAGE" (string-upcase (symbol-name name)))
+                        *package*))
+          ;; 2.  SYMBOLS FOR ACCESSORS (CTX-DSL-TREE, CTX-RAW-TREE, …) ---
+          (in-acc  (intern (format nil "CTX-~A" (string-upcase (symbol-name in-type)))
+                     *package*))
+          (out-acc (intern (format nil "CTX-~A" (string-upcase (symbol-name out-type)))
+                     *package*))
+          ;; 3.  GENSYM’D CTX VARIABLE ------------------------------------
+          (ctx-var  (gensym "CTX")))
     `(progn
        ;; ---------- PURE FUNCTION ---------------------------------------
        (defun ,fun-name (,arg)
@@ -208,7 +208,7 @@
          ;; Bind *CTX* so transforms can peek if they really need to
          (let ((*ctx* ,ctx-var))
            (let* ((,arg (,in-acc ,ctx-var))
-                  (result (,fun-name ,arg)))
+                   (result (,fun-name ,arg)))
              ;; setf via the accessor, not SLOT-VALUE
              (setf (,out-acc ,ctx-var) result)
              ,ctx-var))))))
@@ -240,15 +240,15 @@
 
 (define-condition contract-violation (error)
   ((function-name :initarg :function-name :reader cv-function-name)
-   (expected-type :initarg :expected-type :reader cv-expected-type)
-   (actual-value :initarg :actual-value :reader cv-actual-value)
-   (context :initarg :context :reader cv-context :initform nil))
+    (expected-type :initarg :expected-type :reader cv-expected-type)
+    (actual-value :initarg :actual-value :reader cv-actual-value)
+    (context :initarg :context :reader cv-context :initform nil))
   (:report (lambda (condition stream)
              (format stream "Contract violation in ~A: expected ~A, got ~A~@[ in ~A~]"
-                     (cv-function-name condition)
-                     (cv-expected-type condition)
-                     (cv-actual-value condition)
-                     (cv-context condition)))))
+               (cv-function-name condition)
+               (cv-expected-type condition)
+               (cv-actual-value condition)
+               (cv-context condition)))))
 
 (define-condition update-contract-violation (contract-violation) ())
 (define-condition view-contract-violation (contract-violation) ())
@@ -256,14 +256,14 @@
 (define-condition message-contract-violation (contract-violation) ())
 (define-condition pipeline-contract-violation (error)
   ((stage         :initarg :stage :reader violation-stage)
-   (expected-type :initarg :expected-type :reader violation-expected)
-   (got-object    :initarg :got-object :reader violation-got)
-   (stack-trace :initarg :stack-trace :reader violation-stack-trace :initform nil))
+    (expected-type :initarg :expected-type :reader violation-expected)
+    (got-object    :initarg :got-object :reader violation-got)
+    (stack-trace :initarg :stack-trace :reader violation-stack-trace :initform nil))
   (:report (lambda (c s)
              (with-slots (stage expected-type got-object stack-trace) c
                (format s "~a expected ~s but got ~s (~s).(~s)"
-                       stage expected-type got-object (type-of got-object)
-                       stack-trace)))))
+                 stage expected-type got-object (type-of got-object)
+                 stack-trace)))))
 
 (define-condition undefined-layout (pipeline-contract-violation) ())
 
@@ -283,21 +283,21 @@
 
   (ecase validation-mode
     (:flexible
-     (validate-flexible-message message context))
+      (validate-flexible-message message context))
     (:typed
-     (validate-typed-message message message-type context))
+      (validate-typed-message message message-type context))
     (:hybrid
-     (validate-hybrid-message message message-type context))
+      (validate-hybrid-message message message-type context))
     (:strict
-     (validate-strict-message message message-type context))))
+      (validate-strict-message message message-type context))))
 
 (defun validate-flexible-message (message &optional (context "flexible message validation"))
   "Validates message in flexible mode - accepts any message format"
   (declare (ignore context))
   ;; For flexible mode, we accept any value but can optionally validate common patterns
   (when (and (listp message)
-             (not (keywordp (first message)))
-             (> (length message) 0))
+          (not (keywordp (first message)))
+          (> (length message) 0))
     (warn "Message ~S looks like it might be malformed (first element should be keyword)" message))
   message)
 
@@ -305,25 +305,25 @@
   "Validates message against a specific defmsg schema"
   (unless message-type
     (error 'message-contract-violation
-           :function-name 'validate-typed-message
-           :expected-type "message type specification"
-           :actual-value nil
-           :context context))
+      :function-name 'validate-typed-message
+      :expected-type "message type specification"
+      :actual-value nil
+      :context context))
   (let ((is-variant (message-variant-p message-type message)))
     (unless is-variant
       (when (and (listp message) (keywordp (first message)))
         (let* ((symbol-name (symbol-name (first message)))
-               (pkg (symbol-package message-type)))
+                (pkg (symbol-package message-type)))
           (when pkg
             (let ((sym (find-symbol (string-upcase symbol-name) pkg)))
               (when sym
                 (setq is-variant (message-variant-p message-type (cons sym (rest message))))))))))
     (unless is-variant
       (error 'message-contract-violation
-             :function-name 'validate-typed-message
-             :expected-type (format nil "valid ~A message variant" message-type)
-             :actual-value message
-             :context context)))
+        :function-name 'validate-typed-message
+        :expected-type (format nil "valid ~A message variant" message-type)
+        :actual-value message
+        :context context)))
   message)
 
 (defun validate-hybrid-message (message message-type &optional (context "hybrid message validation"))
@@ -331,15 +331,15 @@
   (cond
     ;; If message-type is specified, prefer typed validation
     ((and message-type (message-variant-p message-type message))
-     (validate-typed-message message message-type context))
+      (validate-typed-message message message-type context))
 
     ;; If message-type specified but doesn't match, check if it's any valid message type
     (message-type
-     (if (some (lambda (schema-name)
-                 (message-variant-p schema-name message))
-               (alexandria:hash-table-keys *message-schemas*))
-         message  ; Valid message for some schema
-         (validate-flexible-message message context)))
+      (if (some (lambda (schema-name)
+                  (message-variant-p schema-name message))
+            (alexandria:hash-table-keys *message-schemas*))
+        message  ; Valid message for some schema
+        (validate-flexible-message message context)))
 
     ;; No message-type specified, use flexible validation
     (t (validate-flexible-message message context))))
@@ -348,10 +348,10 @@
   "Validates message in strict mode - only typed messages allowed"
   (unless message-type
     (error 'message-contract-violation
-           :function-name 'validate-strict-message
-           :expected-type "message type specification required in strict mode"
-           :actual-value message
-           :context context))
+      :function-name 'validate-strict-message
+      :expected-type "message type specification required in strict mode"
+      :actual-value message
+      :context context))
 
   (validate-typed-message message message-type context))
 
@@ -362,34 +362,34 @@
 (defun validate-model (model &optional (context "model validation"))
   "Validates that model follows proper structure"
   (unless (or (null model)
-              (and (listp model)
-                   (evenp (length model))
-                   (loop for (key value) on model by #'cddr
-                         always (keywordp key))))
+            (and (listp model)
+              (evenp (length model))
+              (loop for (key value) on model by #'cddr
+                always (keywordp key))))
     (error 'contract-violation
-           :function-name 'validate-model
-           :expected-type "property list with keyword keys"
-           :actual-value model
-           :context context))
+      :function-name 'validate-model
+      :expected-type "property list with keyword keys"
+      :actual-value model
+      :context context))
   model)
 
 (defun validate-commands (commands &optional (context "command validation"))
   "Validates that commands list is properly structured"
   (unless (or (null commands)
-              (and (listp commands)
-                   (every #'validate-command commands)))
+            (and (listp commands)
+              (every #'validate-command commands)))
     (error 'contract-violation
-           :function-name 'validate-commands
-           :expected-type "list of valid commands"
-           :actual-value commands
-           :context context))
+      :function-name 'validate-commands
+      :expected-type "list of valid commands"
+      :actual-value commands
+      :context context))
   commands)
 
 (defun validate-command (command)
   "Validates individual command structure"
   (and (listp command)
-       (keywordp (first command))
-       (evenp (length (rest command)))))
+    (keywordp (first command))
+    (evenp (length (rest command)))))
 
 ;;;--------------------------------------------------------------
 ;;; Enhanced Update Function Contracts with Message Type Support
@@ -411,7 +411,7 @@
    - commands: List of side-effects to execute or nil"
 
   (let ((doc-string (when (stringp (first body)) (first body)))
-        (actual-body (if (stringp (first body)) (rest body) body)))
+         (actual-body (if (stringp (first body)) (rest body) body)))
     `(defun ,name (,model-param ,message-param)
        ,@(when doc-string (list doc-string))
 
@@ -419,21 +419,21 @@
        (handler-case (validate-model ,model-param "update function input")
          (contract-violation (c)
            (error 'update-contract-violation
-                  :function-name ',name
-                  :expected-type (cv-expected-type c)
-                  :actual-value (cv-actual-value c)
-                  :context (cv-context c))))
+             :function-name ',name
+             :expected-type (cv-expected-type c)
+             :actual-value (cv-actual-value c)
+             :context (cv-context c))))
        (validate-message ,message-param :flexible nil "flexible update message")
 
        ;; Execute update logic with contract enforcement
        (multiple-value-bind (new-model commands)
-           (handler-case (progn ,@actual-body)
-             (error (e)
-               (error 'update-contract-violation
-                      :function-name ',name
-                      :expected-type "successful update execution"
-                      :actual-value e
-                      :context (format nil "processing message ~S" ,message-param))))
+         (handler-case (progn ,@actual-body)
+           (error (e)
+             (error 'update-contract-violation
+               :function-name ',name
+               :expected-type "successful update execution"
+               :actual-value e
+               :context (format nil "processing message ~S" ,message-param))))
 
          ;; Output validation
          (validate-update-result new-model commands ',name ,model-param ,message-param)
@@ -463,7 +463,7 @@
        (t (values nil nil))))"
 
   (let ((doc-string (when (stringp (first body)) (first body)))
-        (actual-body (if (stringp (first body)) (rest body) body)))
+         (actual-body (if (stringp (first body)) (rest body) body)))
     `(defun ,name (,model-param ,message-param)
        ,@(when doc-string (list doc-string))
 
@@ -471,21 +471,21 @@
        (handler-case (validate-model ,model-param "update function input")
          (contract-violation (c)
            (error 'update-contract-violation
-                  :function-name ',name
-                  :expected-type (cv-expected-type c)
-                  :actual-value (cv-actual-value c)
-                  :context (cv-context c))))
+             :function-name ',name
+             :expected-type (cv-expected-type c)
+             :actual-value (cv-actual-value c)
+             :context (cv-context c))))
        (validate-message ,message-param :typed ',message-type "typed update message")
 
        ;; Execute update logic with contract enforcement
        (multiple-value-bind (new-model commands)
-           (handler-case (progn ,@actual-body)
-             (error (e)
-               (error 'update-contract-violation
-                      :function-name ',name
-                      :expected-type "successful update execution"
-                      :actual-value e
-                      :context (format nil "processing ~A message ~S" ',message-type ,message-param))))
+         (handler-case (progn ,@actual-body)
+           (error (e)
+             (error 'update-contract-violation
+               :function-name ',name
+               :expected-type "successful update execution"
+               :actual-value e
+               :context (format nil "processing ~A message ~S" ',message-type ,message-param))))
 
          ;; Output validation
          (validate-update-result new-model commands ',name ,model-param ,message-param)
@@ -511,19 +511,19 @@
    Contract: (update model message) -> (values new-model commands)"
   ;; ── 1.  Split keyword options from body-forms ─────────────────────────────
   (let ((kw-plist '())
-        (body     args))
+         (body     args))
     ;; pull leading keyword/value pairs into KW-PLIST
     (loop while (and body (keywordp (first body)))
-          do (push (pop body) kw-plist)     ; the keyword
-             (push (pop body) kw-plist))    ; its value
+      do (push (pop body) kw-plist)     ; the keyword
+      (push (pop body) kw-plist))    ; its value
     (setq kw-plist (nreverse kw-plist))     ; restore order
 
     (let* ((message-type (getf kw-plist :message-type))
-           (prefer-typed (getf kw-plist :prefer-typed))
-           ;; ── 2.  Optional doc-string detection ────────────────────────────
-           (doc-string  (when (and body (stringp (first body)))
-                          (pop body)))
-           (actual-body body))
+            (prefer-typed (getf kw-plist :prefer-typed))
+            ;; ── 2.  Optional doc-string detection ────────────────────────────
+            (doc-string  (when (and body (stringp (first body)))
+                           (pop body)))
+            (actual-body body))
       ;; ── 3.  Generate the real DEFUN ───────────────────────────────────────
       `(defun ,name (,model-param ,message-param)
          ,@(when doc-string (list doc-string))
@@ -531,32 +531,32 @@
          ;; Input validation
          (validate-model   ,model-param "update function input")
          (validate-message ,message-param :hybrid ',message-type
-                           "hybrid update message")
+           "hybrid update message")
 
          ;; Optional warning for untyped messages
          ,@(when prefer-typed
              `((when (and ',message-type
-                          (not (message-variant-p ',message-type
-                                                  ,message-param)))
+                       (not (message-variant-p ',message-type
+                              ,message-param)))
                  (warn "Non-typed message ~S used in ~A (prefers ~A messages)"
-                       ,message-param ',name ',message-type))))
+                   ,message-param ',name ',message-type))))
 
          ;; Execute update logic under contract enforcement
          (multiple-value-bind (new-model commands)
-             (handler-case (progn ,@actual-body)
-               (error (e)
-                 (error 'update-contract-violation
-                        :function-name ',name
-                        :expected-type "successful update execution"
-                        :actual-value  e
-                        :context (format nil "processing message ~S"
-                                         ,message-param))))
+           (handler-case (progn ,@actual-body)
+             (error (e)
+               (error 'update-contract-violation
+                 :function-name ',name
+                 :expected-type "successful update execution"
+                 :actual-value  e
+                 :context (format nil "processing message ~S"
+                            ,message-param))))
            ;; Output validation + optional debugging
            (validate-update-result new-model commands ',name
-                                   ,model-param ,message-param)
+             ,model-param ,message-param)
            (when *contract-debugging*
              (log-update-execution ',name ,model-param ,message-param
-                                   new-model commands))
+               new-model commands))
            (values new-model commands))))))
 
 
@@ -654,7 +654,7 @@
    Purity: impure (macro, global definition, error signaling)
   "
   (let ((doc-string (when (stringp (first body)) (first body)))
-        (actual-body (if (stringp (first body)) (rest body) body)))
+         (actual-body (if (stringp (first body)) (rest body) body)))
     `(defun ,name (,model-param)
        ,@(when doc-string (list doc-string))
 
@@ -662,19 +662,19 @@
        (handler-case (validate-model ,model-param "view function input")
          (contract-violation (c)
            (error 'view-contract-violation
-                  :function-name ',name
-                  :expected-type (cv-expected-type c)
-                  :actual-value (cv-actual-value c)
-                  :context (cv-context c))))
+             :function-name ',name
+             :expected-type (cv-expected-type c)
+             :actual-value (cv-actual-value c)
+             :context (cv-context c))))
 
        ;; Execute view logic with contract enforcement
        (let ((result (handler-case (progn ,@actual-body)
                        (error (e)
                          (error 'view-contract-violation
-                                :function-name ',name
-                                :expected-type "successful view generation"
-                                :actual-value e
-                                :context (format nil "rendering model ~S" ,model-param))))))
+                           :function-name ',name
+                           :expected-type "successful view generation"
+                           :actual-value e
+                           :context (format nil "rendering model ~S" ,model-param))))))
 
          ;; Output validation: ensure result is a valid DSL tree
          (validate-dsl result ',name ,model-param)
@@ -708,10 +708,10 @@
   "
   (unless (valid-dsl-p dsl)
     (error 'view-contract-violation
-           :function-name function-name
-           :expected-type "valid DSL structure"
-           :actual-value dsl
-           :context (format nil "rendering model ~S" model)))
+      :function-name function-name
+      :expected-type "valid DSL structure"
+      :actual-value dsl
+      :context (format nil "rendering model ~S" model)))
   dsl)
 
 (defun valid-dsl-p (dsl)
@@ -731,10 +731,10 @@
    (any) => boolean (pure, no side-effects)
   "
   (or (stringp dsl)
-      (numberp dsl)
-      (and (listp dsl)
-           (keywordp (first dsl))
-           (evenp (length (rest dsl))))))
+    (numberp dsl)
+    (and (listp dsl)
+      (keywordp (first dsl))
+      (evenp (length (rest dsl))))))
 
 ;;;--------------------------------------------------------------
 ;;; Subscription Contract (unchanged)
@@ -750,7 +750,7 @@
   "Defines a subscriptions function with contract enforcement."
 
   (let ((doc-string (when (stringp (first body)) (first body)))
-        (actual-body (if (stringp (first body)) (rest body) body)))
+         (actual-body (if (stringp (first body)) (rest body) body)))
     `(defun ,name (,model-param)
        ,@(when doc-string (list doc-string))
 
@@ -758,19 +758,19 @@
        (handler-case (validate-model ,model-param "subscriptions function input")
          (contract-violation (c)
            (error 'subscription-contract-violation
-                  :function-name ',name
-                  :expected-type (cv-expected-type c)
-                  :actual-value (cv-actual-value c)
-                  :context (cv-context c))))
+             :function-name ',name
+             :expected-type (cv-expected-type c)
+             :actual-value (cv-actual-value c)
+             :context (cv-context c))))
 
        ;; Execute subscriptions logic
        (let ((result (handler-case (progn ,@actual-body)
                        (error (e)
                          (error 'subscription-contract-violation
-                                :function-name ',name
-                                :expected-type "successful subscriptions generation"
-                                :actual-value e
-                                :context (format nil "generating subscriptions for model ~S" ,model-param))))))
+                           :function-name ',name
+                           :expected-type "successful subscriptions generation"
+                           :actual-value e
+                           :context (format nil "generating subscriptions for model ~S" ,model-param))))))
 
          ;; Output validation
          (validate-subscriptions result ',name ,model-param)
@@ -784,13 +784,13 @@
 (defun validate-subscriptions (subscriptions function-name model)
   "Validates subscriptions list structure"
   (unless (or (null subscriptions)
-              (and (listp subscriptions)
-                   (every #'subscription-p subscriptions)))
+            (and (listp subscriptions)
+              (every #'subscription-p subscriptions)))
     (error 'subscription-contract-violation
-           :function-name function-name
-           :expected-type "list of subscription structures"
-           :actual-value subscriptions
-           :context (format nil "generating subscriptions for model ~S" model)))
+      :function-name function-name
+      :expected-type "list of subscription structures"
+      :actual-value subscriptions
+      :context (format nil "generating subscriptions for model ~S" model)))
   subscriptions)
 
 ;;;--------------------------------------------------------------
@@ -862,39 +862,39 @@
   (setf *contract-debugging* enabled)
   (when enabled
     (setf *update-log* nil
-          *view-log* nil
-          *subscriptions-log* nil
-          *message-validation-log* nil)))
+      *view-log* nil
+      *subscriptions-log* nil
+      *message-validation-log* nil)))
 
 (defun log-update-execution (function-name model message new-model commands)
   "Log update function execution for debugging"
   (push (list :timestamp (get-universal-time)
-              :function function-name
-              :input-model model
-              :message message
-              :message-type (when (listp message) (first message))
-              :message-typed-p (some (lambda (schema-name)
-                                       (message-variant-p schema-name message))
-                                     (alexandria:hash-table-keys *message-schemas*))
-              :output-model new-model
-              :commands commands)
-        *update-log*))
+          :function function-name
+          :input-model model
+          :message message
+          :message-type (when (listp message) (first message))
+          :message-typed-p (some (lambda (schema-name)
+                                   (message-variant-p schema-name message))
+                             (alexandria:hash-table-keys *message-schemas*))
+          :output-model new-model
+          :commands commands)
+    *update-log*))
 
 (defun log-view-execution (function-name model dsl)
   "Log view function execution for debugging"
   (push (list :timestamp (get-universal-time)
-              :function function-name
-              :model model
-              :dsl-size (if (listp dsl) (length dsl) 1))
-        *view-log*))
+          :function function-name
+          :model model
+          :dsl-size (if (listp dsl) (length dsl) 1))
+    *view-log*))
 
 (defun log-subscriptions-execution (function-name model subscriptions)
   "Log subscriptions function execution for debugging"
   (push (list :timestamp (get-universal-time)
-              :function function-name
-              :model model
-              :subscription-count (length subscriptions))
-        *subscriptions-log*))
+          :function function-name
+          :model model
+          :subscription-count (length subscriptions))
+    *subscriptions-log*))
 
 (defun trace-contracts (&key update view subscriptions messages)
   "Enable tracing for specific contract types"
@@ -917,7 +917,7 @@
 
     ;; Test update function
     (multiple-value-bind (new-model commands)
-        (funcall update-fn test-model :test-message)
+      (funcall update-fn test-model :test-message)
       (when new-model (validate-model new-model "update function result"))
       (when commands (validate-commands commands "update function commands")))
 
@@ -934,11 +934,11 @@
 (defun contract-summary ()
   "Returns summary of contract executions for debugging"
   (list :update-executions (length *update-log*)
-        :view-executions (length *view-log*)
-        :subscription-executions (length *subscriptions-log*)
-        :message-validations (length *message-validation-log*)
-        :debugging-enabled *contract-debugging*
-        :available-message-schemas (alexandria:hash-table-keys *message-schemas*)))
+    :view-executions (length *view-log*)
+    :subscription-executions (length *subscriptions-log*)
+    :message-validations (length *message-validation-log*)
+    :debugging-enabled *contract-debugging*
+    :available-message-schemas (alexandria:hash-table-keys *message-schemas*)))
 
 ;;;--------------------------------------------------------------
 ;;; Message Analysis Utilities
@@ -947,99 +947,112 @@
 (defun analyze-message-usage (&optional update-log)
   "Analyzes message usage patterns from update execution log"
   (let ((log-data (or update-log *update-log*))
-        (typed-count 0)
-        (untyped-count 0)
-        (message-types (make-hash-table :test 'equal)))
+         (typed-count 0)
+         (untyped-count 0)
+         (message-types (make-hash-table :test 'equal)))
 
     (dolist (entry log-data)
       (let ((message (getf entry :message))
-            (typed-p (getf entry :message-typed-p)))
+             (typed-p (getf entry :message-typed-p)))
         (if typed-p
-            (incf typed-count)
-            (incf untyped-count))
+          (incf typed-count)
+          (incf untyped-count))
 
         (let ((msg-type (if (listp message) (first message) message)))
           (incf (gethash msg-type message-types 0)))))
 
     (list :total-messages (+ typed-count untyped-count)
-          :typed-messages typed-count
-          :untyped-messages untyped-count
-          :message-frequency (alexandria:hash-table-alist message-types))))
+      :typed-messages typed-count
+      :untyped-messages untyped-count
+      :message-frequency (alexandria:hash-table-alist message-types))))
 
 (defun suggest-message-schema (update-function-name &optional update-log)
   "Suggests a defmsg schema based on observed message patterns"
   (let* ((log-data (or update-log *update-log*))
-         (function-messages (remove-if-not
-                             (lambda (entry)
-                               (eq (getf entry :function) update-function-name))
-                             log-data))
-         (message-patterns (make-hash-table :test 'equal)))
+          (function-messages (remove-if-not
+                               (lambda (entry)
+                                 (eq (getf entry :function) update-function-name))
+                               log-data))
+          (message-patterns (make-hash-table :test 'equal)))
 
     (dolist (entry function-messages)
       (let* ((message (getf entry :message))
-             (msg-type (if (listp message) (first message) message))
-             (msg-args (when (listp message) (rest message))))
+              (msg-type (if (listp message) (first message) message))
+              (msg-args (when (listp message) (rest message))))
         (setf (gethash msg-type message-patterns)
-              (union (gethash msg-type message-patterns)
-                     (list msg-args) :test 'equal))))
+          (union (gethash msg-type message-patterns)
+            (list msg-args) :test 'equal))))
 
     (format t "~&Suggested defmsg schema for ~A:~%" update-function-name)
     (format t "(defmsg ~AMsg (:docstring \"Messages for ~A\")~%"
-            (string-capitalize update-function-name) update-function-name)
+      (string-capitalize update-function-name) update-function-name)
     (maphash (lambda (msg-type patterns)
                (if (every #'null patterns)
-                   (format t "  ~A~%" msg-type)
-                   (format t "  (~A ~{~A~^ ~})~%" msg-type (first patterns))))
-             message-patterns)
+                 (format t "  ~A~%" msg-type)
+                 (format t "  (~A ~{~A~^ ~})~%" msg-type (first patterns))))
+      message-patterns)
     (format t ")~%")))
+;; == elmtui/pipeline/contracts.lisp ==
 
 (defmacro define-stage (name (in-type out-type) arglist &body body)
-  "Wrap BODY in run-time CHECK-TYPE and restartable contract checks."
+  "Define a pipeline stage NAME with input/OUTPUT type contracts.
+
+IN-TYPE and OUT-TYPE are type designators used for:
+  - A CHECK-TYPE precondition on the input.
+  - A TYPEP-based postcondition on the result.
+
+Any non-Elmtui ERROR signaled inside BODY is wrapped in a
+PIPELINE-CONTRACT-VIOLATION. Errors that already belong to the
+Elmtui error hierarchy (ELMTUI-ERROR and subclasses like DSL-ERROR)
+are allowed to propagate unchanged, preserving their rich context."
   (unless (and (listp arglist)
-               (symbolp (first arglist)))
+            (symbolp (first arglist)))
     (error "define-stage: arglist must be a list whose FIRST element is the input symbol"))
   (let* ((input-sym  (first arglist))
-         (result-sym (gensym "RES")))
+          (result-sym (gensym "RES")))
     `(progn
-       ;; record the declared types for pipeline-linkage
+       ;; Record declared types for tooling/pipeline linkage
        (setf (get ',name :pipeline/in-type)  ',in-type
-             (get ',name :pipeline/out-type) ',out-type)
-       ;; (defun ,name ,arglist
-       ;; --- pre-condition -------------------------------------------------
-       ;; (when ,in-type (check-type ,input-sym ,in-type
-       ;;                            ,(format nil "~a input violated contract (expected ~a)."
-       ;;                                     name in-type)))
+         (get ',name :pipeline/out-type) ',out-type)
+
        (defun ,name ,arglist
-         ;; (declare (ignorable ,arglist))
-         ;; --- pre-condition -------------------------------------------------
+         ;; Mark all non-&key/&optional args as ignorable so stages can ignore
+         ;; extra context fields without warnings.
          (declare (ignorable ,@(remove-if
-                                (lambda (x) (or (eql x '&key)
-                                                (eql x '&optional))) arglist)))
+                                 (lambda (x) (or (eql x '&key)
+                                               (eql x '&optional)))
+                                 arglist)))
+
+         ;; --- pre-condition -------------------------------------------------
+         ;; This will be a no-op if IN-TYPE is T, but that’s fine and clear.
          (check-type ,input-sym ,in-type
-                     ,(format nil "~a input violated contract (expected ~a)."
-                              name in-type))
+           ,(format nil "~a input violated contract (expected ~a)."
+              name in-type))
+
+         ;; --- execution with error handling --------------------------------
          (handler-bind
-             ((error (lambda (e)
-                       ;; (error e)
-                       (error 'pipeline-contract-violation
-                              :stage ',name
-                              :expected-type ',in-type
-                              :got-object e
-                              :stack-trace (with-output-to-string
-                                               (dud)
-                                             (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud))))))
+           ((error
+              (lambda (e)
+                ;; Let Elmtui errors (including DSL-ERROR) propagate as-is.
+                ;; For everything else, wrap as a pipeline-contract-violation.
+                (unless (typep e 'elmtui.core.errors:elmtui-error)
+                  (error 'pipeline-contract-violation
+                    :stage ',name
+                    :expected-type ',in-type
+                    :got-object e
+                    :stack-trace (with-output-to-string (dud)
+                                   (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud)))))))
 
            (let ((,result-sym (progn ,@body)))
              ;; --- post-condition -------------------------------------------
              (unless (typep ,result-sym ',out-type)
                (restart-case
-                   (error 'pipeline-contract-violation
-                          :stage ',name
-                          :expected-type ',out-type
-                          :got-object ,result-sym
-                          :stack-trace (with-output-to-string
-                                           (dud)
-                                         (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud)))
+                 (error 'pipeline-contract-violation
+                   :stage ',name
+                   :expected-type ',out-type
+                   :got-object ,result-sym
+                   :stack-trace (with-output-to-string (dud)
+                                  (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud)))
                  (coerce-result (new)
                    :report "Provide replacement value and continue."
                    :interactive (lambda ()
@@ -1051,17 +1064,91 @@
                    (setq ,result-sym ,input-sym))))
              ,result-sym))))))
 
-;; (deftransformer generate-dsl (dsl-tree) (dsl-tree)
-;;                 (abc &key state view-fn)
-;;   (make-dsl-tree :root (funcall view-fn state)))
 (defmacro define-pipeline (name &rest stage-fns)
-  "Compose STAGE-FNS into a single function that threads a context through them."
+  "Compose STAGE-FNS into a single function that threads a context through them.
+
+Each stage must be a function of one argument (the context), and will be
+called in the order provided. The declared :pipeline/in-type and
+:pipeline/out-type metadata from DEFINE-STAGE can be used by tooling or
+validation code, but are not enforced here directly."
   (let ((context (gensym "CONTEXT")))
     `(defun ,name (,context)
        (reduce (lambda (ctx fn)
                  (funcall fn ctx))
-               ',stage-fns
-               :initial-value ,context))))
+         ',stage-fns
+         :initial-value ,context))))
+
+;; == end/contracts.lisp ==
+
+;; (defmacro define-stage (name (in-type out-type) arglist &body body)
+;;   "Wrap BODY in run-time CHECK-TYPE and restartable contract checks."
+;;   (unless (and (listp arglist)
+;;                (symbolp (first arglist)))
+;;     (error "define-stage: arglist must be a list whose FIRST element is the input symbol"))
+;;   (let* ((input-sym  (first arglist))
+;;          (result-sym (gensym "RES")))
+;;     `(progn
+;;        ;; record the declared types for pipeline-linkage
+;;        (setf (get ',name :pipeline/in-type)  ',in-type
+;;              (get ',name :pipeline/out-type) ',out-type)
+;;        ;; (defun ,name ,arglist
+;;        ;; --- pre-condition -------------------------------------------------
+;;        ;; (when ,in-type (check-type ,input-sym ,in-type
+;;        ;;                            ,(format nil "~a input violated contract (expected ~a)."
+;;        ;;                                     name in-type)))
+;;        (defun ,name ,arglist
+;;          ;; (declare (ignorable ,arglist))
+;;          ;; --- pre-condition -------------------------------------------------
+;;          (declare (ignorable ,@(remove-if
+;;                                 (lambda (x) (or (eql x '&key)
+;;                                                 (eql x '&optional))) arglist)))
+;;          (check-type ,input-sym ,in-type
+;;                      ,(format nil "~a input violated contract (expected ~a)."
+;;                               name in-type))
+;;          (handler-bind
+;;              ((error (lambda (e)
+;;                        ;; (error e)
+;;                        (error 'pipeline-contract-violation
+;;                               :stage ',name
+;;                               :expected-type ',in-type
+;;                               :got-object e
+;;                               :stack-trace (with-output-to-string
+;;                                                (dud)
+;;                                              (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud))))))
+
+;;            (let ((,result-sym (progn ,@body)))
+;;              ;; --- post-condition -------------------------------------------
+;;              (unless (typep ,result-sym ',out-type)
+;;                (restart-case
+;;                    (error 'pipeline-contract-violation
+;;                           :stage ',name
+;;                           :expected-type ',out-type
+;;                           :got-object ,result-sym
+;;                           :stack-trace (with-output-to-string
+;;                                            (dud)
+;;                                          (sb-debug:backtrace sb-debug:*backtrace-frame-count* dud)))
+;;                  (coerce-result (new)
+;;                    :report "Provide replacement value and continue."
+;;                    :interactive (lambda ()
+;;                                   (format t "~%New value? ")
+;;                                   (list (eval (read))))
+;;                    (setq ,result-sym new))
+;;                  (skip-stage ()
+;;                    :report "Skip this stage and propagate input forward."
+;;                    (setq ,result-sym ,input-sym))))
+;;              ,result-sym))))))
+
+;; (deftransformer generate-dsl (dsl-tree) (dsl-tree)
+;;                 (abc &key state view-fn)
+;;   (make-dsl-tree :root (funcall view-fn state)))
+;; (defmacro define-pipeline (name &rest stage-fns)
+;;   "Compose STAGE-FNS into a single function that threads a context through them."
+;;   (let ((context (gensym "CONTEXT")))
+;;     `(defun ,name (,context)
+;;        (reduce (lambda (ctx fn)
+;;                  (funcall fn ctx))
+;;                ',stage-fns
+;;                :initial-value ,context))))
 ;; (defmacro define-pipeline (name &rest stage-fns)
 ;;   "Compose STAGE-FNS into a single function that threads a context plist through them."
 ;;   (let ((context (gensym "CONTEXT")))
@@ -1111,30 +1198,30 @@
    CTX-THEME accessors and calls RAW→STYLED with them."
   ;; 0) Split lambda-list into positional TREE and &KEY specs -------------
   (let* ((tree-var  (first lambda-list))
-         (key-tail  (member '&key lambda-list))
-         (key-specs (if key-tail (rest key-tail) '()))
-         ;; 1) Canonical keyword names  ------------------------------------
-         (keyword-syms
-           (mapcar (lambda (spec)
-                     (etypecase spec
-                       (symbol spec)          ;  stylesheet
-                       (cons   (first spec)))) ;  (stylesheet default)
-                   key-specs))
-         ;; 2) Generate CTX-<FOO> accessors for each keyword --------------
-         (accessor-syms
-           (mapcar (lambda (k)
-                     (intern (format nil "CTX-~:@(~A~)" k) *package*))
-                   keyword-syms))
-         ;; 3) Helper symbols ---------------------------------------------
-         (fn-name    name)
-         (stage-name (intern (format nil "~A-STAGE" (string-upcase name))
-                             *package*))
-         (ctx-var   (gensym "CTX"))
-         ;; Accessor for the incoming and outgoing tree slots -------------
-         (in-acc
-           (intern (format nil "CTX-~:@(~A~)" in-type) *package*))
-         (out-acc
-           (intern (format nil "CTX-~:@(~A~)" out-type) *package*)))
+          (key-tail  (member '&key lambda-list))
+          (key-specs (if key-tail (rest key-tail) '()))
+          ;; 1) Canonical keyword names  ------------------------------------
+          (keyword-syms
+            (mapcar (lambda (spec)
+                      (etypecase spec
+                        (symbol spec)          ;  stylesheet
+                        (cons   (first spec)))) ;  (stylesheet default)
+              key-specs))
+          ;; 2) Generate CTX-<FOO> accessors for each keyword --------------
+          (accessor-syms
+            (mapcar (lambda (k)
+                      (intern (format nil "CTX-~:@(~A~)" k) *package*))
+              keyword-syms))
+          ;; 3) Helper symbols ---------------------------------------------
+          (fn-name    name)
+          (stage-name (intern (format nil "~A-STAGE" (string-upcase name))
+                        *package*))
+          (ctx-var   (gensym "CTX"))
+          ;; Accessor for the incoming and outgoing tree slots -------------
+          (in-acc
+            (intern (format nil "CTX-~:@(~A~)" in-type) *package*))
+          (out-acc
+            (intern (format nil "CTX-~:@(~A~)" out-type) *package*)))
     `(progn
        ;; ---------- transformer FUNCTION ---------------------------------
        (defun ,fn-name ,lambda-list
@@ -1146,14 +1233,14 @@
        (define-stage ,stage-name (app-context app-context) (,ctx-var)
          ;; Snapshot all needed values from CTX once
          (let* ((,tree-var (,in-acc ,ctx-var))
-                ,@(mapcar (lambda (key acc)
-                            `(,key (,acc ,ctx-var)))
-                          keyword-syms accessor-syms)
-                (result (funcall #',fn-name ,tree-var
-                                 ,@(apply #'append
-                                          (mapcar (lambda (k)
-                                                    (list (intern (string k) :keyword)
-                                                          k))
-                                                  keyword-syms)))))
+                 ,@(mapcar (lambda (key acc)
+                             `(,key (,acc ,ctx-var)))
+                     keyword-syms accessor-syms)
+                 (result (funcall #',fn-name ,tree-var
+                           ,@(apply #'append
+                               (mapcar (lambda (k)
+                                         (list (intern (string k) :keyword)
+                                           k))
+                                 keyword-syms)))))
            (setf (,out-acc ,ctx-var) result)
            ,ctx-var)))))

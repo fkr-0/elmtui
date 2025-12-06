@@ -4,15 +4,90 @@
 (uiop:define-package :elmtui.tests.application-init
   (:use :cl :fiveam)
   (:import-from :elmtui.app
-                #:app-config
-                #:app-config-name)
+    #:app-config
+    #:app-config-name)
   (:import-from :elmtui.ui.defcomponent #:defcomponent)
   (:import-from #:elmtui.tea-state #:get-path #:state-ref)
   (:import-from :elmtui.view.geo #:=?)
   (:export #:application-init-tests #:test-component #:test-parent-component
-           #:initialize-app-state-test-init-app))
+    #:initialize-app-state-test-init-app))
 (in-package :elmtui.tests.application-init)
+;; Register the test components with the DSL type registry
 
+;;; Test application
+(defun test-init-app-view (app-state)
+  (declare (ignore app-state))
+  '(:column :id :main-column
+     :children
+     ((:test-component :id :comp1 :initial-state "comp1 state")
+       (:test-parent-component :id :parent1 :child-initial-state "child state"))))
+
+(defun test-init-app-update (message app-state)
+  (declare (ignore message app-state))
+  (elmtui.ui.api:make-update-result))
+
+(defun test-init-app-subscriptions (model)
+  (declare (ignore model))
+  nil)
+(elmtui.ui.defcomponent:defcomponent test-component (elmtui.ui.api:component)
+  (:state
+    (state nil))
+  (:view (local-state-map app-state id-path children)
+    ;; (declare (ignore app-state))
+    `(:text :id ,(elmtui.ui.api:id-from-path id-path)
+       :content ,(format nil "State: ~A" (gethash :state local-state-map)))))
+
+(elmtui.ui.defcomponent:defcomponent test-parent-component (elmtui.ui.api:component)
+  (:state
+    (state :parent-default)
+    (children-ids nil))
+  (:init (props self-id-path)
+    (let* ((parent-id (elmtui.ui.api:id-from-path self-id-path))
+            (child-id (elmtui.app::generate-child-id parent-id :child1))
+            (child-initial-state (getf props :child-initial-state))
+            (child-component (make-instance 'test-component :id child-id))
+            (child-id-path `(:components ,child-id)))
+      (multiple-value-bind (instance child-patches child-commands)
+        (elmtui.ui.api:init child-component :id-path child-id-path :initial-state child-initial-state)
+        (declare (ignore instance))
+        (values
+          `(:state :parent-default :children-ids (,child-id))
+          child-patches
+          child-commands))))
+  (:view (local-state-map app-state id-path children)
+    (let* ((parent-map (elmtui.tea-state:get-path id-path app-state))
+            (child-id (first (gethash :children-ids parent-map)))
+            ;; (child-id-path `(:components ,child-id))
+            )
+      `(:test-parent-component
+         :id ,(elmtui.ui.api:id-from-path id-path)
+         :children ((:test-component :id ,child-id))))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (elmtui.app:defapplication test-init-app
+    :initial-state-plist `(:counter 0
+                            :text "hello")
+    :root-component-dsl '(;; :root-viewport :id :main-column passes
+                           :root-viewport :id :main-column ;; fails
+                           :initial-terminal-dimensions (1 1)
+                           :initial-cursor-pos (1 1)
+                           :children
+                           ((:test-component :id :comp1 :initial-state "comp1 state")
+                             (:test-parent-component :id :parent1 :child-initial-state "child state")))
+    :view-fn test-init-app-view
+    :update-fn test-init-app-update
+    :root-viewport-id :rv
+    :subscriptions-fn test-init-app-subscriptions)
+
+  ;; (elmtui.ui.api:initialize-components-from-dsl
+  ;;   '(:root-viewport :id :main-column :initial-terminal-dimensions (1 1)
+  ;;      :initial-cursor-pos (1 1) :children
+  ;;      ((:test-component :id :comp1 :initial-state "comp1 state")
+  ;;        (:test-parent-component :id :parent1 :child-initial-state
+  ;;          "child state"))))
+
+  (elmtui.app.api:register-dsl-component-type :test-component 'test-component)
+  (elmtui.app.api:register-dsl-component-type :test-parent-component 'test-parent-component))
 (def-suite application-init-tests
 
   :in elmtui.tests:elmtui-test
@@ -26,83 +101,10 @@
   (let ((config (elmtui.app:make-app-config :name 'test-app :message-queue (cleve-elm.core.event-channels:make-message-channel))))
     (is (eq 'test-app (app-config-name config)))))
 
-(elmtui.ui.defcomponent:defcomponent test-component (elmtui.ui.api:component)
-  (:state
-   (state nil))
-  (:view (local-state-map app-state id-path children)
-         ;; (declare (ignore app-state))
-         `(:text :id ,(elmtui.ui.api:id-from-path id-path)
-                 :content ,(format nil "State: ~A" (gethash :state local-state-map)))))
-
-(elmtui.ui.defcomponent:defcomponent test-parent-component (elmtui.ui.api:component)
-  (:state
-   (state :parent-default)
-   (children-ids nil))
-  (:init (props self-id-path)
-         (let* ((parent-id (elmtui.ui.api:id-from-path self-id-path))
-                (child-id (elmtui.app::generate-child-id parent-id :child1))
-                (child-initial-state (getf props :child-initial-state))
-                (child-component (make-instance 'test-component :id child-id))
-                (child-id-path `(:components ,child-id)))
-           (multiple-value-bind (instance child-patches child-commands)
-               (elmtui.ui.api:init child-component :id-path child-id-path :initial-state child-initial-state)
-             (declare (ignore instance))
-             (values
-              `(:state :parent-default :children-ids (,child-id))
-              child-patches
-              child-commands))))
-  (:view (local-state-map app-state id-path children)
-         (let* ((parent-map (elmtui.tea-state:get-path id-path app-state))
-                (child-id (first (gethash :children-ids parent-map)))
-                ;; (child-id-path `(:components ,child-id))
-                )
-           `(:test-parent-component
-             :id ,(elmtui.ui.api:id-from-path id-path)
-             :children ((:test-component :id ,child-id))))))
-
-;; Register the test components with the DSL type registry
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (elmtui.app.api:register-dsl-component-type :test-component 'test-component)
-  (elmtui.app.api:register-dsl-component-type :test-parent-component 'test-parent-component))
 
 
-;;; Test application
-(defun test-init-app-view (app-state)
-  (declare (ignore app-state))
-  '(:column :id :main-column
-    :children
-    ((:test-component :id :comp1 :initial-state "comp1 state")
-     (:test-parent-component :id :parent1 :child-initial-state "child state"))))
 
-(defun test-init-app-update (message app-state)
-  (declare (ignore message app-state))
-  (elmtui.ui.api:make-update-result))
 
-(defun test-init-app-subscriptions (model)
-  (declare (ignore model))
-  nil)
-
-(elmtui.app:defapplication test-init-app
-  :initial-state-plist `(:counter 0
-                         :text "hello")
-  :root-component-dsl '(;; :root-viewport :id :main-column passes
-                        :root-viewport :id :main-column ;; fails
-                        :initial-terminal-dimensions (1 1)
-                        :initial-cursor-pos (1 1)
-                        :children
-                        ((:test-component :id :comp1 :initial-state "comp1 state")
-                         (:test-parent-component :id :parent1 :child-initial-state "child state")))
-  :view-fn test-init-app-view
-  :update-fn test-init-app-update
-  :root-viewport-id :rv
-  :subscriptions-fn test-init-app-subscriptions)
-
-(elmtui.ui.api:initialize-components-from-dsl
- '(:root-viewport :id :main-column :initial-terminal-dimensions (1 1)
-   :initial-cursor-pos (1 1) :children
-   ((:test-component :id :comp1 :initial-state "comp1 state")
-    (:test-parent-component :id :parent1 :child-initial-state
-     "child state"))))
 ;; (elmtui.ui.api:initialize-components-from-dsl
 ;;  '(:root-viewport :id :rv :initial-terminal-dimensions (1 1)
 ;;    :initial-cursor-pos (1 1) :children
@@ -129,18 +131,18 @@
 ;;       "child state")))))
 (elmtui.app:defapplication test-init-app-2
   :initial-state-plist `(:counter 0
-                         :text "hello")
+                          :text "hello")
   :root-component-dsl '(;;:root-viewport :id :main-column
-                        ;; :viewport :id :main-column ;; fails
-                        :container :id :main-column ;; fails
-                        :initial-terminal-dimensions (1 1)
-                        :initial-cursor-pos (1 1)
-                        :initial-child-spec
-                        ((:test-component :id :comp1 :initial-state "comp1 state")
-                         (:test-parent-component :id :parent1 :child-initial-state "child state"))
-                        :children
-                        ((:test-component :id :comp1 :initial-state "comp1 state")
-                         (:test-parent-component :id :parent1 :child-initial-state "child state")))
+                         ;; :viewport :id :main-column ;; fails
+                         :container :id :main-column ;; fails
+                         :initial-terminal-dimensions (1 1)
+                         :initial-cursor-pos (1 1)
+                         :initial-child-spec
+                         ((:test-component :id :comp1 :initial-state "comp1 state")
+                           (:test-parent-component :id :parent1 :child-initial-state "child state"))
+                         :children
+                         ((:test-component :id :comp1 :initial-state "comp1 state")
+                           (:test-parent-component :id :parent1 :child-initial-state "child state")))
   :view-fn test-init-app-view
   :update-fn test-init-app-update
   :root-viewport-id :rv
@@ -165,7 +167,7 @@
 
 (test basic-application-initialization-2
   (multiple-value-bind (app-state commands)
-      (initialize-app-state-test-init-app-2)
+    (initialize-app-state-test-init-app-2)
     (declare (ignore commands))
     (let ((app-data (elmtui.tea-state.state::application-state-data app-state)))
       ;; app-data))
@@ -174,7 +176,7 @@
 
 (test basic-application-initialization
   (multiple-value-bind (app-state commands)
-      (initialize-app-state-test-init-app)
+    (initialize-app-state-test-init-app)
     (declare (ignore commands))
     ;; (print app-state)
     (let ((app-data (elmtui.tea-state.state::application-state-data app-state)))
@@ -193,7 +195,7 @@
         (is (typep (elmtui.app:get-component-instance '(:main-column :comp1) app-state) 'test-component)))
 
       (let* ((parent1-map (elmtui.tea-state:get-path '(:components :main-column :parent1) (elmtui.tea-state.state::application-state-data app-state)))
-             (child1-id (first (gethash :children-ids parent1-map))))
+              (child1-id (first (gethash :children-ids parent1-map))))
         (is (not (null parent1-map)))
         (is (equal (gethash :state parent1-map) :parent-default))
         (is (typep (elmtui.app:get-component-instance '(:main-column :parent1) app-state) 'test-parent-component))
@@ -210,10 +212,10 @@
     (declare (ignore commands))
     (let* ((view-tree (test-init-app-view app-state)))
       (is (equalp view-tree
-                  '(:column :id :main-column
-                    :children
-                    ((:test-component :id :comp1 :initial-state "comp1 state")
-                     (:test-parent-component :id :parent1 :child-initial-state "child state"))))))))
+            '(:column :id :main-column
+               :children
+               ((:test-component :id :comp1 :initial-state "comp1 state")
+                 (:test-parent-component :id :parent1 :child-initial-state "child state"))))))))
 
 (elmtui.app:defapplication my-test-app
   :root-component-dsl '(elmtui.ui.widgets.label:label :id :root-label :text "Hello")
@@ -238,7 +240,7 @@
 (test state-initialization
 
   (multiple-value-bind (state commands)
-      (initialize-app-state-my-state-test-app)
+    (initialize-app-state-my-state-test-app)
     (declare (ignore commands))
     (is (typep state 'elmtui.tea-state.state:application-state))
     (is (string= "bar" (elmtui.tea-state:get-path '(:foo) state)))
