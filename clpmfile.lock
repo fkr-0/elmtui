@@ -265,6 +265,7 @@
  ((:system :name "trivia.level2") (:system :name "lisp-namespace")))
 
 ("log4cl" ((:system :name "elmtui") (:system :name "log4cl"))
+ ((:system :name "cl-inputs") (:system :name "log4cl"))
  (t (:system :name "log4cl" :source "quicklisp")))
 
 ("rove" ((:system :name "asdf-test/tests") (:system :name "rove")))

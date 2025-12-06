@@ -12,13 +12,18 @@
   (:import-from :alexandria #:array-index) ; For 2D array indexing if needed
   (:import-from :elmtui.view.geo #:w #:h #:x #:y)
   (:import-from :elmtui.platform.api #:clear-screen)
+  (:import-from :cl-inputs.device.api #:make-device)
+  (:import-from :cl-inputs.loop #:make-input-source #:close-input-source)
+  (:import-from :elmtui.core.errors
+    #:backend-error #:signal-backend-operation-failed
+    #:with-error-context #:error-with-context)
   (:export #:faketerm-instance
-           #:initialize-backend ; Re-exporting for discoverability
-           #:shutdown-backend
-           #:backend-name
-           #:backend-version
-           #:get-char-at-faketerm ; Specific name to avoid conflict if generic exists
-           #:get-cell-style-faketerm)) ; Specific name
+    #:initialize-backend ; Re-exporting for discoverability
+    #:shutdown-backend
+    #:backend-name
+    #:backend-version
+    #:get-char-at-faketerm ; Specific name to avoid conflict if generic exists
+    #:get-cell-style-faketerm)) ; Specific name
 
 (in-package :elmtui.backend.faketerm)
 
@@ -36,6 +41,8 @@
   (cursor-row 0 :type integer)
   (cursor-col 0 :type integer)
   (current-style nil :type list) ; To store style from apply-style
+  (input-source nil :type (or null t))
+  (device nil :type (or null t))
   (input-queue (make-list 0) :type list)) ; For simulating input
 
 ;;;---------------------------------------------------------------
@@ -43,38 +50,34 @@
 ;;;---------------------------------------------------------------
 
 (defmethod initialize-backend ((backend-type (eql :faketerm)) &key filepath (width 80) (height 24) (initial-input nil) &allow-other-keys)
-  (unless filepath
-    (error "Filepath is required for faketerm backend."))
-  (let ((stream
-          (open filepath :direction :output
-                         :if-exists :supersede
-                         :if-does-not-exist :create)))
-    ;; (unless stream
-    ;;   (error "Could not open file for faketerm backend: ~A" filepath))
-    (let* ((screen-buf (make-array (list height width)
-                                   :element-type 'faketerm-cell
-                                   :initial-element (make-faketerm-cell)))
-           (instance (make-faketerm-instance :filepath filepath
-                                             :stream stream
-                                             :width width
-                                             :height height
-                                             :screen-buffer screen-buf
-                                             :input-queue (copy-list initial-input)
-                                             :current-style (list :fg (default-foreground-color nil)
-                                                                  :bg (default-background-color nil)
-                                                                  :attrs nil))))
-      ;; Initialize screen buffer with default cells
-      (loop for r below height do
-        (loop for c below width do
-          (setf (aref screen-buf r c) (make-faketerm-cell :style (faketerm-instance-current-style instance)))))
-
-      (format (faketerm-instance-stream instance)
-              "; Faketerm Initialized: ~A (Width: ~D, Height: ~D)~%"
-              (faketerm-instance-filepath instance)
-              (faketerm-instance-width instance)
-              (faketerm-instance-height instance))
-      (finish-output (faketerm-instance-stream instance))
-      instance)))
+  (with-error-context (:operation "initialize-backend" :module "backend.faketerm")
+    (unless filepath
+      (signal-backend-operation-failed "faketerm" "initialization"))
+    (handler-case
+      (let ((stream (open filepath :direction :output :if-exists :supersede :if-does-not-exist :create)))
+        (unless stream
+          (signal-backend-operation-failed "faketerm" "file-open"
+            (format nil "Could not open file for faketerm backend: ~A" filepath)))
+        (let* ((device (cl-inputs.device.api:make-device :faketerm))
+               (source (cl-inputs.loop:make-input-source :device device))
+               (screen-buf (make-array (list height width)
+                             :element-type 'faketerm-cell
+                             :initial-element (make-faketerm-cell)))
+               (instance (make-faketerm-instance :filepath filepath
+                           :stream stream :width width :height height
+                           :screen-buffer screen-buf
+                           :input-source source
+                           :device device
+                           :input-queue (copy-list initial-input)
+                           :current-style (list :fg :white :bg :black :attrs nil))))
+          (loop for r below height do
+            (loop for c below width do
+              (setf (aref screen-buf r c) (make-faketerm-cell :style (faketerm-instance-current-style instance)))))
+          (format stream "; Faketerm Initialized: ~A (Width: ~D, Height: ~D)~%" filepath width height)
+          (finish-output stream)
+          instance))
+      (error (e)
+        (signal-backend-operation-failed "faketerm" "initialization" e)))))
 
 (defmethod shutdown-backend ((instance faketerm-instance))
   (when (faketerm-instance-stream instance)
@@ -82,6 +85,10 @@
     (finish-output (faketerm-instance-stream instance))
     (close (faketerm-instance-stream instance))
     (setf (faketerm-instance-stream instance) nil))
+  (when (faketerm-instance-input-source instance)
+    (ignore-errors (cl-inputs.loop:close-input-source (faketerm-instance-input-source instance)))
+    (setf (faketerm-instance-input-source instance) nil
+          (faketerm-instance-device instance) nil))
   t)
 
 (defmethod backend-name ((instance faketerm-instance))
@@ -89,6 +96,12 @@
 
 (defmethod backend-version ((instance faketerm-instance))
   "0.1.0")
+
+(defmethod elmtui.platform.api:backend-input-device ((instance faketerm-instance))
+  (faketerm-instance-device instance))
+
+(defmethod elmtui.platform.api:backend-input-source ((instance faketerm-instance))
+  (faketerm-instance-input-source instance))
 
 ;;;---------------------------------------------------------------
 ;;; Display & Screen Management
@@ -100,17 +113,17 @@
 
 (defmethod clear-screen ((instance faketerm-instance) &optional rect)
   (let ((stream (faketerm-instance-stream instance))
-        (buffer (faketerm-instance-screen-buffer instance))
-        (w (or (and rect (w rect))(faketerm-instance-width instance)))
-        (h (or (and rect (h rect))(faketerm-instance-width instance)))
-        (x (or (and rect (x rect)) 0))
-        (y (or (and rect (y rect)) 0))
-        (default-style (list :fg (default-foreground-color instance) :bg (default-background-color instance) :attrs nil)))
+         (buffer (faketerm-instance-screen-buffer instance))
+         (w (or (and rect (w rect))(faketerm-instance-width instance)))
+         (h (or (and rect (h rect))(faketerm-instance-width instance)))
+         (x (or (and rect (x rect)) 0))
+         (y (or (and rect (y rect)) 0))
+         (default-style (list :fg (default-foreground-color instance) :bg (default-background-color instance) :attrs nil)))
     (format stream "; CLEAR_SCREEN~%")
     (loop for r below h do
       (loop for c below w do
         (setf (aref buffer (+ r y) (+ x c))
-              (make-faketerm-cell :char #\Space :style default-style))))
+          (make-faketerm-cell :char #\Space :style default-style))))
     (finish-output stream))
   t)
 
@@ -145,9 +158,9 @@
   (setf (faketerm-instance-width instance) width)
   (setf (faketerm-instance-height instance) height)
   (setf (faketerm-instance-screen-buffer instance)
-        (make-array (list height width)
-                    :element-type 'faketerm-cell
-                    :initial-element (make-faketerm-cell)))
+    (make-array (list height width)
+      :element-type 'faketerm-cell
+      :initial-element (make-faketerm-cell)))
   (format (faketerm-instance-stream instance) "; HANDLE_BACKEND_RESIZE Width: ~D Height: ~D~%" width height)
   (finish-output (faketerm-instance-stream instance))
   t)
@@ -163,24 +176,24 @@
 
 (defmethod draw-text-at ((instance faketerm-instance) target-buffer row col text &key style)
   (let ((stream (faketerm-instance-stream instance))
-        (buffer (faketerm-instance-screen-buffer instance))
-        (effective-style (or style (faketerm-instance-current-style instance)))
-        (max-col (1- (faketerm-instance-width instance)))
-        (max-row (1- (faketerm-instance-height instance))))
+         (buffer (faketerm-instance-screen-buffer instance))
+         (effective-style (or style (faketerm-instance-current-style instance)))
+         (max-col (1- (faketerm-instance-width instance)))
+         (max-row (1- (faketerm-instance-height instance))))
     (format stream "; DRAW_TEXT_AT Row: ~D Col: ~D Text: ~S Style: ~S~%" row col text effective-style)
     (loop for i from 0 below (length text)
-          for c = (+ col i)
-          when (and (>= row 0) (<= row max-row) (>= c 0) (<= c max-col))
-            do (setf (aref buffer row c) (make-faketerm-cell :char (char text i) :style effective-style)))
+      for c = (+ col i)
+      when (and (>= row 0) (<= row max-row) (>= c 0) (<= c max-col))
+      do (setf (aref buffer row c) (make-faketerm-cell :char (char text i) :style effective-style)))
     (finish-output stream))
   t)
 
 (defmethod draw-char-at ((instance faketerm-instance) target-buffer row col char &key style)
   (let ((stream (faketerm-instance-stream instance))
-        (buffer (faketerm-instance-screen-buffer instance))
-        (effective-style (or style (faketerm-instance-current-style instance)))
-        (max-col (1- (faketerm-instance-width instance)))
-        (max-row (1- (faketerm-instance-height instance))))
+         (buffer (faketerm-instance-screen-buffer instance))
+         (effective-style (or style (faketerm-instance-current-style instance)))
+         (max-col (1- (faketerm-instance-width instance)))
+         (max-row (1- (faketerm-instance-height instance))))
     (format stream "; DRAW_CHAR_AT Row: ~D Col: ~D Char: ~S Style: ~S~%" row col char effective-style)
     (when (and (>= row 0) (<= row max-row) (>= col 0) (<= col max-col))
       (setf (aref buffer row col) (make-faketerm-cell :char char :style effective-style)))
@@ -189,53 +202,53 @@
 
 (defmethod fill-rectangle ((instance faketerm-instance) target-buffer  row col height width &key char style)
   (let ((stream (faketerm-instance-stream instance))
-        (buffer (faketerm-instance-screen-buffer instance))
-        (fill-char (or char #\Space))
-        (effective-style (or style (faketerm-instance-current-style instance)))
-        (max-row (1- (faketerm-instance-height instance)))
-        (max-col (1- (faketerm-instance-width instance))))
+         (buffer (faketerm-instance-screen-buffer instance))
+         (fill-char (or char #\Space))
+         (effective-style (or style (faketerm-instance-current-style instance)))
+         (max-row (1- (faketerm-instance-height instance)))
+         (max-col (1- (faketerm-instance-width instance))))
     (format stream "; FILL_RECTANGLE Row: ~D Col: ~D Height: ~D Width: ~D Char: ~S Style: ~S~%"
-            row col height width fill-char effective-style)
+      row col height width fill-char effective-style)
     (loop for r from row below (min (+ row height) (1+ max-row))
-          do (loop for c from col below (min (+ col width) (1+ max-col))
-                   when (and (>= r 0) (>= c 0))
-                     do (setf (aref buffer r c) (make-faketerm-cell :char fill-char :style effective-style))))
+      do (loop for c from col below (min (+ col width) (1+ max-col))
+           when (and (>= r 0) (>= c 0))
+           do (setf (aref buffer r c) (make-faketerm-cell :char fill-char :style effective-style))))
     (finish-output stream))
   t)
 
 (defmethod draw-box-outline ((instance faketerm-instance) target-buffer row col height width &key style corners sides)
   (let ((stream (faketerm-instance-stream instance))
-        (effective-style (or style (faketerm-instance-current-style instance))))
+         (effective-style (or style (faketerm-instance-current-style instance))))
     (format stream "; DRAW_BOX_OUTLINE Row: ~D Col: ~D Height: ~D Width: ~D Style: ~S Corners: ~S Sides: ~S~%"
-            row col height width effective-style corners sides)
+      row col height width effective-style corners sides)
     ;; This is a simplified version for logging; actual drawing would call draw-char-at
     (let ((cs (or corners '(#\+ #\+ #\+ #\+)))
-          (sds (or sides '(#\- #\|))))
+           (sds (or sides '(#\- #\|))))
       (draw-char-at instance target-buffer row col (first cs) :style effective-style)
       (draw-char-at instance target-buffer row (+ col width -1) (second cs) :style effective-style)
       (draw-char-at instance target-buffer (+ row height -1) col (third cs) :style effective-style)
       (draw-char-at instance target-buffer (+ row height -1) (+ col width -1) (fourth cs) :style effective-style)
       (loop for c from (1+ col) below (+ col width -1)
-            do (draw-char-at instance target-buffer row c (first sds) :style effective-style)
-               (draw-char-at instance target-buffer (+ row height -1) c (first sds) :style effective-style))
+        do (draw-char-at instance target-buffer row c (first sds) :style effective-style)
+        (draw-char-at instance target-buffer (+ row height -1) c (first sds) :style effective-style))
       (loop for r from (1+ row) below (+ row height -1)
-            do (draw-char-at instance target-buffer r col (second sds) :style effective-style)
-               (draw-char-at instance target-buffer r (+ col width -1) (second sds) :style effective-style)))
+        do (draw-char-at instance target-buffer r col (second sds) :style effective-style)
+        (draw-char-at instance target-buffer r (+ col width -1) (second sds) :style effective-style)))
     (finish-output stream))
   t)
 
 (defmethod draw-styled-box ((instance faketerm-instance) target-buffer row col height width &key border-style border-color box-char-set style)
   (declare (ignore box-char-set)) ; Not using custom char sets for faketerm yet
   (let* ((stream (faketerm-instance-stream instance))
-         (effective-style (if border-color
-                              (list :fg border-color :attrs (getf style :attrs)) ; Prioritize explicit border-color
-                              (or style (faketerm-instance-current-style instance))))
-         (chars (case border-style
-                  (:single '(#\┌ #\┐ #\└ #\┘ #\─ #\│))
-                  (:double '(#\╔ #\╗ #\╚ #\╝ #\═ #\║))
-                  (otherwise '(#\+ #\+ #\+ #\+ #\- #\|))))) ; Default
+          (effective-style (if border-color
+                             (list :fg border-color :attrs (getf style :attrs)) ; Prioritize explicit border-color
+                             (or style (faketerm-instance-current-style instance))))
+          (chars (case border-style
+                   (:single '(#\┌ #\┐ #\└ #\┘ #\─ #\│))
+                   (:double '(#\╔ #\╗ #\╚ #\╝ #\═ #\║))
+                   (otherwise '(#\+ #\+ #\+ #\+ #\- #\|))))) ; Default
     (format stream "; DRAW_STYLED_BOX Row: ~D Col: ~D H: ~D W: ~D BorderStyle: ~S BorderColor: ~S Style: ~S~%"
-            row col height width border-style border-color effective-style)
+      row col height width border-style border-color effective-style)
     (apply-style instance effective-style) ; Set current style for subsequent draw-char-at calls
     (draw-box-outline instance target-buffer row col height width :style effective-style :corners (subseq chars 0 4) :sides (subseq chars 4 6))
     (apply-style instance (faketerm-instance-current-style instance)) ; Restore previous style
@@ -250,16 +263,16 @@
 
 (defmethod clear-area ((instance faketerm-instance) target-buffer row col height width &key style)
   (let ((stream (faketerm-instance-stream instance))
-        (buffer (faketerm-instance-screen-buffer instance))
-        (effective-style (or style (list :fg (default-foreground-color instance) :bg (default-background-color instance) :attrs nil)))
-        (max-row (1- (faketerm-instance-height instance)))
-        (max-col (1- (faketerm-instance-width instance))))
+         (buffer (faketerm-instance-screen-buffer instance))
+         (effective-style (or style (list :fg (default-foreground-color instance) :bg (default-background-color instance) :attrs nil)))
+         (max-row (1- (faketerm-instance-height instance)))
+         (max-col (1- (faketerm-instance-width instance))))
     (format stream "; CLEAR_AREA Row: ~D Col: ~D Height: ~D Width: ~D Style: ~S~%"
-            row col height width effective-style)
+      row col height width effective-style)
     (loop for r from row below (min (+ row height) (1+ max-row))
-          do (loop for c from col below (min (+ col width) (1+ max-col))
-                   when (and (>= r 0) (>= c 0))
-                     do (setf (aref buffer r c) (make-faketerm-cell :char #\Space :style effective-style))))
+      do (loop for c from col below (min (+ col width) (1+ max-col))
+           when (and (>= r 0) (>= c 0))
+           do (setf (aref buffer r c) (make-faketerm-cell :char #\Space :style effective-style))))
     (finish-output stream))
   t)
 
@@ -269,8 +282,8 @@
 
 (defmethod make-color ((instance faketerm-instance) r-or-name &optional g b)
   (if g ; Assuming if g is present, it's RGB
-      (list :rgb r-or-name g b)
-      r-or-name)) ; Otherwise, it's a named color like :RED
+    (list :rgb r-or-name g b)
+    r-or-name)) ; Otherwise, it's a named color like :RED
 
 (defmethod make-style ((instance faketerm-instance) &key foreground-color background-color attributes)
   (list :fg foreground-color :bg background-color :attrs attributes))
@@ -300,19 +313,19 @@
 (defmethod poll-input-event ((instance faketerm-instance) &key timeout)
   (declare (ignore timeout)) ; Timeout not really applicable for simple queue
   (if (faketerm-instance-input-queue instance)
-      (let ((event (pop (faketerm-instance-input-queue instance))))
-        (format (faketerm-instance-stream instance) "; POLL_INPUT_EVENT Event: ~S~%" event)
-        (finish-output (faketerm-instance-stream instance))
-        event)
-      nil))
+    (let ((event (pop (faketerm-instance-input-queue instance))))
+      (format (faketerm-instance-stream instance) "; POLL_INPUT_EVENT Event: ~S~%" event)
+      (finish-output (faketerm-instance-stream instance))
+      event)
+    nil))
 
 (defmethod peek-input-event ((instance faketerm-instance))
   (if (faketerm-instance-input-queue instance)
-      (let ((event (first (faketerm-instance-input-queue instance))))
-        (format (faketerm-instance-stream instance) "; PEEK_INPUT_EVENT Event: ~S~%" event)
-        (finish-output (faketerm-instance-stream instance))
-        event)
-      nil))
+    (let ((event (first (faketerm-instance-input-queue instance))))
+      (format (faketerm-instance-stream instance) "; PEEK_INPUT_EVENT Event: ~S~%" event)
+      (finish-output (faketerm-instance-stream instance))
+      event)
+    nil))
 
 (defmethod enable-mouse-support ((instance faketerm-instance) &key motion-events-p)
   (format (faketerm-instance-stream instance) "; ENABLE_MOUSE_SUPPORT Motion: ~A~%" motion-events-p)
@@ -356,13 +369,13 @@
 (defun get-char-at-faketerm (instance row col)
   "Returns the character at the given row and col from the screen buffer."
   (when (and (>= row 0) (< row (faketerm-instance-height instance))
-             (>= col 0) (< col (faketerm-instance-width instance)))
+          (>= col 0) (< col (faketerm-instance-width instance)))
     (faketerm-cell-char (aref (faketerm-instance-screen-buffer instance) row col))))
 
 (defun get-cell-style-faketerm (instance row col)
   "Returns the style plist at the given row and col from the screen buffer."
   (when (and (>= row 0) (< row (faketerm-instance-height instance))
-             (>= col 0) (< col (faketerm-instance-width instance)))
+          (>= col 0) (< col (faketerm-instance-width instance)))
     (faketerm-cell-style (aref (faketerm-instance-screen-buffer instance) row col))))
 ;;;---------------------------------------------------------------
 ;;; Raw Access (Escape Hatch)
@@ -384,4 +397,17 @@
 (defmethod clear-lines ((instance faketerm-instance) &optional (n 1))
   (format (faketerm-instance-stream instance) "; CLEAR_LINES N: ~D~%" n)
   (finish-output (faketerm-instance-stream instance))
+  t)
+
+(defmethod elmtui.platform.api:clear-below-cursor ((instance faketerm-instance))
+  "Clear from cursor position to end of screen."
+  (format (faketerm-instance-stream instance) "; CLEAR_BELOW_CURSOR~%")
+  (finish-output (faketerm-instance-stream instance))
+  t)
+
+(defmethod elmtui.platform.api:scroll ((instance faketerm-instance) n)
+  "Scroll the terminal by N lines (positive=down, negative=up)."
+  (if (>= n 0)
+    (scroll-down instance n)
+    (scroll-up instance (- n)))
   t)

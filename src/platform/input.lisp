@@ -10,13 +10,57 @@
     #:with-interruptable-signal #:cond-message)
   (:import-from :elmtui.platform.api
     #:poll-input-event)
-  (:import-from :elmtui.tea-state.msg #:make-focusprevious-appmsg #:make-focusnext-appmsg)
+  (:import-from :elmtui.tea-state.msg #:make-focusprevious-appmsg #:make-focusnext-appmsg
+    )
+  (:import-from :cl-inputs.tokens
+    #:input-token-kind #:input-token-data)
+
+  (:import-from :elmtui.core.event-types
+    #:make-key-event #:make-mouse-event)
+  (:import-from :elmtui.app.system-events
+    #:make-terminalresized-systemevent)
+  (:import-from :cl-inputs.terminal.ansii #:normalize-key-symbol #:%token-char)
   (:export :start-reader
+    #:cl-inputs-token->event
     :stop-reader
     :request-stop-input-reader)) ; Assuming request-stop-input-reader might be a default name
 
 (in-package :elmtui.platform.input)
-
+(defun cl-inputs-token->event (token)
+  "Convert a cl-inputs token to an elmtui event structure. Returns NIL when unsupported."
+  (let* ((kind (input-token-kind token))
+          (data (input-token-data token)))
+    (case kind
+      (:key
+        (let* ((code (getf data :code))
+                (mods (copy-list (getf data :mods)))
+                (char (or (%token-char code) (getf data :char)))
+                (key (normalize-key-symbol code))
+                (type (or (getf data :type) :key-down))
+                (code-value (cond ((integerp code) code)
+                              ((characterp char) (char-code char))
+                              (t nil))))
+          (make-key-event
+            :key key
+            :char char
+            :modifiers mods
+            :type type
+            :code code-value)))
+      (:mouse
+        (make-mouse-event
+          :type (getf data :type)
+          :button (getf data :button)
+          :x (getf data :x)
+          :y (getf data :y)
+          :modifiers (copy-list (getf data :mods))))
+      (:resize
+        (let ((width (getf data :width))
+               (height (getf data :height)))
+          (when (and width height)
+            (make-terminalresized-systemevent :width width :height height))))
+      (t
+        (log:debug "cl-inputs token ignored: ~S (~S)" kind data)
+        nil))))
 ;; Default name for the function to stop the input reader thread.
 ;; This is used if with-interruptable-signal defines 'interrupt-reader-fn'
 ;; and start-reader returns this symbol.

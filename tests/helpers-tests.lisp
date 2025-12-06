@@ -22,9 +22,9 @@
 (test dsl-ui-node-children-wrapping
   "Test that dsl->ui-node wraps children in individual lists"
   (let* ((dsl '(:container :id :main :style (:width 10 :height 10) :classes '("test-class")
-                :children ((:text :id :child1 :content "a")
-                           (:text :id :child2 :content "b"))))
-         (app-state (elmtui.tea-state.api::plist-to-application-state  '(:components (:main (:children (:child1 nil :child2 nil)))))))
+                 :children ((:text :id :child1 :content "a")
+                             (:text :id :child2 :content "b"))))
+          (app-state (elmtui.tea-state.api::plist-to-application-state  '(:components (:main (:children (:child1 nil :child2 nil)))))))
     (let ((ui-node (dsl->ui-node dsl app-state)))
       ;; (list ui-node dsl)))
       ;; (elmtui.utils:as :styled-ui-node ui-node)
@@ -58,25 +58,26 @@
 (test defapplication-initial-state-preservation
   "Test that defapplication preserves numeric types in initial state"
   (multiple-value-bind (app-state commands)
-      (initialize-app-state-test-app-for-state)
+    (initialize-app-state-test-app-for-state)
     (declare (ignore commands))
     (is (numberp (elmtui.utils:get-path '(:counter) app-state)))
     (is (= 99 (elmtui.utils:get-path '(:counter) app-state)))))
 
 ;; Test for defcomponent view
 (defcomponent test-component-for-view-helper ()
-  (:state (:message "hello"))
+  (:state
+    (message "hello"))
   (:view (state app-state id-path children)
-         ;; (declare (ignore app-state id-path))
-         `(:text :content ,(getf state :message "default"))))
+    ;; (declare (ignore app-state id-path))
+    `(:text :content ,(getf state :message "default"))))
 
 ;; test mutating the message in the state
 (test defcomponent-view-defaults-to-state
   "Test that defcomponent's view method uses the state by default"
   (let* ((instance (make-instance 'test-component-for-view-helper))
-         (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:message "hello")))))
-         (id-path '(:components :test1))
-         (view (view instance app-state :id-path id-path)))
+          (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:message "hello")))))
+          (id-path '(:components :test1))
+          (view (view instance app-state :id-path id-path)))
     (cddr view) view;)
     ;; (state-ref app-state (append id-path (list :message)))
     ;; )
@@ -111,28 +112,28 @@
 (test defcomponent-view-honors-custom-view
   "Test that defcomponent's view method uses the custom view"
   (let* ((instance (make-instance 'test-component-for-view-helper))
-         (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:message "custom")))))
-         (id-path '(:components :test1))
-         (view (view instance app-state :id-path id-path)))
+          (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:message "custom")))))
+          (id-path '(:components :test1))
+          (view (view instance app-state :id-path id-path)))
     ;; (cddr view) view)
 
     (is (string= "custom"  (getf (cdr view)
-                                 :content)))))
+                             :content)))))
 
 ;; Test for defcomponent update
 (defcomponent test-component-for-update-helper ()
   (:state (count 0))
   (:update (msg state app-state id-path)
-           (:increment ()
-                       ;; (declare (ignore app-state id-path))
-                       (values `(:count ,(1+ (getf state :count))) nil))))
+    (:increment ()
+      ;; (declare (ignore app-state id-path))
+      (values `(:count ,(1+ (getf state :count))) nil))))
 
 (test defcomponent-update-merges-patches
   "Test that defcomponent's update method merges patches"
   (let* ((instance (make-instance 'test-component-for-update-helper))
-         (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:count 5)))))
-         (id-path '(:components :test1))
-         (result (update instance app-state '(:increment) :id-path id-path)))
+          (app-state (elmtui.tea-state.api::plist-to-application-state '(:components (:test1 (:count 5)))))
+          (id-path '(:components :test1))
+          (result (update instance app-state '(:increment) :id-path id-path)))
     (let ((patches (elmtui.tea-state:ur-patches result)))
       (is (= 1 (length patches)))
       (is (= 6 (second (first patches)))))))
