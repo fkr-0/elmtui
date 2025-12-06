@@ -7,65 +7,66 @@
 ;;; ANSI escape code definitions, input parsing logic, etc.
 ;;;===============================================================
 
-(uiop:define-package :elmtui.backend.common.utils
+(uiop:define-package :cl-inputs.terminal.ansii
   (:use :cl)
+  (:import-from :cl-inputs.tokens
+    #:input-token-kind #:input-token-data)
   (:export
-   ;; ANSI Introducers
-   #:introducer
-   #:make-introducer
-   #:introducer-desc
-   #:introducer-name
-   #:introducer-code
-   #:introducer-esc
-   #:introducer-esc-char
-   #:introducer-esc-str
-   #:introducer-esc-hex
-   #:introducer-esc-dec
-   #:introducer-esc-oct
-   #:*introducers*
-   #:introducer-key
+    ;; ANSI Introducers
+    #:introducer
+    #:make-introducer
+    #:introducer-desc
+    #:introducer-name
+    #:introducer-code
+    #:introducer-esc
+    #:introducer-esc-char
+    #:introducer-esc-str
+    #:introducer-esc-hex
+    #:introducer-esc-dec
+    #:introducer-esc-oct
+    #:*introducers*
+    #:introducer-key
 
-   ;; ANSI Keys
-   #:*ansi-keys* ; For mapping escape sequences to key symbols
-   #:read-escape-bytes ; Parses a sequence of bytes after an ESC
+    ;; ANSI Keys
+    #:*ansi-keys* ; For mapping escape sequences to key symbols
+    #:read-escape-bytes ; Parses a sequence of bytes after an ESC
 
-   ;; ANSI Sequences (from constants.lisp)
-   #:ansi-sequence
-   #:make-ansi-sequence
-   #:seq ; accessor
-   #:description ; accessor
-   #:identifier ; accessor
-   #:prerender ; accessor
-   #:response-parser ; accessor
-   #:reset-sequence ; accessor
-   #:default-args ; accessor
-   #:number-of-arguments
-   #:lookup-sequence
-   #:render-seq
-   #:read-response ; Generic response reader
-   #:parse-cursor-report-response
-   #:parse-device-status-report-response
-   #:+ansi-escape-sequences+
-   #:+ansi-escape-sequences-lookup+
-   #:+ansi-escape-sequences-reset-lookup+
-   #:get-sequence
-   #:get-reset-sequence
+    ;; ANSI Sequences (from constants.lisp)
+    #:ansi-sequence
+    #:make-ansi-sequence
+    #:seq ; accessor
+    #:description ; accessor
+    #:identifier ; accessor
+    #:prerender ; accessor
+    #:response-parser ; accessor
+    #:reset-sequence ; accessor
+    #:default-args ; accessor
+    #:number-of-arguments
+    #:lookup-sequence
+    #:render-seq
+    #:read-response ; Generic response reader
+    #:parse-cursor-report-response
+    #:parse-device-status-report-response
+    #:+ansi-escape-sequences+
+    #:+ansi-escape-sequences-lookup+
+    #:+ansi-escape-sequences-reset-lookup+
+    #:get-sequence
+    #:get-reset-sequence
 
-   ;; Style Parsing (from terminal-style.lisp)
-   #:is-csi-final-byte?
-   #:collect-csi-params
-   #:parse-csi-sequence
-   #:parse-sgr-parameters
-   #:parse-parameters
-   #:split-seq-if
+    ;; Style Parsing (from terminal-style.lisp)
+    #:is-csi-final-byte?
+    #:collect-csi-params
+    #:parse-csi-sequence
+    #:parse-sgr-parameters
+    #:parse-parameters
+    #:split-seq-if
 
-   ;; ANSI Style Sequence Generation Helpers
-   #:ansi-fg-color-seq
-   #:ansi-bg-color-seq
-   #:ansi-attr-seq
-   ))
+    ;; ANSI Style Sequence Generation Helpers
+    #:ansi-fg-color-seq
+    #:ansi-bg-color-seq
+    #:ansi-attr-seq))
 
-(in-package :elmtui.backend.common.utils)
+(in-package :cl-inputs.terminal.ansii)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;;;---------------------------------------------------------------
@@ -84,38 +85,38 @@
 
   (defparameter *introducers*
     '(("Padding Character" :PAD "@" (027 064)) ; Note: Original had list of char codes, simplified to string for esc-char
-      ("High Octet Preset" :HOP "A" (027 065))
-      ("Break Permitted Here" :BPH "B" (027 066))
-      ("No Break Here" :NBH "C" (027 067))
-      ("Index" :IND "D" (027 068))
-      ("Next Line" :NEL "E" (027 069))
-      ("Start of Selected Area" :SSA "F" (027 070))
-      ("End of Selected Area" :ESA "G" (027 071))
-      ("Character Tabulation Set" :HTS "H" (027 072))
-      ("Character Tabulation with Justification" :HTJ "I" (027 073))
-      ("Line Tabulation Set" :VTS "J" (027 074))
-      ("Partial Line Forward" :PLD "K" (027 075))
-      ("Partial Line Backward" :PLU "L" (027 076))
-      ("Reverse Line Feed" :RI "M" (027 077))
-      ("Single Shift 2" :SS2 "N" (027 078))
-      ("Single Shift 3" :SS3 "O" (027 079))
-      ("Device Control String" :DCS "P" (027 080))
-      ("Private Use One" :PU1 "Q" (027 081))
-      ("Private Use Two" :PU2 "R" (027 082))
-      ("Set Transmit State" :STS "S" (027 083))
-      ("Cancel Character" :CCH "T" (027 084))
-      ("Message Waiting" :MW "U" (027 085))
-      ("Start Protected Area" :SPA "V" (027 086))
-      ("End Protected Area" :EPA "W" (027 087))
-      ("Start Of String" :SOS "X" (027 088))
-      ("Single Graphic Character Introducer" :SGCI "Y" (027 089))
-      ("Single Character Introducer" :SCI "Z" (027 090))
-      ("ROI" :ROI "%" (027 03)) ; Assuming ROI is a typo for something else or a custom one
-      ("Control Sequence Intro" :CSI "[" (027 091))
-      ("String Terminator" :ST "\\" (027 092))
-      ("Operating System Command" :OSC "]" (027 093))
-      ("Privacy Message" :PM "^" (027 094))
-      ("Application Program Command" :APC "_" (027 095)))
+       ("High Octet Preset" :HOP "A" (027 065))
+       ("Break Permitted Here" :BPH "B" (027 066))
+       ("No Break Here" :NBH "C" (027 067))
+       ("Index" :IND "D" (027 068))
+       ("Next Line" :NEL "E" (027 069))
+       ("Start of Selected Area" :SSA "F" (027 070))
+       ("End of Selected Area" :ESA "G" (027 071))
+       ("Character Tabulation Set" :HTS "H" (027 072))
+       ("Character Tabulation with Justification" :HTJ "I" (027 073))
+       ("Line Tabulation Set" :VTS "J" (027 074))
+       ("Partial Line Forward" :PLD "K" (027 075))
+       ("Partial Line Backward" :PLU "L" (027 076))
+       ("Reverse Line Feed" :RI "M" (027 077))
+       ("Single Shift 2" :SS2 "N" (027 078))
+       ("Single Shift 3" :SS3 "O" (027 079))
+       ("Device Control String" :DCS "P" (027 080))
+       ("Private Use One" :PU1 "Q" (027 081))
+       ("Private Use Two" :PU2 "R" (027 082))
+       ("Set Transmit State" :STS "S" (027 083))
+       ("Cancel Character" :CCH "T" (027 084))
+       ("Message Waiting" :MW "U" (027 085))
+       ("Start Protected Area" :SPA "V" (027 086))
+       ("End Protected Area" :EPA "W" (027 087))
+       ("Start Of String" :SOS "X" (027 088))
+       ("Single Graphic Character Introducer" :SGCI "Y" (027 089))
+       ("Single Character Introducer" :SCI "Z" (027 090))
+       ("ROI" :ROI "%" (027 03)) ; Assuming ROI is a typo for something else or a custom one
+       ("Control Sequence Intro" :CSI "[" (027 091))
+       ("String Terminator" :ST "\\" (027 092))
+       ("Operating System Command" :OSC "]" (027 093))
+       ("Privacy Message" :PM "^" (027 094))
+       ("Application Program Command" :APC "_" (027 095)))
     "A list of ANSI escape sequence introducers. Each entry is a list of:
   (Description Name Esc-Char-Suffix Esc-Char-Code-List).
   The Esc-Char-Code-List is (ESC-Code Actual-Char-Code).")
@@ -124,9 +125,9 @@
     "Given a byte that follows an ESC (0x1B) character, returns the keyword
    identifier for the introducer type (e.g., :CSI, :SS3, :OSC)."
     (loop for entry in *introducers*
-          when (and (fourth entry) (= byte (second (fourth entry))))
-            return (second entry)
-          finally (return nil))) ; Return nil if no match
+      when (and (fourth entry) (= byte (second (fourth entry))))
+      return (second entry)
+      finally (return nil))) ; Return nil if no match
 
 ;;;---------------------------------------------------------------
 ;;; ANSI Key Definitions (from lowterm/ansi.lisp)
@@ -138,28 +139,28 @@
   ;; :KEYWORD ( (INTRODUCER-TYPE ...) (INTRODUCER-TYPE ...) )
   (defparameter *ansi-keys*
     '((:INSERT (:CSI #\2 #\~))      ; ESC [ 2 ~
-      (:DELETE (:CSI #\3 #\~))      ; ESC [ 3 ~
-      (:PAGE-UP (:CSI #\5 #\~))     ; ESC [ 5 ~
-      (:PAGE-DOWN (:CSI #\6 #\~))   ; ESC [ 6 ~
-      (:HOME (:CSI #\H) (:SS3 #\H)) ; ESC [ H or ESC O H
-      (:END (:CSI #\F) (:SS3 #\F))   ; ESC [ F or ESC O F
-      (:UP (:CSI #\A) (:SS3 #\A))    ; ESC [ A or ESC O A
-      (:DOWN (:CSI #\B) (:SS3 #\B))  ; ESC [ B or ESC O B
-      (:RIGHT (:CSI #\C) (:SS3 #\C)) ; ESC [ C or ESC O C
-      (:LEFT (:CSI #\D) (:SS3 #\D))  ; ESC [ D or ESC O D
-      (:F1 (:SS3 #\P))              ; ESC O P
-      (:F2 (:SS3 #\Q))              ; ESC O Q
-      (:F3 (:SS3 #\R))              ; ESC O R
-      (:F4 (:SS3 #\S))              ; ESC O S
-      (:F5 (:CSI #\1 #\5 #\~))      ; ESC [ 1 5 ~
-      (:F6 (:CSI #\1 #\7 #\~))      ; ESC [ 1 7 ~
-      (:F7 (:CSI #\1 #\8 #\~))      ; ESC [ 1 8 ~
-      (:F8 (:CSI #\1 #\9 #\~))      ; ESC [ 1 9 ~
-      (:F9 (:CSI #\2 #\0 #\~))      ; ESC [ 2 0 ~
-      (:F10 (:CSI #\2 #\1 #\~))     ; ESC [ 2 1 ~
-      (:F11 (:CSI #\2 #\3 #\~))     ; ESC [ 2 3 ~ (Note: original had 23~, assuming typo for 23)
-      (:F12 (:CSI #\2 #\4 #\~))     ; ESC [ 2 4 ~
-      (:MENU (:CSI #\2 #\9 #\~)))   ; ESC [ 2 9 ~  (Often context menu key)
+       (:DELETE (:CSI #\3 #\~))      ; ESC [ 3 ~
+       (:PAGE-UP (:CSI #\5 #\~))     ; ESC [ 5 ~
+       (:PAGE-DOWN (:CSI #\6 #\~))   ; ESC [ 6 ~
+       (:HOME (:CSI #\H) (:SS3 #\H)) ; ESC [ H or ESC O H
+       (:END (:CSI #\F) (:SS3 #\F))   ; ESC [ F or ESC O F
+       (:UP (:CSI #\A) (:SS3 #\A))    ; ESC [ A or ESC O A
+       (:DOWN (:CSI #\B) (:SS3 #\B))  ; ESC [ B or ESC O B
+       (:RIGHT (:CSI #\C) (:SS3 #\C)) ; ESC [ C or ESC O C
+       (:LEFT (:CSI #\D) (:SS3 #\D))  ; ESC [ D or ESC O D
+       (:F1 (:SS3 #\P))              ; ESC O P
+       (:F2 (:SS3 #\Q))              ; ESC O Q
+       (:F3 (:SS3 #\R))              ; ESC O R
+       (:F4 (:SS3 #\S))              ; ESC O S
+       (:F5 (:CSI #\1 #\5 #\~))      ; ESC [ 1 5 ~
+       (:F6 (:CSI #\1 #\7 #\~))      ; ESC [ 1 7 ~
+       (:F7 (:CSI #\1 #\8 #\~))      ; ESC [ 1 8 ~
+       (:F8 (:CSI #\1 #\9 #\~))      ; ESC [ 1 9 ~
+       (:F9 (:CSI #\2 #\0 #\~))      ; ESC [ 2 0 ~
+       (:F10 (:CSI #\2 #\1 #\~))     ; ESC [ 2 1 ~
+       (:F11 (:CSI #\2 #\3 #\~))     ; ESC [ 2 3 ~ (Note: original had 23~, assuming typo for 23)
+       (:F12 (:CSI #\2 #\4 #\~))     ; ESC [ 2 4 ~
+       (:MENU (:CSI #\2 #\9 #\~)))   ; ESC [ 2 9 ~  (Often context menu key)
     "Alist mapping key symbols to their ANSI escape sequence definitions.
    Each definition is a list starting with the introducer type (e.g., :CSI, :SS3)
    followed by the characters/codes that make up the rest of the sequence.
@@ -174,32 +175,32 @@
    REMAINING-BYTES are bytes read that didn't form a known key sequence.
    ALL-READ-BYTES are all bytes read if no specific key was matched."
     (let* ((collected-chars '()) ; Renamed from read-sequence
-           (char-count 0)
-           (_ (loop for char = (read-char stream nil nil)
-                    while char
-                    do (push char collected-chars)
-                       (incf char-count)
-                    until (or (not (graphic-char-p char)) ; Stop on non-graphic or control chars
-                              (>= char-count 6)))) ; Max length for typical key sequences
+            (char-count 0)
+            (_ (loop for char = (read-char stream nil nil)
+                 while char
+                 do (push char collected-chars)
+                 (incf char-count)
+                 until (or (not (graphic-char-p char)) ; Stop on non-graphic or control chars
+                         (>= char-count 6)))) ; Max length for typical key sequences
                                         ; msg is not used in this simple test
-           (collected-chars (nreverse collected-chars)) ; Reverse to get original order
-           (matched-key nil))
+            (collected-chars (nreverse collected-chars)) ; Reverse to get original order
+            (matched-key nil))
       (declare (ignore _))
 
       (unless collected-chars (return-from read-escape-bytes (values nil nil)))
 
       ;; Try to find a match in *ansi-keys*
       (loop for (key . defs) in *ansi-keys*
-            do (let ((normalized-defs (if (keywordp (first defs)) (list defs) defs)))
-                 (loop for def in normalized-defs
-                       when (eq (first def) introducer-type)
-                         do (let* ((key-seq-chars (rest def))
-                                   (key-seq-len (length key-seq-chars)))
-                              (when (and (>= (length collected-chars) key-seq-len) ; Use renamed variable
-                                         (every #'char= key-seq-chars (subseq collected-chars 0 key-seq-len))) ; Use renamed variable
-                                (setf matched-key key)
-                                (return-from read-escape-bytes
-                                  (values matched-key (subseq collected-chars key-seq-len)))))))) ; Use renamed variable
+        do (let ((normalized-defs (if (keywordp (first defs)) (list defs) defs)))
+             (loop for def in normalized-defs
+               when (eq (first def) introducer-type)
+               do (let* ((key-seq-chars (rest def))
+                          (key-seq-len (length key-seq-chars)))
+                    (when (and (>= (length collected-chars) key-seq-len) ; Use renamed variable
+                            (every #'char= key-seq-chars (subseq collected-chars 0 key-seq-len))) ; Use renamed variable
+                      (setf matched-key key)
+                      (return-from read-escape-bytes
+                        (values matched-key (subseq collected-chars key-seq-len)))))))) ; Use renamed variable
       (values nil collected-chars))) ; Use renamed variable
 
 ;;;---------------------------------------------------------------
@@ -210,27 +211,27 @@
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (defclass ansi-sequence ()
       ((seq :initarg :seq :reader seq
-            :documentation "Sequence to be sent. As a list of strings. For execution those are joined on function arguments.")
-       (description :initarg :desc :reader description
-                    :documentation "Description of the sequence.")
-       (identifier :initarg :id :reader identifier
-                   :documentation "Keyword, Identifier of the sequence.")
-       (prerender :initarg :prerender :initform nil :accessor prerender
-                  :documentation "Function to prerender the sequence.")
-       (response-parser :initarg :response-parser :reader response-parser
-                        :documentation "Function to parse the response of the sequence.")
-       (reset-sequence :initarg :reset-sequence :reader reset-sequence)
-       (default-args :initarg :default-args :reader default-args
-                     :documentation "Default arguments for the sequence."))
+         :documentation "Sequence to be sent. As a list of strings. For execution those are joined on function arguments.")
+        (description :initarg :desc :reader description
+          :documentation "Description of the sequence.")
+        (identifier :initarg :id :reader identifier
+          :documentation "Keyword, Identifier of the sequence.")
+        (prerender :initarg :prerender :initform nil :accessor prerender
+          :documentation "Function to prerender the sequence.")
+        (response-parser :initarg :response-parser :reader response-parser
+          :documentation "Function to parse the response of the sequence.")
+        (reset-sequence :initarg :reset-sequence :reader reset-sequence)
+        (default-args :initarg :default-args :reader default-args
+          :documentation "Default arguments for the sequence."))
       (:documentation "Ansi Escape Sequence to be sent to the terminal."))
 
     (defun make-ansi-sequence (&key seq description identifier response-parser reset-sequence)
       (make-instance 'ansi-sequence
-                     :seq seq
-                     :desc description
-                     :id identifier
-                     :response-parser response-parser
-                     :reset-sequence reset-sequence))
+        :seq seq
+        :desc description
+        :id identifier
+        :response-parser response-parser
+        :reset-sequence reset-sequence))
 
     (defun read-response (fd delimiters &optional (fn #'identity))
       "Parses a terminal response stream.
@@ -240,34 +241,34 @@
       (read-char fd nil) ; throw away esc
       (read-char fd nil) ; throw away [ (or other introducer part)
       (let ((current-segment (make-string-output-stream))
-            results)
+             results)
         (loop for char = (read-char fd nil nil)
-              while (and char delimiters)
-              do (if (char= char (car delimiters))
-                     (progn
-                       (push (funcall fn (get-output-stream-string current-segment)) results)
-                       (setf delimiters (cdr delimiters)))
-                     (write-char char current-segment))
-              finally (unless (zerop (length (get-output-stream-string current-segment))) ; Add last segment if any
-                        (push (funcall fn (get-output-stream-string current-segment)) results)))
+          while (and char delimiters)
+          do (if (char= char (car delimiters))
+               (progn
+                 (push (funcall fn (get-output-stream-string current-segment)) results)
+                 (setf delimiters (cdr delimiters)))
+               (write-char char current-segment))
+          finally (unless (zerop (length (get-output-stream-string current-segment))) ; Add last segment if any
+                    (push (funcall fn (get-output-stream-string current-segment)) results)))
         (nreverse results)))
 
     (defun parse-cursor-report-response (fd)
       "Parse a cursor report response (e.g., ESC [ <row> ; <col> R)."
       (let ((delim '(#\; #\R)))
         (mapcar (lambda (x) (parse-integer x :junk-allowed t))
-                (read-response fd delim))))
+          (read-response fd delim))))
 
     (defun parse-device-status-report-response (fd)
       "Parse a device status report response (e.g., ESC [ <status> n)."
       (let ((delim '(#\n)))
         (mapcar (lambda (x) (parse-integer x :junk-allowed t))
-                (read-response fd delim)))))
+          (read-response fd delim)))))
 
   (defmethod render-seq ((seq ansi-sequence) &rest args)
     "Render the ANSI control sequence with args."
     (let ((control-parts (slot-value seq 'seq))
-          (identifier (slot-value seq 'identifier)))
+           (identifier (slot-value seq 'identifier)))
       ;; (log:debug "RENDER-SEQ: Called for seq ID: ~S, control-string template: ~S, args: ~S"
       ;;            identifier control-parts args)
 
@@ -276,26 +277,26 @@
           (dolist (part control-parts)
             (cond
               ((and (stringp part) (string= part "ESC"))
-               ;; The initial ESC character is already added.
-               ;; This part of the sequence definition is effectively a marker.
-               )
+                ;; The initial ESC character is already added.
+                ;; This part of the sequence definition is effectively a marker.
+                )
               ((stringp part)
-               (push part string-builder))
+                (push part string-builder))
               ((null part) ; Placeholder for an argument
-               (if (< arg-index (length args))
-                   (let ((arg-value (nth arg-index args)))
-                     ;; Ensure arguments are converted to strings.
-                     ;; NIL arguments become empty strings in the sequence.
-                     (push (if arg-value (princ-to-string arg-value) "") string-builder)
-                     (incf arg-index))
-                   (progn
-                     (log:warn "RENDER-SEQ: Not enough arguments for sequence ~S. Expected placeholder at index ~D, but no more arguments provided. Inserting empty string."
-                               identifier arg-index)
-                     (push "" string-builder)))) ; Insert empty string if not enough args
+                (if (< arg-index (length args))
+                  (let ((arg-value (nth arg-index args)))
+                    ;; Ensure arguments are converted to strings.
+                    ;; NIL arguments become empty strings in the sequence.
+                    (push (if arg-value (princ-to-string arg-value) "") string-builder)
+                    (incf arg-index))
+                  (progn
+                    (log:warn "RENDER-SEQ: Not enough arguments for sequence ~S. Expected placeholder at index ~D, but no more arguments provided. Inserting empty string."
+                      identifier arg-index)
+                    (push "" string-builder)))) ; Insert empty string if not enough args
               (t
-               ;; (log:error "RENDER-SEQ: Unknown part ~S in sequence definition for ~S. Skipping part." part identifier)
-               ;; Optionally, insert an error marker or an empty string
-               (push "" string-builder)))))
+                ;; (log:error "RENDER-SEQ: Unknown part ~S in sequence definition for ~S. Skipping part." part identifier)
+                ;; Optionally, insert an error marker or an empty string
+                (push "" string-builder)))))
 
         (let ((final-string (apply #'concatenate 'string (nreverse string-builder))))
           ;; (log:debug "RENDER-SEQ: For seq ID: ~S, returning string: ~S (char-codes: ~S)"
@@ -346,14 +347,15 @@
     "Initialize the ANSI sequence object properly."
     (with-slots (identifier seq prerender) obj
       ;; We don't need to precompute prerender anymore since render-seq handles it directly
-      (log:debug "ANSI-SEQ INIT [~A]: Initialized with raw parts: ~S"
-                 identifier seq)))
+      ;; (log:debug "ANSI-SEQ INIT [~A]: Initialized with raw parts: ~S"
+      ;;   identifier seq)
+      ))
 
   ;; Helper function for debugging ANSI sequences
   (defun print-char-codes (string)
     "Print the character codes of STRING for debugging."
     (loop for char across string
-          collect (char-code char)))
+      collect (char-code char)))
 
 
 
@@ -373,15 +375,15 @@
 
     (macrolet ((defseq (id desc seq &key response reset)
                  `(let ((ident ,id)
-                        ;; Use funcall here because make-ansi-sequence is defined inside eval-when
-                        (sequence-obj (funcall #'make-ansi-sequence :seq ',seq
-                                                                    :description ,desc
-                                                                    :identifier ,id
-                                                                    :response-parser ,response
-                                                                    :reset-sequence ,reset)))
+                         ;; Use funcall here because make-ansi-sequence is defined inside eval-when
+                         (sequence-obj (funcall #'make-ansi-sequence :seq ',seq
+                                         :description ,desc
+                                         :identifier ,id
+                                         :response-parser ,response
+                                         :reset-sequence ,reset)))
                     (setf (gethash ident +ansi-escape-sequences+) sequence-obj)
                     (setf (gethash (apply #'concatenate 'string (loop for part in ',seq collect (if (stringp part) part "~A")))
-                                   +ansi-escape-sequences-lookup+) ident)
+                            +ansi-escape-sequences-lookup+) ident)
                     (when ,reset
                       (setf (gethash ident +ansi-escape-sequences-reset-lookup+) ,reset)))))
       ;; SGR (Select Graphic Rendition)
@@ -503,7 +505,7 @@
       (keyword (gethash identifier +ansi-escape-sequences+))
       (ansi-sequence identifier)
       (string (gethash (gethash identifier +ansi-escape-sequences-lookup+)
-                       +ansi-escape-sequences+))))
+                +ansi-escape-sequences+))))
 
 
 ;;;---------------------------------------------------------------
@@ -518,9 +520,9 @@
     "Split STRING into a list of substrings based on characters that match PREDICATE."
     (let ((start 0) result)
       (loop for i from 0 below (length string)
-            do (when (funcall predicate (char string i))
-                 (push (subseq string start i) result)
-                 (setf start (1+ i))))
+        do (when (funcall predicate (char string i))
+             (push (subseq string start i) result)
+             (setf start (1+ i))))
       (push (subseq string start) result)
       (nreverse (remove-if (lambda (x) (string= "" x)) result)))) ; Remove empty strings
 
@@ -528,40 +530,40 @@
     "Parses a list of parameter characters (digits and ';', ':') into a list of integers."
     (let ((param-str (coerce param-chars 'string)))
       (mapcar (lambda (s) (if (string= "" s) 0 (parse-integer s :junk-allowed t))) ; Default to 0 for empty params
-              (split-seq-if (lambda (c) (or (char= c #\;) (char= c #\:))) param-str))))
+        (split-seq-if (lambda (c) (or (char= c #\;) (char= c #\:))) param-str))))
 
 
   (defun collect-csi-params (char-code-list)
     "Parses a list of character codes (after ESC [) into CSI parameters, intermediates, and the final byte.
    Returns (VALUES PARAM-LIST INTERMEDIATE-CHARS FINAL-BYTE-CHAR-CODE)."
     (let ((params-chars '())           ; List to hold parameter characters
-          (intermediate-chars '())     ; List to hold intermediate characters
-          final-byte-code
-          (collecting-params-p t))   ; Flag to indicate if we are collecting params or intermediates
+           (intermediate-chars '())     ; List to hold intermediate characters
+           final-byte-code
+           (collecting-params-p t))   ; Flag to indicate if we are collecting params or intermediates
 
       (loop for code in char-code-list
-            do (cond
-                 ((is-csi-final-byte? code)
-                  (setf final-byte-code code)
-                  (return)) ; End of CSI sequence
-                 ((and (>= code #x30) (<= code #x3F)) ; Parameter bytes 0-9:;<=>?
-                  (if collecting-params-p
-                      (push (code-char code) params-chars)
-                      (progn ; Parameter byte after intermediate byte
-                        (warn "Parameter byte ~A found after intermediate byte in CSI sequence." code)
-                        (push (code-char code) intermediate-chars)))) ; Or handle as error
-                 ((and (>= code #x20) (<= code #x2F)) ; Intermediate bytes SP-'/'
-                  (setf collecting-params-p nil) ; Switch to collecting intermediates
-                  (push (code-char code) intermediate-chars))
-                 (t ;; Should not happen in a valid CSI
-                  (warn "Invalid byte ~A in CSI sequence." code)
-                  (return))))
+        do (cond
+             ((is-csi-final-byte? code)
+               (setf final-byte-code code)
+               (return)) ; End of CSI sequence
+             ((and (>= code #x30) (<= code #x3F)) ; Parameter bytes 0-9:;<=>?
+               (if collecting-params-p
+                 (push (code-char code) params-chars)
+                 (progn ; Parameter byte after intermediate byte
+                   (warn "Parameter byte ~A found after intermediate byte in CSI sequence." code)
+                   (push (code-char code) intermediate-chars)))) ; Or handle as error
+             ((and (>= code #x20) (<= code #x2F)) ; Intermediate bytes SP-'/'
+               (setf collecting-params-p nil) ; Switch to collecting intermediates
+               (push (code-char code) intermediate-chars))
+             (t ;; Should not happen in a valid CSI
+               (warn "Invalid byte ~A in CSI sequence." code)
+               (return))))
       (unless final-byte-code
         (error "CSI sequence did not end with a final byte."))
 
       (values (parse-parameters (nreverse params-chars))
-              (nreverse intermediate-chars)
-              final-byte-code)))
+        (nreverse intermediate-chars)
+        final-byte-code)))
 
 
   (defun parse-sgr-parameters (sgr-params-list)
@@ -572,65 +574,65 @@
             (38 5 200) -> '((:fg-color (:type :xterm :value 200)))
             (38 2 100 150 200) -> '((:fg-color (:type :rgb :r 100 :g 150 :b 200)))"
     (let ((changes '())
-          (i 0))
+           (i 0))
       (labels ((pop-param () (prog1 (nth i sgr-params-list) (incf i)))
-               ;; (peek-param () (nth i sgr-params-list))
-               (params-left () (- (length sgr-params-list) i)))
+                ;; (peek-param () (nth i sgr-params-list))
+                (params-left () (- (length sgr-params-list) i)))
         ;; (declare (ignorable peek-param))
         (loop while (< i (length sgr-params-list))
-              do (let ((p (pop-param)))
-                   (cond
-                     ((= p 0) (push '(:reset t) changes))
-                     ((= p 1) (push '(:bold t) changes))
-                     ((= p 2) (push '(:faint t) changes))
-                     ((= p 3) (push '(:italic t) changes))
-                     ((= p 4) (push '(:underline t) changes))
-                     ((= p 5) (push '(:blink t) changes))
-                     ((= p 7) (push '(:inverse t) changes))
-                     ((= p 8) (push '(:invisible t) changes))
-                     ((= p 9) (push '(:strike t) changes))
-                     ((= p 21) (push '(:bold nil) changes)) ; double underline, or bold off
-                     ((= p 22) (push '(:bold nil) changes) (push '(:faint nil) changes))
-                     ((= p 23) (push '(:italic nil) changes))
-                     ((= p 24) (push '(:underline nil) changes))
-                     ((= p 25) (push '(:blink nil) changes))
-                     ((= p 27) (push '(:inverse nil) changes))
-                     ((= p 28) (push '(:invisible nil) changes))
-                     ((= p 29) (push '(:strike nil) changes))
-                     ((and (>= p 30) (<= p 37)) (push (list :fg-color (nth (- p 30) '(:black :red :green :yellow :blue :magenta :cyan :white))) changes))
-                     ((= p 39) (push '(:fg-color :default) changes))
-                     ((and (>= p 40) (<= p 47)) (push (list :bg-color (nth (- p 40) '(:black :red :green :yellow :blue :magenta :cyan :white))) changes))
-                     ((= p 49) (push '(:bg-color :default) changes))
-                     ((and (>= p 90) (<= p 97)) (push (list :fg-color (nth (- p 90) '(:bright-black :bright-red :bright-green :bright-yellow :bright-blue :bright-magenta :bright-cyan :bright-white))) changes))
-                     ((and (>= p 100) (<= p 107)) (push (list :bg-color (nth (- p 100) '(:bright-black :bright-red :bright-green :bright-yellow :bright-blue :bright-magenta :bright-cyan :bright-white))) changes))
-                     ((= p 38) ; Extended color
-                      (when (>= (params-left) 1)
-                        (let ((type (pop-param)))
-                          (cond
-                            ((= type 5) ; 256-color mode
-                             (when (>= (params-left) 1)
-                               (push (list :fg-color `(:type :xterm :value ,(pop-param))) changes)))
-                            ((= type 2) ; Truecolor mode
-                             (when (>= (params-left) 3)
-                               (push (list :fg-color `(:type :rgb :r ,(pop-param) :g ,(pop-param) :b ,(pop-param))) changes)))))))
-                     ((= p 48) ; Extended background color
-                      (when (>= (params-left) 1)
-                        (let ((type (pop-param)))
-                          (cond
-                            ((= type 5)
-                             (when (>= (params-left) 1)
-                               (push (list :bg-color `(:type :xterm :value ,(pop-param))) changes)))
-                            ((= type 2)
-                             (when (>= (params-left) 3)
-                               (push (list :bg-color `(:type :rgb :r ,(pop-param) :g ,(pop-param) :b ,(pop-param))) changes)))))))
-                     (t (warn "Unknown SGR parameter: ~A" p))))))
+          do (let ((p (pop-param)))
+               (cond
+                 ((= p 0) (push '(:reset t) changes))
+                 ((= p 1) (push '(:bold t) changes))
+                 ((= p 2) (push '(:faint t) changes))
+                 ((= p 3) (push '(:italic t) changes))
+                 ((= p 4) (push '(:underline t) changes))
+                 ((= p 5) (push '(:blink t) changes))
+                 ((= p 7) (push '(:inverse t) changes))
+                 ((= p 8) (push '(:invisible t) changes))
+                 ((= p 9) (push '(:strike t) changes))
+                 ((= p 21) (push '(:bold nil) changes)) ; double underline, or bold off
+                 ((= p 22) (push '(:bold nil) changes) (push '(:faint nil) changes))
+                 ((= p 23) (push '(:italic nil) changes))
+                 ((= p 24) (push '(:underline nil) changes))
+                 ((= p 25) (push '(:blink nil) changes))
+                 ((= p 27) (push '(:inverse nil) changes))
+                 ((= p 28) (push '(:invisible nil) changes))
+                 ((= p 29) (push '(:strike nil) changes))
+                 ((and (>= p 30) (<= p 37)) (push (list :fg-color (nth (- p 30) '(:black :red :green :yellow :blue :magenta :cyan :white))) changes))
+                 ((= p 39) (push '(:fg-color :default) changes))
+                 ((and (>= p 40) (<= p 47)) (push (list :bg-color (nth (- p 40) '(:black :red :green :yellow :blue :magenta :cyan :white))) changes))
+                 ((= p 49) (push '(:bg-color :default) changes))
+                 ((and (>= p 90) (<= p 97)) (push (list :fg-color (nth (- p 90) '(:bright-black :bright-red :bright-green :bright-yellow :bright-blue :bright-magenta :bright-cyan :bright-white))) changes))
+                 ((and (>= p 100) (<= p 107)) (push (list :bg-color (nth (- p 100) '(:bright-black :bright-red :bright-green :bright-yellow :bright-blue :bright-magenta :bright-cyan :bright-white))) changes))
+                 ((= p 38) ; Extended color
+                   (when (>= (params-left) 1)
+                     (let ((type (pop-param)))
+                       (cond
+                         ((= type 5) ; 256-color mode
+                           (when (>= (params-left) 1)
+                             (push (list :fg-color `(:type :xterm :value ,(pop-param))) changes)))
+                         ((= type 2) ; Truecolor mode
+                           (when (>= (params-left) 3)
+                             (push (list :fg-color `(:type :rgb :r ,(pop-param) :g ,(pop-param) :b ,(pop-param))) changes)))))))
+                 ((= p 48) ; Extended background color
+                   (when (>= (params-left) 1)
+                     (let ((type (pop-param)))
+                       (cond
+                         ((= type 5)
+                           (when (>= (params-left) 1)
+                             (push (list :bg-color `(:type :xterm :value ,(pop-param))) changes)))
+                         ((= type 2)
+                           (when (>= (params-left) 3)
+                             (push (list :bg-color `(:type :rgb :r ,(pop-param) :g ,(pop-param) :b ,(pop-param))) changes)))))))
+                 (t (warn "Unknown SGR parameter: ~A" p))))))
       (nreverse changes)))
 
   (defun parse-csi-sequence (char-code-list)
     "Parses a CSI sequence (list of char codes after ESC [) and returns a structured representation.
    Returns a list like (:type :cursor-up :params (1)) or (:type :sgr :changes ((:bold t) (:fg-color :red)))."
     (multiple-value-bind (params intermediates final-byte-code)
-        (collect-csi-params char-code-list)
+      (collect-csi-params char-code-list)
       (declare (ignore intermediates)) ; Intermediates not commonly used for basic TUI
       (let ((final-char (code-char final-byte-code)))
         (case final-char
@@ -646,65 +648,65 @@
           (#\K `(:type :erase-in-line :params ,params))
           (#\m `(:type :sgr :changes ,(parse-sgr-parameters params)))
           (#\n (cond ((equal params '(6)) `(:type :report-cursor-position)) ; DSR CPR
-                     ((equal params '(5)) `(:type :report-device-status))   ; DSR status
-                     (t `(:type :device-status-report :params ,params :final ,final-char))))
+                 ((equal params '(5)) `(:type :report-device-status))   ; DSR status
+                 (t `(:type :device-status-report :params ,params :final ,final-char))))
           ;; Add more cases for other CSI sequences as needed
           (otherwise `(:type :unknown-csi :params ,params :final ,final-char))))))
 
   ;; Helper to convert platform API color/style to SGR sequences
   (defun ansi-fg-color-seq (color-spec)
     (let ((seq-obj nil)
-          (args nil))
+           (args nil))
       (cond
         ((null color-spec)
-         (setf seq-obj (get-sequence :fg-default)))
+          (setf seq-obj (get-sequence :fg-default)))
         ((keywordp color-spec)
-         (setf seq-obj (get-sequence (find-symbol (string-upcase (format nil "FG-~A" color-spec)) :keyword))))
+          (setf seq-obj (get-sequence (find-symbol (string-upcase (format nil "FG-~A" color-spec)) :keyword))))
         ((integerp color-spec)
-         (setf seq-obj (get-sequence :fg-color-256))
-         (setf args (list color-spec)))
+          (setf seq-obj (get-sequence :fg-color-256))
+          (setf args (list color-spec)))
         ((listp color-spec) ; Assuming (R G B) for truecolor, will not be hit if color-spec is nil
-         (setf seq-obj (get-sequence :fg-color-24bit))
-         (setf args color-spec))
+          (setf seq-obj (get-sequence :fg-color-24bit))
+          (setf args color-spec))
         (t (setf seq-obj (get-sequence :fg-default))))
 
       (if seq-obj
-          (let ((rendered-string (apply #'render-seq seq-obj args)))
-            (unless (stringp rendered-string)
-              (log:error "ANSI-FG-COLOR-SEQ: render-seq for ~S (spec ~S, args ~S) returned non-string: ~S (type ~A)"
-                         seq-obj color-spec args rendered-string (type-of rendered-string))
-              (return-from ansi-fg-color-seq nil)) ; Return NIL if render-seq failed
-            rendered-string)
-          (progn
-            (log:debug "ANSI-FG-COLOR-SEQ: No seq-obj found for spec ~S" color-spec)
-            nil))))
+        (let ((rendered-string (apply #'render-seq seq-obj args)))
+          (unless (stringp rendered-string)
+            (log:error "ANSI-FG-COLOR-SEQ: render-seq for ~S (spec ~S, args ~S) returned non-string: ~S (type ~A)"
+              seq-obj color-spec args rendered-string (type-of rendered-string))
+            (return-from ansi-fg-color-seq nil)) ; Return NIL if render-seq failed
+          rendered-string)
+        (progn
+          (log:debug "ANSI-FG-COLOR-SEQ: No seq-obj found for spec ~S" color-spec)
+          nil))))
 
   (defun ansi-bg-color-seq (color-spec)
     (let ((seq-obj nil)
-          (args nil))
+           (args nil))
       (cond
         ((null color-spec)
-         (setf seq-obj (get-sequence :bg-default)))
+          (setf seq-obj (get-sequence :bg-default)))
         ((keywordp color-spec)
-         (setf seq-obj (get-sequence (find-symbol (string-upcase (format nil "BG-~A" color-spec)) :keyword))))
+          (setf seq-obj (get-sequence (find-symbol (string-upcase (format nil "BG-~A" color-spec)) :keyword))))
         ((integerp color-spec)
-         (setf seq-obj (get-sequence :bg-color-256))
-         (setf args (list color-spec)))
+          (setf seq-obj (get-sequence :bg-color-256))
+          (setf args (list color-spec)))
         ((listp color-spec) ; Assuming (R G B) for truecolor, will not be hit if color-spec is nil
-         (setf seq-obj (get-sequence :bg-color-24bit))
-         (setf args color-spec))
+          (setf seq-obj (get-sequence :bg-color-24bit))
+          (setf args color-spec))
         (t (setf seq-obj (get-sequence :bg-default))))
 
       (if seq-obj
-          (let ((rendered-string (apply #'render-seq seq-obj args)))
-            (unless (stringp rendered-string)
-              (log:error "ANSI-BG-COLOR-SEQ: render-seq for ~S (spec ~S, args ~S) returned non-string: ~S (type ~A)"
-                         seq-obj color-spec args rendered-string (type-of rendered-string))
-              (return-from ansi-bg-color-seq nil)) ; Return NIL if render-seq failed
-            rendered-string)
-          (progn
-            (log:debug "ANSI-BG-COLOR-SEQ: No seq-obj found for spec ~S" color-spec)
-            nil))))
+        (let ((rendered-string (apply #'render-seq seq-obj args)))
+          (unless (stringp rendered-string)
+            (log:error "ANSI-BG-COLOR-SEQ: render-seq for ~S (spec ~S, args ~S) returned non-string: ~S (type ~A)"
+              seq-obj color-spec args rendered-string (type-of rendered-string))
+            (return-from ansi-bg-color-seq nil)) ; Return NIL if render-seq failed
+          rendered-string)
+        (progn
+          (log:debug "ANSI-BG-COLOR-SEQ: No seq-obj found for spec ~S" color-spec)
+          nil))))
 
   (defun ansi-attr-seq (attr-keyword activep)
     (let ((seq-obj (get-sequence (find-symbol (format nil "~A~A" attr-keyword (if activep "" "-OFF")) :keyword))))
@@ -716,17 +718,32 @@
     (check-type input-string string)
     (with-output-to-string (s)
       (loop for char across input-string
-            do (let ((code (char-code char)))
-                 (cond
-                   ((= code 27) (write-string "" s))
-                   ((= code 7)  (write-string "" s))
-                   ((= code 8)  (write-string "" s))
-                   ((= code 9)  (write-char #\Tab s)) ; Tab is usually fine in logs
-                   ((= code 10) (write-char #\Newline s)) ; Newline is usually fine
-                   ((= code 13) (write-string "" s))
-                   ((and (>= code 32) (<= code 126)) ; Printable ASCII
-                    (write-char char s))
-                   ;; For characters outside printable ASCII, or other control codes:
-                   (t (format s "<0x~2,'0X>" code)))))))
+        do (let ((code (char-code char)))
+             (cond
+               ((= code 27) (write-string "" s))
+               ((= code 7)  (write-string "" s))
+               ((= code 8)  (write-string "" s))
+               ((= code 9)  (write-char #\Tab s)) ; Tab is usually fine in logs
+               ((= code 10) (write-char #\Newline s)) ; Newline is usually fine
+               ((= code 13) (write-string "" s))
+               ((and (>= code 32) (<= code 126)) ; Printable ASCII
+                 (write-char char s))
+               ;; For characters outside printable ASCII, or other control codes:
+               (t (format s "<0x~2,'0X>" code)))))))
 
-  )
+  (defun normalize-key-symbol (code)
+    "Turn CODE from a cl-inputs key token into a keyword."
+    (cond
+      ((keywordp code) code)
+      ((characterp code) (intern (string-upcase (string code)) :keyword))
+      ((symbolp code) code)
+      ((integerp code)
+        (intern (format nil "KEY-~D" code) :keyword))
+      (t :unknown)))
+
+  (defun %token-char (code)
+    (cond
+      ((characterp code) code)
+      ((and (integerp code) (<= 0 code #xffff))
+        (ignore-errors (code-char code)))
+      (t nil))))

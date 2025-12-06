@@ -3,7 +3,7 @@
 
 (uiop:define-package #:elmtui.core.logging
   (:use #:cl #:log4cl)      ; import LOG4CL public symbols
-  (:import-from :log4cl :logger)
+  (:import-from :log4cl :logger :remove-all-appenders)
   (:export #:setup-ui-loggers
            #:subsystem-logger
            #:with-subsystem-logger))

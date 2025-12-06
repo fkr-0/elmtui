@@ -218,7 +218,8 @@
                (new-term-w (car new-term-dims))
                (new-term-h (cdr new-term-dims))
                (message `(:terminal-resized :new-dimensions ,new-term-dims))
-               (update-patches (update rvp current-app-state message :id-path id-path)))
+               (update-result (update rvp current-app-state message :id-path id-path))
+               (update-patches (elmtui.tea-state.api:ur-patches update-result)))
 
           (is (listp update-patches) "Update patches should be a list for :terminal-resized, anchor ~A" anchor)
           (is (= 4 (length update-patches)) "Should get 4 patches for resize, anchor ~A" anchor)
@@ -268,7 +269,8 @@
                              nil)))
 
                  (let* ((test-message '(:custom-message :data "hello"))
-                        (update-patches (update rvp app-state-with-child test-message :id-path id-path)))
+                        (update-result (update rvp app-state-with-child test-message :id-path id-path))
+                        (update-patches (elmtui.tea-state.api:ur-patches update-result)))
                    (is-true (mock-child-update-called-with child-instance) "Child update should have been called.")
                    (is (equal test-message (mock-child-update-called-with child-instance)) "Child update called with wrong message.")
                    (is (listp update-patches) "Update patches from child should be a list.")
@@ -278,7 +280,8 @@
 
       (let* ((app-state-no-child (setup-initial-state initial-anchor initial-term-dims initial-cur-pos))
              (test-message '(:another-message))
-             (update-patches (update rvp app-state-no-child test-message :id-path id-path)))
+             (update-result (update rvp app-state-no-child test-message :id-path id-path))
+             (update-patches (elmtui.tea-state.api:ur-patches update-result)))
         (is (null update-patches) "Update should return no patches if no child and not a resize message.")))
     ))
 ;;;------------------------------------------------------------------------------------

@@ -107,55 +107,55 @@
   (:use :cl :alexandria :log4cl)
   (:nicknames :et.keymaps)
   (:import-from :elmtui.core.event-types
-                #:key-event
-                #:key-event-key
-                #:key-event-modifiers)
+    #:key-event
+    #:key-event-key
+    #:key-event-modifiers)
   (:export
-   ;; bootstrap
-   #:initialise
-   ;; key helpers
-   #:parse-key-string
-   #:key-event->normalized-key
-   #:normalized-key->string
-   #:normalized-key-key
-   #:normalized-key-modifiers
-   ;; keymap helpers
-   #:define-keymap
-   #:add-keybinding
-   #:remove-keybinding
-   ;; contexts
-   #:define-keymap-context
-   #:keymap!
-   #:make-keymap-context
-   #:add-keymap-to-context
-   #:resolve-keymap-reference
-   #:find-context
-   #:keymap-context-parent
-   #:keymap-context-keymaps
-   #:keymap-context-name
-   #:keymap-bindings
-   #:keymap-context
-   #:activate-context
-   #:deactivate-context
-   #:current-context
-   #:lookup-binding
-   #:lookup-binding-in
-   #:lookup
-   ;; event handling
-   #:process-key-event
-   #:*dispatch-fn*
-   ;; default ready-made maps
-   #:*global-navigation-keymap*
-   #:*dialog-keymap*
-   #:*form-keymap*
-   #:*editor-keymap*
-   #:*list-navigation-keymap*
-   #:*global-keymap-context*
-   #:*active-contexts*
-   #:*contexts*
-   #:*registry*
-   ;; introspection
-   #:list-active-keybindings))
+    ;; bootstrap
+    #:initialise
+    ;; key helpers
+    #:parse-key-string
+    #:key-event->normalized-key
+    #:normalized-key->string
+    #:normalized-key-key
+    #:normalized-key-modifiers
+    ;; keymap helpers
+    #:define-keymap
+    #:add-keybinding
+    #:remove-keybinding
+    ;; contexts
+    #:define-keymap-context
+    #:keymap!
+    #:make-keymap-context
+    #:add-keymap-to-context
+    #:resolve-keymap-reference
+    #:find-context
+    #:keymap-context-parent
+    #:keymap-context-keymaps
+    #:keymap-context-name
+    #:keymap-bindings
+    #:keymap-context
+    #:activate-context
+    #:deactivate-context
+    #:current-context
+    #:lookup-binding
+    #:lookup-binding-in
+    #:lookup
+    ;; event handling
+    #:process-key-event
+    #:*dispatch-fn*
+    ;; default ready-made maps
+    #:*global-navigation-keymap*
+    #:*dialog-keymap*
+    #:*form-keymap*
+    #:*editor-keymap*
+    #:*list-navigation-keymap*
+    #:*global-keymap-context*
+    #:*active-contexts*
+    #:*contexts*
+    #:*registry*
+    ;; introspection
+    #:list-active-keybindings))
 
 (in-package :elmtui.keymaps)
 
@@ -180,15 +180,15 @@
 
 (defparameter *modifier-canon*
   '((:control . :ctrl) (:ctrl . :ctrl)
-    (:shift . :shift)
-    (:meta . :alt)    (:option . :alt) (:alt . :alt)
-    (:command . :cmd) (:cmd . :cmd)))
+     (:shift . :shift)
+     (:meta . :alt)    (:option . :alt) (:alt . :alt)
+     (:command . :cmd) (:cmd . :cmd)))
 
 (defparameter *modifier-order* '(:alt :ctrl :cmd :shift))
 
 (defun %canon (m) (or (cdr (assoc m *modifier-canon* :test #'eq)) m))
 (defun %rank  (m) (or (position (%canon m) *modifier-order* :test #'eq)
-                      most-positive-fixnum))
+                    most-positive-fixnum))
 (defun %normalize-mods (mods)
   (sort (remove-duplicates (mapcar #'%canon mods) :test #'eq) #'< :key #'%rank))
 
@@ -210,19 +210,19 @@
 (defgeneric normalized-key= (a b))
 (defmethod normalized-key= ((a normalized-key) (b normalized-key))
   (and (eql (normalized-key-key a) (normalized-key-key b))
-       (equal (%normalize-mods (normalized-key-modifiers a))
-              (%normalize-mods (normalized-key-modifiers b)))))
+    (equal (%normalize-mods (normalized-key-modifiers a))
+      (%normalize-mods (normalized-key-modifiers b)))))
 
 (defun normalized-key->string (nk)
   (with-output-to-string (out)
     (let* ((mods (%normalize-mods (normalized-key-modifiers nk)))
-           (k    (normalized-key-key nk))
-           (key-str (etypecase k
-                      (character (string-upcase k))
-                      (keyword   (string-capitalize k)))))
+            (k    (normalized-key-key nk))
+            (key-str (etypecase k
+                       (character (string-upcase k))
+                       (keyword   (string-capitalize k)))))
       (loop for m in (sort (copy-list mods) #'string< :key #'string)
-            for i from 0
-            do (format out "~:[~;-~]~A" (> i 0) (string-capitalize m)))
+        for i from 0
+        do (format out "~:[~;-~]~A" (> i 0) (string-capitalize m)))
       (when mods (princ "-" out))
       (princ key-str out))))
 
@@ -245,25 +245,25 @@ If no special mapping exists, returns SYM unchanged."
 (defun parse-single-key-string (s)
   "Handle strings like \"C-x\" or \"Shift-F1\" (no spaces)."
   (let* ((parts (str:split "-" s))
-         (mods  '())
-         (raw   (string-downcase (car (last parts))))
-         (sym   (kw raw))
-         (key   (cond
-                  ((= 1 (length raw)) (char raw 0))
-                  (t (%special-symbol sym)))))
+          (mods  '())
+          (raw   (string-downcase (car (last parts))))
+          (sym   (kw raw))
+          (key   (cond
+                   ((= 1 (length raw)) (char raw 0))
+                   (t (%special-symbol sym)))))
     (dolist (p (butlast parts))
       (push (cond ((member p '("C" "CTRL" "CONTROL") :test #'string=) :ctrl)
-                  ((member p '("S" "SHIFT")          :test #'string=) :shift)
-                  ((member p '("A" "M" "ALT" "META") :test #'string=) :alt)
-                  ((member p '("CMD" "COMMAND")      :test #'string=) :cmd)
-                  (t (kw p)))
-            mods))
+              ((member p '("S" "SHIFT")          :test #'string=) :shift)
+              ((member p '("A" "M" "ALT" "META") :test #'string=) :alt)
+              ((member p '("CMD" "COMMAND")      :test #'string=) :cmd)
+              (t (kw p)))
+        mods))
     (make-nk :key key :modifiers (%normalize-mods mods))))
 
 (defun parse-key-string (s)
   (if (find #\Space s)            ; warn but still parse first token
-      (parse-key-string (subseq s 0 (position #\Space s)))
-      (parse-single-key-string s)))
+    (parse-key-string (subseq s 0 (position #\Space s)))
+    (parse-single-key-string s)))
 
 ;;; --- platform event → nk --------------------------------------------------
 
@@ -274,7 +274,7 @@ If no special mapping exists, returns SYM unchanged."
 
 (defmethod key-event->normalized-key ((evt key-event))
   (make-nk :key (key-event-key evt)
-           :modifiers (%normalize-mods (key-event-modifiers evt))))
+    :modifiers (%normalize-mods (key-event-modifiers evt))))
 
 ;;; ------------------------------------------------------------------------
 ;;; 2.  Keymap
@@ -310,18 +310,18 @@ If no special mapping exists, returns SYM unchanged."
 
 (defun add-keybinding (km key-string &key type target description)
   (let* ((parts (str:split key-string " "))
-         (key   (if (> (length parts) 1)
-                    (make-key-sequence :keys (mapcar #'parse-key-string parts))
-                    (parse-key-string key-string)))
-         (bind  `(:type ,type :target ,target :description ,description)))
+          (key   (if (> (length parts) 1)
+                   (make-key-sequence :keys (mapcar #'parse-key-string parts))
+                   (parse-key-string key-string)))
+          (bind  `(:type ,type :target ,target :description ,description)))
     (setf (lookup km key) bind)
     bind))
 
 (defun remove-keybinding (km key-string)
   (let* ((parts (str:split key-string " "))
-         (key-str (if (> (length parts) 1)
-                      (mapconcat #'normalized-key->string (mapcar #'parse-key-string parts) " ")
-                      (normalized-key->string (parse-key-string key-string)))))
+          (key-str (if (> (length parts) 1)
+                     (mapconcat #'normalized-key->string (mapcar #'parse-key-string parts) " ")
+                     (normalized-key->string (parse-key-string key-string)))))
     (remhash key-str (keymap-bindings km))))
 
 ;;; --- DSL ------------------------------------------------------------------
@@ -359,7 +359,7 @@ Example:
   `(defparameter ,var
      (let ((km (make-keymap :name ',var)))
        ,@(loop for (key . plist) in bindings
-               collect `(add-keybinding km ,key ,@plist))
+           collect `(add-keybinding km ,key ,@plist))
        km)))
 (defmacro keymap! (var &body bindings)
   "Define a keymap VAR with BINDINGS.
@@ -390,18 +390,18 @@ Example:
  Returns the created keymap object."
   `(let ((km (make-keymap :name ',var)))
      ,@(loop for (key . plist) in bindings
-             collect `(add-keybinding km ,key ,@plist))
+         collect `(add-keybinding km ,key ,@plist))
      km))
 
 
 (defun seq= (a b)
   (and (= (length (key-sequence-keys a)) (length (key-sequence-keys b)))
-       (every #'normalized-key= (key-sequence-keys a) (key-sequence-keys b))))
+    (every #'normalized-key= (key-sequence-keys a) (key-sequence-keys b))))
 
 (defun seq-prefix-p (prefix full)
   (every #'normalized-key=
-         (key-sequence-keys prefix)
-         (subseq (key-sequence-keys full) 0 (length (key-sequence-keys prefix)))))
+    (key-sequence-keys prefix)
+    (subseq (key-sequence-keys full) 0 (length (key-sequence-keys prefix)))))
 
 ;;; ------------------------------------------------------------------------
 ;;; 4.  Registry  &  Context Stack
@@ -426,8 +426,8 @@ Example:
 
 (defun make-keymap-context (&key name parent keymaps)
   (%mk-ctx :name name
-           :parent parent
-           :keymaps keymaps))
+    :parent parent
+    :keymaps keymaps))
 
 (defun add-keymap-to-context (context keymap)
   (pushnew (resolve-keymap-reference keymap) (keymap-context-keymaps context)))
@@ -450,20 +450,20 @@ If PARENT is not provided, the context will be a root context.
 If KEYMAPS is not provided, the context will have no keymaps.
 If a keymap name is not found in the registry, an error is raised."
   (let* ((parent-ctx (if parent
-                         (or (find-context parent)
-                             (error 'keymap-error
-                                    :format-control "Parent context ~S not found."
-                                    :format-arguments (list parent)))
-                         nil))
-         (resolved-k-maps (mapcar (lambda (ref)
-                                    (or (resolve-keymap-reference ref)
-                                        (error 'keymap-error
-                                               :format-control "Keymap ~S not found."
-                                               :format-arguments (list ref))))
-                                  keymaps))
-         (context (make-keymap-context :name name
-                                       :parent parent-ctx
-                                       :keymaps resolved-k-maps)))
+                       (or (find-context parent)
+                         (error 'keymap-error
+                           :format-control "Parent context ~S not found."
+                           :format-arguments (list parent)))
+                       nil))
+          (resolved-k-maps (mapcar (lambda (ref)
+                                     (or (resolve-keymap-reference ref)
+                                       (error 'keymap-error
+                                         :format-control "Keymap ~S not found."
+                                         :format-arguments (list ref))))
+                             keymaps))
+          (context (make-keymap-context :name name
+                     :parent parent-ctx
+                     :keymaps resolved-k-maps)))
     (setf (gethash name *contexts*) context)
     context))
 
@@ -479,15 +479,15 @@ If a keymap name is not found in the registry, an error is raised."
 
 (defun %collect-keymaps (ctx)
   (reverse             ; inner → outer priority
-   (loop for c = ctx then (keymap-context-parent c)
-         while c
-         append (mapcar #'resolve-keymap-reference (keymap-context-keymaps c)))))
+    (loop for c = ctx then (keymap-context-parent c)
+      while c
+      append (mapcar #'resolve-keymap-reference (keymap-context-keymaps c)))))
 
 (defun lookup-binding (nk)
   (loop for ctx in *active-contexts*
-        for b = (loop for km in (%collect-keymaps ctx)
-                      thereis (lookup km nk))
-        when b return b))
+    for b = (loop for km in (%collect-keymaps ctx)
+              thereis (lookup km nk))
+    when b return b))
 
 (defun lookup-binding-in (context nk &key (include-parents t))
   "Lookup a binding starting at CONTEXT. If INCLUDE-PARENTS is true,
@@ -495,9 +495,9 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
   (labels ((collect (ctx)
              (when ctx
                (or (loop for km in (%collect-keymaps ctx)
-                         thereis (lookup km nk))
-                   (and include-parents
-                        (collect (keymap-context-parent ctx)))))))
+                     thereis (lookup km nk))
+                 (and include-parents
+                   (collect (keymap-context-parent ctx)))))))
     (collect context)))
 
 ;;; ------------------------------------------------------------------------
@@ -508,8 +508,8 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
   "Dispatches a message using the dynamically bound *dispatch-fn*."
   (declare (ignore app))
   (if *dispatch-fn*
-      (funcall *dispatch-fn* msg)
-      (log-warn "Keymap dispatch function not configured. Dropping message: ~S" msg)))
+    (funcall *dispatch-fn* msg)
+    (log-warn "Keymap dispatch function not configured. Dropping message: ~S" msg)))
 
 (defun action-cancel  (app) (declare (ignore app)) (log-info "cancel"))
 (defun action-confirm (app) (declare (ignore app)) (log-info "confirm"))
@@ -559,7 +559,7 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
   (register-keymap :list-navigation   *list-navigation-keymap*)
   ;; create & activate a permanent global context
   (setf *global-keymap-context*
-        (define-keymap-context :global-context :keymaps '(:global-navigation)))
+    (define-keymap-context :global-context :keymaps '(:global-navigation)))
   (activate-context *global-keymap-context*))
 
 
@@ -573,18 +573,18 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
 
 (defun %now-ms ()
   (truncate (* 1000 (/ (coerce (get-internal-real-time) 'double-float)
-                       internal-time-units-per-second))))
+                      internal-time-units-per-second))))
 
 (defun %update-seq (nk)
   (let* ((now (%now-ms))
-         (last (sequence-state-last-tick *sequence-state*))
-         (expired (and (> last 0)
-                       (> (- now last) (sequence-state-timeout *sequence-state*))))
-         (curr (and (not expired) (sequence-state-current *sequence-state*)))
-         (new-seq (make-key-sequence :keys (append (and curr (key-sequence-keys curr))
-                                                  (list nk)))))
+          (last (sequence-state-last-tick *sequence-state*))
+          (expired (and (> last 0)
+                     (> (- now last) (sequence-state-timeout *sequence-state*))))
+          (curr (and (not expired) (sequence-state-current *sequence-state*)))
+          (new-seq (make-key-sequence :keys (append (and curr (key-sequence-keys curr))
+                                              (list nk)))))
     (setf (sequence-state-last-tick *sequence-state*) now
-          (sequence-state-current *sequence-state*) new-seq)
+      (sequence-state-current *sequence-state*) new-seq)
     new-seq))
 
 (defun %handle-binding (binding app)
@@ -595,20 +595,20 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
 (defun %maybe-handle-sequence (nk app)
   "Return T if event consumed. Uses string keys for sequence storage."
   (let* ((seq (%update-seq nk))
-         (bind (lookup-binding seq)))
+          (bind (lookup-binding seq)))
     (cond
       (bind (%handle-binding bind app) (%reset-seq) t)
       (t
-       (let* ((seq-str (mapconcat #'normalized-key->string (key-sequence-keys seq) " "))
-              (prefix (concatenate 'string seq-str " ")))
-         (if (some (lambda (km)
-                     (loop for k being the hash-keys of (keymap-bindings km)
-                           thereis (and (stringp k)
-                                        (> (length k) (length seq-str))
-                                        (str:starts-with? prefix k))))
-                   (mapcar #'resolve-keymap-reference (keymap-context-keymaps (current-context))))
-             t
-             (progn (%reset-seq) nil)))))))
+        (let* ((seq-str (mapconcat #'normalized-key->string (key-sequence-keys seq) " "))
+                (prefix (concatenate 'string seq-str " ")))
+          (if (some (lambda (km)
+                      (loop for k being the hash-keys of (keymap-bindings km)
+                        thereis (and (stringp k)
+                                  (> (length k) (length seq-str))
+                                  (str:starts-with? prefix k))))
+                (mapcar #'resolve-keymap-reference (keymap-context-keymaps (current-context))))
+            t
+            (progn (%reset-seq) nil)))))))
 
 (defun process-key-event (evt focus-manager &key app-state (handle-sequences t) dispatch-fn)
   "Main dispatcher – converts EVT to NORMALIZED-KEY, runs registry lookup.
@@ -622,12 +622,12 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
       (declare (special *dispatch-fn*))
       ;; 1) Focused component keymap (from app-state)
       (let* ((fm (and (listp app-state) (getf app-state :focus-manager)))
-             (focused (and (listp fm) (or (getf fm :current-focus-id)
-                                          (getf fm :current-focus))))
-             (component-keymaps (and (listp app-state) (getf app-state :component-keymaps)))
-             (km (and focused (assoc focused component-keymaps)))
-             (ckm (and km (cdr km)))
-             (cbind (and (typep ckm 'keymap) (lookup ckm nk))))
+              (focused (and (listp fm) (or (getf fm :current-focus-id)
+                                         (getf fm :current-focus))))
+              (component-keymaps (and (listp app-state) (getf app-state :component-keymaps)))
+              (km (and focused (assoc focused component-keymaps)))
+              (ckm (and km (cdr km)))
+              (cbind (and (typep ckm 'keymap) (lookup ckm nk))))
         (when cbind
           (%handle-binding cbind app-state)
           (return-from process-key-event t))
@@ -660,17 +660,18 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
 (defun list-active-keybindings ()
   "Return list of plists {:key … :description … :source-keymap …}"
   (loop for ctx in *active-contexts*
-        append
-        (loop for km in (%collect-keymaps ctx)
-              append
-              (loop for k being the hash-keys of (keymap-bindings km)
-                      using (hash-value v)
-                    collect (list :key (typecase k
-                                         (string k)
-                                         (normalized-key (normalized-key->string k))
-                                         (list (mapconcat #'normalized-key->string k " "))
-                                         (t (prin1-to-string k)))
-                                  :description (getf v :description)
-                                  :source (keymap-name km))))))
+    append
+    (loop for km in (%collect-keymaps ctx)
+      append
+      (loop for k being the hash-keys of (keymap-bindings km)
+        using (hash-value v)
+        collect (list :key (typecase k
+                             (string k)
+                             (normalized-key (normalized-key->string k))
+                             (list (mapconcat #'normalized-key->string k " "))
+                             (t (prin1-to-string k)))
+                  :description (getf v :description)
+                  :source (keymap-name km))))))
 
 ;;; == end/keymaps.lisp ======================================================
+

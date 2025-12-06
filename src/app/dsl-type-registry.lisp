@@ -13,6 +13,7 @@
 ;; (register-dsl-component-type :scrollable-container 'elmtui.ui.widgets.scrollable-container:scrollable-container)
 ;; (register-dsl-component-type :counter 'elmtui.ui.widgets.counter:counter)
 (register-dsl-component-type :layout 'elmtui.ui.widgets.layout:layout)
+(register-dsl-component-type :text 'elmtui.ui.widgets.label:label)
                                         ; (register-dsl-component-type :column 'elmtui.ui.widgets.layout:layout)
                                         ;(register-dsl-component-type :container 'elmtui.ui.widgets.viewport:viewport)
 ;;; Sanity check (can be removed in production)
