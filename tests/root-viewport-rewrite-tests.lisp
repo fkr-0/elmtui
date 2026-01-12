@@ -77,18 +77,24 @@ PATH is a list of keywords like (:app :rv :state :width)."
       "Without terminal size & cursor pos, view must be NIL.")
 
     ;; Simulate SUT becoming ready by setting the flags it checks
-    (let* ((ready-patches
-             (list (list (append id-path '(:state :size-known)) t)
-               (list (append id-path '(:state :pos-known)) t)
-               (list (append id-path '(:state :terminal-size)) '(20 10))
-               (list (append id-path '(:state :cursor-pos)) '(1 1))
-               (list (append id-path '(:state :width))  20)
-               (list (append id-path '(:state :height)) 10)
-               (list (append id-path '(:state :offset-x)) 0)
-               (list (append id-path '(:state :offset-y)) 0))))
-      (setf state (%apply-patches state ready-patches))
-      (is (consp (view rv state :id-path id-path))
-        "Once both known, view should return a DSL plist (non-NIL)."))))
+    (flet ((mark-ready (st base-path)
+             (let* ((ready-patches
+                      (list (list (append base-path '(:state :size-known)) t)
+                        (list (append base-path '(:state :terminal-size)) '(20 10))
+                        (list (append base-path '(:state :width)) 20)
+                        (list (append base-path '(:state :height)) 10)
+                        (list (append base-path '(:state :offset-x)) 0)
+                        (list (append base-path '(:state :offset-y)) 0))))
+               (%apply-patches st ready-patches))))
+      ;; canonical (:components …) path
+      (let* ((canonical-path (cons :components id-path))
+             (canon-state (mark-ready state canonical-path)))
+        (is (consp (view rv canon-state :id-path canonical-path))
+          "Canonical state path must produce DSL once ready."))
+      ;; legacy path without :components prefix
+      (let* ((legacy-state (mark-ready state id-path)))
+        (is (consp (view rv legacy-state :id-path id-path))
+          "Legacy state path must also produce DSL once ready.")))))
 
 ;;;; --------------------------------------------------------------------------
 ;;;; 2) Anchoring math: position semantics & growth labels
@@ -152,8 +158,8 @@ PATH is a list of keywords like (:app :rv :state :width)."
     st))
 
 (test overflow-below-cursor-scroll
-  ;; rows=20, cursor row=19 → only 0 rows remaining; height=4 => need scroll-down 3.
-  (let* ((st (%mk-state-for-overflow :below-cursor 20 80 19 0 30 4))
+  ;; rows=20, cursor row=20 (1-based) → 1 row remaining; height=4 => need scroll-down 3.
+  (let* ((st (%mk-state-for-overflow :below-cursor 20 80 20 0 30 4))
           (st-path '(:app :rv)))
     ;; wrap into outer state at st-path
     (let ((state (%plist-put-in '() (append st-path '()) st)))
@@ -168,7 +174,7 @@ PATH is a list of keywords like (:app :rv :state :width)."
 
 (test overflow-below-cursor-truncate
   ;; Same geometry, but policy :truncate → height becomes 1; no commands.
-  (let* ((st (%mk-state-for-overflow :below-cursor 20 80 19 0 30 4))
+  (let* ((st (%mk-state-for-overflow :below-cursor 20 80 20 0 30 4))
           (st-path '(:app :rv))
           (state (%plist-put-in '() (append st-path '()) st)))
     (multiple-value-bind (patches commands)
@@ -180,14 +186,14 @@ PATH is a list of keywords like (:app :rv :state :width)."
         "Truncate sets height to available rows (1)."))))
 
 (test overflow-above-cursor-scroll
-  ;; rows=20, cursor row=2 → rows available above = 2; height=5 => need scroll-up 3.
+  ;; rows=20, cursor row=2 (1-based) → rows available above = 1; height=5 => need scroll-up 4.
   (let* ((st (%mk-state-for-overflow :above-cursor 20 80 2 0 30 5))
           (st-path '(:app :rv))
           (state (%plist-put-in '() (append st-path '()) st)))
     (multiple-value-bind (patches commands)
       (%apply-overflow-y (append st-path '(:state)) state :scroll 0 0)
       (declare (ignore patches))
-      (is (find '(:render :scroll-up 3) commands :test #'equal)))))
+      (is (find '(:render :scroll-up 4) commands :test #'equal)))))
 
 ;;;; --------------------------------------------------------------------------
 ;;;; 4) Manual mode: clamping and no re-anchoring on resize/cursor

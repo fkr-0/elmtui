@@ -21,7 +21,7 @@
 (test dynamic-view-size
   (let ((cols 80) (rows 24) (cr 12))
     (multiple-value-bind (w h _) (compute-view-size :below-cursor cols rows cr)
-      (is (= w cols)) (is (= h (max 1 (- rows cr 1)))))
+      (is (= w cols)) (is (= h (max 1 (- rows cr)))))
     (multiple-value-bind (w h _) (compute-view-size :above-cursor cols rows cr)
       (is (= w cols)) (is (= h (max 1 cr))))))
 

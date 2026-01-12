@@ -198,6 +198,11 @@
       (declare (ignore comp))
       ;; Apply patches to state
       (elmtui.tea-state:apply-patches state patches))
+    ;; Provide known viewport size for cleanup
+    (elmtui.tea-state:apply-patches state
+      (list
+        (list (append id-path '(:state :width)) 10)
+        (list (append id-path '(:state :height)) 3)))
 
     ;; Set issued-scroll-net to simulate scrolling happened
     (elmtui.tea-state:apply-patches state
@@ -210,9 +215,9 @@
       (is (find-if (lambda (cmd)
                      (and (consp cmd)
                        (eq (first cmd) :render)
-                       (eq (second cmd) :clear-below-cursor)))
+                       (eq (second cmd) :blank-viewport)))
             commands)
-        "Should have clear-below-cursor command")
+        "Should have blank-viewport command for viewport area")
 
       (is (find-if (lambda (cmd)
                      (and (consp cmd)
@@ -221,6 +226,132 @@
                        (= (third cmd) 5)))
             commands)
         "Should have scroll-up 5 command to restore scroll"))))
+
+;;;---------------------------------------------------------------
+;;; Test: Below-cursor inline startup behavior
+;;;---------------------------------------------------------------
+
+(test below-cursor-inline-startup-scroll-no-clear
+  "Verify inline below-cursor anchoring scrolls for overflow without clearing at startup."
+  (let* ((state (make-application-state))
+          (rv (make-root-viewport :test-inline :anchor :below-cursor))
+          (id-path '(:components :test-inline))
+          (dsl '(:root-viewport :id :test-inline :anchor :below-cursor
+                  :width 10 :height 4 :child-dsl-spec (:view nil))))
+    (multiple-value-bind (comp patches cmds)
+      (init rv :id-path id-path :dsl dsl :anchor :below-cursor)
+      (declare (ignore comp cmds))
+      (elmtui.tea-state:apply-patches state patches))
+    (let* ((res1 (update rv '(:terminalresized :width 10 :height 4) state :id-path id-path))
+            (cmds1 (elmtui.tea-state.api:ur-commands res1)))
+      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res1))
+      (let* ((res2 (update rv '(:cursorposition :col 1 :row 2) state :id-path id-path))
+              (cmds2 (elmtui.tea-state.api:ur-commands res2))
+              (all-commands (append cmds1 cmds2)))
+        (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res2))
+        (is (null (find-if (lambda (cmd)
+                             (and (consp cmd)
+                                  (eq (first cmd) :render)
+                                  (eq (second cmd) :clear)))
+                  all-commands))
+          "Startup should not clear for inline anchoring")
+        (is (null (find-if (lambda (cmd)
+                             (and (consp cmd)
+                               (eq (first cmd) :render)
+                               (eq (second cmd) :clear-below-cursor)))
+                    all-commands))
+          "Startup should not clear below cursor for inline anchoring")
+        (is (find-if (lambda (cmd)
+                       (and (consp cmd)
+                         (eq (first cmd) :render)
+                         (eq (second cmd) :scroll-down)
+                         (= (third cmd) 1)))
+              all-commands)
+          "Should scroll down by 1 when viewport exceeds remaining rows")))))
+
+;;;---------------------------------------------------------------
+;;; Test: Below-cursor inline shutdown cleanup
+;;;---------------------------------------------------------------
+
+(test below-cursor-inline-shutdown-clears-rect-and-restores-scroll
+  "Verify inline below-cursor shutdown blanks only the viewport area and restores scroll."
+  (let* ((state (make-application-state))
+          (rv (make-root-viewport :test-inline-cleanup :anchor :below-cursor))
+          (id-path '(:components :test-inline-cleanup))
+          (dsl '(:root-viewport :id :test-inline-cleanup :anchor :below-cursor
+                  :width 10 :height 4 :child-dsl-spec (:view nil))))
+    (multiple-value-bind (comp patches cmds)
+      (init rv :id-path id-path :dsl dsl :anchor :below-cursor)
+      (declare (ignore comp cmds))
+      (elmtui.tea-state:apply-patches state patches))
+    (let* ((res1 (update rv '(:terminalresized :width 10 :height 4) state :id-path id-path)))
+      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res1)))
+    (let* ((res2 (update rv '(:cursorposition :col 1 :row 2) state :id-path id-path)))
+      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res2)))
+    (let* ((res3 (update rv '(:appshutdown) state :id-path id-path))
+            (cmds3 (elmtui.tea-state.api:ur-commands res3)))
+      (is (find-if (lambda (cmd)
+                     (and (consp cmd)
+                       (eq (first cmd) :render)
+                       (eq (second cmd) :blank-viewport)))
+            cmds3)
+        "Shutdown should blank the viewport rectangle")
+      (is (null (find-if (lambda (cmd)
+                           (and (consp cmd)
+                             (eq (first cmd) :render)
+                             (eq (second cmd) :clear-below-cursor)))
+                  cmds3))
+        "Shutdown should not clear below cursor for inline anchoring")
+      (is (find-if (lambda (cmd)
+                     (and (consp cmd)
+                       (eq (first cmd) :render)
+                       (eq (second cmd) :scroll-up)
+                       (= (third cmd) 1)))
+            cmds3)
+        "Shutdown should restore scroll by 1"))))
+
+;;;---------------------------------------------------------------
+;;; Test: Below-cursor inline lifecycle with faketerm
+;;;---------------------------------------------------------------
+
+(test below-cursor-inline-faketerm-lifecycle
+  "Verify inline below-cursor flow emits blank-viewport and scroll commands on faketerm."
+  (let* ((filepath "/tmp/test-inline-faketerm.log")
+          (backend (make-test-backend filepath))
+          (state (make-application-state))
+          (rv (make-root-viewport :test-inline-ft :anchor :below-cursor))
+          (id-path '(:components :test-inline-ft))
+          (dsl '(:root-viewport :id :test-inline-ft :anchor :below-cursor
+                  :width 10 :height 4 :child-dsl-spec (:view nil))))
+    (unwind-protect
+      (progn
+        (multiple-value-bind (comp patches cmds)
+          (init rv :id-path id-path :dsl dsl :anchor :below-cursor)
+          (declare (ignore comp cmds))
+          (elmtui.tea-state:apply-patches state patches))
+        (let ((res1 (update rv '(:terminalresized :width 10 :height 4) state :id-path id-path)))
+          (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res1))
+          (dolist (cmd (elmtui.tea-state.api:ur-commands res1))
+            (execute-render-command cmd backend)))
+        (let ((res2 (update rv '(:cursorposition :col 1 :row 2) state :id-path id-path)))
+          (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res2))
+          (dolist (cmd (elmtui.tea-state.api:ur-commands res2))
+            (execute-render-command cmd backend)))
+        (let ((res3 (update rv '(:appshutdown) state :id-path id-path)))
+          (dolist (cmd (elmtui.tea-state.api:ur-commands res3))
+            (execute-render-command cmd backend)))
+        (shutdown-backend backend)
+        (let* ((log (read-log-file filepath))
+                (commands (parse-command-sequence log)))
+          (is (find-command-pattern commands "BLANK_VIEWPORT")
+            "Should blank viewport area in faketerm log")
+          (is (find-command-pattern commands "SCROLL_DOWN")
+            "Should scroll down to make space for inline viewport")
+          (is (find-command-pattern commands "SCROLL_UP")
+            "Should scroll up on shutdown to restore scroll")
+          (is (null (find-command-pattern commands "CLEAR_BELOW_CURSOR"))
+            "Should not clear below cursor in inline mode")))
+      (ignore-errors (delete-file filepath)))))
 
 ;;;---------------------------------------------------------------
 ;;; Test: Command Ordering in Driver
