@@ -301,27 +301,28 @@
 (defmethod layout-node (node parent-rect _ctx)
   (declare (ignore _ctx))
   (let* ((st (%style-plist-of node))
-         (display (getf st :display)))
+         (display (getf st :display))
+         (parent-rect* parent-rect))
   (log-info "layout-node ~A display=~S width=~S min-width=~S height=~S min-height=~S parent-rect=~S"
               (element-id node) display
               (getf st :width) (getf st :min-width) (getf st :height) (getf st :min-height)
-              (list (x parent-rect) (y parent-rect) (w parent-rect) (h parent-rect)))
+              (list (x parent-rect*) (y parent-rect*) (w parent-rect*) (h parent-rect*)))
     (case display
-      (:flex (compute-layout :flex node parent-rect :parent-styles st))
-      (:grid (compute-layout :grid node parent-rect))
+      (:flex (compute-layout :flex node parent-rect* :parent-styles st))
+      (:grid (compute-layout :grid node parent-rect*))
       (otherwise
        (cond
          ;; container with explicit flex-direction but no :display
          ((and (typep node 'container-element)
                (or (getf st :flex-direction nil)
                    (getf st :direction nil)))
-          (compute-layout :flex node parent-rect))
+          (compute-layout :flex node parent-rect*))
          ;; default/block: honor rect and let tree-transforms pass content-rect to children
          (t (progn
-              (%commit-rect! node parent-rect)
+              (%commit-rect! node parent-rect*)
               ;; Pre-seed immediate children with parent's content-rect if they lack a rect,
               ;; so the top-down pass propagates usable sizes to their layout.
-              (let* ((content (elmtui.view.layout.size-utils:content-rect-of parent-rect node))
+              (let* ((content (elmtui.view.layout.size-utils:content-rect-of parent-rect* node))
                      (cx (x content)) (cy (y content)) (cw (w content)) (ch (h content)))
                 (dolist (chh (elmtui.view.base-elements:element-children node))
                   (unless (elmtui.view.element:el/layout-rect chh)

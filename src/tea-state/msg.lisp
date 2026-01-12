@@ -89,8 +89,7 @@
 
   (defun %variant-name-to-keyword (sym)
     (let ((name (symbol-name sym)))
-      (intern (string-upcase name) 'keyword)))
-  )
+      (intern (string-upcase name) :keyword))))
 ;;; Primary macro: define a message type and its constructors.
 (defmacro defmsg (name (&key docstring) &rest variant-specs)
   "Define a message type NAME with variants and auto‑generated

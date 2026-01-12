@@ -149,8 +149,8 @@
             (log-info "Rendering node ~A at parent pos (~A, ~A) with rect ~A"
                       node parent-x parent-y rect)
             (when rect
-              (let ((abs-x (+ parent-x (x rect)))
-                    (abs-y (+ parent-y (y rect)))
+              (let* ((abs-x (+ parent-x (x rect)))
+                     (abs-y (+ parent-y (y rect)))
                     (bw (w rect))
                     (bh (h rect)))
                 (when (visible-node-p node bw bh)
@@ -171,8 +171,8 @@
                     (render-node child buffer abs-x abs-y))))))
           (log-info "Skipping non-element node ~A of type ~A" node (type-of node)))))
 
-(defun render-laid-out-tree-to-buffer (laid-out-tree &key buffer)
+(defun render-laid-out-tree-to-buffer (laid-out-tree &key buffer (origin-x 0) (origin-y 0))
   (check-type buffer virtual-terminal-buffer)
   (clear-buffer buffer)
-  (render-node laid-out-tree buffer 0 0)
+  (render-node laid-out-tree buffer origin-x origin-y)
   buffer)
