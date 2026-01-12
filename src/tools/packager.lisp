@@ -11,7 +11,7 @@
 
 (defun print-usage (&optional (stream *standard-output*))
   (format stream
-          "Usage: elmtui-packager [options]\n\n~
+    "Usage: elmtui-packager [options]\n\n~
            Options:\n~
              --system|-s <asdf-system>    Load ASDF system before dumping\n~
              --file|-f   <file.lisp>      Load a Lisp file before dumping\n~
@@ -30,8 +30,8 @@
           ((:--SYSTEM :-S) (push (ensure-value) systems))
           ((:--FILE   :-f) (push (uiop:ensure-pathname (ensure-value)) files))
           ((:--EVAL   :-e) (push (ensure-value) evals))
-          ((:--ENTRY  :-E :--ENTRYPOINT)
-           (setf entry (ensure-value)))
+          ((:--ENTRY  :-X :--ENTRYPOINT)
+            (setf entry (ensure-value)))
           ((:--OUTPUT :-o) (setf output (uiop:ensure-pathname (ensure-value))))
           (t (error "Unknown option: ~A" opt)))))
     (values (nreverse systems) (nreverse files) (nreverse evals) entry output)))
@@ -45,7 +45,7 @@
 
 (defun ensure-entry-fn (entry-spec)
   (let* ((sym (maybe-read-symbol entry-spec))
-         (fn  (and sym (symbol-function sym))))
+          (fn  (and sym (symbol-function sym))))
     (unless (and sym (fboundp sym))
       (error "Entry function not fbound: ~A" entry-spec))
     fn))
@@ -56,29 +56,29 @@
     (format t "Dumping image to ~A ...~%" output)
     (finish-output)
     (sb-ext:save-lisp-and-die (namestring output)
-                              :toplevel entry-fn
-                              :executable t
-                              :compression 9))
+      :toplevel entry-fn
+      :executable t
+      :compression 9))
   #-sbcl
   (error "Image dumping currently supported only on SBCL."))
 
 (defun main ()
   (let ((argv (command-line-arguments)))
     (handler-case
-        (progn
-          (when (or (null argv) (member "-h" argv :test #'string=)
-                    (member "--help" argv :test #'string=))
-            (print-usage)
-            (uiop:quit 0))
-          (multiple-value-bind (systems files evals entry-spec output)
-              (parse-args argv)
-            (dolist (sys systems) (load-system sys))
-            (dolist (f files) (load f))
-            (dolist (form evals) (eval (read-from-string form)))
-            (unless entry-spec (error "--entry is required"))
-            (unless output (error "--output is required"))
-            (let ((entry (ensure-entry-fn entry-spec)))
-              (do-dump output entry))))
+      (progn
+        (when (or (null argv) (member "-h" argv :test #'string=)
+                (member "--help" argv :test #'string=))
+          (print-usage)
+          (uiop:quit 0))
+        (multiple-value-bind (systems files evals entry-spec output)
+          (parse-args argv)
+          (dolist (sys systems) (load-system sys))
+          (dolist (f files) (load f))
+          (dolist (form evals) (eval (read-from-string form)))
+          (unless entry-spec (error "--entry is required"))
+          (unless output (error "--output is required"))
+          (let ((entry (ensure-entry-fn entry-spec)))
+            (do-dump output entry))))
       (error (e)
         (format *error-output* "Packager error: ~A~%" e)
         (print-usage *error-output*)

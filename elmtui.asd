@@ -20,6 +20,7 @@
                 (:file "tea-state/msg")
                 (:file "app/system-events")
 
+                (:file "tools/packager") ;; TODO move me
                 (:file "core/errors")
                 (:file "contracts")
                 (:file "core/logging")

@@ -1,197 +1,244 @@
+;;;===============================================================
+;;; File: examples/dirli.lisp
+;;;
+;;; Description: A clean directory listing application using the
+;;; modern ElmTUI API. Demonstrates widget integration, message
+;;; handling, and state management.
+;;;===============================================================
+
 (uiop:define-package :elmtui.examples.dirli
-  (:use :cl :elmtui.app) ; Use :elmtui.app for defapplication
+  (:use :cl :alexandria :log4cl)
+  (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.ui.widgets.listbox
                 #:init-listbox #:update-listbox #:view-listbox
-                #:listbox-model-height #:listbox-model-items
-                #:listbox-model-selected-index #:listbox-model-on-select
-                #:listbox-model-id)
-  (:import-from :elmtui.core.focus #:handle-focus-message)
-  (:import-from :elmtui.state #:state-ref)
-  (:import-from :elmtui.style.presets #:dark-theme)
-  (:import-from :elmtui.core.event-compat #:normalize-event)
-  (:import-from :elmtui.core.events #:key-event #:key-event-key)
-  (:import-from :elmtui.view.dsl #:vbox #:text) ; Corrected import for view.dsl
-  (:import-from :log4cl)
-  (:export :main :run-dirli))
+                #:listbox-model-id #:listbox-model-items
+                #:listbox-model-selected-index #:listbox-model-height
+                #:listbox-model-on-select)
+  (:import-from :elmtui.core.event-types
+                #:key-event #:key-event-key #:key-event-modifiers)
+  (:export #:run-dirli #:main))
 
 (in-package :elmtui.examples.dirli)
 
+;;;===============================================================
+;;; Directory Operations
+;;;===============================================================
+
 (defun list-directory-contents (path)
+  "List directory contents with directories first, marked with trailing /."
   (handler-case
-      (loop for entry in (append (uiop:subdirectories path)
-                                 (uiop:directory-files path))
-            collect (let ((name (enough-namestring entry path)))
-                      (if (uiop:directory-exists-p entry)
-                          (concatenate 'string name "/")
-                          name)))
+      (append
+        ;; Directories first, with trailing slash
+        (mapcar (lambda (d)
+                  (concatenate 'string (enough-namestring d path) "/"))
+                (uiop:subdirectories path))
+        ;; Then files
+        (mapcar (lambda (f)
+                  (enough-namestring f path))
+                (uiop:directory-files path)))
     (error (e)
-      (log4cl:log-error "Error listing directory ~A: ~A" path e)
+      (log-error "Error listing directory ~A: ~A" path e)
       (list (format nil "Error listing ~A" path)))))
 
+;;;===============================================================
+;;; Helper Functions
+;;;===============================================================
+
+(defun regenerate-listbox-model (lb-model &key items selected-index height)
+  "Regenerate a listbox model with selective field updates."
+  (init-listbox
+    (listbox-model-id lb-model)
+    :items (or items (listbox-model-items lb-model))
+    :height (or height (listbox-model-height lb-model))
+    :selected-index (or selected-index (listbox-model-selected-index lb-model))
+    :on-select (listbox-model-on-select lb-model)))
+
+(defun status-message-result (message)
+  "Create an update result that sets only the status message."
+  (make-update-result
+    :patches `(((:status-message) ,message))))
+
+;;;===============================================================
+;;; Update Function
+;;;===============================================================
+
+(defun app-update (message app-state)
+  "Handle application messages following Elm architecture."
+  (labels
+    ;; Helper: Create quit result
+    ((quit-result ()
+       (make-update-result :patches '((:should-quit t))))
+
+     ;; Helper: Navigate to a directory
+     (navigate-to-directory (path)
+       (handler-case
+           (let* ((new-items (list-directory-contents path))
+                  (lb-model (state-ref app-state :listbox-model))
+                  (new-lb-model (regenerate-listbox-model
+                                  lb-model
+                                  :items new-items
+                                  :selected-index (when new-items 0))))
+             (make-update-result
+               :patches `(((:listbox-model) ,new-lb-model)
+                         (:current-path ,path)
+                         (:status-message
+                          ,(format nil "Directory: ~A"
+                                   (enough-namestring
+                                     path
+                                     (uiop:pathname-parent-directory-pathname path)))))))
+         (error (e)
+           (status-message-result (format nil "Error: ~A" e))))))
+
+    (etypecase message
+      ;; --- Key Events ---
+      (key-event
+       (let ((key (key-event-key message)))
+         (cond
+           ;; C-q to quit
+           ((and (or (eql key :q) (string= key "q"))
+                 (member :control (key-event-modifiers message)))
+            (quit-result))
+           ;; Pass navigation keys to listbox
+           (t
+            (let* ((lb-model (state-ref app-state :listbox-model)))
+              (multiple-value-bind (new-lb-model lb-cmds)
+                  (update-listbox `(:listbox-key-press :key ,key) lb-model)
+                (make-update-result
+                  :patches `(((:listbox-model) ,new-lb-model))
+                  :commands lb-cmds))))))
+
+      ;; --- Application Messages ---
+      ;; Item selected (Enter pressed in listbox)
+      ((eql :item-selected)
+       (let* ((lb-model (state-ref app-state :listbox-model))
+              (selected-idx (listbox-model-selected-index lb-model))
+              (item (when selected-idx
+                     (nth selected-idx (listbox-model-items lb-model))))
+              (current-path (state-ref app-state :current-path)))
+         (cond
+           ;; No item selected
+           ((not item)
+            (status-message-result "No item selected"))
+           (t
+            (let ((new-path (merge-pathnames item current-path)))
+              (cond
+                ;; Parent directory - navigate up
+                ((string= item "../")
+                 (navigate-to-directory
+                   (uiop:pathname-parent-directory-pathname current-path)))
+                ;; Directory - navigate into it
+                ((uiop:directory-exists-p new-path)
+                 (navigate-to-directory new-path))
+                ;; File - just show status
+                ((uiop:file-exists-p new-path)
+                 (status-message-result (format nil "File: ~A" item)))
+                ;; Can't access
+                (t
+                 (status-message-result
+                   (format nil "Cannot access: ~A" item))))))))
+
+      ;; Terminal resized - update listbox height
+      ((cons (eql :terminal-resized))
+       (let* ((msg-data (rest message))
+              (term-height (getf msg-data :height))
+              (available-height (max 5 (- term-height 5)))
+              (lb-model (state-ref app-state :listbox-model))
+              (current-height (listbox-model-height lb-model)))
+         (if (= available-height current-height)
+             (make-update-result) ; No change needed
+             (let ((new-lb-model (regenerate-listbox-model
+                                   lb-model
+                                   :height available-height)))
+               (make-update-result
+                 :patches `(((:listbox-model) ,new-lb-model)
+                           (:terminal-width ,(getf msg-data :width))
+                           (:terminal-height ,(getf msg-data :height))))))))
+
+      ;; Default: no-op
+      (t (make-update-result)))))
+
+;;;===============================================================
+;;; View Function
+;;;===============================================================
+
+(defun app-view (app-state)
+  "Render the directory listing application."
+  (let* ((current-path (state-ref app-state :current-path))
+         (status-message (state-ref app-state :status-message))
+         (terminal-width (state-ref app-state :terminal-width))
+         (terminal-height (state-ref app-state :terminal-height))
+         (lb-model (state-ref app-state :listbox-model)))
+    `(:container
+       :id :root
+       :style (:width :fill
+               :height :fill
+               :display :flex
+               :flex-direction :column
+               :gap 1
+               :padding 1)
+       :children
+       ((:text
+         :id :header
+         :content ,(format nil "Dirli - ~A" current-path)
+         :style (:fg-color :cyan :bold t))
+        (:text
+         :id :instructions
+         :content "↑↓: Navigate | Enter: Open | C-q: Quit"
+         :style (:fg-color :gray))
+        (:container
+         :id :listbox-container
+         :style (:width :fill :height :fill)
+         :children
+         ((:text
+           :id :listbox-placeholder
+           :content "Loading..."
+           :style (:width :fill :height :fill :text-align :center))))
+        (:text
+         :id :status
+         :content ,status-message
+         :style (:fg-color :yellow))
+        (:text
+         :id :footer
+         :content ,(format nil "Terminal: ~A x ~A"
+                           terminal-width
+                           terminal-height)
+         :style (:fg-color :gray))))))
+
+;;;===============================================================
+;;; Application Definition
+;;;===============================================================
+
 (defapplication dirli-app
-  :initial-state-fn
-  (lambda ()
-    (let* ((current-path (uiop:getcwd))
-           (items (list-directory-contents current-path))
-           (listbox-state (init-listbox
-                           :main-listbox ; ID for focus and state
-                           :items items
-                           :height 10
-                           :selected-index (when items 0)
-                           :on-select '(:listbox-item-selected))))
-      (list :listbox-state listbox-state
-            :current-path current-path
-            :status-message "Welcome to Dirli!"
-            :terminal-width 80
-            :terminal-height 24
-            :output-to-print nil
-            :current-focus-id :main-listbox
-            :prev-focus-id nil
-            :focusable-elements '(:main-listbox) ; Only listbox is focusable initially
-            :current-stylesheet dark-theme)))
-  :update-fn
-  (lambda (app-state message)
-    (let* ((focus-state-patch (handle-focus-message app-state message))
-           (app-patch nil)
-           (commands nil)
-           (current-message-patch nil)
-           (listbox-id :main-listbox)
-           (current-focus (or (getf focus-state-patch :current-focus-id) (state-ref app-state :current-focus-id)))
-           (prev-focus (or (getf focus-state-patch :prev-focus-id) (state-ref app-state :prev-focus-id)))
-           (listbox-state (state-ref app-state :listbox-state))
-           (normalized-message (normalize-event message)))
+  :root-viewport-id :root
+  :initial-state-plist
+  (let* ((current-path (uiop:getcwd))
+         (items (list-directory-contents current-path)))
+    (list :current-path current-path
+          :listbox-model (init-listbox
+                          :main-listbox
+                          :items items
+                          :height 10
+                          :selected-index (when items 0)
+                          :on-select '(:item-selected))
+          :status-message "Welcome to Dirli! Navigate directories with arrow keys."
+          :should-quit nil
+          :terminal-width 80
+          :terminal-height 24))
+  :root-component-dsl '(:container :id :root)
+  :update-fn 'app-update
+  :view-fn 'app-view)
 
-      ;; --- Focus sync logic for listbox (if it were a separate component needing explicit focus messages) ---
-      ;; With listbox state integrated, direct key handling when focused is more common.
-      ;; However, if listbox had its own :listbox-focus / :listbox-blur messages, this would be relevant.
-      (when (and focus-state-patch (not (equal current-focus prev-focus)))
-        (cond
-          ((equal current-focus listbox-id)
-           (log4cl:log-debug "DIRLI-UPDATE: Listbox ~A gained focus." listbox-id)
-           ;; If listbox had its own focus message:
-           ;; (multiple-value-bind (new-lb-state lb-cmds) (update-listbox '(:listbox-focus) listbox-state) ... )
-           )
-          ((equal prev-focus listbox-id)
-           (log4cl:log-debug "DIRLI-UPDATE: Listbox ~A lost focus." listbox-id)
-           ;; (multiple-value-bind (new-lb-state lb-cmds) (update-listbox '(:listbox-blur) listbox-state) ... )
-           )))
+;;;===============================================================
+;;; Entry Points
+;;;===============================================================
 
-      (if focus-state-patch
-          (setf app-patch (append focus-state-patch app-patch))
-          ;; Handle application-specific messages only if focus didn't change things
-          (cond
-            ;; Key events when listbox is focused
-            ((and normalized-message (typep normalized-message 'key-event) (equal current-focus listbox-id))
-             (log4cl:log-debug "DIRLI-UPDATE: Processing key event for listbox: ~S" normalized-message)
-             (let ((key (key-event-key normalized-message)))
-               (cond
-                 ((and (string= key "q") (member :control (elmtui.core.event-types:key-event-modifiers normalized-message)))
-                  (setf current-message-patch (list :should-quit t))
-                  (log4cl:log-info "App quit requested (C-q), setting should-quit flag."))
-                 (t
-                  (multiple-value-bind (new-listbox-state listbox-commands)
-                      (update-listbox `(:listbox-key-press :key ,key) listbox-state)
-                    (setf current-message-patch (list :listbox-state new-listbox-state))
-                    (setf commands (append listbox-commands commands)))))))
-
-            ;; Handle list-based messages (custom messages)
-            ((listp message)
-             (let ((msg-type (first message))
-                   (msg-data (rest message)))
-               (case msg-type
-                 (:listbox-item-selected
-                  (let* ((selected-item-name (getf msg-data :item))
-                         (current-path (state-ref app-state :current-path))
-                         (new-path-attempt (uiop:resolve-location
-                                            (merge-pathnames selected-item-name current-path))))
-                    (log4cl:log-debug "Listbox item selected: ~S, current-path: ~S, new-path-attempt: ~S"
-                                      selected-item-name current-path new-path-attempt)
-                    (cond
-                      ((uiop:directory-exists-p new-path-attempt)
-                       (let* ((new-items (list-directory-contents new-path-attempt))
-                              (new-listbox-state (init-listbox
-                                                  (listbox-model-id listbox-state) ; Preserve ID
-                                                  :items new-items
-                                                  :height (listbox-model-height listbox-state)
-                                                  :selected-index (when new-items 0)
-                                                  :on-select (listbox-model-on-select listbox-state))))
-                         (setf current-message-patch
-                               (list :listbox-state new-listbox-state
-                                     :current-path new-path-attempt
-                                     :status-message (format nil "Entered ~A"
-                                                             (enough-namestring new-path-attempt
-                                                                                (uiop:pathname-parent-directory-pathname new-path-attempt)))))))
-                      ((uiop:file-exists-p new-path-attempt)
-                       (setf current-message-patch (list :status-message (format nil "Selected file: ~A" selected-item-name))))
-                      (t
-                       (setf current-message-patch (list :status-message (format nil "Cannot access: ~A" selected-item-name)))))))
-
-                 (:terminal-resized
-                  (let* ((new-height (max 5 (- (getf msg-data :height) 5))) ; Adjusted height for listbox
-                         (base-patch (list :terminal-width (getf msg-data :width)
-                                           :terminal-height (getf msg-data :height))))
-                    (if (and listbox-state ;; Ensure listbox-state exists
-                             (not (= (listbox-model-height listbox-state) new-height)))
-                        (let ((resized-lb-state (init-listbox
-                                                 (listbox-model-id listbox-state)
-                                                 :items (listbox-model-items listbox-state)
-                                                 :selected-index (or (listbox-model-selected-index listbox-state) 0)
-                                                 :height new-height
-                                                 :on-select (listbox-model-on-select listbox-state))))
-                          (setf current-message-patch
-                                (append base-patch (list :listbox-state resized-lb-state))))
-                        (setf current-message-patch base-patch))))
-
-                 ((:request-focus :focus-next :focus-previous :update-focusable-ids)
-                  (log4cl:log-debug "Focus message ~S (already handled by handle-focus-message)" msg-type))
-
-                 (otherwise
-                  (unless (typep message 'key-event) ; Already handled above
-                    (log4cl:log-warn "Unhandled list-based message type in dirli-update: ~A" msg-type))))))
-
-            ;; Catch-all for other unhandled messages
-            (t (unless (or (null message) focus-state-patch) ; Don't warn for nil or already handled focus
-                 (log4cl:log-warn "Unhandled message in dirli-update: ~S" message))))
-
-          (when current-message-patch
-            (setf app-patch (append current-message-patch app-patch)))
-
-          (values app-patch commands))))
-  :view-fn
-  (lambda (app-state)
-    (let* ((status-message (state-ref app-state :status-message))
-           (current-path (state-ref app-state :current-path))
-           (terminal-width (state-ref app-state :terminal-width))
-           (terminal-height (state-ref app-state :terminal-height))
-           (output-to-print (state-ref app-state :output-to-print)))
-      (vbox :id :dirli-app-root :style '(:width :fill :height :fill)
-            (text :content (format nil "Current Path: ~A" current-path))
-            ;; Pass the entire app-state to view-listbox, as it might need other parts of the state
-            ;; or its own sub-state which is part of app-state.
-            ;; The :widget-id for view-listbox should match the ID used in init-listbox and update-listbox.
-            (view-listbox app-state :widget-id :main-listbox)
-            (text :content (or status-message ""))
-            (text :content (format nil "Terminal Size: ~A x ~A" terminal-width terminal-height))
-            (text :content (or output-to-print ""))
-            (text :content "Press C-q to quit."))))
-  :root-component-dsl
-  '(vbox :id :dirli-app-root
-    :style '(:width :fill :height :fill)
-    (text :content "Dirli - Directory Listing Application")
-    (view-listbox :widget-id :main-listbox)
-    (text :content "Press C-q to quit."))
-  :command-processor-fn nil ; No external command processor needed for this example
-  :event-translator-fn nil ; Use default event translation
-  :root-viewport-id :dirli-app-root
-  :quit-flag-path '(:should-quit)
-  :style-sheet-path '(:current-stylesheet))
-
-;;; Main function to run the application
 (defun run-dirli (&rest args)
+  "Run the Dirli directory listing application."
   (apply #'elmtui.app.api:run-application 'dirli-app args))
 
-;;; Alias for convenience
 (defun main ()
+  "Main entry point for the application."
   (run-dirli))
 
 ;; To run from REPL:
