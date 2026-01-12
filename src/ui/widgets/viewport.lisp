@@ -225,6 +225,10 @@ It stores the ID of its child component in app-state under :child."))
                            (new-height (msg-data message :height)))
                       (when new-width (setf (cstate> :width) new-width))
                       (when new-height (setf (cstate> :height) new-height))
+                      (let ((w (cstate> :width nil))
+                             (h (cstate> :height nil)))
+                        (when (and w h (> w 0) (> h 0))
+                          (setf (cstate> :size-known) t)))
                       (apply-overflow)))
                   (:set-clipping
                     (let ((flag (msg-data message :enabled)))
@@ -236,29 +240,31 @@ It stores the ID of its child component in app-state under :child."))
                       (setf (cstate> :scroll-y) (+ (cstate> :scroll-y 0) dy))
                       (apply-overflow)))
                   (otherwise
-                    (propagate-to-child)))))))
-        (let* ((command-payloads
-                 (remove nil
-                   (mapcar (lambda (cmd)
-                             (when (typep cmd 'elmtui.update-dsl.api:command)
-                               (funcall (elmtui.update-dsl.api::command-thunk cmd))))
-                     commands)))
-                (all-commands (nconc (nreverse render-commands) command-payloads)))
-          (log-info "viewport ~A produced ~A patches and ~A commands."
-            id-path patches (length all-commands))
-          (elmtui.tea-state:make-update-result :patches patches :commands all-commands))))))
+                    (propagate-to-child))))))))
+      (declare (ignore _new-state))
+      (let* ((command-payloads
+               (remove nil
+                 (mapcar (lambda (cmd)
+                           (when (typep cmd 'elmtui.update-dsl.api:command)
+                             (funcall (elmtui.update-dsl.api::command-thunk cmd))))
+                   commands)))
+              (all-commands (nconc (nreverse render-commands) command-payloads)))
+        (log-info "viewport ~A produced ~A patches and ~A commands."
+          id-path patches (length all-commands))
+        (elmtui.tea-state:make-update-result :patches patches :commands all-commands)))))
 
 (defmethod view ((component viewport) state &key id-path (children nil) &allow-other-keys)
   (declare (type list id-path) (type t state))
-  (log-info "viewport: rendering component at path ~S with children ~S" id-path children)
+  (log-debug "viewport: rendering component at path ~S with children ~S" id-path children)
   (let* ((vp-state (get-path (append id-path '(:state)) state))
           (size-known (%state-value vp-state :size-known))
-          (pos-known (%state-value vp-state :pos-known))
+          (width (%state-value vp-state :width))
+          (height (%state-value vp-state :height))
           (effective-id (or (%state-value vp-state :id) (first (last id-path)))))
-    ;; Guard view until basic readiness conditions are met
-    (unless (or size-known pos-known ; Allow viewport to render if either dimension is known
-              (and (%state-value vp-state :width) (%state-value vp-state :height)))
-      (log-debug "Viewport ~A waiting for size/position; returning NIL view." effective-id)
+    ;; Guard view until basic readiness conditions are met.
+    (unless (or size-known
+              (and width height (> width 0) (> height 0)))
+      (log-debug "Viewport ~A waiting for size/position; skipping view." effective-id)
       (return-from view nil))
     (let* ((children-from-args children)
             (child-from-state (%state-value vp-state :child-dsl-spec))
@@ -269,16 +275,20 @@ It stores the ID of its child component in app-state under :child."))
                                    (keywordp (first child-from-state)))
                                   (list child-from-state))
                                 (t (list child-from-state)))))
-            (width (%state-value vp-state :width 80))
-            (height (%state-value vp-state :height 24))
+            (width (or width 1))
+            (height (or height 1))
             (offset-x (%state-value vp-state :offset-x 0))
             (offset-y (%state-value vp-state :offset-y 0))
             (scroll-x (%state-value vp-state :scroll-x 0))
             (scroll-y (%state-value vp-state :scroll-y 0))
             (clipping (%state-value vp-state :clipping))
-            (effective-id-viewport (intern (format nil "VIEWPORT-~A" effective-id) :keyword)))
+            (effective-id-viewport (let* ((name (string-upcase (string effective-id)))
+                                           (pref "VIEWPORT-"))
+                                     (if (uiop:string-prefix-p pref name)
+                                       effective-id
+                                       (intern (concatenate 'string pref name) :keyword)))))
       (unless final-children
-        (log-warn "Viewport ~A has no children." effective-id))
+        (log-debug "Viewport ~A has no children." effective-id))
       `(:viewport :id ,effective-id-viewport
          :style (:width ,width :height ,height
                   :offset-x ,offset-x :offset-y ,offset-y

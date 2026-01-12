@@ -64,7 +64,20 @@
           (log-warn "Root component ~A not found – message dropped: ~S"
             root-id msg)
           (values nil nil))
-        (elmtui.ui.api:update root msg state :id-path id-path))))
+        (let ((raw-result (multiple-value-list
+                            (elmtui.ui.api:update root msg state :id-path id-path))))
+          (cond
+            ((and raw-result
+                  (= (length raw-result) 1)
+                  (typep (first raw-result) 'update-result))
+             (values (ur-patches (first raw-result))
+                     (ur-commands (first raw-result))))
+            ((>= (length raw-result) 2)
+             (values (first raw-result) (second raw-result)))
+            (t
+             (log-warn "Component ~A returned unexpected update result: ~S"
+               root-id raw-result)
+             (values nil nil)))))))
 
 
 
@@ -97,6 +110,7 @@ DSL cases handled:
                   ;; :initial-cursor-pos          ,cursor-pos
                   :children                    ,inner)))
       (cond
+        ((null dsl) nil)
         ;; ───────────────────────────────────────────────────────────────
         ;; ❶  Quoted input – unwrap, process, then re‑quote
         ;; ───────────────────────────────────────────────────────────────

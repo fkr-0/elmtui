@@ -49,8 +49,9 @@
 - consumer is the dequeuing events/messages and running the update function
 as well as the view function for the application.")
 
-(defvar *shutdown-requested* nil
-  "Flag to signal the consumer thread to shutdown")
+(defvar *shutdown-requested-cell* (list nil)
+  "Shared cell storing the shutdown-requested flag across threads.")
+(define-symbol-macro *shutdown-requested* (car *shutdown-requested-cell*))
 
 
 (defvar *event-loop-metrics* (make-hash-table :test 'eq)
