@@ -220,18 +220,11 @@ Handles app-state, application-state, hash-table, and plist inputs."
     ;;    new-state))
     ;; Handle application-state struct
     ((application-state-p state)
-     ;; (let ((data (make-hash-table)))
-     ;;   (if (hash-table-p data)
-     ;;       (progn
-     ;;         (loop for patch in patches
-     ;;               do (destructuring-bind (path value) patch
-     ;;                    (set-path-in-hash data path value)))
-     ;;         state)
-     ;;       ;; (let ((new-data (merge-patches data patches)))
-     ;;       ;;   (setf (application-state-data state) new-data)
-     ;;       ;;   state)
-     ;;       ))
-     )
+     (let ((data (application-state-data state)))
+       (loop for patch in patches
+             do (destructuring-bind (path value) patch
+                  (set-path-in-hash data path value)))
+       state))
     ;; Handle direct hash-table
     ((hash-table-p state)
      (let ((new-table (make-hash-table :test 'equal)))

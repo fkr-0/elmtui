@@ -65,6 +65,20 @@
 ;;; Capture utilities
 ;;;----------------------------------------------------------------
 
+(defun %split-string-keep-empty (content separator)
+  "Split CONTENT by SEPARATOR, preserving empty segments."
+  (when content
+    (let ((sep (if (consp separator) (first separator) separator))
+          (result '())
+          (start 0)
+          (len (length content)))
+      (loop for i from 0 below len do
+        (when (char= (aref content i) sep)
+          (push (subseq content start i) result)
+          (setf start (1+ i))))
+      (push (subseq content start len) result)
+      (nreverse result))))
+
 (defun capture-pane-string (&key (mode :pane))
   "Capture the current tmux pane (MODE :pane or :screen) and return it as a string."
   (case mode
@@ -78,10 +92,7 @@
 (defun capture-lines (&key (mode :pane))
   "Capture tmux output and return a vector of lines."
   (let* ((content (capture-pane-string :mode mode))
-          (lines (and content
-                   (uiop:split-string content
-                     :separator '(#\Newline)
-                     :keep-empty-subseqs t))))
+          (lines (%split-string-keep-empty content '(#\Newline))))
     (if lines
       (coerce lines 'vector)
       #())))
@@ -92,10 +103,8 @@
 
 (defun %normalize-lines (content width height)
   "Return a vector of lines sized for WIDTH/HEIGHT given CONTENT string."
-  (let* ((raw-lines (and content
-                      (uiop:split-string content
-                        :separator '(#\Newline)
-                        :keep-empty-subseqs t)))
+  (declare (ignore width))
+  (let* ((raw-lines (%split-string-keep-empty content '(#\Newline)))
           (vector-lines (or (and raw-lines (coerce raw-lines 'vector))
                           (make-array 0 :element-type 'string))))
     (let ((result (make-array height :element-type 'string :initial-element "")))

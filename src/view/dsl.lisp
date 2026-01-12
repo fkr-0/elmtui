@@ -1,6 +1,6 @@
 (uiop:define-package #:elmtui.view.dsl
   (:use #:cl)
-  (:import-from #:log4cl #:log-info)
+  (:import-from #:log4cl #:log-debug)
   (:import-from #:elmtui.view.base-elements
     #:element-class)
   (:import-from #:elmtui.app.api
@@ -45,6 +45,36 @@ This macro is useful for building extensible DSLs, especially for UI or data str
        (export ',helper-fn-name))))
 
 
+(defparameter *dsl-summary-max-length* 200
+  "Maximum number of characters emitted when logging DSL summaries.
+If NIL, summaries are not truncated.")
+
+(defun %truncate-dsl-summary (text)
+  (if (and *dsl-summary-max-length*
+        (> (length text) *dsl-summary-max-length*))
+      (concatenate 'string
+        (subseq text 0 (max 0 (1- *dsl-summary-max-length*)))
+        "…")
+      text))
+
+
+
+(defun %dsl-summary (dsl)
+  "Return a concise description of a DSL node for logging."
+  (%truncate-dsl-summary
+    (cond
+      ((atom dsl) (format nil "~A" dsl))
+      ((and (listp dsl) (keywordp (first dsl)))
+       (multiple-value-bind (props children) (split-props/children (rest dsl))
+         (let* ((id (getf props :id))
+                (child-list (cond
+                              ((null children) nil)
+                              ((listp children) children)
+                              (t (list children))))
+                (child-count (length child-list)))
+           (format nil "~(~a~)~@[ id=~a~] (~d child~:p)"
+                   (first dsl) id child-count))))
+      (t (format nil "~A" dsl)))))
 
 (defun split-props/children (args)
   "Split top-level tail into (values PROPS CHILDREN), without touching prop values.
@@ -88,7 +118,7 @@ This macro is useful for building extensible DSLs, especially for UI or data str
   "Resolve DSL to a tree. Only recurse into *children*. Prop values are opaque data.
    Treat a list as a DSL node only if its head keyword is a *known* DSL tag."
   (with-error-context (:operation "render-dsl-to-resolved-tree" :module "view.dsl")
-    (log-info "Resolving DSL: ~S" dsl-spec)
+    (log-debug "Resolving DSL root ~A" (%dsl-summary dsl-spec))
     (when (null dsl-spec)
       (signal-dsl-validation-error dsl-spec nil "DSL specification cannot be nil"
         "Provide a valid DSL specification like (:text \"Hello\")"
@@ -99,6 +129,7 @@ This macro is useful for building extensible DSLs, especially for UI or data str
       (return-from render-dsl-to-resolved-tree dsl-spec))
 
     (let ((resolved-something nil))
+      (block resolve
       (labels
         ((process-node (spec path &key (in-children-p nil))
            ;; (with-error-context (:operation "process-node" :module "view.dsl")
@@ -145,6 +176,10 @@ This macro is useful for building extensible DSLs, especially for UI or data str
                                    (view     (elmtui.ui.api:view instance app-state
                                                :id-path new-path
                                                :children children))
+                                   (_ (when (null view)
+                                        (log-debug "Component ~A at ~A returned NIL view; delaying DSL resolution."
+                                          type new-path)
+                                        (return-from resolve (values nil nil))))
                                    (rv       (process-node view new-path :in-children-p nil)))
                              (%emit-node type (append props (list :resolved-view rv)) nil))
                            (error (e)
@@ -161,7 +196,7 @@ This macro is useful for building extensible DSLs, especially for UI or data str
              ;; ((listp spec) spec)
 
              (t spec))));)
-        (values (process-node dsl-spec '()) resolved-something)))))
+        (values (process-node dsl-spec '()) resolved-something))))))
 ;; == end/resolve.lisp ==
 ;; == end/resolve.lisp ==
 
@@ -194,6 +229,9 @@ This macro is useful for building extensible DSLs, especially for UI or data str
                   (warn "DSL resolution took more than 10 iterations. Possible circular reference.")
                   (signal-dsl-validation-error dsl-spec 0
                     "DSL resolution exceeded maximum iterations")))
+      (when (null spec)
+        (log-debug "dsl->ui-node: unresolved spec; returning NIL.")
+        (return-from dsl->ui-node nil))
       (handler-case
         (elmtui.view.base-elements:dsl->objects spec)
         (error (e)

@@ -102,6 +102,15 @@
 
 (in-package :elmtui.platform.backend.terminal)
 
+(defparameter *log-terminal-clear-calls* nil
+  "When true, log clear/erase calls with a backtrace for debugging.")
+
+(defun %log-terminal-clear (label &optional details)
+  (when *log-terminal-clear-calls*
+    (let ((bt (with-output-to-string (s)
+                (uiop:print-backtrace :stream s))))
+      (log-info "TERMINAL ~A ~A~%~A" label details bt))))
+
 (defstruct terminal-instance
   (stream nil :type (or null stream))
   (cl-device nil :type (or null t))
@@ -178,8 +187,10 @@
             (terminal-instance-back-buffer instance) back)))
       (setup-terminal-signal-handlers instance publish-fn)
       (when device (cl-inputs.terminal.api:hide-cursor device))
-      (when initial-clear
-        (%force-clear-terminal-and-reset-buffers instance))
+      ;; Only clear terminal if explicitly requested during init
+      ;; This prevents clearing screen when initial-clear=nil is passed
+      ;; Only clear terminal if explicitly requested during init
+      ;; This prevents clearing screen when initial-clear=nil is passed
       ;; (setf elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t)
       (when device (cl-inputs.terminal.api:flush-output device))
       instance)))
@@ -266,13 +277,10 @@
   (log-info "TERMINAL: Shutting down backend...")
   (handler-case
     (with-terminal-lock (instance)
-      (let ((scrolled (terminal-instance-scrolled-lines instance)))
-        (when (> scrolled 0)
-          (scroll-up instance scrolled)))
       (teardown-terminal-signal-handlers)
       (send-sequence instance :cursor-show)
       (send-sequence instance :reset) ; SGR 0
-      (%force-clear-terminal-and-reset-buffers instance)
+      ;; Do not force-clear here; let root-viewport cleanup preserve surrounding content.
       ;; Restore normal screen buffer if alt screen was used
       ;; (send-sequence instance :normal-screen-buffer)
       ;; (write-output  (format nil "~c[?25h~c[0m~c[J~c[H"
@@ -331,7 +339,6 @@
 (defmethod handle-backend-resize ((instance terminal-instance) width height)
   (log:info "TERMINAL: Handling backend resize to ~Ax~A" width height)
   (resize-terminal-buffers instance width height)
-  (%force-clear-terminal-and-reset-buffers instance)
   t)
 
 ;;;---------------------------------------------------------------
@@ -388,6 +395,7 @@
   (terminal-instance-input-source instance))
 
 (defmethod clear-screen ((instance terminal-instance) &optional rect)
+  (%log-terminal-clear "clear-screen" rect)
   (log:debug "TERMINAL clear-screen: Clearing back-buffer.")
   (let ((dev (%terminal-device instance)))
     (when dev
@@ -457,6 +465,11 @@
       (if dev
         (cl-inputs.terminal.api:scroll-lines dev (- lines))
         (send-sequence instance :scroll-up lines)))))
+
+(defmethod elmtui.platform.api:scroll ((instance terminal-instance) n)
+  "Scroll the terminal by N lines (positive=down, negative=up)."
+  (elmtui.platform.api:scroll-lines instance n)
+  t)
 
 (defmethod elmtui.platform.api:scroll-lines ((instance terminal-instance) n)
   (cond
@@ -564,6 +577,8 @@
   t)
 
 (defmethod clear-area ((instance terminal-instance) target-buffer row col height width &key style)
+  (%log-terminal-clear "clear-area"
+                       (list :row row :col col :height height :width width :style style))
   (log:debug "BUFFER: clear-area on target-buffer - Row: ~A, Col: ~A, H: ~A, W: ~A, Style: ~S" row col height width style)
   (when target-buffer
     (with-virtual-buffer-lock (target-buffer)
