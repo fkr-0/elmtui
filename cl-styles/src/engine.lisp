@@ -140,16 +140,17 @@ Example:
    (compute-style obj pairs :inherit-from '(:font-family \"Arial\") :sheet sheet))
   => (:COLOR :GREEN :FONT-SIZE 12 :FONT-FAMILY \"Arial\")"
   (let* ((inline (or (cl-styles.protocols:stylable-inline-style obj) nil))
-         (acc (copy-list inline))
-         (sorted (sort (copy-list rules) #'%spec< :key #'cdr)))
+         (acc '())
+         (sorted (stable-sort (copy-list (reverse rules)) #'%spec< :key #'cdr)))
     (dolist (pr sorted)
       (let* ((rule (car pr))
              (decls (cl-styles.rule:rule-declarations rule)))
         ;; (format t "Applying rule ~a~% to acc ~a%" rule acc)
         (setf acc (%plist-merge acc decls))))
     (when inherit-from
-      ;; (format t "Inheriting from ~a~% to acc ~a%" inherit-from acc)
       (setf acc (%inherit inherit-from acc)))
+    (when inline
+      (setf acc (%plist-merge acc inline)))
     ;; (format t "Final acc before normalization: ~a~%" acc)
     (let* ((vars (and sheet (cl-styles.sheet:stylesheet-variables sheet)))
            (resolved (if vars (cl-styles.tokens:resolve-variables acc vars) acc))

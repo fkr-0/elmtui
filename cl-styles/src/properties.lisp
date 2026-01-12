@@ -62,14 +62,17 @@
 (defun %normalize-value (prop v)
   (let* ((def (property-definition prop))
           (type-of-prop (getf def :type nil))
-          (syns (getf def :synonyms nil))
-          (vv (%ensure-keyword v)))
+          (syns (getf def :synonyms nil)))
     (cond
-      ((and syns (hash-table-p syns))
-        (multiple-value-bind (m present) (gethash vv syns)
-          (if present m vv)))
+      ;; Preserve strings for string properties
       ((and (eq type-of-prop :string) (stringp v)) v)
-      (t vv))))
+      ;; Handle synonyms
+      ((and syns (hash-table-p syns))
+        (let ((vv (%ensure-keyword v)))
+          (multiple-value-bind (m present) (gethash vv syns)
+            (if present m vv))))
+      ;; Default: convert to keyword
+      (t (%ensure-keyword v)))))
 
 (defun %check-type (prop v)
   (let* ((def (property-definition prop))
