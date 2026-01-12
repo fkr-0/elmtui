@@ -60,7 +60,6 @@
   (let ((result (update rv msg state :id-path id-path)))
     (let ((patches (ur-patches result))
           (commands (ur-commands result)))
-      (format t "Patches: ~S Cmds: ~S~%" patches commands)
       (elmtui.tea-state:apply-patches state patches)
       (values patches state commands))))
 
@@ -112,12 +111,11 @@
         "Viewport width patch recorded on resize")
       (is (state-patch-p patches idp '(:state :height) 10)
         "Viewport height patch recorded on resize")
-      ;; overflow handling may now clear-below instead of scrolling; accept either
-      (is-true (or (has-render-cmd-p cmds :scroll-down)
-                 (has-render-cmd-p cmds :clear-below-cursor))))))
+      (is-true (has-render-cmd-p cmds :scroll-down)))))
 
 (test above-cursor-overflow-scrolls-up
   (multiple-value-bind (rv idp statep state) (init-root :above-cursor 40 20 3 10)
+    (declare (ignore statep))
     ;; Set terminal size and cursor pos for overflow logic context
     (setf (state-ref state (append idp '(:state :terminal-size))) '(40 20))
     (setf (state-ref state (append idp '(:state :cursor-pos))) '(10 3))
@@ -125,13 +123,10 @@
     (setf (state-ref state (append idp '(:state :height))) 6)
     (setf (state-ref state (append idp '(:state :width))) 40)
     (setf (state-ref state (append idp '(:state :size-known))) t)
-    (multiple-value-bind (s cmds)
-      (update rv '(:cursorposition :col 10 :row 3) state :id-path idp)
-
-      (declare (ignore s))
-      ;; Accept clear-above-cursor (first-ready) or explicit scroll-up when overflow detected
-      (is-true (or (has-render-cmd-p cmds :clear-above-cursor)
-                 (has-render-cmd-p cmds :scroll-up))))))
+    (multiple-value-bind (patches new-state cmds)
+        (upd rv idp state '(:cursorposition :col 10 :row 3))
+      (declare (ignore patches new-state))
+      (is-true (has-render-cmd-p cmds :scroll-up)))))
 
 (test revert-scroll-on-shutdown
   (multiple-value-bind (rv idp o state) (init-root :below-cursor 80 24 12 10)

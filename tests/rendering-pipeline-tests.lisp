@@ -112,6 +112,55 @@
             (elmtui.view.geo:w (elmtui.view.element:el/layout-rect a)))
         "Inner text width never exceeds its container's width.")))
 
+(test root-viewport-produces-layoutable-child
+  "Regression: ensure root viewport DSL resolves and layouts once terminal size is known."
+  (let* ((state (make-hash-table :test 'equal))
+         (components (make-hash-table :test 'equal))
+         (root-entry (make-hash-table :test 'equal)))
+    (setf (gethash :components state) components)
+    (setf (gethash :root components) root-entry)
+    (setf (gethash :state root-entry)
+          '(:size-known t
+            :terminal-size (40 10)
+            :width 40 :height 10
+            :offset-x 0 :offset-y 0
+            :scroll-x 0 :scroll-y 0
+            :child-dsl-spec (:text :id :child :content "hello world")))
+    (let* ((ctx (make-app-context
+                 :state state
+                 :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
+                                                :size (make-size :w 40 :h 10))
+                 :front-buffer (make-virtual-buffer 40 10)
+                 :view-fn (lambda (_model)
+                            '(:root-viewport :id :root)))))
+      (let ((result (render-pipeline-0-to-5 ctx)))
+        (is-true (ctx-laid-out-tree result)
+                 "Root viewport DSL should produce a laid-out tree.")))))
+
+(test root-viewport-gates-pipeline-when-terminal-size-missing
+  "Regression: pipeline should skip layouting until the terminal size becomes available."
+  (let* ((state (make-hash-table :test 'equal))
+         (components (make-hash-table :test 'equal))
+         (root-entry (make-hash-table :test 'equal)))
+    (setf (gethash :components state) components)
+    (setf (gethash :root components) root-entry)
+    (setf (gethash :state root-entry)
+          '(:size-known nil
+            :terminal-size (0 0)
+            :child-dsl-spec (:text :id :child :content "pending")))
+    (let* ((ctx (make-app-context
+                 :state state
+                 :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
+                                                :size (make-size :w 40 :h 10))
+                 :front-buffer (make-virtual-buffer 40 10)
+                 :view-fn (lambda (_model)
+                            '(:root-viewport :id :root)))))
+      (let ((result (render-pipeline-0-to-5 ctx)))
+        (is (null (ctx-laid-out-tree result))
+            "Root viewport should not emit a layout before terminal size is ready.")
+        (is (null (ctx-back-buffer result))
+            "No buffer should be generated while layouting is gated.")))))
+
 
 ;; (test pipeline-step-by-step-transformation
 ;;   "Tests each stage of the rendering pipeline individually."
