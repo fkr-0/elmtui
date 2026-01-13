@@ -3,7 +3,8 @@
 *.fasl
 *.lisp-temp
 *.log
-
+*/coverage/
+/coverage/
 
 ### Emacs ###
 # -*- mode: gitignore; -*-
