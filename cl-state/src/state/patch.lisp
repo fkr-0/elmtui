@@ -1,49 +1,55 @@
-;;; src/state/patch.lisp
+;;; cl-state/src/state/patch.lisp
 (in-package :cl-state.patch)
 
 (defstruct patch path op value)
 ;; path: list designating a place in your state (e.g., (:components :main :count))
-;; op  : :set | :update | :remove | :merge (extend as needed)
+;; op  : :set | :update | :remove | :merge
 ;; value: depends on op
 
-(defun plist-getf* (plist path)
-  (if (endp path)
-      plist
-      (plist-getf* (getf plist (first path)) (rest path))))
-
-(defun plist-setf* (plist path value)
-  (if (endp path)
-      value
-      (let* ((key (first path))
-             (rest-path (rest path))
-             (sub (getf plist key)))
-        (setf (getf plist key)
-              (plist-setf* (if (consp sub) sub nil) rest-path value))
-        plist)))
-
-(defun plist-remf* (plist path)
+(defun %normalize-patch (p)
   (cond
-    ((endp path) plist)
-    ((endp (rest path))
-     (remf plist (first path))
-     plist)
+    ((patch-p p) p)
+    ((and (listp p) (= (length p) 2) (listp (first p)))
+     (make-patch :path (first p) :op :set :value (second p)))
     (t
-     (let* ((key (first path))
-            (sub (getf plist key)))
-       (when (consp sub)
-         (setf (getf plist key) (plist-remf* sub (rest path))))
-       plist))))
+     (error "Unsupported patch format: ~S" p))))
+
+(defun normalize-patches (patches)
+  (mapcar #'%normalize-patch patches))
+
+(defun merge-patch (state patch)
+  "Merge a single PATCH of the form (path value) into STATE."
+  (destructuring-bind (path value) patch
+    (if (eq value :elmtui-delete-path)
+        (multiple-value-bind (state* _) (remove-path state path)
+          (declare (ignore _))
+          state*)
+        (set-path state path value))))
+
+(defun merge-patches (state patches)
+  "Merge a list of PATCHES into STATE."
+  (reduce #'merge-patch patches :initial-value state))
 
 (defun apply-patch (state p)
-  (ecase (patch-op p)
-    (:set    (plist-setf* state (patch-path p) (patch-value p)))
-    (:remove (plist-remf* state (patch-path p)))
-    (:merge  (let* ((cur (plist-getf* state (patch-path p)))
-                    (new (alexandria:alist-plist (patch-value p))))
-               (plist-setf* state (patch-path p) (append new cur))))
-    (:update (let* ((cur (plist-getf* state (patch-path p)))
-                    (fn (patch-value p)))
-               (plist-setf* state (patch-path p) (funcall fn cur)))))
+  (let* ((patch (%normalize-patch p))
+         (path (patch-path patch))
+         (op (patch-op patch))
+         (value (patch-value patch)))
+    (ecase op
+      (:set
+       (set-path state path value))
+      (:remove
+       (multiple-value-bind (state* _) (remove-path state path)
+         (declare (ignore _))
+         state*))
+      (:merge
+       (let* ((cur (get-path path state nil))
+              (new (append value cur)))
+         (set-path state path new)))
+      (:update
+       (let* ((cur (get-path path state nil))
+              (fn value))
+         (set-path state path (funcall fn cur))))))
   state)
 
 (defun apply-patches (state patches)
@@ -51,7 +57,5 @@
 
 (defun diff-states (old new)
   "Very naive: returns :set patches where values differ."
-  (declare (ignore old new)) ; implement your keyed diff as needed
+  (declare (ignore old new))
   '())
-
-

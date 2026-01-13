@@ -29,7 +29,8 @@
                 (:file "tests/sheets")
                 (:file "tests/selector")
                 (:file "tests/engine")
-                (:file "tests/integration"))
+                (:file "tests/integration")
+                (:file "tests/edge-cases"))
   :perform (test-op (o c)
              (uiop:symbol-call '#:fiveam '#:run!
                (find-symbol (string :suite) :cl-styles/tests))))
