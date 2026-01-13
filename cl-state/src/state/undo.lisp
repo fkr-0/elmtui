@@ -1,10 +1,12 @@
-;;; src/state/undo.lisp
+;;; cl-state/src/state/undo.lisp
 (in-package :cl-state.undo)
 
 (defstruct history past future)
 
 (defun push-snapshot (hist state)
-  (push state (history-past hist)) (setf (history-future hist) nil) hist)
+  (push state (history-past hist))
+  (setf (history-future hist) nil)
+  hist)
 
 (defun undo (hist current)
   (when (history-past hist)

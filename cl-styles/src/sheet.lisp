@@ -34,28 +34,28 @@ Reserved for future optimizations like selector compilation caching or computed 
 
 
 (defgeneric add-rule (stylesheet rule)
-  (:documentation "Add a rule to the stylesheet."))
+  (:documentation "Add a rule to the stylesheet.
+
+WARNING: This mutates the stylesheet in-place. For functional/immutable
+operations (preferred in TEA architecture), create a new stylesheet with
+make-stylesheet instead."))
 
 (defmethod add-rule ((stylesheet stylesheet) rule)
   (push rule (slot-value stylesheet 'rules))
   stylesheet)
 
-(defun add-rule* (stylesheet rule)
-  "Helper to add a rule to the stylesheet and return the updated instance."
-  (add-rule stylesheet rule))
-
 (defgeneric remove-rule (stylesheet rule)
-  (:documentation "Remove a rule from the stylesheet."))
+  (:documentation "Remove a rule from the stylesheet.
+
+WARNING: This mutates the stylesheet in-place. For functional/immutable
+operations (preferred in TEA architecture), create a new stylesheet with
+make-stylesheet instead."))
 
 (defmethod remove-rule ((stylesheet stylesheet) rule)
   (setf (slot-value stylesheet 'rules)
     (remove rule (slot-value stylesheet 'rules) :test #'equal))
   stylesheet)
 
-(defun remove-rule* (stylesheet rule)
-  "Helper to remove a rule from the stylesheet and return the updated instance."
-  (remove-rule stylesheet rule))
-
 ;; (let ((ss (make-stylesheet :rules '((:selector ".a")))))
-;;   (add-rule* ss '(:selector ".b"))
-;;   (remove-rule* ss '(:selector ".a")))
+;;   (add-rule ss '(:selector ".b"))
+;;   (remove-rule ss '(:selector ".a")))
