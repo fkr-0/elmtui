@@ -4,53 +4,125 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.state.update
   (:use :cl :alexandria)
-
-  (:import-from :elmtui.tea-state.state ; For application-state structure if needed
-   :application-state ;; Assuming this is the type from statelib
-                :application-state-data   ;; Accessor for the raw data within app-state
-                )
-  (:import-from :elmtui.state.api ; Import from the central API
-   :*log-update-results* ; For controlling logging of update results
-                :get-state :state-data ; Accessor for the state data
-                :make-patch :state-get :state-set :state-patch
-                :state-observe :undo-update-state :redo-update-state
-   :application-state-data ; Accessor for the raw data within app-state
-                :application-state-data-object ; For accessing the state data object
-   :application-state-data ; For accessing the raw data plist within app-state
-                :defupdate
-                ;; Re-exports for command handling and topic dispatching
-   :dispatch-to-topic
-                :handle-async-command :application-state :get-state
-   :application-state :with-transaction
-   :merge-patches ; For applying patches to state data
-                :publish-to-topic :dispatch-to-topic :handle-async-command
-   :malformed-update-result-error)
-  ;; (:import-from :elmtui.statelib.state ; For direct access to app-state internals if needed
-  ;;  :state-data-data) ; Accessor for the raw data plist within app-state
+  (:import-from :cl-state.core
+                #:state-set
+                #:state-ref
+                #:application-state-plist)
+  (:import-from :cl-state.utils
+                #:get-path
+                #:set-path
+                #:remove-path)
+  (:import-from :cl-state.tx
+                #:with-transaction)
   (:import-from :elmtui.core.globals #:*app-sender*)
   (:import-from :log4cl #:log-debug #:log-warn #:log-info)
-  (:export ;; Symbols defined *in this file* that are part of the public API
-   ;; These are already exported by elmtui.state.api
-   :defupdate
-   ;; :publish-to-topic :dispatch-to-topic :handle-async-command (already imported and re-exported by api)
-   ;; :malformed-update-result-error (already imported and re-exported by api)
-   ))
+  (:export
+   #:*log-update-results*
+   #:malformed-update-result-error
+   #:update-context
+   #:make-update-context
+   #:context-patches
+   #:context-commands
+   #:sref
+   #:sapply
+   #:sdelete
+   #:send-command
+   #:cmd
+   #:defupdate
+   #:dispatch-to-topic
+   #:publish-to-topic
+   #:handle-async-command))
+
 (in-package :elmtui.state.update)
 
-;; `publish-to-topic` should be defined if it's not just a re-export.
-;; Assuming it's related to command handling and might be more complex.
-;; For now, if it's just a concept, elmtui.state.api exports it.
-;; If it needs an implementation here:
+(defvar *log-update-results* nil
+  "When T, logs the patches and commands returned by update functions.")
 
+(defstruct (update-context (:constructor %make-update-context))
+  state
+  base-path
+  draft
+  patches
+  commands)
 
-;; Default method for publish-to-topic (can be specialized by users or other systems)
-(defmethod publish-to-topic (topic-name message)
-  (log-warn "Default publish-to-topic: No specific handler for topic ~S with message ~S. Consider using elmtui.core.topics:publish."
-            topic-name message)
-  ;; Or, integrate with elmtui.core.topics if that's the intended mechanism
-  ;; (elmtui.core.topics:publish topic-name message)
-  nil)
+(defun %full-path (ctx path)
+  (let ((base (update-context-base-path ctx)))
+    (cond
+      ((null base) path)
+      ((null path) base)
+      ((symbolp path) (append base (list path)))
+      ((listp path) (append base path))
+      (t path))))
 
+(defun make-update-context (state &key base-path)
+  "Create an update context with an isolated draft for mutations."
+  (let ((draft (application-state-plist state)))
+    (%make-update-context
+     :state state
+     :base-path base-path
+     :draft draft
+     :patches nil
+     :commands nil)))
+
+(defun context-patches (ctx)
+  "Return recorded patches in original order."
+  (nreverse (update-context-patches ctx)))
+
+(defun context-commands (ctx)
+  "Return recorded commands in original order."
+  (nreverse (update-context-commands ctx)))
+
+(defgeneric sref (obj path &optional default))
+
+(defmethod sref ((ctx update-context) path &optional default)
+  (get-path (%full-path ctx path) (update-context-draft ctx) default))
+
+(defmethod sref (obj path &optional default)
+  (state-ref obj path default))
+
+(defmethod (setf sref) (value (ctx update-context) path)
+  (let* ((full-path (%full-path ctx path))
+         (draft (update-context-draft ctx)))
+    (if (eq value :elmtui-delete-path)
+        (multiple-value-bind (draft* _) (remove-path draft full-path)
+          (declare (ignore _))
+          (setf (update-context-draft ctx) draft*))
+        (setf (update-context-draft ctx)
+              (set-path draft full-path value))))
+  (push (list (%full-path ctx path) value) (update-context-patches ctx))
+  value)
+
+(defmethod (setf sref) (value obj path)
+  (setf (state-ref obj path) value))
+
+(defun sapply (ctx path fn &optional default)
+  "Apply FN to the current value at PATH and store the result."
+  (let* ((cur (sref ctx path default))
+         (next (funcall fn cur)))
+    (setf (sref ctx path) next)
+    next))
+
+(defun sdelete (ctx path)
+  "Delete PATH in the update context."
+  (setf (sref ctx path) :elmtui-delete-path))
+
+(defun send-command (ctx command)
+  "Record a command in the update context."
+  (push command (update-context-commands ctx))
+  command)
+
+(defun cmd (ctx command)
+  "Alias for SEND-COMMAND."
+  (send-command ctx command))
+
+(defmethod cl-state.core:state-ref ((ctx update-context) key &optional default)
+  (sref ctx key default))
+
+(defmethod (setf cl-state.core:state-ref) (value (ctx update-context) (key t))
+  (setf (sref ctx key) value))
+
+(defmethod cl-state.utils:get-path (path (ctx update-context) &optional default)
+  (sref ctx path default))
 
 (define-condition malformed-update-result-error (error)
   ((update-fn-name :initarg :update-fn-name :reader malformed-update-result-fn-name :type symbol)
@@ -62,138 +134,81 @@
                      (malformed-update-result-reason condition)
                      (malformed-update-result-values condition)))))
 
-
-
-(defun process-update-result (returned-values &key update-fn-name (log-p
-                                                                   elmtui.state.api:*log-update-results*))
-  "Validates and processes the values returned by an update function's body.
-   Expects RETURNED-VALUES to be a list of values from MULTIPLE-VALUE-LIST.
-   The first value should be a list of patches (or nil).
-   The second value should be a list of commands (or nil).
-   Returns (values patches-list commands-list) or signals MALFORMED-UPDATE-RESULT-ERROR."
+(defun process-update-result (returned-values &key update-fn-name (log-p *log-update-results*))
+  "Validate and process values returned by an update function."
   (unless (and (listp returned-values) (= (length returned-values) 2))
     (error 'malformed-update-result-error
            :update-fn-name update-fn-name
            :reason "Expected exactly two values: (patches-list commands-list)"
            :returned-values returned-values))
-
   (let ((patches-list (first returned-values))
         (commands-list (second returned-values)))
-
-    ;; Validate patches-list: must be a list (can be nil). Each patch itself should be (path value).
     (unless (listp patches-list)
       (error 'malformed-update-result-error
              :update-fn-name update-fn-name
              :reason "Patches list is not a list (or nil)"
              :returned-values returned-values))
-    ;; Further validation for each patch structure can be added if needed.
-    ;; e.g., (every #'(lambda (p) (and (listp p) (= (length p) 2) (listp (first p)))) patches-list)
-
-    ;; Validate commands-list: must be a list (can be nil).
     (unless (listp commands-list)
       (error 'malformed-update-result-error
              :update-fn-name update-fn-name
              :reason "Commands list is not a list (or nil)"
              :returned-values returned-values))
-
     (when log-p
       (log-debug "Update ~S: Patches=~S, Commands=~S"
                  update-fn-name patches-list commands-list))
-
     (values patches-list commands-list)))
 
-;; Helper for the basic macroexpansion-time check (simple walker)
-(defun %walk-tree (fn tree)
-  "Recursively applies FN to each node (cons or atom) in TREE."
-  (cond
-    ((atom tree) (funcall fn tree))
-    (t (funcall fn (cons (%walk-tree fn (car tree))
-                         (%walk-tree fn (cdr tree)))))))
-;; Helper functions for topic commands (assuming structure)
 (defun topic-command-p (cmd)
   (and (listp cmd) (eq (first cmd) :topic-dispatch) (= (length cmd) 3)))
 
-(defun topic-command-topic (cmd)
-  (second cmd))
-
-(defun topic-command-payload (cmd)
-  (third cmd))
-
+(defun topic-command-topic (cmd) (second cmd))
+(defun topic-command-payload (cmd) (third cmd))
 
 (defmacro defupdate (name (state-var msg-var) &body body)
-  "Define an Elm-style update function.
-   The function takes the current application-state (STATE-VAR) and a message (MSG-VAR).
-   The BODY is expected to return two values:
-     1. A list of patches (property list or list of path-value pairs) to apply to the state.
-     2. A list of commands to be executed.
-   This macro wraps the body in a transaction (`elmtui.state.api:with-transaction`).
-   Inside the transaction, it applies the returned patches to the STATE-VAR's internal data
-   using `elmtui.state.api:merge-patches`.
-   The commands-list is processed for topic dispatch and then returned by the generated function.
-
-   Example:
-   (defupdate my-updater (current-app-state message)
-     (if (eq message :increment)
-         (values (list :counter (1+ (getf (elmtui.state.api:get-state current-app-state :counter) 0))) ; Patches
-                 (list '(:log \"Counter incremented\"))) ; Commands
-         (values nil nil))) ; No change, no commands
-  "
+  "Define an Elm-style update function."
   `(defun ,name (,state-var ,msg-var)
-     (declare (ignorable ,msg-var)
-              (type elmtui.tea-state:application-state ,state-var))
-     (elmtui.tea-state:with-transaction (,state-var :name ',name)
+     (declare (ignorable ,msg-var))
+     (with-transaction (,state-var :name ',name)
        (multiple-value-bind (returned-patches returned-commands)
-           (progn ,@body) ; Execute the user-provided body
-         (let ((processed-patches (process-update-result (list returned-patches returned-commands)
-                                                         :update-fn-name ',name
-                                                         :log-p *log-update-results*)))
-           (when processed-patches
-             ;; Correctly access the nested data structure:
-             ;; state-var (application-state) -> its 'data' slot (state-data instance) -> its 'data' slot (raw hash-table)
-             (let* ((the-state-data-object (application-state-data ,state-var))
-                    (current-raw-data (application-state-data the-state-data-object)))
-               (setf (application-state-data the-state-data-object)
-                     (elmtui.state:merge-patches
-                      current-raw-data
-                      processed-patches))))
-
-           ;; Process commands: dispatch topic commands, handle async commands
+           (progn ,@body)
+         (multiple-value-bind (patches commands)
+             (process-update-result (list returned-patches returned-commands)
+                                    :update-fn-name ',name
+                                    :log-p *log-update-results*)
+           (when patches
+             (dolist (p patches)
+               (state-set ,state-var (first p) (second p))))
            (let ((remaining-commands nil))
-             (dolist (cmd returned-commands)
+             (dolist (cmd commands)
                (if (topic-command-p cmd)
                    (publish-to-topic (topic-command-topic cmd) (topic-command-payload cmd))
                    (push cmd remaining-commands)))
-             ;; Handle other async commands (those not dispatched to topics)
              (dolist (cmd remaining-commands)
-               (handle-async-command cmd ,state-var)) ;; Pass state-var for context if needed
-             )
-           ;; The generated function itself returns the patches and original commands list
-           ;; for potential further processing or inspection by the caller (e.g., the main app loop).
-           (values processed-patches returned-commands))))))
+               (handle-async-command cmd ,state-var)))
+           (values patches commands))))))
 
-;; `dispatch-to-topic` is a helper to create a command, exported by API.
+(defmethod publish-to-topic (topic-name message)
+  (log-warn "Default publish-to-topic: no handler for topic ~S with message ~S."
+            topic-name message)
+  nil)
+
 (defun dispatch-to-topic (topic payload)
   "Create a command that dispatches a payload to a specific topic."
   (list :topic-dispatch topic payload))
 
-;; `handle-async-command` is for processing commands, exported by API.
 (defmethod handle-async-command (command app-state)
   "Handle asynchronous commands and feed results back to update cycle via *app-sender*."
-  (declare (ignorable app-state)) ; app-state might be needed for context
+  (declare (ignorable app-state))
   (case (first command)
     (:async-task
      (let ((task-fn (second command))
-           (on-complete-msg-constructor (third command))) ; Expects a function that takes result and returns a message
-       ;; Assuming cleve-elm.async is available or a similar promise mechanism
-       ;; For simplicity, using bordeaux-threads for a detached thread.
-       ;; A real promise library would be better.
+           (on-complete-msg-constructor (third command)))
        (bt:make-thread
         (lambda ()
-          (let ((result (funcall task-fn))) ; task-fn should not rely on dynamic context from here
+          (let ((result (funcall task-fn)))
             (when on-complete-msg-constructor
               (let ((msg (funcall on-complete-msg-constructor result)))
                 (funcall elmtui.core.globals:*app-sender* msg))))))))
-    ;; Potentially handle other async command types here
     (:log-message
      (log-info "Command: ~S" (second command)))
     (t (log-warn "Unknown command structure passed to handle-async-command: ~S" command))))

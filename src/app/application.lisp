@@ -27,11 +27,14 @@
     #:app-config-renderer-fn
     #:app-config-subscriptions-fn-form     ; <— newly imported
     #:get-component-instance)
-  (:import-from #:elmtui.tea-state.api                 #:merge-patches
+  (:import-from #:elmtui.state.api                 #:merge-patches
     #:update-result
     #:ur-handled
     #:ur-patches
-    #:ur-commands)
+    #:ur-commands
+    #:make-state)
+  (:import-from #:elmtui.state.transactions
+    #:apply-patches)
   (:import-from #:elmtui.ui.api                #:init #:view #:initialize-components-from-dsl
     #:instantiate-component-from-dsl)
   (:import-from #:elmtui.ui.widgets.root-viewport #:root-viewport)
@@ -340,7 +343,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                                  (initial-cursor-position '(0 0))
                                  &allow-other-keys) ; Allow other platform-options
              (declare (ignorable initial-terminal-dimensions initial-cursor-position))
-             (let* ((app-state (elmtui.tea-state:make-state (alexandria:plist-hash-table ,initial-state-plist))))
+            (let* ((app-state (make-state :initial (alexandria:plist-hash-table ,initial-state-plist))))
                (multiple-value-bind (patches commands)
                  (initialize-components-from-dsl
                    ;; (maybe-wrap-with-root-viewport
@@ -349,7 +352,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                  ;; :term-size initial-terminal-dimensions
                  ;; :cursor-pos initial-cursor-position))
                  ;; (format t "~A ~A~%" app-state patches)
-                 (elmtui.tea-state:apply-patches app-state patches)
+                 (apply-patches app-state patches)
                  (values app-state commands))))
 
 
@@ -373,7 +376,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
            ;;               (merge-patches (ur-patches update-result)
            ;;                               (dispatch-to-root msg (merge-patches model app-patches)))
            ;;       )
-           ;;     (elmtui.tea-state.transactions:apply-patches state (ur-patches update-result))
+           ;;     (elmtui.state.transactions:apply-patches state (ur-patches update-result))
            ;;     (values state (ur-commands update-result))))
            (defun ,proc-fn-sym (msg state)
              (let ((cfg (gethash ',name *applications*)))
@@ -394,14 +397,17 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                          ;; If not handled, fall through to the component tree
                          (multiple-value-bind (comp-patches comp-cmds)
                            (dispatch-to-root msg state ',root-vp-id)
-                           (elmtui.tea-state:apply-patches state comp-patches)
+                           (apply-patches state comp-patches)
                            (values state comp-cmds))))))
 
                  ;; -------------------------------------------------------------
                  ;; Handle all other messages via the app's update function
                  ;; -------------------------------------------------------------
                  (t
-                   (let* ((ur (funcall (%normalize-fn ',update-fn* nil nil) msg state)))
+                   (let* ((ur (elmtui.state.api:invoke-update
+                                (%normalize-fn ',update-fn* nil nil)
+                                msg
+                                state)))
                      (unless (typep ur 'update-result)
                        (error "~A update function (~S) must return UPDATE-RESULT, got: ~S"
                          ',name ',update-fn* ur))
@@ -413,7 +419,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
 
                        (let* ((all-patches (nconc (ur-patches ur) comp-patches))
                                (all-cmds    (nconc (ur-commands ur) comp-cmds)))
-                         (elmtui.tea-state:apply-patches state all-patches)
+                        (apply-patches state all-patches)
                          (values state all-cmds))))))))
            ;; --------------------------------------------------------------
            ;; RUN-<app>
@@ -609,7 +615,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
 ;;     (multiple-value-bind (state commands)
 ;;         (initialize-app-state-my-state-test-app)
 ;;       (declare (ignore commands))
-;;       (is (typep state 'elmtui.tea-state.state:application-state))
+;;       (is (typep state 'elmtui.state:application-state))
 ;;       (is (string= "bar" (elmtui.state:get-path '(:foo) state)))
 ;;       (is (not (null (elmtui.state:get-path '(:components :my-root) state))))
 ;;       (is (eq :container (elmtui.state:get-path '(:components :my-root :main :type) state)))

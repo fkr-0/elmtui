@@ -9,7 +9,7 @@
   (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
   (:import-from :cl-styles.selector #:cls> #:type>)
   (:import-from :elmtui.core.event-types #:key-event)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:export
    :run-rainbow-example-app
    :rainbow-content-view

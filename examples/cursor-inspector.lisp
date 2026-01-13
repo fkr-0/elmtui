@@ -4,7 +4,7 @@
 ;;; A modern refactoring following elm-tui best practices with:
 ;;; - Object-only message handling (key-event)
 ;;; - Logging via log4cl for debugging
-;;; - Modern API patterns from elmtui.tea-state.api
+;;; - Modern API patterns from elmtui.state.api
 ;;; - Clean etypecase message dispatch
 ;;;===============================================================
 
@@ -12,7 +12,7 @@
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.app
                 #:defapplication)
-  (:import-from :elmtui.tea-state.api
+  (:import-from :elmtui.state.api
                 #:make-update-result
                 #:state-ref)
   (:import-from :elmtui.core.event-types

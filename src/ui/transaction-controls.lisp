@@ -1,8 +1,10 @@
 (uiop:define-package :elmtui.ui.transaction-controls
   (:use :cl :alexandria)
   (:import-from :elmtui.view.core #:make-node)
-  (:import-from :elmtui.ui.widgets.button #:make-button) ; Assuming button widget
-  (:import-from :elmtui.state.statelib.transaction #:get-transaction-history #:application-state-undone-history) ; For can-undo/can-redo
+  (:import-from :elmtui.ui.widgets.button #:make-button)
+  (:import-from :elmtui.state.api
+                #:application-state-history
+                #:application-state-undone)
   (:export #:view-transaction-controls
            ;; Messages that these controls might dispatch
            #:msg-undo-last
@@ -26,10 +28,10 @@
 
    Returns a UI node tree for the controls."
   (let ((can-undo (if app-state
-                      (not (null (get-transaction-history app-state)))
+                      (not (null (application-state-history app-state)))
                       default-can-undo))
         (can-redo (if app-state
-                      (not (null (application-state-undone-history app-state)))
+                      (not (null (application-state-undone app-state)))
                       default-can-redo)))
     (make-node :row
                :id id

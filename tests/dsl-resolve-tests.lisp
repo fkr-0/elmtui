@@ -68,7 +68,7 @@
   (declare (ignore app-state id-path))
   '(:text :content "0"))
 
-(defmethod elmtui.tea-state:get-component-by-path ((app-state mock-app-state) path)
+(defmethod elmtui.state:get-component-by-path ((app-state mock-app-state) path)
   (gethash path (slot-value app-state 'components)))
 
 (defun setup-test-app-state (component-specs)
@@ -143,7 +143,7 @@
 ;;             :CHILDREN ((:TEXT :VALUE "Elm TUI Key Tester")
 ;;                        (:TEXT :VALUE "Input: ")
 ;;                        (:TEXT :VALUE "Echo:  (:|j|)")
-;;                        (:TEXT :VALUE "Press 'q' to quit. Try Backspace and Escape.")))) (elmtui.tea-state:make-application-state))
+;;                        (:TEXT :VALUE "Press 'q' to quit. Try Backspace and Escape.")))) (elmtui.state:make-application-state))
 
 ;; (elmtui.view.dsl:dsl->ui-node '(:LAYOUT :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT
 ;;                                 :FOCUSABLE T :STYLE
@@ -152,7 +152,7 @@
 ;;   ((:TEXT :VALUE "Elm TUI Key Tester") (:TEXT :VALUE "Input: ")
 ;;    (:TEXT :VALUE "Echo:  (:|j|)")
 ;;    (:TEXT :VALUE "Press 'q' to quit. Try Backspace and Escape.")))
-;;                                              (elmtui.tea-state.api:make-application-state))
+;;                                              (elmtui.state.api:make-application-state))
 
 ;;               (let ((spec (:LAYOUT :ID :KEY-TESTER-WIDGET :KEYMAP-ID :KEY-TESTER-EXAMPLE-CONTEXT
 ;;   :FOCUSABLE T :STYLE

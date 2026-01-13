@@ -1,7 +1,7 @@
 (uiop:define-package :elmtui.ui.widgets.drawable-content
   (:use :cl :alexandria)
   (:import-from :elmtui.ui.api #:component #:make-state-patch #:id-from-path #:get-path)
-  (:import-from :elmtui.tea-state.api #:make-update-result) ; For make-update-result
+  (:import-from :elmtui.state.api #:make-update-result) ; For make-update-result
   ;; No direct view.styled import, as view returns data for renderer
   (:export
    #:drawable-content

@@ -17,7 +17,8 @@
   :components (
                 (:file "utils")
                 ;; (:file "state/utils")
-                (:file "tea-state/msg")
+                
+                (:file "state/msg")
                 (:file "app/system-events")
 
                 (:file "tools/packager") ;; TODO move me
@@ -57,17 +58,17 @@
 
                 (:file "core/conditions")
                 ;; Load state module early since focus manager needs it
-                (:module "tea-state"
-                  :pathname "tea-state/"
+                (:module "state"
+                  :pathname "state/"
                   :serial t
-                  :components ((:file "api")
-                                (:file "state")
-                                (:file "transactions") ; Added transactions.lisp
+                  :components (
+                                (:file "utils")
                                 (:file "observers")
+                                (:file "transactions")
                                 (:file "update")
+                                (:file "api")
                                 (:file "model")
-                                (:file "core")))
-                (:file "update-dsl")
+                                (:file "state")))
                 ;; (:module "state"
                 ;;  :pathname "state/"
                 ;;  :serial t

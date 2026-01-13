@@ -6,8 +6,8 @@
   (:use :cl :fiveam)
   (:import-from :elmtui.ui.defcomponent #:defcomponent #:cclass-name)
   (:import-from :elmtui.ui.api #:component #:component-id #:id-from-path #:init #:update #:view)
-  (:import-from :elmtui.tea-state.api #:get-path)
-  (:import-from :elmtui.tea-state.api
+  (:import-from :elmtui.state.api #:get-path)
+  (:import-from :elmtui.state.api
                 #:make-update-result
                 #:make-state
                 #:ur-patches #:ur-commands)
@@ -85,7 +85,7 @@
                    :active t)
                  nil))
 
-  (:update (local-state app-state msg id-path)
+  (:update (msg local-state app-state id-path)
            (:set-name (new-name)
                       (values `(:name ,new-name) nil))
            (:toggle-active ()
@@ -173,22 +173,22 @@
          (mock-app-state '())
          (message '(:some-message :data)))
     (let ((result (update instance mock-app-state message :id-path '(:components :test))))
-      (is (typep result 'elmtui.tea-state.api:update-result))
-      (is (null (elmtui.tea-state.api:ur-patches result)))
-      (is (null (elmtui.tea-state.api:ur-commands result))))))
+      (is (typep result 'elmtui.state.api:update-result))
+      (is (null (elmtui.state.api:ur-patches result)))
+      (is (null (elmtui.state.api:ur-commands result))))))
 
 (test defcomponent-custom-update
   "Test component with custom update method"
   (let* ((instance (make-instance 'test-with-update))
          (id-path '(:components :test))
-         (mock-app-state (make-state (alexandria:plist-hash-table `(:components (:test (:counter 5 :messages () :type :test-with-update :id :test)))))))
+         (mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:test (:counter 5 :messages () :type :test-with-update :id :test)))))))
 
     ;; Test increment message
     (let* ((result (update instance mock-app-state '(:increment 3) :id-path id-path))
            (patches (ur-patches result))
            (counter-patch (find '(:components :test :counter) patches :key #'first :test #'equal))
            (messages-patch (find '(:components :test :messages) patches :key #'first :test #'equal)))
-      (is (typep result 'elmtui.tea-state.api:update-result))
+      (is (typep result 'elmtui.state.api:update-result))
       (is (= 2 (length patches)))
       (is (not (null counter-patch)))
       (is (= 8 (second counter-patch)))
@@ -198,14 +198,14 @@
     (let* ((result (update instance mock-app-state '(:reset) :id-path id-path))
            (patches (ur-patches result))
            (counter-patch (find '(:components :test :counter) patches :key #'first :test #'equal)))
-      (is (typep result 'elmtui.tea-state.api:update-result))
+      (is (typep result 'elmtui.state.api:update-result))
       (is (= 2 (length patches)))
       (is (not (null counter-patch)))
       (is (= 0 (second counter-patch))))
 
     ;; Test unhandled message (otherwise clause)
     (let ((result (update instance mock-app-state '(:unknown-message) :id-path id-path)))
-      (is (typep result 'elmtui.tea-state.api:update-result))
+      (is (typep result 'elmtui.state.api:update-result))
       (let ((patches (ur-patches result)))
         (is (= 1 (length patches)))))))
 
@@ -223,7 +223,7 @@
 (test defcomponent-custom-view
   "Test component with custom view method"
   (let* ((instance (make-instance 'test-with-view))
-         (mock-app-state (make-state (alexandria:plist-hash-table `(:components (:test (:label "Custom Label"))))))
+         (mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:test (:label "Custom Label"))))))
          (id-path '(:components :test)))
     (let ((view-result (view instance mock-app-state :id-path id-path)))
       (is (listp view-result))
@@ -233,7 +233,7 @@
 
 (test defcomponent-accessors
   "Test generated accessor functions"
-  (let* ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:test (:value 123 :enabled nil))))))
+  (let* ((mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:test (:value 123 :enabled nil))))))
          (instance (make-instance 'test-simple)))
     (setf (component-id instance) :test)
 
@@ -259,15 +259,15 @@
         (is (eq t (gethash :active state)))))
 
     ;; Test update
-    (let* ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "test" :active t))))))
+    (let* ((mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:complete-test (:name "test" :active t))))))
            (result (update instance mock-app-state '(:set-name "updated") :id-path id-path)))
-      (is (typep result 'elmtui.tea-state.api:update-result))
+      (is (typep result 'elmtui.state.api:update-result))
       (let ((patches (ur-patches result)))
         (is (= 1 (length patches)))
         (is (string= "updated" (second (first patches))))))
 
     ;; Test view
-    (let* ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "view-test" :active nil))))))
+    (let* ((mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:complete-test (:name "view-test" :active nil))))))
            (view-result (view instance mock-app-state :id-path id-path)))
       (is (eq :component (first view-result)))
       (let ((props (alexandria:plist-hash-table (cdr view-result))))
@@ -278,7 +278,7 @@
     ;; Test accessors
     ;; (let* ((instance (make-instance 'test-complete))
     ;;        (id-path '(:components :complete-test)))
-    (let ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "accessor-test" :data (1 2 3) :active t)))))))
+    (let ((mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:complete-test (:name "accessor-test" :data (1 2 3) :active t)))))))
       (setf (component-id instance) :complete-test)
       ;; (complete-data mock-app-state instance)))
       (is (string= "accessor-test" (complete-name mock-app-state instance)))
@@ -326,6 +326,6 @@
 ;;                    :initial-name '(:button :label "Submit" :on-click #'submit-handler))
 ;; (let* ((instance (make-instance 'test-complete))
 ;;        (id-path '(:components :complete-test)))
-;;   (let ((mock-app-state (make-state (alexandria:plist-hash-table `(:components (:complete-test (:name "accessor-test" :data '(1 2 3) :active t)))))))
+;;   (let ((mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:complete-test (:name "accessor-test" :data '(1 2 3) :active t)))))))
 ;;     (setf (component-id instance) :complete-test)
 ;;     (list '(1 2 3 ) (complete-data mock-app-state instance))))

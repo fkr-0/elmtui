@@ -3,18 +3,20 @@
 
 (uiop:define-package :elmtui.tests.component-init
   (:use :cl :fiveam)
-  (:import-from :elmtui.utils #:get-path)
   (:import-from :elmtui.app
     #:defapplication)
-  (:import-from :elmtui.tea-state #:apply-patches #:make-state nil)
+  (:import-from :elmtui.state.api
+    #:get-path
+    #:make-state
+    #:make-update-result
+    #:state-ref)
+  (:import-from :elmtui.state.transactions
+    #:apply-patches)
   (:import-from :elmtui.ui.api
     #:component)
   (:import-from :elmtui.ui.defcomponent
     #:defcomponent
     #:defcomponent-slots)
-  (:import-from :elmtui.tea-state
-    #:make-update-result
-    #:state-ref)
   (:import-from :elmtui.ui.api
     #:id-from-path
     #:component-id)
@@ -68,7 +70,7 @@
 (defun get-component-state (app-state component-id)
   (get-path `(:components ,component-id) app-state))
 
-;; The new apply-patches from tea-state will be used directly.
+;; The new apply-patches from elmtui.state will be used directly.
 
 ;;;------------------------------------------------------------------------------------
 ;;; Define some test components using defcomponent
@@ -135,7 +137,7 @@
 
 (test init-simple-component
   (let* (;; Application instance is not directly used here for init,
-          (app-state (make-state nil))
+          (app-state (make-state))
           (comp-id :my-simple-comp)
           (comp-instance (make-instance 'test-simple-component :id comp-id))
           (id-path `(:components ,comp-id)))
@@ -155,7 +157,7 @@
         (is (= 0 (gethash :count state)))))
 
     ;; Test with provided initargs
-    (setf (elmtui.tea-state.state::application-state-data app-state) (make-hash-table :test 'equal)) ; Reset state
+    (setf (elmtui.state:application-state-data app-state) (make-hash-table :test 'equal)) ; Reset state
     (multiple-value-bind (instance patches commands)
       (elmtui.ui.api:init comp-instance :id-path id-path :initial-text "Hello" :initial-count 42)
       (declare (ignore commands)) ; No commands expected
@@ -168,7 +170,7 @@
   )
 
 (test init-parent-component-no-children
-  (let* ((app-state (make-state nil))
+  (let* ((app-state (make-state))
           (comp-id :my-parent-comp)
           (comp-instance (make-instance 'test-parent-component :id comp-id))
           (id-path `(:components ,comp-id)))
@@ -189,7 +191,7 @@
         (is-false (gethash :child-refs state))))))
 
 (test init-parent-component-with-children
-  (let* ((app-state (make-state nil))
+  (let* ((app-state (make-state))
           (parent-id :main-parent)
           (child1-id :child1)
           (child2-id :child2)
@@ -237,7 +239,7 @@
         (is (= 99 (gethash :count child2-state)))))))
 
 (test defcomponent-accessors
-  (let* ((the-app-state (make-state nil))
+  (let* ((the-app-state (make-state))
           (comp-id :accessor-test-comp)
           (comp-instance (make-instance 'test-simple-component :id comp-id)))
 
@@ -287,7 +289,7 @@
     (extra-info nil)))
 
 (test init-label-component-via-defcomponent
-  (let* ((app-state (make-state nil))
+  (let* ((app-state (make-state))
           (comp-id :my-label)
           (comp-instance (make-instance 'test-label-component :id comp-id))
           (id-path `(:components ,comp-id)))
@@ -319,9 +321,8 @@
 
 (test defcomponent-default-initargs-passed-to-defclass
   (let ((instance (make-instance 'test-default-initargs-component))
-         (state (make-state nil)))
+         (state (make-state)))
     (elmtui.ui.api:init instance :id-path `(:components :my-defaulted-id))
     state
     ;; This tests that the :id slot in the base 'component' class was set via :default-initargs
     (is (eq :my-defaulted-id (test-default-initargs-component-id state instance)))))
-

@@ -3,6 +3,7 @@
   (:import-from :cl-styles.sheet
                 #:make-stylesheet
                 #:stylesheet-rules #:stylesheet-variables #:stylesheet-namespace)
+  (:import-from :cl-state.utils #:get-path)
   (:export #:compute-active-stylesheet #:default-stylesheet))
 
 (in-package :elmtui.style.manager)
@@ -21,10 +22,10 @@
    - state :current-stylesheet if it is a cl-styles sheet
    - otherwise a default empty sheet
    Variables can be provided at (:style-variables ...) in STATE."
-  (let* ((sheet0 (or (elmtui.tea-state:get-path '(:current-stylesheet) state)
+  (let* ((sheet0 (or (get-path '(:current-stylesheet) state)
                      (default-stylesheet)))
          (sheet  (if (%cl-styles-sheet-p sheet0) sheet0 (default-stylesheet)))
-         (vars   (elmtui.tea-state:get-path '(:style-variables) state)))
+         (vars   (get-path '(:style-variables) state)))
     (if vars
         (make-stylesheet :rules (stylesheet-rules sheet)
                          :variables vars

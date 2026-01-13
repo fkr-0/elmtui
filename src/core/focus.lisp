@@ -42,8 +42,9 @@
                 #:key-event-key
                 #:key-event-modifiers)
 
-  (:import-from :elmtui.tea-state.api
-                #:state-ref
+  (:import-from :elmtui.state.api
+                #:state-ref)
+  (:import-from :cl-state.core
                 #:application-state)
   ;; Imports for keymap integration (from legacy focus-integration.lisp)
   (:import-from :elmtui.keymaps

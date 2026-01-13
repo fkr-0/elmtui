@@ -4,7 +4,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.core.keymap
   (:use :cl :alexandria :log4cl )
-  (:import-from :elmtui.tea-state #:state-ref) ; For list-widget-keybindings
+  (:import-from :elmtui.state.api #:state-ref) ; For list-widget-keybindings
   (:import-from :str :split)
   (:export #:keymap
            #:nkwrap

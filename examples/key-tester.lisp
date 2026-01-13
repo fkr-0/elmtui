@@ -18,7 +18,7 @@
                 #:kt-handle-clear-input)
   ;; Import from elmtui systems
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.tea-state
+  (:import-from :elmtui.state
                 #:make-update-result
                 #:state-ref)
 
@@ -167,19 +167,19 @@
 ;;     (ignorable elmtui.app::initial-terminal-dimensions
 ;;      elmtui.app::initial-cursor-position))
 ;;    (let* ((elmtui.app::app-state
-;;            (elmtui.tea-state.api:make-state
+;;            (elmtui.state.api:make-state
 ;;             (alexandria:plist-hash-table `(:component ,(make-key-tester))))))
 ;;      (multiple-value-bind (elmtui.app::patches elmtui.app::commands)
 ;;          (elmtui.ui.api:initialize-components-from-dsl
 ;;           '(:root-viewport :id :key-tester-root :initial-terminal-dimensions
 ;;             (1 1) :initial-cursor-pos (1 1) :children
 ;;             (:layout :id :key-tester-widget)))
-;;        (elmtui.tea-state.transactions:apply-patches elmtui.app::app-state
+;;        (elmtui.state.transactions:apply-patches elmtui.app::app-state
 ;;                                                     elmtui.app::patches)
 ;;        (values elmtui.app::app-state elmtui.app::commands))))
 ;; (let* ((tutu (elmtui.contracts:make-app-context
 ;;               :view-fn 'wrapped-view-key-tester-app
-;;               :state (elmtui.tea-state.api:make-state
+;;               :state (elmtui.state.api:make-state
 ;;                       `(:component ,(make-key-tester)))
 ;;               :stylesheet nil
 ;;               ;; :root-rect (elmtui.view.geo:make-rectangle
@@ -217,7 +217,7 @@
 ;;                (:TEXT :CONTENT "Echo:  ")
 ;;                (:TEXT :CONTENT "Press 'q' to quit. Try Backspace and Escape."))))))
 ;;   (elmtui.view.dsl:render-dsl-to-resolved-tree
-;;    dsl (elmtui.tea-state.api:make-state
+;;    dsl (elmtui.state.api:make-state
 ;;         `(:component ,(make-key-tester)))))
 ;; ==>
 ;; (:ROOT-VIEWPORT :ID :KEY-TESTER-ROOT :INITIAL-TERMINAL-DIMENSIONS (1 1)
@@ -247,7 +247,7 @@
 ;;                          :size (elmtui.view.geo:make-size :w 95 :h 41))))
 
 ;; (key-tester-view )
-;; (elmtui.tea-state:make-application-state)
+;; (elmtui.state:make-application-state)
 ;; == tests/flex-smoke.lisp ==
 ;; expected x positions: content-x, content-x+10+gap, content-x+10+gap+5+gap
 ;; expected y position: content-y (align-items defaults to :stretch, but heights fixed)

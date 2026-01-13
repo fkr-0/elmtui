@@ -8,7 +8,7 @@
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.app.api #:find-component-by-id) 
   (:import-from :elmtui.view.dsl #:view #:element) ; Removed unused #:children #:props
-  (:import-from :elmtui.tea-state #:state-ref #:make-update-result #:get-path)
+  (:import-from :elmtui.state #:state-ref #:make-update-result #:get-path)
   (:import-from :elmtui.ui.api #:component-id #:update)
   (:import-from :elmtui.ui.widgets.label #:label)
   (:import-from :elmtui.ui.widgets.layout #:box-layout)
