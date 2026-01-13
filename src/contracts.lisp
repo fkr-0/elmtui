@@ -1,6 +1,6 @@
 (uiop:define-package :elmtui.contracts
   (:use :cl)
-  (:import-from :elmtui.tea-state.msg
+  (:import-from :elmtui.state.msg
     #:message-variant-p #:*message-schemas* #:message-schema)
   (:export
     ;; transform macros

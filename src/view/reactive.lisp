@@ -9,9 +9,9 @@
                 #:make-channel
                 #:channel-put!
                 #:channel-take!)
-  (:import-from :elmtui.tea-state.state
+  (:import-from :elmtui.state.api
                 #:application-state)
-  (:import-from :elmtui.tea-state.observers
+  (:import-from :elmtui.state.observers
                 #:add-observer
                 #:remove-observer)
   (:import-from :elmtui.core.async

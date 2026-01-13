@@ -1,9 +1,10 @@
 (uiop:define-package :elmtui.dev.transaction-viewer
   (:use :cl :alexandria)
-  (:import-from :elmtui.state.statelib.transaction
-                #:get-transaction-history #:transaction-id #:transaction-name
-                #:transaction-description #:transaction-timestamp #:transaction-changes
-                #:transaction-categories #:format-transaction-summary #:format-universal-time)
+  (:import-from :elmtui.state.api
+                #:application-state-history
+                #:tx-id
+                #:tx-name
+                #:tx-changes)
   (:import-from :elmtui.view.core #:make-node)
   (:import-from :elmtui.ui.widgets.label #:make-label)
   (:import-from :elmtui.ui.widgets.listbox #:make-listbox) ; Assuming a listbox widget
@@ -22,12 +23,14 @@
    FOCUSED-LIST-ITEM-ID: The ID of the listbox item that should have focus.
 
    Returns a UI node tree."
-  (let* ((history (get-transaction-history app-state))
+  (let* ((history (application-state-history app-state))
          (items (loop for tx in history
-                      collect (list :id (transaction-id tx)
-                                    :label (format-transaction-summary tx))))
+                      collect (list :id (tx-id tx)
+                                    :label (format nil "~A (~D changes)"
+                                                   (or (tx-name tx) "TX")
+                                                   (length (tx-changes tx))))))
          (selected-tx (when selected-transaction-id
-                        (find selected-transaction-id history :key #'transaction-id))))
+                        (find selected-transaction-id history :key #'tx-id))))
     (make-node :column :id id :properties '(:gap 1) :children
                (list
                 (make-label :id (symbolicate id '-title) :text "Transaction History Viewer")
@@ -50,19 +53,16 @@
   "Renders details for a single transaction."
   (make-node :column :id id :properties '(:gap 0) :children
              (list
-              (make-label :text (format nil "ID: ~A" (transaction-id transaction)))
-              (make-label :text (format nil "Name: ~A" (or (transaction-name transaction) "N/A")))
-              (make-label :text (format nil "Timestamp: ~A" (format-universal-time (transaction-timestamp transaction))))
-              (make-label :text (format nil "Description: ~A" (or (transaction-description transaction) "N/A")))
-              (make-label :text (format nil "Categories: ~{~S~^, ~}" (transaction-categories transaction)))
-              (make-label :text (format nil "Changes (~D):" (length (transaction-changes transaction))))
+              (make-label :text (format nil "ID: ~A" (tx-id transaction)))
+              (make-label :text (format nil "Name: ~A" (or (tx-name transaction) "N/A")))
+              (make-label :text (format nil "Changes (~D):" (length (tx-changes transaction))))
               (make-node :column :id (symbolicate id '-changes) :children
-                         (loop for change in (transaction-changes transaction)
+                         (loop for change in (tx-changes transaction)
                                for i from 0 below 10 ; Limit displayed changes for simplicity
                                collect (destructuring-bind (key old-value new-value) change
                                          (make-label :text (format nil "  - ~S: ~S => ~S" key old-value new-value)))))
-              (when (> (length (transaction-changes transaction)) 10)
-                (make-label :text (format nil "  ...and ~D more changes." (- (length (transaction-changes transaction)) 10))))
+              (when (> (length (tx-changes transaction)) 10)
+                (make-label :text (format nil "  ...and ~D more changes." (- (length (tx-changes transaction)) 10))))
               ;; Placeholder for a button to selectively undo this transaction
               ;; (make-button :label "Undo This Transaction"
               ;;              :on-click `(,msg-selective-undo (:id ,(transaction-id transaction))))

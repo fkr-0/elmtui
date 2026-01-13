@@ -11,7 +11,7 @@
   (:import-from :cl-styles.api #:rgb #:defrule #:defstylesheet #:cls> #:type>)
   (:import-from :elmtui.core.event-types
                 #:key-event #:key-event-key #:key-event-char #:key-event-type)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:export #:run-mini-rainbow))
 
 (in-package :elmtui.examples.mini-rainbow)

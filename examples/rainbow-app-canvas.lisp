@@ -8,10 +8,10 @@
   (:use :cl :alexandria :log4cl)
   (:import-from :log4cl #:log-info #:log-debug)
   (:import-from :elmtui.app #:defapplication #:run-application)
-  (:import-from :elmtui.tea-state #:defupdate)
-  (:import-from :elmtui.tea-state #:state-ref #:make-update-result)
+  (:import-from :elmtui.state #:defupdate)
+  (:import-from :elmtui.state #:state-ref #:make-update-result)
   (:import-from :elmtui.core.event-types #:key-event)
-  (:import-from :elmtui.tea-state.transactions  #:with-transaction)
+  (:import-from :elmtui.state.transactions  #:with-transaction)
   (:import-from :elmtui.view.geo #:w)
   (:import-from :elmtui.ui.widgets.root-viewport #:make-root-viewport)
   (:import-from :elmtui.platform.api #:get-terminal-dimensions)
@@ -44,7 +44,7 @@
    ;; No initial commands
    nil))
 
-(elmtui.tea-state:defupdate app-update (app-state message)
+(elmtui.state:defupdate app-update (app-state message)
   "Handles updates to the application state based on messages.
    Any key press will quit the application."
   (log-info "RAINBOW-APP-CANVAS: app-update called with message: ~S (Type: ~A)" message (type-of message))

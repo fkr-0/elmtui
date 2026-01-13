@@ -2,7 +2,7 @@
   (:use :cl :fiveam)
   (:import-from :elmtui.pipeline #:pre-render-terminal-prep)
   (:import-from :elmtui.contracts #:make-app-context)
-  (:import-from :elmtui.tea-state #:apply-patches)
+  (:import-from :elmtui.state #:apply-patches)
   (:import-from :elmtui.state.model #:make-state-patch)
   (:import-from :elmtui.platform.api #:scroll-lines #:clear-below-cursor))
 
@@ -23,7 +23,7 @@
 
 (test pending-scroll-triggers-backend
   (let* ((backend (make-instance 'mock-backend))
-         (state   (list :components :rv :state
+         (state   (list :components :rv
                         '(:anchor :below-cursor :pending-scroll (:down 3))))
          (ctx     (make-app-context :state state :backend backend)))
     (let ((new-ctx (pre-render-terminal-prep ctx)))

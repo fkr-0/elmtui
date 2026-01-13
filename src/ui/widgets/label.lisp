@@ -5,7 +5,7 @@
 (uiop:define-package :elmtui.ui.widgets.label
   (:use :cl :elmtui.ui.defcomponent)
   (:import-from :elmtui.ui.api #:id-from-path #:component) ; Keep only used API functions
-  (:import-from :elmtui.tea-state.api #:app-state #:make-update-result) ; Keep app-state and make-update-result
+  (:import-from :elmtui.state.api #:app-state #:make-update-result) ; Keep app-state and make-update-result
   (:import-from :elmtui.view.styled #:make-styled-node)
   (:export #:label)) ; Export only the component name
 

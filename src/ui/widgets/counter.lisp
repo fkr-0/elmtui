@@ -9,7 +9,7 @@
   (:import-from :elmtui.ui.defcomponent #:defcomponent)
   (:import-from :elmtui.ui.api
                 #:component-id #:init #:update #:view #:get-path #:id-from-path)
-  (:import-from :elmtui.tea-state.api #:make-update-result)
+  (:import-from :elmtui.state.api #:make-update-result)
   ;; Removed :make-state-patch as defcomponent handles patch creation from :update return values
   ;; Removed :log-warn as unhandled messages are handled by defcomponent's :on-unhandled-message
   (:export #:counter))

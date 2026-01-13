@@ -1,6 +1,6 @@
 (uiop:define-package :elmtui.ui.api
   (:use :cl #:log4cl)
-  (:import-from :elmtui.tea-state #:state-ref #:make-update-result)
+  (:import-from :elmtui.state.api #:state-ref #:make-update-result)
   (:import-from :elmtui.utils #:ensure-keyword #:get-path)
   (:export
    ;; Component Class & Generics
@@ -13,6 +13,7 @@
    #:layout-node
    #:id-from-path #:get-path
    ;; State Helpers
+   #:+component-state-root+
    #:component-state-path #:get-component-property #:make-state-patch #:component-state-map-path
    ;; Update Macro and its local functions
    #:with-update-patch #:add-patch #:add-command #:get-property
@@ -115,6 +116,9 @@
 ;;;---------------------------------------------------------------
 ;;; State Path and Patch Utilities
 ;;;---------------------------------------------------------------
+(defparameter +component-state-root+ '(:components)
+  "Canonical root path for component state in app-state.")
+
 (declaim (ftype (function (list) list) component-state-map-path))
 (defun component-state-map-path (id-path)
   "Generates a path list for accessing the entire state map of a component.
@@ -131,10 +135,9 @@
     => '(:components :my-app :main-layout :submit-button"
   (declare (type list id-path))
   (check-type id-path list)
-  (if (eql (car id-path) :components) ;;TODO why? clean impl!
+  (if (and id-path (eql (car id-path) (first +component-state-root+)))
       id-path
-      ;; If the first element is not :components, prepend it
-      (append '(:components) id-path)))
+      (append +component-state-root+ id-path)))
 
 (declaim (ftype (function (list keyword) list) component-state-path))
 (defun component-state-path (id-path property-key)
@@ -525,7 +528,7 @@
 ;;     ;;    (t (elmtui.state.api:state-ref state (first full-path) default-value))))
 ;;     ;; If state is raw data (list/plist), use the raw get-path function
 ;;     ((listp state)
-;;      (elmtui.state::get-path full-path state default-value))
+;;      (elmtui.state:get-path full-path state default-value))
 ;;     ;; Fallback
 ;;     (t default-value)))
 

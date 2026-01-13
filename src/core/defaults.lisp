@@ -62,7 +62,7 @@ VALIDATOR: Function to validate the value
 CATEGORY: Keyword for grouping related defaults
 SOURCE: Source file or system where this default originated"
   `(let ((existing (gethash ,key *default-registry*)))
-     (when existing
+     (when (and existing (not (equal (default-spec-value existing) ,value)))
        (warn "Overriding existing default for key ~A (old: ~A, new: ~A)"
          ,key (default-spec-value existing) ,value))
      (let ((spec (make-default-spec :key ,key
@@ -75,6 +75,7 @@ SOURCE: Source file or system where this default originated"
                    :source ,source)))
        (setf (gethash ,key *default-registry*) spec)
        spec)))
+
 
 ;; (defun register-default (key value &key
 ;;                           (type t)
@@ -287,13 +288,13 @@ SOURCE: Source file or system where this default originated"
 
 (defmacro with-defaults (overrides context-or-parent &body body)
   "Execute BODY with overridden defaults."
-  `(let* ((parent-context (if (default-context-p context-or-parent)
+  `(let* ((parent-context (if (default-context-p ,context-or-parent)
                             context-or-parent
-                            (make-default-context context-or-parent)))
+                            (make-default-context ,context-or-parent)))
            (new-context (make-default-context parent-context))
            (old-registry *default-registry*))
      ;; Apply overrides to new context
-     (loop for (key value) on overrides by #'cddr do
+     (loop for (key value) on ,overrides by #'cddr do
        (setf (gethash key (default-context-overrides new-context)) value))
 
      (unwind-protect
@@ -381,12 +382,14 @@ SOURCE: Source file or system where this default originated"
 
 (defun get-color-default (color-type &key (category :colors))
   "Get a color-related default value."
+  (declare (ignore category))
   (get-default
     (if (keywordp color-type)
       color-type (intern (string-upcase color-type) :keyword))))
 
 (defun get-dimension-default (dimension-type &key (category :dimensions))
   "Get a dimension-related default value."
+  (declare (ignore category))
   (get-default
     (if (keywordp dimension-type)
       dimension-type (intern (string-upcase dimension-type) :keyword))))

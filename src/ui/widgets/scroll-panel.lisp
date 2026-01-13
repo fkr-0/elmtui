@@ -11,9 +11,12 @@
   (:import-from :elmtui.ui.api
     #:component #:id-from-path
     #:init #:update #:view #:make-state-patch)
-  (:import-from :elmtui.tea-state
-    #:make-update-result #:get-path #:state-ref
-    #:update-result-patches #:update-result-commands)
+  (:import-from :elmtui.state.api
+    #:make-update-result
+    #:get-path
+    #:state-ref
+    #:update-result-patches
+    #:update-result-commands)
   (:export #:scroll-panel
     #:make-scroll-panel))
 

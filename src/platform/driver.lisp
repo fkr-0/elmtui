@@ -23,7 +23,8 @@
   (:import-from :elmtui.keymaps
     #:initialise
     #:process-key-event)
-  (:import-from :elmtui.tea-state #:get-path #:apply-patches)
+  (:import-from :elmtui.state.api #:get-path)
+  (:import-from :elmtui.state.transactions #:apply-patches)
   (:import-from :elmtui.platform.api
     #:initialize-backend #:shutdown-backend #:render-and-present
     #:term-w #:term-h #:handle-backend-resize #:get-screen-dimensions
@@ -280,7 +281,7 @@
                 (setf *current-app-model* next-model)
                 (log-info "DRIVER: update phase done")
                 ;; Check for shutdown flag in model
-                (when (elmtui.tea-state:get-path '(:should-quit) next-model)
+                (when (get-path '(:should-quit) next-model)
                   (log:info "DRIVER: :should-quit flag is true in model. Setting *shutdown-requested*.")
                   (setf elmtui.core.loop::*shutdown-requested* t))
                 ;; Process commands if a command processor is present

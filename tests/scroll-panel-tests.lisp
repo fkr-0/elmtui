@@ -11,14 +11,13 @@
     #:make-scroll-panel)
   (:import-from :elmtui.ui.api
     #:init #:update #:view)
-  (:import-from :elmtui.tea-state #:make-state #:state-ref
+  (:import-from :elmtui.state #:make-state #:state-ref
     #:apply-patches)
-  (:import-from :elmtui.tea-state.transactions
+  (:import-from :elmtui.state.transactions
     #:with-transaction
-    #:apply-patches
     #:undo
     #:redo)
-  (:import-from :elmtui.tea-state
+  (:import-from :elmtui.state
     #:ur-patches
     #:ur-commands)
   (:export #:run-scroll-panel-tests))
@@ -53,7 +52,7 @@
     (has-key plist path)))
 (defun make-test-state ()
   "Create a test state (hash-table based)."
-  (make-state (alexandria:plist-hash-table '(:components ()))))
+  (make-state :initial (alexandria:plist-hash-table '(:components ()))))
 
 (defun scrollbar-node-p (node)
   "Return non-nil when NODE represents the scrollbar text element."

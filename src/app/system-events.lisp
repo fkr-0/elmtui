@@ -1,5 +1,5 @@
 (uiop:define-package :elmtui.app.system-events
-  (:use :cl :elmtui.tea-state.msg)
+  (:use :cl :elmtui.state.msg)
   (:export #:SystemEvent
            #:make-appshutdown-systemevent
            #:make-terminalresized-systemevent

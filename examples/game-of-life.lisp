@@ -2,7 +2,7 @@
   (:use :cl :alexandria :log4cl)
   (:import-from :log4cl #:log-info #:log-debug)
   (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.app #:defapplication)
   (:export #:run-game-of-life-app))
 

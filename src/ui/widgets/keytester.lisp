@@ -70,10 +70,10 @@
    - If key is printable ASCII and has no modifiers, append to INPUT.
    Returns the updated COMPONENT."
   (log-info "Key-Tester> Key event: ~A" evt)
-  (let* ((e (getf (elmtui.tea-state.msg:msg-data evt) :event))
-          (chr (getf (elmtui.tea-state.msg:msg-data evt) :char))
+  (let* ((e (getf (elmtui.state.msg:msg-data evt) :event))
+          (chr (getf (elmtui.state.msg:msg-data evt) :char))
           (nk (key-event->normalized-key e))
-          (ck (getf (elmtui.tea-state.msg:msg-data evt) :key)))
+          (ck (getf (elmtui.state.msg:msg-data evt) :key)))
     (if (null nk)
       component
       (let* ((kw-form (nk->keyword-list nk))

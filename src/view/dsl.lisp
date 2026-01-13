@@ -52,10 +52,10 @@ If NIL, summaries are not truncated.")
 (defun %truncate-dsl-summary (text)
   (if (and *dsl-summary-max-length*
         (> (length text) *dsl-summary-max-length*))
-      (concatenate 'string
-        (subseq text 0 (max 0 (1- *dsl-summary-max-length*)))
-        "…")
-      text))
+    (concatenate 'string
+      (subseq text 0 (max 0 (1- *dsl-summary-max-length*)))
+      "…")
+    text))
 
 
 
@@ -65,15 +65,15 @@ If NIL, summaries are not truncated.")
     (cond
       ((atom dsl) (format nil "~A" dsl))
       ((and (listp dsl) (keywordp (first dsl)))
-       (multiple-value-bind (props children) (split-props/children (rest dsl))
-         (let* ((id (getf props :id))
-                (child-list (cond
-                              ((null children) nil)
-                              ((listp children) children)
-                              (t (list children))))
-                (child-count (length child-list)))
-           (format nil "~(~a~)~@[ id=~a~] (~d child~:p)"
-                   (first dsl) id child-count))))
+        (multiple-value-bind (props children) (split-props/children (rest dsl))
+          (let* ((id (getf props :id))
+                  (child-list (cond
+                                ((null children) nil)
+                                ((listp children) children)
+                                (t (list children))))
+                  (child-count (length child-list)))
+            (format nil "~(~a~)~@[ id=~a~] (~d child~:p)"
+              (first dsl) id child-count))))
       (t (format nil "~A" dsl)))))
 
 (defun split-props/children (args)
@@ -130,73 +130,74 @@ If NIL, summaries are not truncated.")
 
     (let ((resolved-something nil))
       (block resolve
-      (labels
-        ((process-node (spec path &key (in-children-p nil))
-           ;; (with-error-context (:operation "process-node" :module "view.dsl")
-           ;; (log-info "Processing node: ~S (path ~S, in-children-p ~A)" spec path in-children-p)
-           (cond
-             ;; atoms pass through
-             ((atom spec) spec)
+        (labels
+          ((process-node (spec path &key (in-children-p nil))
+             ;; (with-error-context (:operation "process-node" :module "view.dsl")
+             ;; (log-info "Processing node: ~S (path ~S, in-children-p ~A)" spec path in-children-p)
+             (cond
+               ;; atoms pass through
+               ((atom spec) spec)
 
-             ;; sibling bag: only inside a children position
-             ((and in-children-p (listp spec) (not (keywordp (first spec))))
-               (mapcar (lambda (item) (process-node item path :in-children-p nil)) spec))
+               ;; sibling bag: only inside a children position
+               ((and in-children-p (listp spec) (not (keywordp (first spec))))
+                 (mapcar (lambda (item) (process-node item path :in-children-p nil)) spec))
 
-             ;; potential DSL node: only if head is a known DSL tag
-             ((and (listp spec)
-                (keywordp (first spec))
-                (or (and (fboundp 'registered-dsl-component-p)
-                      (ignore-errors (registered-dsl-component-p (first spec))))
-                  (element-class (first spec)))) ;; (element-class :root-viewport)
-               (destructuring-bind (type &rest tail) spec
-                 ;; shorthand (:TEXT "hello")
-                 (when (and (= (length tail) 1) (stringp (first tail)))
-                   (return-from process-node `(,type :content ,(first tail))))
-                 (multiple-value-bind (props children) (split-props/children tail)
-                   (let* ((id (getf props :id))
-                           (new-path (if id (append path (list id)) path)))
-                     (when (and id (member id path :test #'equal))
-                       (signal-dsl-validation-error spec 0
-                         (format nil "Circular dependency for ID ~S detected in path ~S" id path)
-                         "Use unique IDs within the component hierarchy"
-                         "Check that no parent and child share the same ID"))
-                     (if (and (fboundp 'registered-dsl-component-p)
-                           (ignore-errors (registered-dsl-component-p type)))
-                       ;; component → resolve view, attach as a PROP
-                       (progn
-                         (unless id
-                           (signal-dsl-validation-error spec 0
-                             (format nil "Component ~S requires an :id" type)
-                             "Add an :id property to all components"
-                             "Example: (:my-button :id :btn1 :label \"Click\")"))
-                         (setf resolved-something t)
-                         (handler-case
-                           (let* ((klass    (get-component-class-for-dsl-type type))
-                                   (instance (make-instance klass))
-                                   (view     (elmtui.ui.api:view instance app-state
-                                               :id-path new-path
-                                               :children children))
-                                   (_ (when (null view)
-                                        (log-debug "Component ~A at ~A returned NIL view; delaying DSL resolution."
-                                          type new-path)
-                                        (return-from resolve (values nil nil))))
-                                   (rv       (process-node view new-path :in-children-p nil)))
-                             (%emit-node type (append props (list :resolved-view rv)) nil))
-                           (error (e)
-                             (progn (format t "Error resolving component ~S at path ~S: ~A~%" type new-path e)
-                               (signal-dsl-validation-error spec 0
-                                 (format nil "Failed to resolve component ~S: ~A" type e))))))
-                       ;; normal element → recurse only into CHILDREN
-                       (%emit-node type props
-                         (when children
-                           (mapcar (lambda (c) (process-node c new-path :in-children-p t))
-                             children))))))))
+               ;; potential DSL node: only if head is a known DSL tag
+               ((and (listp spec)
+                  (keywordp (first spec))
+                  (or (and (fboundp 'registered-dsl-component-p)
+                        (ignore-errors (registered-dsl-component-p (first spec))))
+                    (element-class (first spec)))) ;; (element-class :root-viewport)
+                 (destructuring-bind (type &rest tail) spec
+                   ;; shorthand (:TEXT "hello")
+                   (when (and (= (length tail) 1) (stringp (first tail)))
+                     (return-from process-node `(,type :content ,(first tail))))
+                   (multiple-value-bind (props children) (split-props/children tail)
+                     (let* ((id (getf props :id))
+                             (new-path (if id (append path (list id)) path)))
+                       (when (and id (member id path :test #'equal))
+                         (signal-dsl-validation-error spec 0
+                           (format nil "Circular dependency for ID ~S detected in path ~S" id path)
+                           "Use unique IDs within the component hierarchy"
+                           "Check that no parent and child share the same ID"))
+                       (if (and (fboundp 'registered-dsl-component-p)
+                             (ignore-errors (registered-dsl-component-p type)))
+                         ;; component → resolve view, attach as a PROP
+                         (progn
+                           (unless id
+                             (signal-dsl-validation-error spec 0
+                               (format nil "Component ~S requires an :id" type)
+                               "Add an :id property to all components"
+                               "Example: (:my-button :id :btn1 :label \"Click\")"))
+                           (setf resolved-something t)
+                           (handler-case
+                             (let* ((klass    (get-component-class-for-dsl-type type))
+                                     (instance (make-instance klass))
+                                     (view     (elmtui.ui.api:view instance app-state
+                                                 :id-path new-path
+                                                 :children children))
+                                     (_ (when (null view)
+                                          (log-debug "Component ~A at ~A returned NIL view; delaying DSL resolution."
+                                            type new-path)
+                                          (return-from resolve (values nil nil))))
+                                     (rv       (process-node view new-path :in-children-p nil)))
+                               (declare (ignore _))
+                               (%emit-node type (append props (list :resolved-view rv)) nil))
+                             (error (e)
+                               (progn (format t "Error resolving component ~S at path ~S: ~A~%" type new-path e)
+                                 (signal-dsl-validation-error spec 0
+                                   (format nil "Failed to resolve component ~S: ~A" type e))))))
+                         ;; normal element → recurse only into CHILDREN
+                         (%emit-node type props
+                           (when children
+                             (mapcar (lambda (c) (process-node c new-path :in-children-p t))
+                               children))))))))
 
-             ;; any other list (including style plists like (:BORDER T ...)) is **data**
-             ;; ((listp spec) spec)
+               ;; any other list (including style plists like (:BORDER T ...)) is **data**
+               ;; ((listp spec) spec)
 
-             (t spec))));)
-        (values (process-node dsl-spec '()) resolved-something))))))
+               (t spec))));)
+          (values (process-node dsl-spec '()) resolved-something))))))
 ;; == end/resolve.lisp ==
 ;; == end/resolve.lisp ==
 

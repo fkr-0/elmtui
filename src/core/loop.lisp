@@ -10,7 +10,7 @@
                 #:*event-loop* #:*app-state* #:*app-message-processor* #:*app-sender*)
   (:import-from :elmtui.core.event-types
                 #:key-event #:key-event-key #:key-event-code #:key-event-modifiers)
-  (:import-from :elmtui.tea-state.msg #:make-keyevent-appmsg)
+  (:import-from :elmtui.state.msg #:make-keyevent-appmsg)
   (:import-from :bordeaux-threads
                 #:make-thread #:thread-alive-p #:join-thread #:destroy-thread)
   (:import-from :elmtui.core.conditions
@@ -24,7 +24,7 @@
   (:import-from :elmtui.core.event-channels
                 #:event-channel #:handlers #:name #:channel-of #:wait-for-event
                 #:standard-event-channels)
-  (:import-from :elmtui.tea-state.update ; Assuming this is the correct package for handle-async-command
+  (:import-from :elmtui.state.update ; Assuming this is the correct package for handle-async-command
                 #:handle-async-command)
   (:import-from :elmtui.app.system-events #:terminalresized-system-event)
   (:export :start-loop :elm-stop-loop :publish :subscribe :*event-loop* #:as-plist
@@ -358,7 +358,7 @@ as well as the view function for the application.")
           nil))))
 
 (defun keymsg-from-event (e)
-  (elmtui.tea-state.msg:make-keyevent-appmsg :event e
+  (elmtui.state.msg:make-keyevent-appmsg :event e
                                              :key (elmtui.core.event-types:key-event-key e)
                                              :char (when (elmtui.core.event-types:key-event-code e)
                                                      (code-char (elmtui.core.event-types:key-event-code e)))

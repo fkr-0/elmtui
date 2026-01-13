@@ -13,7 +13,7 @@
     #:faketerm-instance
     #:faketerm-instance-stream
     #:faketerm-instance-filepath)
-  (:import-from :elmtui.tea-state
+  (:import-from :elmtui.state
     #:state-ref
     #:make-application-state)
   (:import-from :elmtui.platform.api
@@ -197,20 +197,20 @@
         :anchor :below-cursor)
       (declare (ignore comp))
       ;; Apply patches to state
-      (elmtui.tea-state:apply-patches state patches))
+      (elmtui.state:apply-patches state patches))
     ;; Provide known viewport size for cleanup
-    (elmtui.tea-state:apply-patches state
+    (elmtui.state:apply-patches state
       (list
-        (list (append id-path '(:state :width)) 10)
-        (list (append id-path '(:state :height)) 3)))
+        (list (append id-path '(:width)) 10)
+        (list (append id-path '(:height)) 3)))
 
     ;; Set issued-scroll-net to simulate scrolling happened
-    (elmtui.tea-state:apply-patches state
-      (list (list (append id-path '(:state :issued-scroll-net)) 5)))
+    (elmtui.state:apply-patches state
+      (list (list (append id-path '(:issued-scroll-net)) 5)))
 
     ;; Send shutdown message
     (let* ((result (update rv '(:appshutdown) state :id-path id-path))
-            (commands (elmtui.tea-state.api:ur-commands result)))
+            (commands (elmtui.state.api:ur-commands result)))
       ;; Verify commands
       (is (find-if (lambda (cmd)
                      (and (consp cmd)
@@ -241,14 +241,14 @@
     (multiple-value-bind (comp patches cmds)
       (init rv :id-path id-path :dsl dsl :anchor :below-cursor)
       (declare (ignore comp cmds))
-      (elmtui.tea-state:apply-patches state patches))
+      (elmtui.state:apply-patches state patches))
     (let* ((res1 (update rv '(:terminalresized :width 10 :height 4) state :id-path id-path))
-            (cmds1 (elmtui.tea-state.api:ur-commands res1)))
-      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res1))
+            (cmds1 (elmtui.state.api:ur-commands res1)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches res1))
       (let* ((res2 (update rv '(:cursorposition :col 1 :row 2) state :id-path id-path))
-              (cmds2 (elmtui.tea-state.api:ur-commands res2))
+              (cmds2 (elmtui.state.api:ur-commands res2))
               (all-commands (append cmds1 cmds2)))
-        (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res2))
+        (elmtui.state:apply-patches state (elmtui.state.api:ur-patches res2))
         (is (null (find-if (lambda (cmd)
                              (and (consp cmd)
                                   (eq (first cmd) :render)
@@ -283,13 +283,13 @@
     (multiple-value-bind (comp patches cmds)
       (init rv :id-path id-path :dsl dsl :anchor :below-cursor)
       (declare (ignore comp cmds))
-      (elmtui.tea-state:apply-patches state patches))
+      (elmtui.state:apply-patches state patches))
     (let* ((res1 (update rv '(:terminalresized :width 10 :height 4) state :id-path id-path)))
-      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res1)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches res1)))
     (let* ((res2 (update rv '(:cursorposition :col 1 :row 2) state :id-path id-path)))
-      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res2)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches res2)))
     (let* ((res3 (update rv '(:appshutdown) state :id-path id-path))
-            (cmds3 (elmtui.tea-state.api:ur-commands res3)))
+            (cmds3 (elmtui.state.api:ur-commands res3)))
       (is (find-if (lambda (cmd)
                      (and (consp cmd)
                        (eq (first cmd) :render)
@@ -328,17 +328,17 @@
         (multiple-value-bind (comp patches cmds)
           (init rv :id-path id-path :dsl dsl :anchor :below-cursor)
           (declare (ignore comp cmds))
-          (elmtui.tea-state:apply-patches state patches))
+          (elmtui.state:apply-patches state patches))
         (let ((res1 (update rv '(:terminalresized :width 10 :height 4) state :id-path id-path)))
-          (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res1))
-          (dolist (cmd (elmtui.tea-state.api:ur-commands res1))
+          (elmtui.state:apply-patches state (elmtui.state.api:ur-patches res1))
+          (dolist (cmd (elmtui.state.api:ur-commands res1))
             (execute-render-command cmd backend)))
         (let ((res2 (update rv '(:cursorposition :col 1 :row 2) state :id-path id-path)))
-          (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches res2))
-          (dolist (cmd (elmtui.tea-state.api:ur-commands res2))
+          (elmtui.state:apply-patches state (elmtui.state.api:ur-patches res2))
+          (dolist (cmd (elmtui.state.api:ur-commands res2))
             (execute-render-command cmd backend)))
         (let ((res3 (update rv '(:appshutdown) state :id-path id-path)))
-          (dolist (cmd (elmtui.tea-state.api:ur-commands res3))
+          (dolist (cmd (elmtui.state.api:ur-commands res3))
             (execute-render-command cmd backend)))
         (shutdown-backend backend)
         (let* ((log (read-log-file filepath))
@@ -409,7 +409,7 @@
 ;;   :update-fn test-init-app-update
 ;;   :root-viewport-id :rv
 ;;   :subscriptions-fn test-init-app-subscriptions)
-;; (let* ((state (elmtui.tea-state:make-application-state))
+;; (let* ((state (elmtui.state:make-application-state))
 ;;         (rv (make-root-viewport :test-rv2 :anchor :below-cursor))
 ;;         (id-path '(:components :test-rv2)))
 ;;   (multiple-value-bind (comp patches cmds)
@@ -418,19 +418,19 @@
 ;;       :initial-cursor-pos '(0 18)
 ;;       :anchor :below-cursor)
 ;;     ;; (cl-state.patch:apply-patches state patches)
-;;     (elmtui.tea-state:apply-patches state patches)
+;;     (elmtui.state:apply-patches state patches)
 ;;     (list comp state patches cmds))
 ;;   (multiple-value-bind (patches3 cmds3)
 ;;     (update rv '(:terminal-scrolled :direction :up :amount 3) state :id-path id-path)
 ;;     (declare (ignore cmds3))
-;;     (elmtui.tea-state:apply-patches state patches3))
+;;     (elmtui.state:apply-patches state patches3))
 ;;   (state-ref state (append id-path '(:issued-scroll-net))))
 
 (defun get-prop (state compid prop)
   (state-ref state (list :components compid prop)))
 (test scroll-net-tracking
   "Verify scroll tracking accumulates correctly."
-  (let* ((state (elmtui.tea-state:make-application-state))
+  (let* ((state (elmtui.state:make-application-state))
           (rv (make-root-viewport :test-rv2 :anchor :below-cursor))
           (id-path '(:components :test-rv2)))
 
@@ -440,26 +440,26 @@
         :initial-terminal-dimensions '(80 24)
         :initial-cursor-pos '(0 18)
         :anchor :below-cursor)
-      (elmtui.tea-state:apply-patches state patches))
+      (elmtui.state:apply-patches state patches))
 
     ;; Simulate scroll events
     (let ((result1 (update rv '(:terminal-scrolled :direction :down :amount 3) state :id-path id-path)))
-      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches result1)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches result1)))
 
     (let ((result2 (update rv '(:terminal-scrolled :direction :down :amount 2) state :id-path id-path)))
-      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches result2)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches result2)))
 
     (let ((result3 (update rv '(:terminal-scrolled :direction :up :amount 1) state :id-path id-path)))
-      (elmtui.tea-state:apply-patches state (elmtui.tea-state.api:ur-patches result3)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches result3)))
 
     ;; Check accumulated scroll
     (let ((net-scroll
-            (state-ref state (list :components :test-rv2 :state :issued-scroll-net))))
+            (state-ref state (list :components :test-rv2 :issued-scroll-net))))
       (is (= net-scroll 4) (format nil "Net scroll got ~A should be 3 + 2 - 1 = 4"
                              net-scroll)))))
 
 
-;; (let* ((state (elmtui.tea-state:make-application-state))
+;; (let* ((state (elmtui.state:make-application-state))
 ;;         (rv (make-root-viewport :test-rv2 :anchor :below-cursor))
 ;;         (id-path '(:components :test-rv2)))
 
@@ -469,27 +469,27 @@
 ;;       :initial-terminal-dimensions '(80 24)
 ;;       :initial-cursor-pos '(0 18)
 ;;       :anchor :below-cursor)
-;;     (elmtui.tea-state:apply-patches state patches))
+;;     (elmtui.state:apply-patches state patches))
 
 ;;   ;; Simulate scroll events
 ;;   (multiple-value-bind (patches1 cmds1)
 ;;     (update rv '(:terminal-scrolled :direction :down :amount 3) state :id-path id-path)
 ;;     (declare (ignore cmds1))
-;;     (elmtui.tea-state:apply-patches state patches1))
+;;     (elmtui.state:apply-patches state patches1))
 
 ;;   (multiple-value-bind (patches2 cmds2)
 ;;     (update rv '(:terminal-scrolled :direction :down :amount 2) state :id-path id-path)
 ;;     (declare (ignore cmds2))
-;;     (elmtui.tea-state:apply-patches state patches2))
+;;     (elmtui.state:apply-patches state patches2))
 
 ;;   (multiple-value-bind (patches3 cmds3)
 ;;     (update rv '(:terminal-scrolled :direction :up :amount 1) state :id-path id-path)
 ;;     (declare (ignore cmds3))
-;;     (elmtui.tea-state:apply-patches state patches3))
+;;     (elmtui.state:apply-patches state patches3))
 
 ;;   ;; Check accumulated scroll
 ;;   (let ((net-scroll
-;;           (state-ref state (list :components :test-rv2 :state :issued-scroll-net))))
+;;           (state-ref state (list :components :test-rv2 :issued-scroll-net))))
 ;;      (format nil "Net scroll got ~A should be 3 + 2 - 1 = 4"
 ;;                            net-scroll)))
 ;;;---------------------------------------------------------------
