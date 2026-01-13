@@ -87,13 +87,15 @@ For now, we use identity. In the future, we might want to parse strings, e.g.
                               (and (listp attrs) (getf attrs k)))))
                 (if (null v) got (equal got v)))))
     (:state (let ((st (stylable-state obj))) (every (lambda (f) (%in-list-p f st)) (cdr s))))
-    (:first-child (= (stylable-index obj) 0))
+    (:first-child (let ((p (stylable-parent obj)))
+                    (and p (= (stylable-index obj) 0))))
     (:last-child  (let ((p (stylable-parent obj)))
                     (if p
                         (let ((kids (stylable-children p)))
                           (= (stylable-index obj) (1- (length kids))))
-                        t)))
-    (:nth-child (= (stylable-index obj) (second s)))
+                        nil)))
+    (:nth-child (let ((p (stylable-parent obj)))
+                  (and p (= (stylable-index obj) (second s)))))
     (t nil)))
 
 (defun match-selector-p (sel obj)

@@ -1,6 +1,6 @@
 (uiop:define-package :stylesheet-tests
   (:use :cl :fiveam)
-  (:import-from :cl-styles.sheet #:stylesheet-rules #:add-rule* #:remove-rule* #:make-stylesheet))
+  (:import-from :cl-styles.sheet #:stylesheet-rules #:add-rule #:remove-rule #:make-stylesheet))
 (in-package :stylesheet-tests)
 
 (def-suite stylesheet-suite
@@ -10,20 +10,20 @@
 
 (test add-rule
   (let ((ss (make-stylesheet :rules '((:selector ".a")))))
-    (add-rule* ss '(:selector ".b"))
+    (add-rule ss '(:selector ".b"))
     (is (equal (stylesheet-rules ss)
           '((:selector ".b") (:selector ".a"))))))
 
 (test remove-rule
   (let ((ss (make-stylesheet :rules '((:selector ".a") (:selector ".b")))))
-    (remove-rule* ss '(:selector ".a"))
+    (remove-rule ss '(:selector ".a"))
     (is (equal (stylesheet-rules ss)
           '((:selector ".b"))))))
 
 (test add-and-remove-rule
   (let ((ss (make-stylesheet :rules '((:selector ".a")))))
-    (add-rule* ss '(:selector ".b"))
-    (remove-rule* ss '(:selector ".a"))
+    (add-rule ss '(:selector ".b"))
+    (remove-rule ss '(:selector ".a"))
     (is (equal (stylesheet-rules ss)
           '((:selector ".b"))))))
 
