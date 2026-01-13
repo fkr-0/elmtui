@@ -256,26 +256,37 @@ This function is useful for creating rich, informative error conditions througho
 ;;; Context Management Macros
 ;;;===================================================================
 
-(defmacro with-error-context
-  ((&key context module operation component-id macro-arg) &body body)
-  "
-Execute ~BODY~ with enhanced error context for any ~elmtui-error~ signaled.
+(defmacro with-error-context ((&key context module operation component-id macro-arg) &body body)
+  "Execute BODY with enhanced error context for any elmtui-error signaled.
 
-This macro allows you to provide additional contextual information (such as ~:operation~, ~:component-id~, ~:macro-arg~, ~:module~, and ~:context~) that will be appended to the error context if an ~elmtui-error~ is signaled during the execution of ~BODY~.
+This macro allows you to provide additional contextual information (such as :operation, :component-id, :macro-arg, :module, and :context) that will be appended to the error context if an elmtui-error is signaled during the execution of BODY.
 
-If an ~elmtui-error~ is caught, a new condition of the same type is constructed with:
+If an elmtui-error is caught, a new condition of the same type is constructed with:
 + The original context, plus any extra context provided via keyword arguments.
-+ The ~:module~ slot set to the supplied value or the original error's module.
-+ The ~:suggestions~ slot preserved from the original error.
++ The :module slot set to the supplied value or the original error's module.
++ The :suggestions slot preserved from the original error.
 + All other slots from the original error, except those explicitly overridden.
 
 This is useful for debugging and tracing errors in complex systems, as it allows you to annotate errors with precise, dynamic context at the point where they occur.
 
-*Example usage:*
-(with-error-context (:operation \"update\" :component-id 42)
-  (do-something-that-might-error)) "
-
-  `(progn ,@body))
+Example usage:
+  (with-error-context (:operation \"update\" :component-id 42)
+    (do-something-that-might-error))"
+  `(handler-case
+     (progn ,@body)
+     (elmtui-error (err)
+       (let* ((new-context (append (slot-value err 'context)
+                             (remove nil (list
+                                           ,@(when context      `((cons :context ,context)))
+                                           ,@(when module       `((cons :module ,module)))
+                                           ,@(when operation    `((cons :operation ,operation)))
+                                           ,@(when component-id `((cons :component-id ,component-id)))
+                                           ,@(when macro-arg    `((cons :macro-arg ,macro-arg)))))))
+               (new-error (make-condition (type-of err)
+                            :context new-context
+                            :module (or ,module (slot-value err 'module))
+                            :suggestions (slot-value err 'suggestions))))
+         (signal new-error)))))
 
 
 

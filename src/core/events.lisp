@@ -15,7 +15,7 @@
                 :command-execution-error)
   (:import-from :elmtui.core.globals
    :*app-sender*)
-  (:import-from :elmtui.tea-state.msg
+  (:import-from :elmtui.state.msg
    :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
    :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
                 :arg-def #:arg-def-type #:arg-def-keyword

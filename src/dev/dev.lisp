@@ -10,13 +10,13 @@
                                         ;(eval-when (:compile-toplevel :load-toplevel :execute)
 (uiop:define-package :elmtui.dev
   (:use :cl :elmtui.core.events :elmtui.core.conditions :elmtui.view.core
-        :elmtui.view.geo) ; Added :elmtui.view.geo
+    :elmtui.view.geo) ; Added :elmtui.view.geo
   (:export :example-flexbox-layout
-   :example-grid-layout
-           :send-foo-message
-   :dev-main
-           :run-faulty-async
-   :demo-event-loop));)
+    :example-grid-layout
+    :send-foo-message
+    :dev-main
+    :run-faulty-async
+    :demo-event-loop));)
 
 (in-package :elmtui.dev)
 
@@ -27,12 +27,12 @@
 ;; (defun example-flexbox-layout ()
 ;;   "Interactive example demonstrating flexbox layout."
 ;;   (let* ((child1 (make-styled-node :type :text :props '(:content "Child 1" :flex-grow 1)))
-;;          (child2 (make-styled-node :type :text :props '(:content "Child 2" :flex-grow 2)))
-;;          (child3 (make-styled-node :type :text :props '(:content "Child 3" :flex-grow 1)))
-;;          (container (make-styled-node :type :container
-;;                                       :props '(:display :flex :flex-direction :row)
-;;                                       :children (list child1 child2 child3)))
-;;          (screen-rect (make-instance 'rectangle :x 0 :y 0 :w 800 :h 600))) ; Use make-instance
+;;           (child2 (make-styled-node :type :text :props '(:content "Child 2" :flex-grow 2)))
+;;           (child3 (make-styled-node :type :text :props '(:content "Child 3" :flex-grow 1)))
+;;           (container (make-styled-node :type :container
+;;                        :props '(:display :flex :flex-direction :row)
+;;                        :children (list child1 child2 child3)))
+;;           (screen-rect (make-instance 'rectangle :x 0 :y 0 :w 800 :h 600))) ; Use make-instance
 ;;     (layout-tree container screen-rect)
 ;;     (format t "Flexbox Layout Example:~%")
 ;;     (dolist (child (ui-node-children container))
@@ -154,9 +154,9 @@
 (defun buffer->string (buffer)
   "Convert a virtual buffer to a string representation."
   (let ((rows-count (elmtui.platform.backend.common.virtual-buffer:buffer-height buffer))
-        (cols-count (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer)))
+         (cols-count (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer)))
     (with-output-to-string
-        (a)
+      (a)
       (dotimes (row rows-count)
         (progn
           (dotimes (col cols-count)
@@ -167,8 +167,8 @@
 
 (defmacro with-buffer-dump ((buffer) &body body)
   `(handler-bind
-       ((error (lambda (c)
-                 (format *error-output* "~%Buffer state on error:~%~A"
-                         (buffer->string ,buffer))
-                 (invoke-debugger c))))
+     ((error (lambda (c)
+               (format *error-output* "~%Buffer state on error:~%~A"
+                 (buffer->string ,buffer))
+               (invoke-debugger c))))
      ,@body))

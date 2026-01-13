@@ -1,18 +1,13 @@
 (uiop:define-package :elmtui.tests.path
   (:use :cl :fiveam :elmtui.contracts :elmtui.pipeline
-        :elmtui.tea-state
-   :elmtui.utils)
+        :elmtui.state)
   (:import-from :elmtui.view.core #:ui-node-p)
   (:import-from :elmtui.view.styled #:styled-ui-node-p)
   (:import-from :elmtui.pipeline
                 #:generate-dsl)
 
-  (:import-from :elmtui.tea-state
+  (:import-from :elmtui.state
                 #:state-ref
-                #:state-patch
-                #:state-observe
-                #:undo-update-state
-                #:redo-update-state
                 #:make-patch)
   (:import-from :elmtui.view.geo #:make-rectangle #:w #:h #:rectangle #:make-size
                 #:make-pos)
@@ -106,6 +101,6 @@
       (is (eql :not-present old))
       (is (= 1 new)))
     ;; wrapper behaves identically
-    (elmtui.tea-state.state::state-set state '(:foo) 2)
+    (elmtui.state:state-set state '(:foo) 2)
     (is (= 2 (state-ref state '(:foo))))
     (is (= 2 (length (application-state-log state))))))

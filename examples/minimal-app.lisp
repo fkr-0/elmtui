@@ -1,7 +1,7 @@
 (uiop:define-package :elmtui.examples.minimal
   (:use :cl :log4cl)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.core.event-types #:key-event)
   (:export #:run-minimal))
 

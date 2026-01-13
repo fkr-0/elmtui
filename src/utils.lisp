@@ -482,6 +482,12 @@ are discarded recursively."
   (:documentation "Read value at PATH inside DATA; return DEFAULT when absent.
 PATH is either a symbol/keyword (single level) or a proper list."))
 
+(defmethod get-path ((path symbol) (state cl-state.core:application-state) &optional default)
+  (cl-state.utils:get-path path (cl-state.core:application-state-data state) default))
+
+(defmethod get-path ((path list) (state cl-state.core:application-state) &optional default)
+  (cl-state.utils:get-path path (cl-state.core:application-state-data state) default))
+
 (defmethod get-path ((path symbol) data &optional default)
   (get-path (list path) data default))
 

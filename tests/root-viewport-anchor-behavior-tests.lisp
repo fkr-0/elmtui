@@ -2,7 +2,7 @@
   (:use :cl :fiveam)
   (:import-from :elmtui.ui.widgets.root-viewport
     #:make-root-viewport)
-  (:import-from :elmtui.tea-state.api
+  (:import-from :elmtui.state.api
     #:state-ref
     #:apply-patches
     #:ur-patches
@@ -45,7 +45,7 @@
   (let* ((id :rv)
           (id-path `(:components ,id))
           (rv (make-root-viewport id :anchor anchor))
-          (state (elmtui.tea-state:make-application-state)))
+          (state (elmtui.state:make-application-state)))
     (multiple-value-bind (_component patches _cmds)
       (init rv :id-path id-path
         :initial-terminal-dimensions (list term-w term-h)
@@ -53,14 +53,14 @@
         :anchor anchor)
       (list _component patches _cmds)
 
-      (values rv id-path (elmtui.tea-state:apply-patches state patches) state))))
+      (values rv id-path (elmtui.state:apply-patches state patches) state))))
 
 (defun upd (rv id-path state msg)
   "Updated test helper for the modern update method that returns an update-result"
   (let ((result (update rv msg state :id-path id-path)))
     (let ((patches (ur-patches result))
           (commands (ur-commands result)))
-      (elmtui.tea-state:apply-patches state patches)
+      (elmtui.state:apply-patches state patches)
       (values patches state commands))))
 
 (defun has-render-cmd-p (cmds op &optional arg)
@@ -99,17 +99,17 @@
 (test below-cursor-overflow-scrolls-down
   (multiple-value-bind (rv idp o state) (init-root :below-cursor 40 20 18 10)
     ;; Set terminal size so overflow logic has context
-    (setf (state-ref state (append idp '(:state :terminal-size))) '(40 20))
-    (setf (state-ref state (append idp '(:state :cursor-pos))) '(10 18))
+    (setf (state-ref state (append idp '(:terminal-size))) '(40 20))
+    (setf (state-ref state (append idp '(:cursor-pos))) '(10 18))
     ;; Force a larger viewport height in state to provoke overflow
-    (setf (state-ref state (append idp '(:state :height))) 10)
-    (setf (state-ref state (append idp '(:state :width))) 40)
-    (setf (state-ref state (append idp '(:state :pos-known))) t)
+    (setf (state-ref state (append idp '(:height))) 10)
+    (setf (state-ref state (append idp '(:width))) 40)
+    (setf (state-ref state (append idp '(:pos-known))) t)
     (multiple-value-bind (patches state cmds)
       (upd rv idp state '(:terminalresized :width 40 :height 20))
-      (is (state-patch-p patches idp '(:state :width) 40)
+      (is (state-patch-p patches idp '(:width) 40)
         "Viewport width patch recorded on resize")
-      (is (state-patch-p patches idp '(:state :height) 10)
+      (is (state-patch-p patches idp '(:height) 10)
         "Viewport height patch recorded on resize")
       (is-true (has-render-cmd-p cmds :scroll-down)))))
 
@@ -117,12 +117,12 @@
   (multiple-value-bind (rv idp statep state) (init-root :above-cursor 40 20 3 10)
     (declare (ignore statep))
     ;; Set terminal size and cursor pos for overflow logic context
-    (setf (state-ref state (append idp '(:state :terminal-size))) '(40 20))
-    (setf (state-ref state (append idp '(:state :cursor-pos))) '(10 3))
+    (setf (state-ref state (append idp '(:terminal-size))) '(40 20))
+    (setf (state-ref state (append idp '(:cursor-pos))) '(10 3))
     ;; Set height larger than available rows above cursor (3)
-    (setf (state-ref state (append idp '(:state :height))) 6)
-    (setf (state-ref state (append idp '(:state :width))) 40)
-    (setf (state-ref state (append idp '(:state :size-known))) t)
+    (setf (state-ref state (append idp '(:height))) 6)
+    (setf (state-ref state (append idp '(:width))) 40)
+    (setf (state-ref state (append idp '(:size-known))) t)
     (multiple-value-bind (patches new-state cmds)
         (upd rv idp state '(:cursorposition :col 10 :row 3))
       (declare (ignore patches new-state))
@@ -132,12 +132,12 @@
   (multiple-value-bind (rv idp o state) (init-root :below-cursor 80 24 12 10)
 
     ;; Set terminal size and cursor pos for context
-    (setf (state-ref state (append idp '(:state :terminal-size))) '(80 24))
-    (setf (state-ref state (append idp '(:state :cursor-pos))) '(10 12))
+    (setf (state-ref state (append idp '(:terminal-size))) '(80 24))
+    (setf (state-ref state (append idp '(:cursor-pos))) '(10 12))
     ;; Simulate issued scroll net = 5 and ensure on :appshutdown we scroll back up 5
-    (setf (state-ref state (append idp '(:state :issued-scroll-net))) 5)
-    (setf (state-ref state (append idp '(:state :width))) 80)
-    (setf (state-ref state (append idp '(:state :height))) 12)
+    (setf (state-ref state (append idp '(:issued-scroll-net))) 5)
+    (setf (state-ref state (append idp '(:width))) 80)
+    (setf (state-ref state (append idp '(:height))) 12)
     (multiple-value-bind (s k cmds)
       (upd rv idp state '(:appshutdown))
       (declare (ignore s))

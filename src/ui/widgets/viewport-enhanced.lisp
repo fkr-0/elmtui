@@ -246,13 +246,22 @@
             (list (list id-path
                         (list* :type (type-of component)
                                :id component-id
-                               :state viewport-state)))
+                               viewport-state)))
             nil)))
 
 ;; Legacy update method with contract integration
+(defun %viewport-enhanced-state (component-state)
+  "Return component-state without metadata keys."
+  (let ((state (when component-state (copy-list component-state))))
+    (when state
+      (remf state :type)
+      (remf state :id))
+    state))
+
 (defmethod update ((component viewport-enhanced) state message &key id-path)
   "Enhanced update method with contract enforcement"
-  (let* ((current-state (getf (get-path id-path state) :state))
+  (let* ((component-state (get-path id-path state))
+         (current-state (%viewport-enhanced-state component-state))
          (patches nil)
          (commands nil))
 
@@ -261,7 +270,11 @@
         (viewport-enhanced-update current-state message)
 
       (when new-state
-        (push (list (append id-path '(:state)) new-state) patches))
+        (push (list id-path
+                    (list* :type (getf component-state :type)
+                           :id (getf component-state :id)
+                           new-state))
+              patches))
 
       (when new-commands
         (setf commands (append commands new-commands))))
@@ -271,8 +284,9 @@
 ;; Legacy view method with DSL integration
 (defmethod view ((component viewport-enhanced) state &key id-path)
   "Enhanced view method with base DSL output"
-  (let* ((component-state (getf (get-path id-path state) :state))
-         (enhanced-state (list* :id (id-from-path id-path) component-state)))
+  (let* ((component-state (get-path id-path state))
+         (viewport-state (%viewport-enhanced-state component-state))
+         (enhanced-state (list* :id (id-from-path id-path) viewport-state)))
 
     ;; Use the contract-enforced view function
     (viewport-enhanced-view enhanced-state)))

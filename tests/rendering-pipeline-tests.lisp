@@ -8,17 +8,17 @@
   (:import-from #:cl-styles.tokens #:rgb)
   (:import-from :elmtui.view.styled #:styled-ui-node-p)
   (:import-from :elmtui.pipeline
-                #:generate-dsl)
+    #:generate-dsl)
 
   (:import-from :elmtui.view.geo #:make-rectangle #:w #:h #:rectangle #:make-size
-                #:make-pos)
+    #:make-pos)
   (:import-from :elmtui.platform.backend.common.virtual-buffer
-                #:virtual-terminal-buffer-p
-                #:make-virtual-buffer)
+    #:virtual-terminal-buffer-p
+    #:make-virtual-buffer)
   (:import-from :elmtui.tests.rainbow
-                #:rainbow-content-view
-                #:rainbow-stylesheet
-                #:initialize-app-state-rainbow-example-app)
+    #:rainbow-content-view
+    #:rainbow-stylesheet
+    #:initialize-app-state-rainbow-example-app)
   )
 (in-package :elmtui.tests.rendering-pipeline)
 ;;;--------------------------------------------------------------
@@ -47,18 +47,18 @@
   "Helper to create a default context for pipeline tests."
   (declare (ignorable width height))
   (multiple-value-bind (app-state commands)
-      (initialize-app-state-rainbow-example-app
-       :initial-terminal-dimensions (list 80 24)
-       :initial-cursor-position (list 0 0))
+    (initialize-app-state-rainbow-example-app
+      :initial-terminal-dimensions (list 80 24)
+      :initial-cursor-position (list 0 0))
     (declare (ignore commands))
     (make-app-context
-     :state app-state
-     :viewport-rect (make-rectangle
-                     :size (make-size :h 24 :w 80) ;;width :h height)
-                     :pos (make-pos :x 0 :y 0))
-     :front-buffer (make-virtual-buffer 80 24)
-     :view-fn #'rainbow-content-view
-     :backend nil)
+      :state app-state
+      :viewport-rect (make-rectangle
+                       :size (make-size :h 24 :w 80) ;;width :h height)
+                       :pos (make-pos :x 0 :y 0))
+      :front-buffer (make-virtual-buffer 80 24)
+      :view-fn #'rainbow-content-view
+      :backend nil)
     ;; app-state
     ))
 ;; (setup-test-context)
@@ -67,20 +67,20 @@
   "Tests the initial state of the rainbow app example."
   (let ((context (setup-test-context)))
     (is-true (ctx-state context) "Context should have an application state.")
-    (is-true (elmtui.tea-state:application-state-p (ctx-state context)) "Context state should be a valid app state.")
+    (is-true (elmtui.state:application-state-p (ctx-state context)) "Context state should be a valid app state.")
     (is-true (ctx-viewport-rect context) "Context should have a viewport rectangle.")
     (is-true (ctx-front-buffer context) "Context should have a front buffer.")
     (is-true (virtual-terminal-buffer-p (ctx-front-buffer context))
-             "Front buffer should be a virtual-terminal-buffer.")))
+      "Front buffer should be a virtual-terminal-buffer.")))
 
 (test full-pipeline-macro-execution
   "Tests the entire full-view-pipeline from DSL generation to buffer rendering."
   (let* ((initial-context (setup-test-context))
-         (final-context (render-pipeline-0-to-5 initial-context)))
+          (final-context (render-pipeline-0-to-5 initial-context)))
     (is-true (ctx-laid-out-tree final-context) "Pipeline should produce a laid-out tree.")
     (is-true (ctx-back-buffer final-context) "Pipeline should produce a back-buffer.")
     (is (typep (ctx-back-buffer final-context) 'elmtui.platform.backend.common.virtual-buffer:virtual-terminal-buffer)
-        "The back-buffer should be a virtual-terminal-buffer.")))
+      "The back-buffer should be a virtual-terminal-buffer.")))
 
 ;; Ensure the pipeline lays out children with their own computed rects
 (test pipeline-layout-correctness-basic
@@ -88,78 +88,80 @@
            (lambda (model)
              (declare (ignore model))
              (let* ((root (make-instance 'elmtui.view.base-elements:container-element
-                                         :id :root
-                                         :style '(:display :flex :flex-direction :row :gap 1)))
-                    (a    (make-instance 'elmtui.view.base-elements:container-element :id :a :style '(:width 10 :height 3)))
-                    (b    (make-instance 'elmtui.view.base-elements:text-element      :id :b :content "hello world")))
+                            :id :root
+                            :style '(:display :flex :flex-direction :row :gap 1)))
+                     (a    (make-instance 'elmtui.view.base-elements:container-element :id :a :style '(:width 10 :height 3)))
+                     (b    (make-instance 'elmtui.view.base-elements:text-element      :id :b :content "hello world")))
                (setf (elmtui.view.base-elements:element-children a) (list b))
                (setf (elmtui.view.base-elements:element-children root) (list a))
                root)))
-         (ctx (make-app-context
-               :state nil
-               :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
-                                              :size (make-size :w 80 :h 10))
-               :front-buffer (make-virtual-buffer 80 10)
-               :view-fn view))
-         (ctx2 (render-pipeline-0-to-5 ctx))
-         (laid (ctx-laid-out-tree ctx2))
-         (root (root laid))
-         (a    (car (elmtui.view.base-elements:element-children root)))
-         (b    (car (elmtui.view.base-elements:element-children a))))
+          (ctx (make-app-context
+                 :state nil
+                 :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
+                                  :size (make-size :w 80 :h 10))
+                 :front-buffer (make-virtual-buffer 80 10)
+                 :view-fn view))
+          (ctx2 (render-pipeline-0-to-5 ctx))
+          (laid (ctx-laid-out-tree ctx2))
+          (root (root laid))
+          (a    (car (elmtui.view.base-elements:element-children root)))
+          (b    (car (elmtui.view.base-elements:element-children a))))
     (is (>= (elmtui.view.geo:w (elmtui.view.element:el/layout-rect a)) 10)
-        "Child A keeps its fixed width (lower bound), not forced to viewport.")
+      "Child A keeps its fixed width (lower bound), not forced to viewport.")
     (is (<= (elmtui.view.geo:w (elmtui.view.element:el/layout-rect b))
-            (elmtui.view.geo:w (elmtui.view.element:el/layout-rect a)))
-        "Inner text width never exceeds its container's width.")))
+          (elmtui.view.geo:w (elmtui.view.element:el/layout-rect a)))
+      "Inner text width never exceeds its container's width.")))
 
 (test root-viewport-produces-layoutable-child
   "Regression: ensure root viewport DSL resolves and layouts once terminal size is known."
   (let* ((state (make-hash-table :test 'equal))
-         (components (make-hash-table :test 'equal))
-         (root-entry (make-hash-table :test 'equal)))
+          (components (make-hash-table :test 'equal))
+          (root-entry (make-hash-table :test 'equal)))
     (setf (gethash :components state) components)
     (setf (gethash :root components) root-entry)
     (setf (gethash :state root-entry)
-          '(:size-known t
-            :terminal-size (40 10)
-            :width 40 :height 10
-            :offset-x 0 :offset-y 0
-            :scroll-x 0 :scroll-y 0
-            :child-dsl-spec (:text :id :child :content "hello world")))
+      '(:size-known t
+         :terminal-size (40 10)
+         :width 40 :height 10
+         :offset-x 0 :offset-y 0
+         :scroll-x 0 :scroll-y 0
+         :child-dsl-spec (:text :id :child :content "hello world")))
     (let* ((ctx (make-app-context
-                 :state state
-                 :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
-                                                :size (make-size :w 40 :h 10))
-                 :front-buffer (make-virtual-buffer 40 10)
-                 :view-fn (lambda (_model)
-                            '(:root-viewport :id :root)))))
+                  :state state
+                  :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
+                                   :size (make-size :w 40 :h 10))
+                  :front-buffer (make-virtual-buffer 40 10)
+                  :view-fn (lambda (_model)
+                             (declare (ignore _model))
+                             '(:root-viewport :id :root)))))
       (let ((result (render-pipeline-0-to-5 ctx)))
         (is-true (ctx-laid-out-tree result)
-                 "Root viewport DSL should produce a laid-out tree.")))))
+          "Root viewport DSL should produce a laid-out tree.")))))
 
 (test root-viewport-gates-pipeline-when-terminal-size-missing
   "Regression: pipeline should skip layouting until the terminal size becomes available."
   (let* ((state (make-hash-table :test 'equal))
-         (components (make-hash-table :test 'equal))
-         (root-entry (make-hash-table :test 'equal)))
+          (components (make-hash-table :test 'equal))
+          (root-entry (make-hash-table :test 'equal)))
     (setf (gethash :components state) components)
     (setf (gethash :root components) root-entry)
     (setf (gethash :state root-entry)
-          '(:size-known nil
-            :terminal-size (0 0)
-            :child-dsl-spec (:text :id :child :content "pending")))
+      '(:size-known nil
+         :terminal-size (0 0)
+         :child-dsl-spec (:text :id :child :content "pending")))
     (let* ((ctx (make-app-context
-                 :state state
-                 :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
-                                                :size (make-size :w 40 :h 10))
-                 :front-buffer (make-virtual-buffer 40 10)
-                 :view-fn (lambda (_model)
-                            '(:root-viewport :id :root)))))
+                  :state state
+                  :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
+                                   :size (make-size :w 40 :h 10))
+                  :front-buffer (make-virtual-buffer 40 10)
+                  :view-fn (lambda (_model)
+                             (declare (ignore _model))
+                             '(:root-viewport :id :root)))))
       (let ((result (render-pipeline-0-to-5 ctx)))
         (is (null (ctx-laid-out-tree result))
-            "Root viewport should not emit a layout before terminal size is ready.")
+          "Root viewport should not emit a layout before terminal size is ready.")
         (is (null (ctx-back-buffer result))
-            "No buffer should be generated while layouting is gated.")))))
+          "No buffer should be generated while layouting is gated.")))))
 
 
 ;; (test pipeline-step-by-step-transformation

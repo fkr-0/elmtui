@@ -5,7 +5,7 @@
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-info)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.ui.widgets.layout #:defcomponent-dsl)
   (:import-from :elmtui.ui.widgets.panel #:defcomponent-dsl)
   (:import-from :elmtui.core.defaults #:default-keymap)

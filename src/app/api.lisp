@@ -8,7 +8,8 @@
   (:import-from #:elmtui.ui.api #:instantiate-component-from-dsl)
   (:import-from :elmtui.core.event-channels
    :event-channel)
-  (:import-from :elmtui.tea-state :get-path)
+  (:import-from :elmtui.state.api :get-path)
+  (:import-from :cl-state.core :application-state)
   (:export #:defapplication
            #:with-temporary-dsl-component-registry
            #:run-application
@@ -50,7 +51,7 @@
     (symbol   (intern (string-upcase x) "KEYWORD"))
     (string   (intern (string-upcase x) "KEYWORD"))))
 (defgeneric get-component-instance (id-path state)
-  (:method ((id-path list) (state elmtui.tea-state.api:application-state))
+  (:method ((id-path list) (state application-state))
     "Retrieve a component instance from STATE by following ID-PATH."
     (let* ((path-keys (if (eq :components (car id-path))
                           (rest id-path)

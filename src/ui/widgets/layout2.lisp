@@ -10,7 +10,7 @@
                 #:view               ; For calling on children
                 #:destroy            ; For defining and calling on children
                 #:make-state-patch)  ; For manual patch creation (e.g. in destroy)
-  (:import-from :elmtui.tea-state.api
+  (:import-from :elmtui.state.api
                 #:ur-patches       ; For collecting child patches
                 #:ur-commands       ; For collecting child commands
                 #:get-path           ; Used in user code (e.g. for child state, or in destroy)
@@ -228,7 +228,7 @@
    (:message-to (target-child-id-segment child-message)
                 (let* ((target-child-id (ensure-keyword target-child-id-segment))
                        (child-full-id-path (append self-id-path (list target-child-id)))
-                       (child-type (elmtui.tea-state.api:get-path child-full-id-path app-state :type)))
+                       (child-type (elmtui.state.api:get-path child-full-id-path app-state :type)))
                   (if (and child-type (find target-child-id (getf local-state :children-ids) :test #'equal))
                       (let* ((child-instance (make-instance child-type))
                              (child-update-result (apply #'elmtui.ui.api:update child-instance app-state child-message :id-path child-full-id-path)))
@@ -292,7 +292,7 @@
                  :children (mapcar
                             (lambda (child-id-segment)
                               (let* ((child-full-id-path (append self-id-path (list child-id-segment)))
-                                     (child-type (elmtui.tea-state.api:get-path child-full-id-path  app-state :type)))
+                                     (child-type (elmtui.state.api:get-path child-full-id-path  app-state :type)))
                                 (if child-type
                                     (let ((child-instance (make-instance child-type)))
                                       (elmtui.ui.api:view child-instance app-state :id-path child-full-id-path))
@@ -306,7 +306,7 @@
 
 ;; Manual destroy method for layout
 ;; (defmethod elmtui.ui.api:destroy ((self layout) app-state &key id-path)
-;;   (let ((layout-local-state (elmtui.tea-state.api:get-path id-path app-state ))
+;;   (let ((layout-local-state (elmtui.state.api:get-path id-path app-state ))
 ;;         (all-patches nil)
 ;;         (all-commands nil))
 
@@ -314,7 +314,7 @@
 
 ;;     (loop for child-id-segment in (getf layout-local-state :children-ids)
 ;;           for child-full-id-path = (append id-path (list child-id-segment))
-;;           for child-type = (elmtui.tea-state.api:get-path child-full-id-path  app-state :type)
+;;           for child-type = (elmtui.state.api:get-path child-full-id-path  app-state :type)
 ;;           when child-type
 ;;             do (let ((child-instance (make-instance child-type)))
 ;;                  (multiple-value-bind (child-patches child-commands-from-destroy)

@@ -3,7 +3,7 @@
   (:export #:run-focus-simple)
   (:import-from :log4cl #:log-info)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.ui.widgets.listbox
                 #:init-listbox #:update-listbox #:view-listbox
                 #:listbox-model-height #:listbox-model-items

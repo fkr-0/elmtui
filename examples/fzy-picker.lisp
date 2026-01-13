@@ -8,8 +8,8 @@
 (uiop:define-package :elmtui.examples.fzy-picker
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
-  (:import-from :elmtui.tea-state.msg #:msg-type #:msg-data)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.msg #:msg-type #:msg-data)
   (:import-from :elmtui.core.event-types
     #:key-event #:key-event-key #:key-event-char #:key-event-modifiers)
   (:import-from :cl-fzy

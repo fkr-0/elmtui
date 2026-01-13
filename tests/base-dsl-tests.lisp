@@ -17,7 +17,7 @@
                 #:button-element #:button-content
                 #:container-element #:element-children #:element-id)
 
-  (:import-from :elmtui.tea-state.model
+  (:import-from :elmtui.state.model
                 #:transaction-status
                 #:defmodel-contracted #:validate-state-schema #:validate-state-instance
                 #:defpatch #:deftransaction #:apply-state-patches

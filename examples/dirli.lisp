@@ -9,7 +9,7 @@
 (uiop:define-package :elmtui.examples.dirli
   (:use :cl :alexandria :log4cl)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.ui.widgets.listbox
                 #:init-listbox #:update-listbox #:view-listbox
                 #:listbox-model-id #:listbox-model-items

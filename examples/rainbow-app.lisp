@@ -13,7 +13,7 @@
   (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
   (:import-from :cl-styles.selector #:cls> #:type>)
   (:import-from :elmtui.core.event-types #:key-event)
-  (:import-from :elmtui.tea-state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:export
     :run-rainbow-example-app
     :rainbow-content-view
@@ -156,8 +156,8 @@
   :view-fn 'rainbow-content-view)
 
 ;; (elmtui.view.dsl:dsl->ui-node (elmtui.app::maybe-wrap-with-root-viewport
-;;                                (funcall 'rainbow-content-view (elmtui.tea-state:make-application-state)) :root-id
-;;                                ':rainbow-root-vp)(elmtui.tea-state:make-application-state))
+;;                                (funcall 'rainbow-content-view (elmtui.state:make-application-state)) :root-id
+;;                                ':rainbow-root-vp)(elmtui.state:make-application-state))
 
 ;; (let* ((o (elmtui.view.dsl:render-dsl-to-resolved-tree
 ;;             '(:ROOT-VIEWPORT :ID :RAINBOW-ROOT-VP :INITIAL-TERMINAL-DIMENSIONS (1 1)
@@ -187,13 +187,13 @@
 ;;                        (75 0 130)))
 ;;                    (:CONTAINER :ID :STRIPE-VIOLET :CLASSES ("violet-stripe") :STYLE
 ;;                      (:WIDTH :FILL :HEIGHT :FILL :MIN-WIDTH 10 :FG-COLOR (238 130 238) :BG-COLOR
-;;                        (238 130 238)))))) (elmtui.tea-state:make-application-state)))
+;;                        (238 130 238)))))) (elmtui.state:make-application-state)))
 ;;         (r (getf (cdr o)
 ;;              :resolved-view)))r)
-;;         (i (getf (cdr (elmtui.view.dsl:render-dsl-to-resolved-tree r (elmtui.tea-state:make-application-state)))
+;;         (i (getf (cdr (elmtui.view.dsl:render-dsl-to-resolved-tree r (elmtui.state:make-application-state)))
 ;;              :resolved-view))
-;;         (j (elmtui.view.dsl:render-dsl-to-resolved-tree i (elmtui.tea-state:make-application-state))))
-;; (elmtui.view.dsl:render-dsl-to-resolved-tree r (elmtui.tea-state:make-application-state))
+;;         (j (elmtui.view.dsl:render-dsl-to-resolved-tree i (elmtui.state:make-application-state))))
+;; (elmtui.view.dsl:render-dsl-to-resolved-tree r (elmtui.state:make-application-state))
 ;; (elmtui.utils:as :styled-ui-node
 ;;                    r)
 ;; j)

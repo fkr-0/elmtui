@@ -11,6 +11,10 @@
     #:compute-anchor-solution
     #:%recompute-anchoring
     #:%apply-overflow-y)
+  (:import-from :elmtui.state
+    #:make-state)
+  (:import-from :elmtui.state.update
+    #:make-update-context)
   (:import-from :elmtui.utils #:as)
   (:import-from :elmtui.ui.api
     #:init #:view)  ; we only call :view for gating (no rendering)
@@ -36,7 +40,7 @@
 
 (defun %plist-put-in (plist path value)
   "Functional-ish put: returns new PLIST with PATH set to VALUE.
-PATH is a list of keywords like (:app :rv :state :width)."
+PATH is a list of keywords like (:app :rv :width)."
   (labels ((put (cell ks)
              (if (endp ks)
                value
@@ -55,6 +59,11 @@ PATH is a list of keywords like (:app :rv :state :width)."
             (destructuring-bind (path value) p
               (%plist-put-in s path value)))
     patches :initial-value state))
+
+(defun %make-test-ctx (base-path state)
+  "Create an update context for STATE rooted at BASE-PATH."
+  (let ((app (make-state :initial state :backend :plist)))
+    (make-update-context app :base-path base-path)))
 
 ;;;; --------------------------------------------------------------------------
 ;;;; 1) View gating: return NIL until both size & cursor are known
@@ -79,16 +88,16 @@ PATH is a list of keywords like (:app :rv :state :width)."
     ;; Simulate SUT becoming ready by setting the flags it checks
     (flet ((mark-ready (st base-path)
              (let* ((ready-patches
-                      (list (list (append base-path '(:state :size-known)) t)
-                        (list (append base-path '(:state :terminal-size)) '(20 10))
-                        (list (append base-path '(:state :width)) 20)
-                        (list (append base-path '(:state :height)) 10)
-                        (list (append base-path '(:state :offset-x)) 0)
-                        (list (append base-path '(:state :offset-y)) 0))))
+                      (list (list (append base-path '(:size-known)) t)
+                        (list (append base-path '(:terminal-size)) '(20 10))
+                        (list (append base-path '(:width)) 20)
+                        (list (append base-path '(:height)) 10)
+                        (list (append base-path '(:offset-x)) 0)
+                        (list (append base-path '(:offset-y)) 0))))
                (%apply-patches st ready-patches))))
       ;; canonical (:components …) path
       (let* ((canonical-path (cons :components id-path))
-             (canon-state (mark-ready state canonical-path)))
+              (canon-state (mark-ready state canonical-path)))
         (is (consp (view rv canon-state :id-path canonical-path))
           "Canonical state path must produce DSL once ready."))
       ;; legacy path without :components prefix
@@ -148,39 +157,40 @@ PATH is a list of keywords like (:app :rv :state :width)."
   "Build a minimal state subtree used by %apply-overflow-y."
   (let ((st '()))
     (dolist (p
-              `(((:state :anchor) ,anchor)
-                 ((:state :terminal-size) (,cols ,rows))
-                 ((:state :cursor-pos) (,cur-col ,cur-row))
-                 ((:state :height) ,height)
-                 ((:state :width) ,width)
-                 ((:state :issued-scroll-net) ,issued)))
+              `(((:anchor) ,anchor)
+                 ((:terminal-size) (,cols ,rows))
+                 ((:cursor-pos) (,cur-col ,cur-row))
+                 ((:height) ,height)
+                 ((:width) ,width)
+                 ((:issued-scroll-net) ,issued)))
       (setf st (%plist-put-in st (first p) (second p))))
     st))
 
 (test overflow-below-cursor-scroll
   ;; rows=20, cursor row=20 (1-based) → 1 row remaining; height=4 => need scroll-down 3.
   (let* ((st (%mk-state-for-overflow :below-cursor 20 80 20 0 30 4))
-          (st-path '(:app :rv)))
-    ;; wrap into outer state at st-path
-    (let ((state (%plist-put-in '() (append st-path '()) st)))
-      (multiple-value-bind (patches commands)
-        (%apply-overflow-y (append st-path '(:state)) state :scroll 0 0)
-        (is (find '(:render :scroll-down 3) commands :test #'equal)
-          "Below-cursor + overflow :scroll → issue :scroll-down by the deficit.")
-        (is (some (lambda (p) (and (equal (first p) (append st-path '(:state :issued-scroll-net)))
-                                (= (second p) 3)))
-              patches)
-          "Issued scroll net must accumulate by 3.")))))
+          (st-path '(:app :rv))
+          (state (%plist-put-in '() st-path st))
+          (ctx (%make-test-ctx st-path state)))
+    (multiple-value-bind (patches commands)
+      (%apply-overflow-y ctx :scroll 0 0)
+      (is (find '(:render :scroll-down 3) commands :test #'equal)
+        "Below-cursor + overflow :scroll → issue :scroll-down by the deficit.")
+      (is (some (lambda (p) (and (equal (first p) (append st-path '(:issued-scroll-net)))
+                              (= (second p) 3)))
+            patches)
+        "Issued scroll net must accumulate by 3."))))
 
 (test overflow-below-cursor-truncate
   ;; Same geometry, but policy :truncate → height becomes 1; no commands.
   (let* ((st (%mk-state-for-overflow :below-cursor 20 80 20 0 30 4))
           (st-path '(:app :rv))
-          (state (%plist-put-in '() (append st-path '()) st)))
+          (state (%plist-put-in '() st-path st))
+          (ctx (%make-test-ctx st-path state)))
     (multiple-value-bind (patches commands)
-      (%apply-overflow-y (append st-path '(:state)) state :truncate 0 0)
+      (%apply-overflow-y ctx :truncate 0 0)
       (is (null commands) "Truncate issues no :render commands.")
-      (is (some (lambda (p) (and (equal (first p) (append st-path '(:state :height)))
+      (is (some (lambda (p) (and (equal (first p) (append st-path '(:height)))
                               (= (second p) 1)))
             patches)
         "Truncate sets height to available rows (1)."))))
@@ -189,9 +199,10 @@ PATH is a list of keywords like (:app :rv :state :width)."
   ;; rows=20, cursor row=2 (1-based) → rows available above = 1; height=5 => need scroll-up 4.
   (let* ((st (%mk-state-for-overflow :above-cursor 20 80 2 0 30 5))
           (st-path '(:app :rv))
-          (state (%plist-put-in '() (append st-path '()) st)))
+          (state (%plist-put-in '() st-path st))
+          (ctx (%make-test-ctx st-path state)))
     (multiple-value-bind (patches commands)
-      (%apply-overflow-y (append st-path '(:state)) state :scroll 0 0)
+      (%apply-overflow-y ctx :scroll 0 0)
       (declare (ignore patches))
       (is (find '(:render :scroll-up 4) commands :test #'equal)))))
 
@@ -202,13 +213,13 @@ PATH is a list of keywords like (:app :rv :state :width)."
 (defun %mk-state-for-manual (rows cols width height off-y off-x &key growth)
   (let ((st '()))
     (dolist (p
-              `(((:state :anchor) :manual)
-                 ((:state :terminal-size) (,cols ,rows))
-                 ((:state :width) ,width)
-                 ((:state :height) ,height)
-                 ((:state :offset-x) ,off-y)
-                 ((:state :offset-y) ,off-x)
-                 ,@(when growth `(((:state :anchor-growth) ,growth)))))
+              `(((:anchor) :manual)
+                 ((:terminal-size) (,cols ,rows))
+                 ((:width) ,width)
+                 ((:height) ,height)
+                 ((:offset-x) ,off-y)
+                 ((:offset-y) ,off-x)
+                 ,@(when growth `(((:anchor-growth) ,growth)))))
       (setf st (%plist-put-in st (first p) (second p))))
     st))
 
@@ -216,9 +227,10 @@ PATH is a list of keywords like (:app :rv :state :width)."
   ;; Start somewhere near the bottom-right; grow terminal smaller; ensure clamping but no repositioning logic.
   (let* ((st (%mk-state-for-manual 40 100 20 10 35 90 :growth :bottom-right))
           (st-path '(:app :rv))
-          (state (%plist-put-in '() (append st-path '()) st)))
+          (state (%plist-put-in '() st-path st))
+          (ctx (%make-test-ctx st-path state)))
     (multiple-value-bind (oy ox ap growth eff)
-      (%recompute-anchoring (append st-path '(:state)) state)
+      (%recompute-anchoring ctx)
       ;; In manual mode, offsets returned are the (possibly clamped) stored offsets
       ;; Note: rows/cols in state are 40x100, height=10,width=20 → max off-x = 30, off-y = 80
       (is (= oy 30))
@@ -231,9 +243,10 @@ PATH is a list of keywords like (:app :rv :state :width)."
   ;; If no growth stored, fall back to :bottom-right.
   (let* ((st (%mk-state-for-manual 24 60 10 6 3 7))
           (st-path '(:app :rv))
-          (state (%plist-put-in '() (append st-path '()) st)))
+          (state (%plist-put-in '() st-path st))
+          (ctx (%make-test-ctx st-path state)))
     (multiple-value-bind (_oy _ox _ap growth _eff)
-      (%recompute-anchoring (append st-path '(:state)) state)
+      (%recompute-anchoring ctx)
       (declare (ignore _oy _ox _ap _eff))
       (is (eql growth :bottom-right)))))
 

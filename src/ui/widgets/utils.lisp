@@ -4,7 +4,7 @@
 ;;;===============================================================
 (uiop:define-package :elmtui.ui.widgets.utils
   (:use :cl )
-  (:import-from :elmtui.tea-state.api #:application-state #:state-ref)
+  (:import-from :elmtui.state.api #:application-state #:state-ref)
   (:import-from :elmtui.core.focus #:get-current-focus)
 
   (:export
