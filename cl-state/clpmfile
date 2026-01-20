@@ -13,6 +13,7 @@
 
 
 (:asd "./cl-state.asd")
+(:asd "./cl-state-tests.asd")
 
 (:system "alexandria" :source "quicklisp")
 (:system "log4cl" :source "quicklisp")

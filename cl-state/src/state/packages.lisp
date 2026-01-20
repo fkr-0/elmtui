@@ -36,6 +36,7 @@
   (:use :cl :alexandria :cl-state.utils)
   (:export
    #:patch
+   #:patch-p
    #:make-patch
    #:patch-path
    #:patch-op
@@ -58,9 +59,9 @@
    #:tx-changes
    #:with-transaction
    #:apply-patches
+   #:state-set
    #:undo
-   #:redo
-   #:state-set))
+   #:redo))
 
 (uiop:define-package :cl-state.undo
   (:use :cl :alexandria)
@@ -70,8 +71,8 @@
    #:history-past
    #:history-future
    #:push-snapshot
-   #:undo
-   #:redo))
+   #:history-undo
+   #:history-redo))
 
 (uiop:define-package :cl-state.observer
   (:use :cl :alexandria :cl-state.core)
@@ -85,16 +86,78 @@
         :cl-state.utils
         :cl-state.core
         :cl-state.patch
-        :cl-state.tx
-        :cl-state.observer)
-  (:import-from :cl-state.undo
+        :cl-state.observer
+        :cl-state.tx)
+  (:shadowing-import-from :cl-state.undo
     #:history
     #:make-history
     #:history-past
     #:history-future
     #:push-snapshot)
-  (:reexport :cl-state.utils
-             :cl-state.core
-             :cl-state.patch
-             :cl-state.tx
-             :cl-state.observer))
+  (:import-from :cl-state.undo
+    #:history-undo
+    #:history-redo)
+  ;; Re-export all public symbols from subsystems
+  (:export
+   ;; From cl-state.utils
+   #:get-path
+   #:set-path
+   #:remove-path
+   #:plist->hash-table
+   #:hash-table->plist
+   #:coerce-data
+   ;; From cl-state.core
+   #:application-state
+   #:application-state-p
+   #:make-application-state
+   #:application-state-data
+   #:application-state-backend
+   #:application-state-log
+   #:application-state-history
+   #:application-state-undone
+   #:application-state-version
+   #:application-state-lock
+   #:application-state-observers
+   #:state-ref
+   #:get-state
+   #:state-set
+   #:make-state
+   #:set-application-state-backend
+   #:deep-copy-application-state
+   #:application-state-plist
+   #:get-component-by-path
+   ;; From cl-state.patch
+   #:patch
+   #:patch-p
+   #:make-patch
+   #:patch-path
+   #:patch-op
+   #:patch-value
+   #:apply-patch
+   #:apply-patches
+   #:merge-patch
+   #:merge-patches
+   #:diff-states
+   #:normalize-patches
+   ;; From cl-state.tx
+   #:tx
+   #:make-tx
+   #:tx-p
+   #:tx-id
+   #:tx-name
+   #:tx-changes
+   #:with-transaction
+   #:undo
+   #:redo
+   ;; From cl-state.observer
+   #:add-observer
+   #:remove-observer
+   #:notify-observers
+   ;; From cl-state.undo
+   #:history
+   #:make-history
+   #:history-past
+   #:history-future
+   #:push-snapshot
+   #:history-undo
+   #:history-redo))

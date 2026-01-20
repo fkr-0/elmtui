@@ -10,20 +10,19 @@
 (defun add-observer (app key fn)
   "Adds an observer FN for KEY in application-state APP."
   (let* ((observers (application-state-observers app))
-         (key-obs (%alist-get key observers)))
-    (setf (application-state-observers app)
-          (if key-obs
-              (cons (cons key (cons fn key-obs)) (remove (assoc key observers) observers))
-              (cons (cons key (list fn)) observers)))
-    (unless (assoc key observers)
-      (push (cons key (list fn)) (application-state-observers app))))
-  fn)
+         (pair (assoc key observers)))
+    (if pair
+        ;; Key exists: add fn to existing observer list
+        (setf (cdr pair) (cons fn (cdr pair)))
+        ;; Key doesn't exist: create new entry
+        (push (cons key (list fn)) (application-state-observers app)))
+    fn))
 
 (defun remove-observer (app key fn)
-  "Removes observer FN for KEY in application-state APP."
+  "Removes observer FN for KEY in application-state APP. Returns T if FN was found and removed, NIL otherwise."
   (let* ((observers (application-state-observers app))
          (pair (assoc key observers)))
-    (when pair
+    (when (and pair (member fn (cdr pair)))
       (setf (cdr pair) (remove fn (cdr pair)))
       t)))
 

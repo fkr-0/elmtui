@@ -115,29 +115,31 @@ Accepts even-length lists with symbol/keyword keys in odd positions."
   (etypecase path
     (symbol (%remove-entry data path))
     (list
-      (let* ((key (car path))
-              (rest (cdr path))
-              (child (%get-entry data key nil)))
-        (if (null child)
-          (values data nil)
-          (multiple-value-bind (new-child removedp)
-            (remove-path child rest :prune-empty prune-empty)
-            (if (not removedp)
-              (values data nil)
-              (let ((child-empty (%empty-container-p new-child)))
-                (cond
-                  ((and prune-empty child-empty)
-                    (multiple-value-bind (data* _) (%remove-entry data key)
-                      (declare (ignore _))
-                      (values data* t)))
-                  (child-empty
-                    (values (%set-entry data key
-                              (typecase child
-                                (hash-table (make-hash-table :test 'equal))
-                                (t nil)))
-                      t))
-                  (t
-                    (values (%set-entry data key new-child) t)))))))))
+      (if (null (cdr path))
+        (%remove-entry data (car path))
+        (let* ((key (car path))
+                (rest (cdr path))
+                (child (%get-entry data key nil)))
+          (if (null child)
+            (values data nil)
+            (multiple-value-bind (new-child removedp)
+              (remove-path child rest :prune-empty prune-empty)
+              (if (not removedp)
+                (values data nil)
+                (let ((child-empty (%empty-container-p new-child)))
+                  (cond
+                    ((and prune-empty child-empty)
+                      (multiple-value-bind (data* _) (%remove-entry data key)
+                        (declare (ignore _))
+                        (values data* t)))
+                    (child-empty
+                      (values (%set-entry data key
+                                (typecase child
+                                  (hash-table (make-hash-table :test 'equal))
+                                  (t nil)))
+                        t))
+                    (t
+                      (values (%set-entry data key new-child) t))))))))))
     (t (values data nil))))
 
 (defun plist->hash-table (plist &key (test 'equal))
@@ -156,7 +158,7 @@ Accepts even-length lists with symbol/keyword keys in odd positions."
     (maphash (lambda (k v)
                (setf plist (list* k (if (hash-table-p v) (hash-table->plist v) v) plist)))
       table)
-    (nreverse plist)))
+    plist))
 
 (defun coerce-data (data backend)
   "Coerce DATA to BACKEND (:hash-table or :plist) when possible."
