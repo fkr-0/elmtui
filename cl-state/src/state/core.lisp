@@ -92,6 +92,12 @@ See Also:
 (defmethod get-path (path (state application-state) &optional default)
   (cl-state.utils:get-path path (application-state-data state) default))
 
+(defmethod get-path ((path list) (state application-state) &optional default)
+  (cl-state.utils:get-path path (application-state-data state) default))
+
+(defmethod get-path ((path symbol) (state application-state) &optional default)
+  (cl-state.utils:get-path path (application-state-data state) default))
+
 (defmethod (setf state-ref) (value (state application-state) (key t))
   "Atomically store VALUE at KEY inside STATE and log the change."
   (bt:with-lock-held ((application-state-lock state))
