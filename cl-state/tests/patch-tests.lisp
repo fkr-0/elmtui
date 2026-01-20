@@ -1,0 +1,176 @@
+;;;===============================================================
+;;; File: cl-state/tests/patch-tests.lisp
+;;; Unit tests for cl-state.patch module
+;;;===============================================================
+(uiop:define-package :cl-state-tests.patch
+  (:use :cl :fiveam :cl-state.api)
+  (:import-from #:cl-state.patch
+                #:apply-patch
+                #:apply-patches)
+  (:export #:patch-suite
+    #:run-patch-tests))
+
+(in-package :cl-state-tests.patch)
+
+(def-suite patch-suite
+  :description "Tests for cl-state.patch module")
+
+(in-suite patch-suite)
+
+;;; make-patch tests
+
+(test make-patch-struct
+  "Creating patch structure"
+  (let ((p (make-patch :path '(:a) :op :set :value 1)))
+    (is (patch-p p))
+    (is (equal '(:a) (patch-path p)))
+    (is (eq :set (patch-op p)))
+    (is (= 1 (patch-value p)))))
+
+;;; normalize-patches tests
+
+(test normalize-patches-lists
+  "Normalizing list-format patches"
+  (let ((patches (normalize-patches '(((:a) 1) ((:b) 2)))))
+    (is (= 2 (length patches)))
+    (is (equal '(:a) (patch-path (first patches))))
+    (is (eq :set (patch-op (first patches))))))
+
+(test normalize-patches-patch-structs
+  "Normalizing patch structures returns as-is"
+  (let* ((p1 (make-patch :path '(:a) :op :set :value 1))
+          (patches (normalize-patches (list p1))))
+    (is (= 1 (length patches)))
+    (is (eq p1 (first patches)))))
+
+;;; merge-patch tests
+
+(test merge-patch-basic
+  "Merging single patch into state"
+  (let ((ht (plist->hash-table '(:a 1))))
+    (let ((result (merge-patch ht '((:b) 2))))
+      (is (= 1 (gethash :a result)))
+      (is (= 2 (gethash :b result))))))
+
+(test merge-patch-nested
+  "Merging nested patch"
+  (let ((ht (plist->hash-table '(:user (:name "Alice")))))
+    (let ((result (merge-patch ht '((:user :age) 30))))
+      (is (equal "Alice" (get-path '(:user :name) result)))
+      (is (= 30 (get-path '(:user :age) result))))))
+
+(test merge-patch-delete
+  "Merging delete patch"
+  (let ((ht (plist->hash-table '(:a 1 :b 2))))
+    (let ((result (merge-patch ht '((:b) :elmtui-delete-path))))
+      (is (= 1 (gethash :a result)))
+      (is (null (gethash :b result))))))
+
+;;; merge-patches tests
+
+(test merge-patches-multiple
+  "Merging multiple patches"
+  (let ((ht (plist->hash-table '(:a 1))))
+    (let ((result (merge-patches ht '(((:b) 2) ((:c) 3)))))
+      (is (= 1 (gethash :a result)))
+      (is (= 2 (gethash :b result)))
+      (is (= 3 (gethash :c result))))))
+
+;;; apply-patch tests
+
+(test apply-patch-set-op
+  "Applying patch with :set operation"
+  (let ((ht (plist->hash-table '(:a 1))))
+    (let ((result (apply-patch ht (make-patch :path '(:b) :op :set :value 2))))
+      (is (= 1 (gethash :a result)))
+      (is (= 2 (gethash :b result))))))
+
+(test apply-patch-remove-op
+  "Applying patch with :remove operation"
+  (let ((ht (plist->hash-table '(:a 1 :b 2))))
+    (let ((result (apply-patch ht (make-patch :path '(:b) :op :remove))))
+      (is (= 1 (gethash :a result)))
+      (is (null (gethash :b result))))))
+
+(test apply-patch-merge-op
+  "Applying patch with :merge operation"
+  (let ((ht (plist->hash-table '(:lst (1 2)))))
+  (let ((result (apply-patch ht (make-patch :path '(:lst) :op :merge :value '(3 4)))))
+    (is (equal '(3 4 1 2) (get-path '(:lst) result)))))
+
+(test apply-patch-update-op
+  "Applying patch with :update operation"
+  (let ((ht (plist->hash-table '(:count 5))))
+    (let ((result (apply-patch ht (make-patch :path '(:count) :op :update :value #'1+))))
+      (is (= 6 (gethash :count result))))))
+
+;;; apply-patches tests
+
+(test apply-patches-multiple-ops
+  "Applying multiple patches with different operations"
+  (let ((ht (plist->hash-table '(:a 1 :b 2 :count 5))))
+    (let ((patches (list (make-patch :path '(:c) :op :set :value 3)
+                     (make-patch :path '(:b) :op :remove)
+                     (make-patch :path '(:count) :op :update :value #'1+))))
+      (let ((result (apply-patches ht patches)))
+        (is (= 1 (gethash :a result)))
+        (is (null (gethash :b result)))
+        (is (= 3 (gethash :c result)))
+        (is (= 6 (gethash :count result)))))))
+
+;;; diff-states tests
+
+(test diff-states-no-changes
+  "Diff of identical states returns empty list"
+  (let ((ht1 (plist->hash-table '(:a 1 :b 2)))
+         (ht2 (plist->hash-table '(:a 1 :b 2))))
+    (is (null (diff-states ht1 ht2)))))
+
+(test diff-states-simple-change
+  "Detecting simple value changes"
+  (let ((ht1 (plist->hash-table '(:a 1 :b 2)))
+         (ht2 (plist->hash-table '(:a 99 :b 2))))
+    (let ((diff (diff-states ht1 ht2)))
+      (is (= 1 (length diff)))
+      (is (equal '(:a) (first (first diff))))
+      (is (= 99 (second (first diff)))))))
+
+(test diff-states-new-key
+  "Detecting new keys"
+  (let ((ht1 (plist->hash-table '(:a 1)))
+        (ht2 (plist->hash-table '(:a 1 :b 2))))
+    (let ((diff (diff-states ht1 ht2)))
+      (is (= 1 (length diff)))
+      (is (equal '(:b) (first (first diff))))
+      (is (= 2 (second (first diff))))))))
+
+(test diff-states-nested-change
+  "Detecting nested changes"
+  (let ((ht1 (plist->hash-table '(:user (:name "Alice" :age 30))))
+         (ht2 (plist->hash-table '(:user (:name "Bob" :age 30)))))
+    (let ((diff (diff-states ht1 ht2)))
+      (is (= 1 (length diff)))
+      (is (equal '(:user :name) (first (first diff))))
+      (is (equal "Bob" (second (first diff)))))))
+
+(test diff-states-nested-new-key
+  "Detecting new nested keys"
+  (let ((ht1 (plist->hash-table '(:user (:name "Alice"))))
+         (ht2 (plist->hash-table '(:user (:name "Alice" :age 30)))))
+    (let ((diff (diff-states ht1 ht2)))
+      (is (= 1 (length diff)))
+      (is (equal '(:user :age) (first (first diff))))
+      (is (= 30 (second (first diff)))))))
+
+(test diff-states-multiple-changes
+  "Detecting multiple changes"
+  (let ((ht1 (plist->hash-table '(:a 1 :b 2 :c (:nested 3))))
+         (ht2 (plist->hash-table '(:a 10 :b 2 :c (:nested 30)))))
+    (let ((diff (diff-states ht1 ht2)))
+      (is (= 2 (length diff)))
+      ;; Check that both changes are present
+      (is (some (lambda (d) (equal '(:a) (first d))) diff))
+      (is (some (lambda (d) (equal '(:c :nested) (first d))) diff)))))
+
+(defun run-patch-tests ()
+  (run! 'patch-suite))
