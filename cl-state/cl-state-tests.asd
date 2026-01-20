@@ -10,4 +10,13 @@
   :serial t
   :components ((:module "tests"
                  :serial t
-                 :components ((:file "cl-state-tests")))))
+                 :components
+                 ((:file "utils-tests")
+                  (:file "core-tests" :depends-on ("utils-tests"))
+                  (:file "patch-tests" :depends-on ("utils-tests"))
+                  (:file "tx-tests" :depends-on ("core-tests"))
+                  (:file "observer-tests" :depends-on ("core-tests" "tx-tests"))
+                  (:file "undo-tests")
+                  (:file "cl-state-tests" :depends-on ("utils-tests" "core-tests"
+                                                       "patch-tests" "tx-tests"
+                                                       "observer-tests" "undo-tests"))))))

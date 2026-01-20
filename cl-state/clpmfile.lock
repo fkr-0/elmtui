@@ -9,6 +9,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :sources
+(:implicit-file :type :file-system :system-files ("./cl-state-tests.asd"))
 (:implicit-file :type :file-system :system-files ("./cl-state.asd"))
 (:implicit-file :type :file-system :system-files
  ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"))
@@ -22,8 +23,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :requirements
+(:system :name "bordeaux-threads" :source "quicklisp")
 (:system :name "log4cl" :source "quicklisp")
 (:system :name "alexandria" :source "quicklisp")
+(:asd-file :name "./cl-state-tests.asd")
 (:asd-file :name "./cl-state.asd")
 (:asd-file :name "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 (:project :name "fiveam" :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379"
@@ -35,6 +38,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :releases
+("./cl-state-tests.asd" :version :newest :source :implicit-file :systems nil)
 ("./cl-state.asd" :version :newest :source :implicit-file :systems nil)
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd" :version :newest
  :source :implicit-file :systems ("quicklisp"))
@@ -61,6 +65,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :reverse-dependencies
+("./cl-state-tests.asd" (t (:asd-file :name "./cl-state-tests.asd")))
+
 ("./cl-state.asd" (t (:asd-file :name "./cl-state.asd")))
 
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"
@@ -76,7 +82,8 @@
  ((:system :name "fiveam") (:system :name "net.didierverna.asdf-flv")))
 
 ("bordeaux-threads"
- ((:system :name "log4cl") (:system :name "bordeaux-threads")))
+ ((:system :name "log4cl") (:system :name "bordeaux-threads"))
+ (t (:system :name "bordeaux-threads" :source "quicklisp")))
 
 ("fiveam" ((:system :name "fiveam/test") (:system :name "fiveam"))
  (t
