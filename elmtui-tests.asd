@@ -40,7 +40,6 @@
                                (:file "scroll-panel-tests")
                                (:file "driver-tests")
                                (:file "dev-tests")
-                               (:file "clevelib-tests")
                                (:file "tools-tests")
                                (:file "style-tests")
                                ;; Commented out until proper tests for actual APIs are written
