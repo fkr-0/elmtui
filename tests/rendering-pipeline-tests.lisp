@@ -166,6 +166,40 @@
         (is (null (ctx-back-buffer result))
           "No buffer should be generated while layouting is gated.")))))
 
+;;;--------------------------------------------------------------
+;;; Regression: convert-abstract-style-to-terminal-style
+;;;--------------------------------------------------------------
+
+(defun %make-convert-style-test-node ()
+  "Build a styled node for conversion regression tests."
+  (let* ((style (elmtui.style-lib.api:new 'elmtui.style-lib.api:style-set
+                                         :styles (list :bg-color :red)))
+         (rect (make-rectangle
+                 :pos (make-pos :x 0 :y 0)
+                 :size (make-size :w 5 :h 5))))
+    (elmtui.view.styled:make-styled-node
+      :type :container
+      :styles style
+      :props (list :layout-rect rect))))
+
+(test convert-abstract-style-to-terminal-style-returns-terminal-style
+  "Regression: conversion should return a terminal-style instance."
+  (let* ((node (%make-convert-style-test-node))
+         (result (elmtui.platform.tree-renderer::convert-abstract-style-to-terminal-style node)))
+    (is-true result "convert-abstract-style-to-terminal-style should not return NIL.")
+    (is (typep result 'elmtui.platform.backend.common.ansi-styling:terminal-style)
+      "Conversion should yield a terminal-style.")))
+
+(test convert-abstract-style-to-terminal-style-bg-color
+  "Regression: conversion should preserve background color."
+  (let* ((node (%make-convert-style-test-node))
+         (result (elmtui.platform.tree-renderer::convert-abstract-style-to-terminal-style node)))
+    (is-true result "Conversion result should not be NIL.")
+    (is-true (typep result 'elmtui.platform.backend.common.ansi-styling:terminal-style)
+      "Conversion result should be terminal-style.")
+    (is-true (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color result)
+      "Converted terminal-style should include a background color.")))
+
 
 ;; (test pipeline-step-by-step-transformation
 ;;   "Tests each stage of the rendering pipeline individually."
