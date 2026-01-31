@@ -1,13 +1,14 @@
 ;;;===============================================================
 ;;; File: src/core/async.lisp
-;;; Async Command Interpreter (using clevelib)
+;;; Async Command Interpreter (using cl-events)
 (uiop:define-package :elmtui.core.async
   (:use :cl)
-  (:import-from :cleve-elm.async
-   :async-task :new-task :async-exec :cancel-async-task
+  (:import-from :cl-events.async
+   :async-task :new-task :async-exec :cancel
    :async-task-finished-p :async-task-result :async-task-status :promise-cancel
-   :async-task-error :promise-cancelled-p :promise-cancelled-condition
-                :promise :resolve-promise :reject-promise :await)
+   :async-task-error :promise-cancelled-p
+   :promise :make-promise :resolve-promise :reject-promise :await
+   :schedule-after)
   (:import-from :elmtui.core.globals #:*app-sender*) ; Import *app-sender* from globals
                                         ;(:import-from :elmtui.state #:rollback-state) ; Import rollback-state from state module
                                         ; Import *app-sender* from globals
@@ -29,6 +30,11 @@
 
 (defvar *async-tasks* (make-hash-table :test 'equal) "Active async tasks.") ;; Still not used for cancellation
 (defvar *async-errors* (make-hash-table :test 'equal) "Async task errors.")
+
+(define-condition promise-cancelled-condition (error)
+  ((message :initarg :message :reader promise-cancelled-message))
+  (:report (lambda (c s)
+             (format s "~A" (promise-cancelled-message c)))))
 
 ;; Docs:
 ;; On the relation between a cmd and an async task:
@@ -65,9 +71,10 @@
    The progress-callback can be called with arbitrary data to report progress."
   (elmtui.core.conditions:with-recovery (elmtui.core.conditions:async-task-error :restarts '(:ignore-task :retry))
     (let* ((task-id (gensym "TASK-"))
-           (promise (make-instance 'cleve-elm.async:promise
-                                   :timeout timeout
-                                   :cancellation-fn cancellation-fn))
+           (promise (make-promise :cancellation-fn cancellation-fn))
+           (_timeout-thread (when timeout
+                              (schedule-after
+                               timeout (lambda () (promise-cancel promise)))))
            (progress-callback
              (lambda (progress-data)
                ;; Sends progress updates to the app
@@ -97,7 +104,7 @@
                      result)
                  (error (e)
                    ;; Task failed with an error
-                   (unless (cleve-elm.async:promise-cancelled-p promise)
+                   (unless (promise-cancelled-p promise)
                      (reject-promise promise e)
                      ;; If on-error callback provided, call it with the error
                      (when on-error
@@ -370,7 +377,7 @@ Handles errors with restarts and async-task-error.
            ;; Then cancel the task itself
            (handler-case
                (progn
-                 (cancel-async-task task)
+                 (cancel task)
                  (remhash task-id *async-tasks*)
                  t)
              (error (e)

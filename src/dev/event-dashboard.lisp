@@ -20,7 +20,7 @@
                 #:get-all-subscriptions
                 #:get-topics-with-subscribers
                 #:subscription-count)
-  (:import-from :elmtui.clevelib.utils
+  (:import-from :elmtui.utils
                 #:format-duration
                 #:format-percentage)
   (:export #:show-event-dashboard

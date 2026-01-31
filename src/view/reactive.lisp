@@ -5,10 +5,10 @@
 (uiop:define-package :elmtui.view.reactive
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-debug #:log-info)
-  (:import-from :cleve-elm.channel
+  (:import-from :cl-events.channel
                 #:make-channel
-                #:channel-put!
-                #:channel-take!)
+                #:->
+                #:<-)
   (:import-from :elmtui.state.api
                 #:application-state)
   (:import-from :elmtui.state.observers
@@ -97,7 +97,7 @@
          ;; Wait for debounce period
          (sleep (/ *view-invalidation-debounce* 1000.0))
          ;; Send update message
-         (channel-put! channel :render)
+         (-> channel :render)
          ;; Reset debounce timer
          (setf (view-debounce-timer view) nil))))))
 ;; (defun invalidate-view (view)
@@ -166,7 +166,7 @@
     (let ((channel (view-update-channel view)))
       (loop
         ;; Wait for a message on the view's channel
-        (let ((msg (channel-take! channel)))
+        (let ((msg (<- channel)))
           (case msg
             (:render
              ;; Only render if the view is invalidated
@@ -210,7 +210,7 @@
       (remove-observer app-state observer-id (lambda () 0)))
 
     ;; Send shutdown message to the view's channel
-    (channel-put! (view-update-channel view) :shutdown)))
+    (-> (view-update-channel view) :shutdown)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Rendering in Background Threads

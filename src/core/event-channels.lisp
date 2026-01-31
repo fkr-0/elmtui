@@ -4,10 +4,8 @@
 (uiop:define-package :cleve-elm.core.event-channels
   (:nicknames :elmtui.core.event-channels)
   (:use :cl :log4cl)
-  (:import-from :cleve-elm.channel
-   :make-channel :make-filtered-channel :channel-add-filter :-> :<- :select)
-  (:import-from :cleve-elm.queue
-   :make-priority-queue)
+  (:import-from :cl-events.channel
+   :make-channel :make-filtered-channel :channel-add-filter :-> :<- :select :no-wait)
   ;; Removed duplicate :nicknames, :use, and :import-from clauses that were here
   (:export
    ;; class names
@@ -49,19 +47,12 @@
 (defmethod initialize-instance :after ((ec event-channel) &key)
   ;; Create the underlying channel after the event-channel instance is initialized,
   ;; so (name ec) and (filters ec) are available.
-  (let (
-        (channel-name-string
-          (string (if (slot-boundp ec '%name) ; Use slot-value to access %name)
-                      (name ec)
-                      (gensym))))
-        (ec-filters (filters ec))
+  (let ((ec-filters (filters ec))
         (ec-capacity (channel-capacity ec))) ; Get capacity from the event-channel instance
     (setf (channel-of ec)
           (if ec-filters
-              (make-filtered-channel :filters ec-filters
-                                     :name channel-name-string
-                                     :capacity ec-capacity)
-              (make-channel :name channel-name-string :capacity ec-capacity)))))
+              (make-filtered-channel :filters ec-filters :capacity ec-capacity)
+              (make-channel :capacity ec-capacity)))))
 
 (defun %priority-weight (p)
   "Translate symbolic PRIORITY into an integer for `sort` / `<`."
@@ -151,7 +142,7 @@ Returns the message, or NIL on timeout / no data."
                          (* timeout internal-time-units-per-second)))))
     (loop
       ;; fast path: data already waiting?
-      (when (cleve-elm.channel:no-wait raw :send nil)
+      (when (no-wait raw :send nil)
         (return (receive-event chan)))
       ;; timed-out?
       (when (and deadline ; Only check deadline if it was calculated
@@ -226,7 +217,7 @@ Returns the message, or NIL on timeout / no data."
           ;; 1) scan in priority order ---------------------------------
           do (dolist (ec sorted-event-channels) ; ec is an event-channel wrapper object
                (let ((raw-channel (channel-of ec)))
-                 (if (cleve-elm.channel:no-wait raw-channel :send nil) ; Use channel-of to get raw channel
+                 (if (no-wait raw-channel :send nil) ; Use channel-of to get raw channel
                      (progn
                        (log-debug :event-channels.wait "WAIT-FOR-EVENT: Data ready on ~S; receiving." (name ec))
                        (let ((event (receive-event ec)))

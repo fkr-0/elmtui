@@ -17,6 +17,7 @@
   :components (
                 (:file "utils")
                 ;; (:file "state/utils")
+                
                 (:file "state/msg")
                 (:file "app/system-events")
 
@@ -27,29 +28,9 @@
                 (:file "core/defaults")
                 (:file "core/globals")
                 (:file "api")
-                (:module "cleve-elm"
-                  :pathname "clevelib/"
-                  :serial t
-                  :components ((:file "api")
-                                (:file "config")
-                                (:file "queue")
-                                (:file "thread")
-                                (:file "async")
-                                (:file "thread-pool")
-                                (:file "event-loop")
-                                (:file "channel")
-                                (:file "event")
-                                (:file "message")
-                                (:file "emitter")
-                                (:file "target")
-                                (:file "translator")
-                                ;; (:file "relay")
-                                (:file "ems")
-                                (:file "clevelib")))
-
                 (:file "view/geo")
                 ;; (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
-                ;; Core Modules (Load after cleve-elm, before API Layer)
+                ;; Core Modules (load after foundational deps, before API layer)
                 (:file "view/position") ; Load position before focus manager
                 (:file "view/api")
                 (:file "view/base-elements" :depends-on ("view/api" "view/geo"))
