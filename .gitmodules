@@ -1,0 +1,3 @@
+[submodule "cl-events"]
+	path = cl-events
+	url = /home/user/code/lisp/elmtui.lisp/cl-events
