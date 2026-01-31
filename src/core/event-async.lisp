@@ -19,25 +19,20 @@
   (:import-from :elmtui.core.event-channels
                 #:wait-for-event
                 #:register-event-handler)
-  (:import-from :cleve-elm.channel
-   :make-channel
-                :make-filtered-channel
-   :channel-add-filter
-                :->
-   :<-
-                :select
-   :go)
-  (:import-from :cleve-elm.async
-   :make-promise
-                :promise
-   :resolve-promise
-                :reject-promise
-   :await
-                :chain
-   :all
-                :race)
-  (:import-from :cleve-elm.thread
-   :create-thread)
+  (:import-from :cl-events.channel
+   #:make-channel
+   #:make-filtered-channel
+   #:->
+   #:<-
+   #:select)
+  (:import-from :cl-events.async
+   #:make-promise
+   #:promise
+   #:resolve-promise
+   #:reject-promise
+   #:await)
+  (:import-from :bordeaux-threads
+   #:make-thread)
   (:export
    ;; Event channels
    #:*main-event-channel*
@@ -157,7 +152,7 @@
 
   ;; Start the main event processing thread
   (setf *event-worker*
-        (create-thread
+        (make-thread
          (lambda ()
            (event-processing-loop ui-tree-fn app-state-fn))
          :name "ELMTUI Event Worker"))

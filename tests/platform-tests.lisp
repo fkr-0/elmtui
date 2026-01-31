@@ -167,7 +167,7 @@
     ;; Check all cells are spaces
     (dotimes (row 10)
       (dotimes (col 10)
-        (is (char= (buffer-cell-char (buffer-cell-at buf row col)) #\Space)))))
+        (is (char= (buffer-cell-char (buffer-cell-at buf row col)) #\Space))))))
 
 (test fill-buffer-region-basic
   "Test filling a region of the buffer"
@@ -191,8 +191,8 @@
   (let ((buf (make-virtual-buffer 10 10)))
     (write-string-to-buffer buf 0 0 "Test" nil)
 
-    ;; Resize to larger
-    (resize-buffer buf 20 20)
+    ;; Resize to larger (returns new buffer)
+    (setf buf (resize-buffer buf 20 20))
 
     (is (= (buffer-width buf) 20))
     (is (= (buffer-height buf) 20))
@@ -204,8 +204,8 @@
   (let ((buf (make-virtual-buffer 20 20)))
     (write-string-to-buffer buf 0 0 "Test" nil)
 
-    ;; Resize to smaller
-    (resize-buffer buf 10 10)
+    ;; Resize to smaller (returns new buffer)
+    (setf buf (resize-buffer buf 10 10))
 
     (is (= (buffer-width buf) 10))
     (is (= (buffer-height buf) 10))
@@ -237,8 +237,8 @@
         (dst-buf (make-virtual-buffer 10 10)))
     (write-string-to-buffer src-buf 0 0 "Source Data" nil)
 
-    ;; Copy contents
-    (copy-buffer-contents dst-buf src-buf)
+    ;; Copy contents (source -> target)
+    (copy-buffer-contents src-buf dst-buf)
 
     ;; Destination should have source content
     (is (char= (buffer-cell-char (buffer-cell-at dst-buf 0 0)) #\S))
@@ -252,34 +252,34 @@
 (test terminal-style-create
   "Test creating terminal styles"
   (let ((style (make-terminal-style
-                 :fg-color (make-termcolor :red)
-                 :bg-color (make-termcolor :blue))))
+                 :fg-color (make-termcolor :simple :red)
+                 :bg-color (make-termcolor :simple :blue))))
     (is (not (null style)))
     (is (not (null (terminal-style-fg-color style))))
     (is (not (null (terminal-style-bg-color style))))))
 
 (test termcolor-simple
   "Test creating simple terminal colors"
-  (let ((red (make-termcolor :red))
-        (blue (make-termcolor :blue)))
+  (let ((red (make-termcolor :simple :red))
+        (blue (make-termcolor :simple :blue)))
     (is (eq (terminal-color-simple red) :red))
     (is (eq (terminal-color-simple blue) :blue))))
 
 (test copy-term-style
   "Test copying terminal styles"
-  (let ((style1 (make-terminal-style
-                  :fg-color (make-termcolor :green)))
-        (style2 (copy-term-style style1)))
+  (let* ((orig (make-terminal-style
+                 :fg-color (make-termcolor :simple :green)))
+         (copy (copy-term-style orig)))
     ;; Styles should be equal but not identical
     (is (eq (terminal-color-simple
-              (terminal-style-fg-color style1))
-            (terminal-color-simple
-              (terminal-style-fg-color style2))))))
+              (terminal-style-fg-color copy))
+            :green))
+    (is (not (eq orig copy)))))
 
 (test style-to-terminal-style
   "Test converting style plist to terminal style"
-  (let ((style-plist '(:fg-color :red :bg-color :blue))
-        (term-style (style-to-terminal-style style-plist)))
+  (let* ((style-plist '(:fg-color :red :bg-color :blue))
+         (term-style (style-to-terminal-style style-plist)))
     (is (not (null term-style)))
     (is (not (null (terminal-style-fg-color term-style))))
     (is (not (null (terminal-style-bg-color term-style)))))
@@ -314,7 +314,7 @@
 
 (test buffer-stress-test
   "Test buffer operations with larger data"
-  (let ((buf (make-virtual-buffer 80 24))))
+  (let ((buf (make-virtual-buffer 80 24)))
     ;; Fill entire buffer
     (dotimes (row 24)
       (write-string-to-buffer buf row 0

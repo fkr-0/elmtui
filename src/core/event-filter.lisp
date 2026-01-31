@@ -4,8 +4,8 @@
 (uiop:define-package :cleve-elm.core.event-filter
   (:nicknames :elmtui.core.event-filter)
   (:use :cl :log4cl)
-  (:import-from :cleve-elm.message
-                :message :message-type :message-data :message-priority)
+  (:import-from :cl-events.types
+                :message :message-type :message-data)
   (:export :filter-by-type
            :filter-by-priority
            :filter-by-source
@@ -18,21 +18,46 @@
 
 (in-package :cleve-elm.core.event-filter)
 
+(defun message-type-of (message)
+  "Extract a message type keyword from MESSAGE."
+  (typecase message
+    (message (message-type message))
+    (keyword message)
+    (symbol (intern (string-upcase (symbol-name message)) :keyword))
+    (cons (or (getf message :type)
+              (getf message :message-type)
+              (first message)))
+    (t (type-of message))))
+
+(defun message-priority-of (message)
+  "Extract a priority keyword from MESSAGE."
+  (typecase message
+    (message (getf (message-data message) :priority :normal))
+    (cons (or (getf message :priority) :normal))
+    (t :normal)))
+
+(defun message-source-of (message)
+  "Extract a source identifier from MESSAGE."
+  (typecase message
+    (message (getf (message-data message) :source))
+    (cons (getf message :source))
+    (t nil)))
+
 ;; Basic filter predicates
 (defun filter-by-type (type-or-types)
   "Create a filter function that matches messages of a specific type or types"
   (if (listp type-or-types)
       ;; Multiple types
       (lambda (message)
-        (member (message-type message) type-or-types :test #'eq))
+        (member (message-type-of message) type-or-types :test #'eq))
       ;; Single type
       (lambda (message)
-        (eq (message-type message) type-or-types))))
+        (eq (message-type-of message) type-or-types))))
 
 (defun filter-by-priority (min-priority)
   "Create a filter function that matches messages with at least the specified priority"
   (lambda (message)
-    (let ((msg-priority (message-priority message))
+    (let ((msg-priority (message-priority-of message))
           (priority-values '(:low 0 :normal 1 :high 2 :urgent 3)))
       (>= (getf priority-values msg-priority 0)
           (getf priority-values min-priority 0)))))
@@ -40,7 +65,7 @@
 (defun filter-by-source (source)
   "Create a filter function that matches messages from a specific source"
   (lambda (message)
-    (equal (message-source message) source)))
+    (equal (message-source-of message) source)))
 
 (defun filter-by-predicate (predicate)
   "Create a filter function that applies a custom predicate to the message"

@@ -1,15 +1,11 @@
 ;;;===============================================================
 ;;; File: src/core/events.lisp
-;;; Advanced Event & Message Layer (using clevelib)
+;;; Advanced Event & Message Layer (using cl-events)
 (uiop:define-package :elmtui.core.events
   (:use :cl :alexandria) ; Added alexandria for once-only
   (:import-from :elmtui.core.conditions :log-condition :with-recovery)
-  (:import-from :cleve-elm.message
-   :message :make-message :message-type :message-data :message-state
-                :broadcast-p :capture-p :bubble-p :propagation-stopped-p
-                :stop-propagation)
-  (:import-from :cleve-elm.api
-   :on-message :relay-message)
+  (:import-from :cl-events.types
+   :message :make-message :message-type :message-data)
   (:import-from :elmtui.core.conditions
    :message-validation-error
                 :command-execution-error)
@@ -116,6 +112,73 @@
 (in-package :elmtui.core.events)
 
 ;; *app-sender* is now defined in elmtui.core.globals
+
+(defgeneric on-message (target message &rest args &key &allow-other-keys)
+  (:documentation "Dispatch MESSAGE to TARGET. Defaults to calling TARGET when it is a function."))
+
+(defmethod on-message ((target function) message &rest args &key &allow-other-keys)
+  (apply target message args))
+
+(defmethod on-message ((target t) message &rest args &key &allow-other-keys)
+  (declare (ignore args))
+  (error "No on-message method for target ~S and message ~S" target message))
+
+(defun %plist-set (plist key value)
+  (let ((out (if (listp plist) (copy-list plist) nil)))
+    (setf (getf out key) value)
+    out))
+
+(defun message-state (msg)
+  "Return the message state if present, otherwise NIL."
+  (typecase msg
+    (message (getf (message-data msg) :state))
+    (cons (getf msg :state))
+    (t nil)))
+
+(defun (setf message-state) (new-state msg)
+  (typecase msg
+    (message
+     (setf (message-data msg)
+           (%plist-set (message-data msg) :state new-state))
+     new-state)
+    (cons
+     (setf (getf msg :state) new-state)
+     new-state)
+    (t new-state)))
+
+(defun broadcast-p (msg &rest _args)
+  (declare (ignore _args))
+  (typecase msg
+    (message
+     (let ((data (message-data msg)))
+       (or (eq (getf data :target) :broadcast)
+           (null (getf data :target)))))
+    (cons
+     (or (eq (getf msg :target) :broadcast)
+         (null (getf msg :target))))
+    (t nil)))
+
+(defun capture-p (msg &rest _args)
+  (declare (ignore _args))
+  (typecase msg
+    (message (getf (message-data msg) :capture))
+    (cons (getf msg :capture))
+    (t nil)))
+
+(defun bubble-p (msg &rest _args)
+  (declare (ignore _args))
+  (typecase msg
+    (message (getf (message-data msg) :bubble))
+    (cons (getf msg :bubble))
+    (t nil)))
+
+(defun propagation-stopped-p (msg &rest _args)
+  (declare (ignore _args))
+  (eq (message-state msg) :stopped))
+
+(defun stop-propagation (msg)
+  (setf (message-state msg) :stopped)
+  msg)
 
 (defvar *message-contracts* (make-hash-table :test 'equal)
   "Registry of message contracts for validation and documentation.")
@@ -244,7 +307,7 @@ Stub for richer contract registration and enforcement."
 ;;   (make-cmd :type type :args args))
 
 (defun send-message (target msg)
-  "Send MSG to TARGET using clevelib's on-message/relay-message.
+  "Send MSG to TARGET using the on-message protocol.
    Validates, logs the message, and calls lifecycle hooks. Handles validation and dispatch errors."
   (dolist (hook *before-send-message-hooks*)
     (funcall hook target msg))
@@ -255,7 +318,7 @@ Stub for richer contract registration and enforcement."
     (with-recovery (elmtui.core.conditions:command-execution-error)
       (handler-case
           (progn
-            (setf result (on-message target msg)) ; This is cleve-elm.api:on-message
+            (setf result (on-message target msg))
             (setf successp t))
         (error (e)
           (signal 'elmtui.core.conditions:command-execution-error
@@ -271,7 +334,7 @@ Stub for richer contract registration and enforcement."
 ;; (send-message *relay* *msg*)
 
 ;;; CONTRACTS:
-;; - All messages must be instances of cleve-elm.message:message or subclasses.
+;; - All messages must be instances of cl-events.types:message or subclasses.
 ;; - Message types must be registered in *message-contracts* for validation.
 ;; - Message flows are logged and traced.
 ;; - Commands are constructed with make-cmd and dispatched via the event loop.
@@ -328,7 +391,7 @@ Stub for richer contract registration and enforcement."
             nil))))))
 
 (defun serialize-message (msg)
-  "Serializes a clevelib message object into a property list.
+  "Serializes a message object into a property list.
    Focuses on :type and :data. Other slots (state, handles) are lost.
    Returns a plist like '(:type <type> :data \"<serialized-data-string>\") or NIL if serialization fails and is not recovered."
   (when (typep msg 'message)
@@ -340,7 +403,7 @@ Stub for richer contract registration and enforcement."
           `(:type ,msg-type :data ,serialized-data))))))
 
 (defun deserialize-message (representation)
-  "Deserializes a property list representation back into a clevelib message object.
+  "Deserializes a property list representation back into a message object.
    Expects a plist like '(:type <type> :data \"<serialized-data-string>\").
    Returns a new message object or NIL if deserialization fails and is not recovered."
   (when (and (listp representation) (getf representation :type) (getf representation :data))
@@ -352,4 +415,3 @@ Stub for richer contract registration and enforcement."
         ;; we still create the message but with nil data.
         ;; A different restart could provide alternative data.
         (make-message :type msg-type :data msg-data)))))
-

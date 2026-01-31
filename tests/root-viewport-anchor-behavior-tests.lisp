@@ -98,6 +98,7 @@
 
 (test below-cursor-overflow-scrolls-down
   (multiple-value-bind (rv idp o state) (init-root :below-cursor 40 20 18 10)
+    (declare (ignore o))
     ;; Set terminal size so overflow logic has context
     (setf (state-ref state (append idp '(:terminal-size))) '(40 20))
     (setf (state-ref state (append idp '(:cursor-pos))) '(10 18))
@@ -107,6 +108,7 @@
     (setf (state-ref state (append idp '(:pos-known))) t)
     (multiple-value-bind (patches state cmds)
       (upd rv idp state '(:terminalresized :width 40 :height 20))
+      (declare (ignore state))
       (is (state-patch-p patches idp '(:width) 40)
         "Viewport width patch recorded on resize")
       (is (state-patch-p patches idp '(:height) 10)
@@ -130,6 +132,7 @@
 
 (test revert-scroll-on-shutdown
   (multiple-value-bind (rv idp o state) (init-root :below-cursor 80 24 12 10)
+    (declare (ignore o))
 
     ;; Set terminal size and cursor pos for context
     (setf (state-ref state (append idp '(:terminal-size))) '(80 24))
@@ -139,8 +142,8 @@
     (setf (state-ref state (append idp '(:width))) 80)
     (setf (state-ref state (append idp '(:height))) 12)
     (multiple-value-bind (s k cmds)
-      (upd rv idp state '(:appshutdown))
-      (declare (ignore s))
+        (upd rv idp state '(:appshutdown))
+      (declare (ignore s k))
       (is-true (has-render-cmd-p cmds :scroll-up 5)))))
 
 (defun run-root-viewport-anchor-behavior-tests ()
