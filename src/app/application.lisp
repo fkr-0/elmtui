@@ -13,7 +13,7 @@
   (:import-from #:elmtui.core.globals          :*applications*)
   (:import-from #:elmtui.utils                 #:ensure-keyword
     #:coerce-fn)
-  (:import-from #:cleve-elm.channel #:make-channel )
+  (:import-from #:cl-events.channel #:make-channel)
   (:import-from #:cleve-elm.core.event-channels #:make-message-channel )
   (:import-from #:elmtui.core.event-types #:key-event #:key-event-key #:key-event-char)
   (:import-from #:elmtui.app.api

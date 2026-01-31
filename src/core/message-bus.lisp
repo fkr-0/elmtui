@@ -4,12 +4,12 @@
 (uiop:define-package :cleve-elm.core.message-bus
   (:nicknames :elmtui.core.message-bus)
   (:use :cl :log4cl)
-  (:import-from :cleve-elm.channel
-   :make-channel :-> :<- :select :gogo)
-  (:import-from :cleve-elm.message
-   :message :message-priority :message-type)
-  (:import-from :cleve-elm.thread
-   :create-thread)
+  (:import-from :cl-events.channel
+   :make-channel :-> :<- :select)
+  (:import-from :cl-events.types
+   :message :message-type)
+  (:import-from :bordeaux-threads
+   :make-thread)
   (:import-from :cleve-elm.core.event-channels
    :event-channel :send-event :receive-event)
   (:export :message-bus
@@ -82,9 +82,20 @@
   "Get a channel by name from the message bus"
   (gethash name (channels bus)))
 
+(defun message-type-of (message)
+  "Extract a routing type from MESSAGE."
+  (typecase message
+    (message (message-type message))
+    (keyword message)
+    (symbol (intern (string-upcase (symbol-name message)) :keyword))
+    (cons (or (getf message :type)
+              (getf message :message-type)
+              (first message)))
+    (t (type-of message))))
+
 (defun apply-routing-rules (bus message)
   "Apply routing rules to a message"
-  (let ((message-type (message-type message)))
+  (let ((message-type (message-type-of message)))
     (dolist (rule (routing-rules bus))
       (when (eq (source-type rule) message-type)
         (let ((target (get-channel-by-name bus (target-channel rule))))
@@ -124,8 +135,8 @@
   (unless (active-p bus)
     (setf (active-p bus) t)
     (setf (thread bus)
-          ( gogo
-            (process-messages bus)))
+          (make-thread (lambda () (process-messages bus))
+                       :name "elmtui-message-bus"))
     t))
 
 (defun stop-message-bus (bus)

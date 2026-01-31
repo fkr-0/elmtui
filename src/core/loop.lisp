@@ -15,12 +15,8 @@
                 #:make-thread #:thread-alive-p #:join-thread #:destroy-thread)
   (:import-from :elmtui.core.conditions
                 #:event-loop-dispatch-error #:async-task-error)
-  (:import-from :cleve-elm.event-loop
-                #:event-loop #:make-event-loop #:run-loop #:stop-loop #:event-loop-active-p)
-  (:import-from :cleve-elm.channel
-                #:make-channel #:channel-close #:channel-closed #:-> #:<- #:channel-queue)
-  (:import-from :cleve-elm.queue
-                #:queue-length)
+  (:import-from :cl-events.channel
+                #:make-channel #:chan-close #:-> #:<- #:no-wait #:channel-length)
   (:import-from :elmtui.core.event-channels
                 #:event-channel #:handlers #:name #:channel-of #:wait-for-event
                 #:standard-event-channels)
@@ -376,9 +372,9 @@ as well as the view function for the application.")
     (when *active-event-channels*
       (let* ((ch-obj (first *active-event-channels*)))
         (when ch-obj
-          (let ((clevelib-ch (elmtui.core.event-channels:channel-of ch-obj)))
-            (when (and clevelib-ch (not (cleve-elm.channel:channel-closed clevelib-ch)))
-              (ignore-errors (cleve-elm.channel:-> clevelib-ch :shutdown-loop)))))))
+          (let ((raw-ch (elmtui.core.event-channels:channel-of ch-obj)))
+            (when raw-ch
+              (ignore-errors (-> raw-ch :shutdown-loop)))))))
 
     ;; 2. Wait for the consumer thread to exit cleanly.
     (when (and *consumer-thread* (bt:thread-alive-p *consumer-thread*))
@@ -394,7 +390,7 @@ as well as the view function for the application.")
     ;; 3. Now that the consumer is stopped, it's safe to clean up channels.
     (log-info "LOOP: Closing event channels.")
     (dolist (ch-obj *active-event-channels*)
-      (ignore-errors (cleve-elm.channel:channel-close (elmtui.core.event-channels:channel-of ch-obj))))
+      (ignore-errors (chan-close (elmtui.core.event-channels:channel-of ch-obj))))
     (setf *active-event-channels* nil)
     (log-info "LOOP: *active-event-channels* set to NIL.")
 
@@ -435,8 +431,7 @@ Returns T on success, NIL on drop. Safe after shutdown."
       (return-from publish nil))
 
     (let ((the-channel (elmtui.core.event-channels:channel-of channel-obj)))
-      (unless (and the-channel
-                   (not (cleve-elm.channel:channel-closed the-channel)))
+      (unless the-channel
         ;; Silently drop - logging here can cause deadlock
         (return-from publish nil))
 
@@ -450,7 +445,7 @@ Returns T on success, NIL on drop. Safe after shutdown."
                          (list :app-message event))))
         (handler-case
             (progn
-              (cleve-elm.channel:-> the-channel event*)
+              (-> the-channel event*)
               ;; Log outside of the critical section to avoid deadlock with Log4CL
               t)                                 ;; success
           (error (e)
@@ -510,17 +505,11 @@ Returns T on success, NIL on drop. Safe after shutdown."
         ;;     (mapcar
         ;;      (lambda (x)
         ;;        ;; get enqueued, dequeued, closed, name, and queue length
-        ;;        (let ((clevelib-channel (elmtui.core.event-channels:channel-of x)))
+        ;;        (let ((raw-channel (elmtui.core.event-channels:channel-of x)))
         ;;          (list :name (elmtui.core.event-channels:name x)
-        ;;                :enqueued (cleve-elm.channel:channel-length clevelib-channel)
-        ;;                :closed (cleve-elm.channel:channel-closed clevelib-channel)
-        ;;                :queue-length
-        ;;                (if (fboundp 'cleve-elm.queue:queue-length)
-        ;;                    (ignore-errors
-        ;;                     (cleve-elm.queue:queue-length
-        ;;                      (cleve-elm.channel:channel-queue clevelib-channel)))
-        ;;                    0) ; If queue-length function is not available, return 0
-        ;;                )))
+        ;;                :enqueued (cl-events.channel:channel-length raw-channel)
+        ;;                :closed (cl-events.channel:channel-closed raw-channel)
+        ;;                :queue-length (cl-events.channel:channel-length raw-channel)))
         ;;      *active-event-channels*)
         ;;     nil)
         :shutdown-requested *shutdown-requested*
@@ -537,12 +526,9 @@ Returns T on success, NIL on drop. Safe after shutdown."
   "Get the sum of approximate queue lengths of all active event channels."
   (if *active-event-channels*
       (loop for channel-obj in *active-event-channels*
-            sum (let ((clevelib-channel (elmtui.core.event-channels:channel-of channel-obj)))
-                  (if (and clevelib-channel (not (cleve-elm.channel:channel-closed clevelib-channel)))
-                      (let ((queue-obj (ignore-errors (cleve-elm.channel:channel-queue clevelib-channel))))
-                        (if (and queue-obj (fboundp 'cleve-elm.queue:queue-length))
-                            (or (ignore-errors (cleve-elm.queue:queue-length queue-obj)) 0)
-                            0))
+            sum (let ((raw-ch (elmtui.core.event-channels:channel-of channel-obj)))
+                  (if raw-ch
+                      (cl-events.channel:channel-length raw-ch)
                       0)))
       0))
 

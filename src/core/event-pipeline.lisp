@@ -4,8 +4,8 @@
 (uiop:define-package :cleve-elm.core.event-pipeline
   (:nicknames :elmtui.core.event-pipeline)
   (:use :cl :log4cl)
-  (:import-from :cleve-elm.message
-                :message :message-type :message-data)
+  (:import-from :cl-events.channel
+                #:->)
   (:export :pipeline
            :make-pipeline
            :add-pipe
@@ -82,7 +82,7 @@
   (when (enabled-p pipe)
     (dolist (target (targets pipe))
       (handler-case
-          (cleve-elm.channel:-> target event)
+          (-> target event)
         (error (e)
           (log-warn "Failed to broadcast event to target: ~A - ~A" target e))))
     event))

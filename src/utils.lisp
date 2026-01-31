@@ -11,7 +11,8 @@
     #:remove-path #:ensure-keyword
     #:copy-hash-table
     #:struct->plist
-    #:coerce-fn #:hex-str-to-rgb))
+    #:coerce-fn #:hex-str-to-rgb
+    #:format-duration #:format-percentage))
 
 
 (in-package :elmtui.utils)
@@ -67,6 +68,24 @@ Useful for ensuring path segments are keywords."
     ;;      (error "DEFAPPLICATION: :subscriptions-fn cannot be NIL")
     ;;      ''(lambda (model) (declare (ignore model)) nil)))
     ))
+
+(defun format-duration (seconds)
+  "Format SECONDS as a short human-readable duration string."
+  (let ((s (or seconds 0.0)))
+    (cond
+      ((< s 1.0) (format nil "~,3fs" s))
+      ((< s 60.0) (format nil "~,1fs" s))
+      (t (multiple-value-bind (mins rem) (floor s 60)
+           (format nil "~dm ~,1fs" mins rem))))))
+
+(defun format-percentage (value &optional (total 100.0))
+  "Format VALUE as a percentage string. When TOTAL is provided, VALUE/TOTAL is used."
+  (cond
+    ((null value) "0.0%")
+    ((and total (not (zerop total)))
+     (format nil "~,1f%%" (* 100.0 (/ value total))))
+    (t
+     (format nil "~,1f%%" (* 100.0 value)))))
 
 
 

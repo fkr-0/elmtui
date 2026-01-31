@@ -20,7 +20,9 @@
                 #:message-bus
                 #:register-channel
                 #:add-routing-rule)
-  (:import-from :cleve-elm.message
+  (:import-from :cl-events.channel
+                #:make-channel #:->)
+  (:import-from :cl-events.types
                 #:message
                 #:message-type
                 #:message-data)
@@ -111,6 +113,12 @@
   (typecase message
     (message (or (getf (message-data message) :topic)
                  (string (message-type message))))
+    (keyword (string message))
+    (symbol (string message))
+    (cons (or (getf message :topic)
+              (getf message :message-type)
+              (getf message :type)
+              (string (first message))))
     (t "unknown")))
 
 (defun remove-topic-subscription (token)
@@ -123,11 +131,11 @@
 
 (defun create-topic-channel (pattern &key (buffer-size 10))
   "Create a channel that forwards messages matching a topic pattern."
-  (let* ((channel (cleve-elm.channel:make-channel :capacity buffer-size))
+  (let* ((channel (make-channel :capacity buffer-size))
          (subscription (create-topic-subscription 
                         pattern
                         (lambda (message)
-                          (cleve-elm.channel:-> channel message)))))
+                          (-> channel message)))))
     ;; Return both the channel and subscription token for management
     (values channel subscription)))
 
