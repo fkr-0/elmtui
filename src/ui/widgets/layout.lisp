@@ -229,7 +229,7 @@
                        (child-type (get-path child-full-id-path app-state :type)))
                   (if (and child-type (find target-child-id (getf local-state :children-ids) :test #'equal))
                       (let* ((child-instance (make-instance child-type))
-                             (child-update-result (apply #'elmtui.ui.api:update child-instance app-state child-message :id-path child-full-id-path)))
+                             (child-update-result (apply #'elmtui.ui.api:update child-instance child-message app-state :id-path child-full-id-path)))
                         (values nil ; No direct state change for layout
                                 (append (ur-patches child-update-result)
                                         (ur-commands child-update-result))))

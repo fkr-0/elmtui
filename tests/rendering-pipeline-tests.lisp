@@ -119,13 +119,16 @@
           (root-entry (make-hash-table :test 'equal)))
     (setf (gethash :components state) components)
     (setf (gethash :root components) root-entry)
-    (setf (gethash :state root-entry)
-      '(:size-known t
-         :terminal-size (40 10)
-         :width 40 :height 10
-         :offset-x 0 :offset-y 0
-         :scroll-x 0 :scroll-y 0
-         :child-dsl-spec (:text :id :child :content "hello world")))
+    (setf (gethash :size-known root-entry) t)
+    (setf (gethash :terminal-size root-entry) '(40 10))
+    (setf (gethash :width root-entry) 40)
+    (setf (gethash :height root-entry) 10)
+    (setf (gethash :offset-x root-entry) 0)
+    (setf (gethash :offset-y root-entry) 0)
+    (setf (gethash :scroll-x root-entry) 0)
+    (setf (gethash :scroll-y root-entry) 0)
+    (setf (gethash :child-dsl-spec root-entry)
+      '(:text :id :child :content "hello world"))
     (let* ((ctx (make-app-context
                   :state state
                   :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
@@ -145,10 +148,10 @@
           (root-entry (make-hash-table :test 'equal)))
     (setf (gethash :components state) components)
     (setf (gethash :root components) root-entry)
-    (setf (gethash :state root-entry)
-      '(:size-known nil
-         :terminal-size (0 0)
-         :child-dsl-spec (:text :id :child :content "pending")))
+    (setf (gethash :size-known root-entry) nil)
+    (setf (gethash :terminal-size root-entry) '(0 0))
+    (setf (gethash :child-dsl-spec root-entry)
+      '(:text :id :child :content "pending"))
     (let* ((ctx (make-app-context
                   :state state
                   :viewport-rect (make-rectangle :pos (make-pos :x 0 :y 0)
