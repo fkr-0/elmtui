@@ -22,7 +22,7 @@ Example skeleton:
 
 ```lisp
 (defun my-update (message app-state)
-  (elmtui.tea-state.api:make-update-result))
+  (elmtui.state.api:make-update-result))
 
 (defun my-view (app-state &key root-id)
   (declare (ignore app-state root-id))
@@ -40,7 +40,7 @@ Run it: `(hello-app:run-hello-app :platform :terminal)`; or through the driver: 
 
 ## State and Updates
 
-- Use `elmtui.tea-state.api:make-update-result` to return patches and commands.
+- Use `elmtui.state.api:make-update-result` to return patches and commands.
 - Patches are plists replacing or setting keys in the model; commands are async tasks/messages.
 
 ```lisp
@@ -113,10 +113,10 @@ Define a local keymap with both single keys and a multi-key sequence, attach it 
 ;; 3) Handle dispatched messages in your update
 (defun my-update (message app-state)
   (case (car message)
-    (:save (format t "Saved!~%") (elmtui.tea-state.api:make-update-result))
-    (:quit (elmtui.tea-state.api:make-update-result :patches '((:should-quit t))))
-    (:delete-last (elmtui.tea-state.api:make-update-result))
-    (t (elmtui.tea-state.api:make-update-result))))
+    (:save (format t "Saved!~%") (elmtui.state.api:make-update-result))
+    (:quit (elmtui.state.api:make-update-result :patches '((:should-quit t))))
+    (:delete-last (elmtui.state.api:make-update-result))
+    (t (elmtui.state.api:make-update-result))))
 
 ;; 4) Ensure keymaps are initialised once (driver does this for you)
 (elmtui.keymaps:initialise)

@@ -116,7 +116,7 @@
            (child-type (get-path child-full-id-path app-state :type)))
       (if (and child-type (find target-child-id-segment (getf local-state :children-ids) :test #'equal))
           (let* ((child-instance (make-instance child-type))
-                 (child-update-result (elmtui.ui.api:update child-instance app-state child-message :id-path child-full-id-path)))
+                 (child-update-result (elmtui.ui.api:update child-instance child-message app-state :id-path child-full-id-path)))
             (values nil ; No local state change for the panel itself
                     (append (update-result-patches child-update-result)
                             (update-result-commands child-update-result))))

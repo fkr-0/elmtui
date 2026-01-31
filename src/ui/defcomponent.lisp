@@ -535,72 +535,74 @@ SYNTAX:
               (destructuring-bind
                 (message-var &optional path-var app-state-var id-path-var ctx-var)
                 update-lambda-list
-                `(defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
-                   (declare (ignorable app-state id-path))
-                   (let* ((,path-var (let ((raw (get-path id-path app-state)))
-                                       (if (hash-table-p raw)
-                                         (cl-state.utils:hash-table->plist raw)
-                                         raw)))
-                           (,app-state-var app-state)
-                           (,id-path-var id-path)
-                           (ctx# (elmtui.state.update:make-update-context
-                                   app-state
-                                   :base-path (elmtui.ui.api:component-state-map-path id-path)))
-                           ,@(when ctx-var `((,ctx-var ctx#))))
-                     (declare (ignorable ,@(remove nil (list path-var app-state-var id-path-var ctx-var))))
-                     (let ((,message-var message))
-                       (declare (ignorable ,message-var))
-                       (multiple-value-bind (default-patches default-commands)
-                         (if (fboundp 'call-next-method)
-                           (call-next-method)
-                           (values nil nil))
-                         (declare (ignorable default-patches default-commands))
-                         (let* ((returned-values
-                                  (multiple-value-list
-                                    (multiple-value-call #'values
-                                      ,(generate-update-dispatch-code
-                                         message-var path-var app-state-var id-path-var
-                                         update-user-code-block
-                                         component-class-name
-                                         on-unhandled-behavior))))
-                                 (ctx-patches (elmtui.state.update:context-patches ctx#))
-                                 (ctx-commands (elmtui.state.update:context-commands ctx#))
-                                 (local-changes nil)
-                                 (extra-patches nil)
-                                 (extra-commands nil))
-                           (cond
-                             ((and (= (length returned-values) 1)
-                                (typep (first returned-values) 'update-result))
-                               (let ((ur (first returned-values)))
-                                 (setf extra-patches (ur-patches ur)
-                                   extra-commands (ur-commands ur))))
-                             ((= (length returned-values) 2)
-                               (setf local-changes (first returned-values)
-                                 extra-commands (second returned-values)))
-                             ((or (null returned-values) (equal returned-values '(nil)))
-                               (setf local-changes nil
-                                 extra-commands nil))
-                             (t
-                               (error "Malformed component update return: ~S" returned-values)))
-                           (when local-changes
-                             (if (and (listp local-changes)
-                                   (consp (first local-changes))
-                                   (listp (first local-changes)))
-                               (setf extra-patches local-changes)
-                               (let* ((local-changes-ht (when local-changes
-                                                          (%plist-hash-table local-changes :test 'eq)))
-                                       (custom-patches
-                                         (when local-changes-ht
-                                           (loop for key being the hash-keys of local-changes-ht
-                                             using (hash-value val)
-                                             collect (list (elmtui.ui.api:component-state-path id-path key) val)))))
-                                 (setf extra-patches custom-patches))))
-                           (make-update-result
-                             :patches (append default-patches ctx-patches extra-patches)
-                             :commands (append default-commands ctx-commands extra-commands)))))))))) 
-         (defmethod elmtui.ui.api:update ((self ,component-class-name) app-state message &key id-path)
-           (declare (ignore app-state message id-path))
-           (make-update-result :patches nil :commands nil))
+                `(defmethod elmtui.ui.api:update ((self ,component-class-name) message app-state &key id-path)
+                   (declare (ignorable message app-state id-path))
+                   (multiple-value-bind (message* app-state*)
+                     (elmtui.ui.api:normalize-update-args message app-state)
+                     (let* ((,path-var (let ((raw (get-path id-path app-state*)))
+                                         (if (hash-table-p raw)
+                                           (cl-state.utils:hash-table->plist raw)
+                                           raw)))
+                             (,app-state-var app-state*)
+                             (,id-path-var id-path)
+                             (ctx# (elmtui.state.update:make-update-context
+                                     app-state*
+                                     :base-path (elmtui.ui.api:component-state-map-path id-path)))
+                             ,@(when ctx-var `((,ctx-var ctx#))))
+                       (declare (ignorable ,@(remove nil (list path-var app-state-var id-path-var ctx-var))))
+                       (let ((,message-var message*))
+                         (declare (ignorable ,message-var))
+                         (multiple-value-bind (default-patches default-commands)
+                           (if (fboundp 'call-next-method)
+                             (call-next-method)
+                             (values nil nil))
+                           (declare (ignorable default-patches default-commands))
+                           (let* ((returned-values
+                                    (multiple-value-list
+                                      (multiple-value-call #'values
+                                        ,(generate-update-dispatch-code
+                                           message-var path-var app-state-var id-path-var
+                                           update-user-code-block
+                                           component-class-name
+                                           on-unhandled-behavior))))
+                                   (ctx-patches (elmtui.state.update:context-patches ctx#))
+                                   (ctx-commands (elmtui.state.update:context-commands ctx#))
+                                   (local-changes nil)
+                                   (extra-patches nil)
+                                   (extra-commands nil))
+                             (cond
+                               ((and (= (length returned-values) 1)
+                                  (typep (first returned-values) 'update-result))
+                                 (let ((ur (first returned-values)))
+                                   (setf extra-patches (ur-patches ur)
+                                     extra-commands (ur-commands ur))))
+                               ((= (length returned-values) 2)
+                                 (setf local-changes (first returned-values)
+                                   extra-commands (second returned-values)))
+                               ((or (null returned-values) (equal returned-values '(nil)))
+                                 (setf local-changes nil
+                                   extra-commands nil))
+                               (t
+                                 (error "Malformed component update return: ~S" returned-values)))
+                             (when local-changes
+                               (if (and (listp local-changes)
+                                     (consp (first local-changes))
+                                     (listp (first local-changes)))
+                                 (setf extra-patches local-changes)
+                                 (let* ((local-changes-ht (when local-changes
+                                                            (%plist-hash-table local-changes :test 'eq)))
+                                         (custom-patches
+                                           (when local-changes-ht
+                                             (loop for key being the hash-keys of local-changes-ht
+                                               using (hash-value val)
+                                               collect (list (elmtui.ui.api:component-state-path id-path key) val)))))
+                                   (setf extra-patches custom-patches))))
+                             (make-update-result
+                               :patches (append default-patches ctx-patches extra-patches)
+                               :commands (append default-commands ctx-commands extra-commands))))))))))
+            `(defmethod elmtui.ui.api:update ((self ,component-class-name) message app-state &key id-path)
+               (declare (ignore message app-state id-path))
+               (make-update-result :patches nil :commands nil)))
 
          ,(if view-clause
             (let* ((view-body-forms (clause-body view-clause))
