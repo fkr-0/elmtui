@@ -1,6 +1,8 @@
 (uiop:define-package :elmtui.tests.rendering-pipeline
   (:use :cl :fiveam :elmtui.contracts :elmtui.pipeline)
   (:import-from :elmtui.view.core #:ui-node-p)
+  (:import-from :elmtui.view.element #:el/styles)
+  (:import-from :elmtui.view.base-elements #:container-element)
   (:import-from :cl-styles.selector #:cls> #:type> #:id>)
   (:import-from :elmtui.app #:defapplication)
   (:import-from #:cl-styles.rule #:defrule)
@@ -171,29 +173,29 @@
 ;;;--------------------------------------------------------------
 
 (defun %make-convert-style-test-node ()
-  "Build a styled node for conversion regression tests."
-  (let* ((style (elmtui.style-lib.api:new 'elmtui.style-lib.api:style-set
-                                         :styles (list :bg-color :red)))
-         (rect (make-rectangle
-                 :pos (make-pos :x 0 :y 0)
-                 :size (make-size :w 5 :h 5))))
-    (elmtui.view.styled:make-styled-node
-      :type :container
-      :styles style
-      :props (list :layout-rect rect))))
+  "Build a node with a style plist for conversion regression tests."
+  (let ((rect (make-rectangle
+                :pos (make-pos :x 0 :y 0)
+                :size (make-size :w 5 :h 5))))
+    (make-instance 'elmtui.view.base-elements:container-element
+                   :id :style-test
+                   :layout-rect rect
+                   :style '(:bg-color :red))))
 
-(test convert-abstract-style-to-terminal-style-returns-terminal-style
-  "Regression: conversion should return a terminal-style instance."
+(test convert-style-plist-to-terminal-style-returns-terminal-style
+  "Regression: style conversion should return a terminal-style instance."
   (let* ((node (%make-convert-style-test-node))
-         (result (elmtui.platform.tree-renderer::convert-abstract-style-to-terminal-style node)))
-    (is-true result "convert-abstract-style-to-terminal-style should not return NIL.")
+         (result (elmtui.platform.backend.common.ansi-styling:style-to-terminal-style
+                  (elmtui.view.element:el/styles node))))
+    (is-true result "style-to-terminal-style should not return NIL.")
     (is (typep result 'elmtui.platform.backend.common.ansi-styling:terminal-style)
       "Conversion should yield a terminal-style.")))
 
-(test convert-abstract-style-to-terminal-style-bg-color
-  "Regression: conversion should preserve background color."
+(test convert-style-plist-to-terminal-style-bg-color
+  "Regression: style conversion should preserve background color."
   (let* ((node (%make-convert-style-test-node))
-         (result (elmtui.platform.tree-renderer::convert-abstract-style-to-terminal-style node)))
+         (result (elmtui.platform.backend.common.ansi-styling:style-to-terminal-style
+                  (elmtui.view.element:el/styles node))))
     (is-true result "Conversion result should not be NIL.")
     (is-true (typep result 'elmtui.platform.backend.common.ansi-styling:terminal-style)
       "Conversion result should be terminal-style.")
