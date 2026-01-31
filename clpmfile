@@ -8,7 +8,8 @@
 (:asd "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 
 
-(:asd "../cl-fzy/cl-fzy.asd")
+;; (:asd "../cl-fzy/cl-fzy.asd")
+(:asd "/home/user/code/lisp/cl-fzy/cl-fzy.asd")
 (:asd "cl-styles/cl-styles.asd")
 (:asd "cl-inputs/cl-inputs.asd")
 (:asd "cl-events/cl-events.asd")

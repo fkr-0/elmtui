@@ -8,6 +8,9 @@
     #:thread #:thread-alive-p #:join-thread #:destroy-thread)
   (:import-from :log4cl
     #:log-debug #:log-info #:log-warn #:log-error)
+  (:import-from :sb-sys #:fd-stream-fd)
+  (:import-from :sb-posix #:pipe ;; #:write  #:read #:close
+    )
   (:import-from :elmtui.app.system-events
     #:make-appshutdown-systemevent
     #:make-terminalresized-systemevent
@@ -57,6 +60,7 @@
     #:driver-context-backend #:driver-context-device
     #:driver-context-input-source #:driver-context-publish-fn
     #:driver-context-input-thread #:driver-context-stop-flag
+    #:driver-context-shutdown-pipe-read-fd #:driver-context-shutdown-pipe-write-fd
     #:start-driver-input-loop #:stop-driver-input-loop
     #:execute-render-command))
 (in-package #:elmtui.platform.driver)
@@ -312,8 +316,6 @@
                         (setf *last-ctx* (or *last-ctx* ctx)))))))))))
       (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
       (values initial-model initial-cmds))))
-
-;;; Helper: execute :render commands synchronously prior to view
 (defun execute-render-command (cmd backend)
   "Execute a :render command against BACKEND. Format examples:
    (:render :clear rect)
@@ -333,29 +335,29 @@
           (elmtui.platform.api:clear-screen backend arg1))
         (:blank-viewport
           (let* ((rect arg1)
-                 (w (elmtui.view.geo:w rect))
-                 (h (elmtui.view.geo:h rect))
-                 (ox (elmtui.view.geo:x rect))
-                 (oy (elmtui.view.geo:y rect)))
+                  (w (elmtui.view.geo:w rect))
+                  (h (elmtui.view.geo:h rect))
+                  (ox (elmtui.view.geo:x rect))
+                  (oy (elmtui.view.geo:y rect)))
             (when (and (numberp w) (numberp h) (> w 0) (> h 0))
               (cond
                 ((typep backend 'elmtui.platform.backend.terminal:terminal-instance)
-                 (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
-                   (let* ((front (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
-                          (back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
-                          (diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front back)))
-                     (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend oy ox)
-                     (elmtui.platform.api:flush-output backend))))
+                  (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
+                    (let* ((front (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
+                            (back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
+                            (diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front back)))
+                      (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend oy ox)
+                      (elmtui.platform.api:flush-output backend))))
                 ((typep backend 'elmtui.backend.faketerm:faketerm-instance)
-                 (let ((stream (elmtui.backend.faketerm::faketerm-instance-stream backend))
-                       (buffer (elmtui.backend.faketerm::faketerm-instance-screen-buffer backend)))
-                   (when stream
-                     (format stream "; BLANK_VIEWPORT Row: ~D Col: ~D Height: ~D Width: ~D~%"
-                       oy ox h w)
-                     (finish-output stream))
-                   (elmtui.platform.api:fill-rectangle backend buffer oy ox h w :char #\Space)))
+                  (let ((stream (elmtui.backend.faketerm::faketerm-instance-stream backend))
+                         (buffer (elmtui.backend.faketerm::faketerm-instance-screen-buffer backend)))
+                    (when stream
+                      (format stream "; BLANK_VIEWPORT Row: ~D Col: ~D Height: ~D Width: ~D~%"
+                        oy ox h w)
+                      (finish-output stream))
+                    (elmtui.platform.api:fill-rectangle backend buffer oy ox h w :char #\Space)))
                 ((fboundp 'elmtui.platform.api:clear-area)
-                 (elmtui.platform.api:clear-area backend nil oy ox h w))
+                  (elmtui.platform.api:clear-area backend nil oy ox h w))
                 (t
                   (log-warn "blank-viewport not implemented for backend ~S" backend))))))
         (:scroll
@@ -369,7 +371,6 @@
             (elmtui.platform.api:clear-below-cursor backend)
             (log-warn "clear-below-cursor not implemented for backend ~S" backend)))
         (:clear-above-cursor
-          ;; Clear above cursor by moving to top and clearing down to cursor
           (let ((current-pos (ignore-errors (elmtui.platform.api:get-cursor-position backend))))
             (when current-pos
               (elmtui.platform.api:set-cursor-position backend 0 0)
@@ -379,8 +380,79 @@
               (elmtui.platform.api:set-cursor-position backend (car current-pos) (cdr current-pos)))))
         (:set-cursor
           (elmtui.platform.api:set-cursor-position backend (or arg1 1) (or arg2 1)))
-        (otherwise (log-warn "Unknown :render op ~S" op))))
-    (error (e) (log-warn "Render command failed: ~A" e))))
+        (otherwise
+          (log-warn "Unknown :render op ~S" op))))
+    (error (e)
+      (log-warn "Render command failed: ~A" e))))
+
+;;; Helper: execute :render commands synchronously prior to view
+;; (defun execute-render-command (cmd backend)
+;;   "Execute a :render command against BACKEND. Format examples:
+;;    (:render :clear rect)
+;;    (:render :blank-viewport rect)
+;;    (:render :scroll n)
+;;    (:render :scroll-down n)
+;;    (:render :scroll-up n)
+;;    (:render :clear-below-cursor)
+;;    (:render :clear-above-cursor)
+;;    (:render :set-cursor row col)"
+;;   (handler-case
+;;     (let ((op (second cmd))
+;;            (arg1 (third cmd))
+;;            (arg2 (fourth cmd)))
+;;       (case op
+;;         (:clear
+;;           (elmtui.platform.api:clear-screen backend arg1))
+;;         (:blank-viewport
+;;           (let* ((rect arg1)
+;;                   (w (elmtui.view.geo:w rect))
+;;                   (h (elmtui.view.geo:h rect))
+;;                   (ox (elmtui.view.geo:x rect))
+;;                   (oy (elmtui.view.geo:y rect)))
+;;             (when (and (numberp w) (numberp h) (> w 0) (> h 0))
+;;               (cond
+;;                 ((typep backend 'elmtui.platform.backend.terminal:terminal-instance)
+;;                   (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
+;;                     (let* ((front (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
+;;                             (back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
+;;                             (diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front back)))
+;;                       (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend oy ox)
+;;                       (elmtui.platform.api:flush-output backend))))
+;;                 ((typep backend 'elmtui.backend.faketerm:faketerm-instance)
+;;                   (let ((stream (elmtui.backend.faketerm::faketerm-instance-stream backend))
+;;                          (buffer (elmtui.backend.faketerm::faketerm-instance-screen-buffer backend)))
+;;                     (when stream
+;;                       (format stream "; BLANK_VIEWPORT Row: ~D Col: ~D Height: ~D Width: ~D~%"
+;;                         oy ox h w)
+;;                       (finish-output stream))
+;;                     (elmtui.platform.api:fill-rectangle backend buffer oy ox h w :char #\Space)))
+;;                 ((fboundp 'elmtui.platform.api:clear-area)
+;;                   (elmtui.platform.api:clear-area backend nil oy ox h w))
+;;                 (t
+;;                   (log-warn "blank-viewport not implemented for backend ~S" backend))))))
+;;         (:scroll
+;;           (elmtui.platform.api:scroll backend (or arg1 -1)))
+;;         (:scroll-down
+;;           (elmtui.platform.api:scroll backend (or arg1 1)))
+;;         (:scroll-up
+;;           (elmtui.platform.api:scroll backend (- (or arg1 1))))
+;;         (:clear-below-cursor
+;;           (if (fboundp 'elmtui.platform.api:clear-below-cursor)
+;;             (elmtui.platform.api:clear-below-cursor backend)
+;;             (log-warn "clear-below-cursor not implemented for backend ~S" backend)))
+;;         (:clear-above-cursor
+;;           ;; Clear above cursor by moving to top and clearing down to cursor
+;;           (let ((current-pos (ignore-errors (elmtui.platform.api:get-cursor-position backend))))
+;;             (when current-pos
+;;               (elmtui.platform.api:set-cursor-position backend 0 0)
+;;               (if (fboundp 'elmtui.platform.api:clear-below-cursor)
+;;                 (elmtui.platform.api:clear-below-cursor backend)
+;;                 (elmtui.platform.api:clear-screen backend))
+;;               (elmtui.platform.api:set-cursor-position backend (car current-pos) (cdr current-pos)))))
+;;         (:set-cursor
+;;           (elmtui.platform.api:set-cursor-position backend (or arg1 1) (or arg2 1)))
+;;         (otherwise (log-warn "Unknown :render op ~S" op))))
+;;     (error (e) (log-warn "Render command failed: ~A" e))))
 
 (defun force-render-current-frame (app-spec)
   "Render the current app model immediately using APP-SPEC."
@@ -388,9 +460,9 @@
     (let ((ctx (make-context-from-spec app-spec *current-app-model* *backend*)))
       (handler-case
         (progn
-          (setf *last-ctx* (full-view-pipeline ctx))
-          (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*))
-          (setf *initial-render-done* t))
+          (setf *last-ctx* (full-view-pipeline ctx)
+            *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*)
+            *initial-render-done* t))
         (elmtui.contracts:pipeline-contract-violation (e)
           (log:error "DRIVER: Pipeline contract violation during force render ~A; keeping previous ctx." e)
           (setf *last-ctx* (or *last-ctx* ctx)))
@@ -406,7 +478,7 @@ Returns T if rendering-related state changed enough to warrant a re-render."
   (when (and root-id *current-app-model*)
     (multiple-value-bind (patches commands)
       (elmtui.app::dispatch-to-root msg *current-app-model* root-id)
-      (let ((changed (not (null patches))))
+      (let ((changed (and patches (not (null patches)))))
         (when patches
           (apply-patches *current-app-model* patches))
         (dolist (cmd commands)
@@ -417,23 +489,37 @@ Returns T if rendering-related state changed enough to warrant a re-render."
 
 (defun process-initial-commands (cmds app-spec)
   "Process a list of initial commands for an application, using an app-specific processor if available.
+
 CMDs: list of commands to process.
-PUBLISH-FN: function to publish messages (unused here, but may be used in future).
 APP-SPEC: property list describing the app, must contain :command-processor-fn, :message-queue, and :name."
   (declare (type list cmds) (type list app-spec))
   (when (and cmds (listp cmds))
     (log:debug "DRIVER: Processing initial commands...")
     (destructuring-bind (&key command-processor-fn message-queue name &allow-other-keys) app-spec
-      (let* ((cmd-proc-fn command-processor-fn)
-              (msg-queue message-queue)
-              (app-cfg-for-cmd (when name
-                                 (gethash name elmtui.core.globals:*applications*))))
-        (loop for cmd in cmds
-          do (cond
-               (cmd-proc-fn
-                 (funcall cmd-proc-fn cmd msg-queue *current-app-model* app-cfg-for-cmd))
-               (t
-                 (interpret-cmd cmd))))))))
+      (let ((app-cfg-for-cmd (and name (gethash name elmtui.core.globals:*applications*))))
+        (dolist (cmd cmds)
+          (if command-processor-fn
+            (funcall command-processor-fn cmd message-queue *current-app-model* app-cfg-for-cmd)
+            (interpret-cmd cmd)))))))
+;; (defun process-initial-commands (cmds app-spec)
+;;   "Process a list of initial commands for an application, using an app-specific processor if available.
+;; CMDs: list of commands to process.
+;; PUBLISH-FN: function to publish messages (unused here, but may be used in future).
+;; APP-SPEC: property list describing the app, must contain :command-processor-fn, :message-queue, and :name."
+;;   (declare (type list cmds) (type list app-spec))
+;;   (when (and cmds (listp cmds))
+;;     (log:debug "DRIVER: Processing initial commands...")
+;;     (destructuring-bind (&key command-processor-fn message-queue name &allow-other-keys) app-spec
+;;       (let* ((cmd-proc-fn command-processor-fn)
+;;               (msg-queue message-queue)
+;;               (app-cfg-for-cmd (when name
+;;                                  (gethash name elmtui.core.globals:*applications*))))
+;;         (loop for cmd in cmds
+;;           do (cond
+;;                (cmd-proc-fn
+;;                  (funcall cmd-proc-fn cmd msg-queue *current-app-model* app-cfg-for-cmd))
+;;                (t
+;;                  (interpret-cmd cmd))))))))
 ;;; ---------------------------------------------------------------------------
 ;;; == Context Construction ==
 ;;; ---------------------------------------------------------------------------
@@ -444,15 +530,18 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   input-source
   publish-fn
   (input-thread nil)
-  (stop-flag nil))
+  (stop-flag nil)
+  ;; Self-pipe for immediate shutdown notification
+  ;; When written to, wakes up the input thread from blocking system calls
+  (shutdown-pipe-read-fd nil)
+  (shutdown-pipe-write-fd nil))
 
 (defvar *driver-context* nil
   "Driver-level context that ties the backend to a cl-inputs device and publish function.")
 
 (defun driver-context-input-loop (ctx)
   "Main loop that pulls tokens, converts them, and publishes the result.
-   This function ensures raw mode is properly enabled during input reading
-   and disabled on cleanup, even if errors occur."
+Ensures raw mode is properly enabled during input reading and disabled on cleanup, even if errors occur."
   (let* ((backend (driver-context-backend ctx))
           (device (or (driver-context-device ctx)
                     (and backend (backend-input-device backend))))
@@ -467,40 +556,88 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
       (log-info "DRIVER: Raw mode enabled for input target: ~A" (type-of device)))
 
     (unwind-protect
+      ;; Main input loop with responsive shutdown checking
       (loop
+        ;; Check stop flag BEFORE blocking on next-token
         (when (or (driver-context-stop-flag ctx)
                 elmtui.core.loop::*shutdown-requested*)
+          (log-info "DRIVER: Input loop detected stop flag or shutdown request.")
           (return))
-        (let ((token (cl-inputs.loop:next-token source :timeout 0.1)))
+        ;; Use shorter timeout (50ms) for faster shutdown response
+        (let ((token (cl-inputs.loop:next-token source :timeout 0.05)))
           (when token
             (let ((event (cl-inputs-token->event token)))
               (when (and event (driver-context-publish-fn ctx))
-                (funcall (driver-context-publish-fn ctx) event)))))
-        (sleep 0.01))
+                (funcall (driver-context-publish-fn ctx) event))))))
       ;; Cleanup: Always disable raw mode, even on error
       (when device
         (ignore-errors (disable-raw-mode device))
-        (log-info "DRIVER: Raw mode disabled for input target")))))
+        (log-info "DRIVER: Raw mode disabled for input target.")))))
 
 (defun start-driver-input-loop (ctx)
-  "Begin the driver input thread; returns the thread object."
-  (let ((thread (bt:make-thread (lambda ()
-                                  (driver-context-input-loop ctx))
+  "Start the driver input thread and store it in CTX.
+
+Returns the created thread object."
+  (let ((thread (bt:make-thread
+                  (lambda () (driver-context-input-loop ctx))
                   :name "elmtui.driver.input")))
     (setf (driver-context-input-thread ctx) thread)
     thread))
 
 (defun stop-driver-input-loop (ctx)
-  "Signal the driver input loop to stop and wait for the thread."
+  "Signal the driver input loop to stop and wait for the thread.
+
+If CTX is non-nil, sets the stop flag, interrupts and waits for the input thread to exit.
+If the thread does not exit within the timeout, it is forcibly destroyed.
+Resets the stop flag and returns CTX."
   (when ctx
+    (log-info "DRIVER: Stopping driver input loop...")
     (setf (driver-context-stop-flag ctx) t)
     (let ((thread (driver-context-input-thread ctx)))
       (when thread
-        (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted.")))
-        (bt:join-thread thread)
+        ;; Try to interrupt the thread (may not work if thread is in system call)
+        (bt:interrupt-thread thread (lambda () (log-info "Driver input thread interrupted.")))
+        ;; Wait for thread to exit with shorter timeout (2 seconds total)
+        (loop repeat 20 ; 20 * 0.1 = 2 seconds
+          when (not (bt:thread-alive-p thread))
+          do (progn
+               (log-info "DRIVER: Input thread terminated gracefully.")
+               (return))
+          do (sleep 0.1))
+        ;; Force destroy if still alive after timeout
+        (when (bt:thread-alive-p thread)
+          (log-warn "DRIVER: Input thread still alive after timeout, forcing destruction.")
+          (bt:destroy-thread thread))
         (setf (driver-context-input-thread ctx) nil)))
     (setf (driver-context-stop-flag ctx) nil)
-    ctx))
+    (log-info "DRIVER: Driver input loop stopped."))
+  ctx)
+
+;; (defun stop-driver-input-loop (ctx)
+;;   "Signal the driver input loop to stop and wait for the thread."
+;;   (when ctx
+;;     (log-info "DRIVER: Stopping driver input loop...")
+;;     (setf (driver-context-stop-flag ctx) t)
+;;     (let ((thread (driver-context-input-thread ctx)))
+;;       (when thread
+;;         ;; Try to interrupt the thread (may not work if thread is in system call)
+;;         (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted.")))
+;;         ;; Wait for thread to exit with shorter timeout (1 second instead of 5)
+;;         ;; With the 50ms timeout in the input loop, the thread should exit quickly
+;;         (loop repeat 20 ; 2 seconds total (20 * 0.1)
+;;           when (not (bt:thread-alive-p thread))
+;;           do (progn
+;;                (log-info "DRIVER: Input thread terminated gracefully.")
+;;                (return))
+;;           do (sleep 0.1))
+;;         ;; Force destroy if still alive after timeout
+;;         (when (bt:thread-alive-p thread)
+;;           (log-warn "DRIVER: Input thread still alive after timeout, forcing destruction.")
+;;           (bt:destroy-thread thread))
+;;         (setf (driver-context-input-thread ctx) nil)))
+;;     (setf (driver-context-stop-flag ctx) nil)
+;;     (log-info "DRIVER: Driver input loop stopped.")
+;;     ctx))
 
 (defun make-context-from-spec (app-spec state backend)
   "Creates an app-context struct from an app-spec, the current state, and the backend."
@@ -540,11 +677,17 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   (when (and *input-thread* (bt:thread-alive-p *input-thread*))
     (log:info "DRIVER: Waiting for input thread to terminate...")
     (if (bt:join-thread *input-thread*) ; :timeout 0.5
-      (log:info "DRIVER: Input thread terminated gracefully.")
-      (progn
-        (log:warn "DRIVER: Input thread failed to terminate in time. Forcing termination.")
-        (when (bt:thread-alive-p *input-thread*)
-          (bt:destroy-thread *input-thread*))))
+      ;; bt:join-thread doesn't support timeout, so we poll instead (max 2 seconds)
+      (loop repeat 20
+        when (not (bt:thread-alive-p *input-thread*))
+        do (progn
+             (log-info "DRIVER: Input thread terminated gracefully.")
+             (return))
+        do (sleep 0.1))
+      ;; Force destroy if still alive after timeout
+      (when (bt:thread-alive-p *input-thread*)
+        (log-warn "DRIVER: Input thread still alive after timeout, forcing termination.")
+        (bt:destroy-thread *input-thread*)))
     (setf *input-thread* nil))
 
   ;; Attempt to clean up the root viewport instance if present

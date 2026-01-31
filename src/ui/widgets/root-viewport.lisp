@@ -266,7 +266,9 @@ geometry.  NIL means the value should remain unchanged."
 
 (defun rv-primary-path (id-path rel-path)
   (let ((rel (ensure-list rel-path)))
-    (rv-component-state-path id-path rel)))
+    (if (rv-id-path-canonical-p id-path)
+      (rv-component-state-path id-path rel)
+      (append id-path rel))))
 
 (defun rv-secondary-path (id-path rel-path)
   (let ((rel (ensure-list rel-path)))
@@ -437,28 +439,30 @@ for state updates, and COMMANDS is a list of render command plists."
         (values (nreverse patches) commands)))))
 
 (defmethod elmtui.ui.api:update ((component root-viewport) message state &key id-path)
-  (log-debug "root-viewport: update id-path=~a message=~a" id-path message)
-  (let* ((ctx (make-update-context state :base-path (component-state-map-path id-path)))
-          (render-commands nil)
-          (extra-patches nil)
-          (extra-commands nil))
-    (labels
-      ((ensure-initial-cursor! (x y)
-         "Record initial cursor position if not already set."
-         (unless (sref ctx :initial-cursor-pos)
-           (setf (sref ctx :initial-cursor-pos) (list x y))))
-        (ready? ()
-          "Check if the terminal geometry is known."
-          (let ((term-size (sref ctx :terminal-size)))
-            (or (and (sref ctx :size-known)
-                  (and term-size (> (first term-size) 0) (> (second term-size) 0)))
-              (and term-size (> (first term-size) 0) (> (second term-size) 0)))))
-        (mark-first-ready! ()
-          "Mark first ready and emit initial clear commands."
-          (when (and (ready?) (not (sref ctx :first-ready-done)))
-            (setf (sref ctx :first-ready-done) t))))
-      (when (listp message)
-        (case (msg-type message)
+  (multiple-value-bind (message* state*)
+    (elmtui.ui.api:normalize-update-args message state)
+    (log-debug "root-viewport: update id-path=~a message=~a" id-path message*)
+    (let* ((ctx (make-update-context state* :base-path (component-state-map-path id-path)))
+            (render-commands nil)
+            (extra-patches nil)
+            (extra-commands nil))
+      (labels
+        ((ensure-initial-cursor! (x y)
+           "Record initial cursor position if not already set."
+           (unless (sref ctx :initial-cursor-pos)
+             (setf (sref ctx :initial-cursor-pos) (list x y))))
+          (ready? ()
+            "Check if the terminal geometry is known."
+            (let ((term-size (sref ctx :terminal-size)))
+              (or (and (sref ctx :size-known)
+                    (and term-size (> (first term-size) 0) (> (second term-size) 0)))
+                (and term-size (> (first term-size) 0) (> (second term-size) 0)))))
+          (mark-first-ready! ()
+            "Mark first ready and emit initial clear commands."
+            (when (and (ready?) (not (sref ctx :first-ready-done)))
+              (setf (sref ctx :first-ready-done) t))))
+        (when (listp message*)
+          (case (msg-type message*)
           ((:terminalresized :terminal-resized :TERMINALRESIZED :TERMINAL-RESIZED)
             (let* ((cols (msg-data message :width))
                     (rows (msg-data message :height))
@@ -640,10 +644,10 @@ for state updates, and COMMANDS is a list of render command plists."
                 (when (and (numberp row) (numberp col))
                   (push `(:render :set-cursor ,row ,col) render-commands)))))
           (otherwise
-            (setf (sref ctx :unrecognized-message) message))))
-      (let ((child (child-instance state id-path)))
+            (setf (sref ctx :unrecognized-message) message*))))
+      (let ((child (child-instance state* id-path)))
         (when child
-          (let* ((result (elmtui.ui.api:update child message state
+          (let* ((result (elmtui.ui.api:update child message* state*
                            :id-path (append id-path (list (slot-value child 'id)))))
                   (child-patches (elmtui.state.api:ur-patches result))
                   (child-cmds (elmtui.state.api:ur-commands result)))
@@ -651,12 +655,12 @@ for state updates, and COMMANDS is a list of render command plists."
               (setf extra-patches (nconc extra-patches child-patches)))
             (when (and child-cmds (listp child-cmds))
               (setf extra-commands (nconc extra-commands child-cmds)))))))
-    (let* ((ctx-patches (context-patches ctx))
-            (ctx-commands (context-commands ctx))
-            (all-commands (nconc (nreverse render-commands) ctx-commands extra-commands)))
-      (elmtui.state.api:make-update-result
-        :patches (append ctx-patches extra-patches)
-        :commands all-commands))))
+      (let* ((ctx-patches (context-patches ctx))
+              (ctx-commands (context-commands ctx))
+              (all-commands (nconc (nreverse render-commands) ctx-commands extra-commands)))
+        (elmtui.state.api:make-update-result
+          :patches (append ctx-patches extra-patches)
+          :commands all-commands)))))
 ;; (defmethod elmtui.ui.api:update ((component root-viewport) message state &key id-path)
 ;;   (log-info "root-viewport: update id-path=~a message=~a"
 ;;     id-path message)
@@ -873,7 +877,13 @@ for state updates, and COMMANDS is a list of render command plists."
 (defmethod elmtui.ui.api:view ((component root-viewport) state
                                 &key id-path children &allow-other-keys)
   (declare (type list id-path) (type t state))
-  (let* ((vp-state (rv-get-state-value state id-path nil))
+  (let* ((vp-state-raw (rv-get-state-value state id-path nil))
+          (vp-state (multiple-value-bind (inner present-p)
+                      (typecase vp-state-raw
+                        (hash-table (gethash :state vp-state-raw))
+                        (list (rv-plist-lookup vp-state-raw :state))
+                        (t (values nil nil)))
+                      (if present-p inner vp-state-raw)))
           (term-size (or (%state-value vp-state :terminal-size) '(0 0)))
           (size-known (or (%state-value vp-state :size-known)
                         (and term-size (> (first term-size) 1) (> (second term-size) 1))))

@@ -17,6 +17,7 @@
    #:component-state-path #:get-component-property #:make-state-patch #:component-state-map-path
    ;; Update Macro and its local functions
    #:with-update-patch #:add-patch #:add-command #:get-property
+   #:normalize-update-args
    ;; Note: elmtui.state:update-result is the return type for update methods
    #:id ; Export the new generic function
    #:make-update-result
@@ -412,13 +413,20 @@
 (defgeneric update (component msg app-state &key id-path)
   (:documentation "Processes a message for a component instance. Returns an `update-result` struct.")
   (:method ((component component) msg app-state &key id-path)
-    (declare (ignore msg id-path))
+    (declare (ignore msg app-state id-path))
     ;;          (type t msg app-state) ; app-state type can be more specific
     ;;          (type list id-path))
     ;; (check-type component component)
     ;; (check-type id-path list)
 
     (make-update-result)))
+
+(defun normalize-update-args (msg app-state)
+  "Normalize UPDATE arguments so callers may pass either (msg app-state) or (app-state msg)."
+  (if (and (cl-state.core:application-state-p msg)
+        (not (cl-state.core:application-state-p app-state)))
+    (values app-state msg)
+    (values msg app-state)))
 
 
 (defmethod view ((component hash-table) app-state &key id-path)
