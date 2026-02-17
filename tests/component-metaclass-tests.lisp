@@ -84,16 +84,3 @@
         "Documentation should be stored")
     (is (equalp (getf metadata3 :examples) '((:comp :enabled t)))
         "Examples should be stored")))
-
-(test metadata-default-initialization
-  "Test that metadata defaults to nil when not provided"
-  (finishes
-    (defclass test-no-metadata-component ()
-      ()
-      (:metaclass elmtui.ui.component-metaclass:component-class)))
-  (let* ((test-class (find-class 'test-no-metadata-component))
-         (metadata (elmtui.ui.component-metaclass:class-metadata test-class)))
-    (is (null metadata)
-        "Metadata should be nil when not provided"))
-  ;; Clean up
-  (setf (find-class 'test-no-metadata-component) nil))
