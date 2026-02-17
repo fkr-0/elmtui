@@ -1,12 +1,14 @@
-(defpackage :elmtui.state.schema
+(uiop:define-package :cl-state.schema
   (:use :cl)
   (:export :register-type-predicate
-           :define-type-predicate
-           :lookup-type-predicate
-           :list-registered-types
-           :validate-type))
+    :define-type-predicate
+    :lookup-type-predicate
+    :list-registered-types
+    :validate-type
+    :make-enum-predicate
+    :register-enum-type))
 
-(in-package :elmtui.state.schema)
+(in-package :cl-state.schema)
 
 ;; Comprehensive type predicate registry
 (defvar *type-predicates* (make-hash-table :test #'equal)
@@ -27,85 +29,85 @@
   `(progn
      (defun ,name ,args ,@body)
      (register-type-predicate ',(intern (symbol-name name) :keyword)
-                             #',name
-                             ,(format nil "Must satisfy ~a" name))))
+       #',name
+       ,(format nil "Must satisfy ~a" name))))
 
 (defun lookup-type-predicate (type-name)
   "Get a predicate for a type"
   (or (gethash type-name *type-predicates*)
-      ;; For simple types, try to find CL built-in type predicate
-      (let ((possible-predicate
-              (find-symbol (concatenate 'string (string type-name) "P") :cl)))
-        (when (and possible-predicate (fboundp possible-predicate))
-          (register-type-predicate type-name (symbol-function possible-predicate))
-          (symbol-function possible-predicate)))))
+    ;; For simple types, try to find CL built-in type predicate
+    (let ((possible-predicate
+            (find-symbol (concatenate 'string (string type-name) "P") :cl)))
+      (when (and possible-predicate (fboundp possible-predicate))
+        (register-type-predicate type-name (symbol-function possible-predicate))
+        (symbol-function possible-predicate)))))
 
 (defun list-registered-types ()
   "List all registered type predicates"
   (let ((result nil))
     (maphash (lambda (k v)
-               (push (list k (gethash k *type-descriptions* "No description")) 
-                     result))
-             *type-predicates*)
+               (push (list k (gethash k *type-descriptions* "No description"))
+                 result))
+      *type-predicates*)
     (sort result #'string< :key #'(lambda (x) (string (car x))))))
 
 (defun validate-type (value type &optional context)
   "Validate that a value satisfies a type predicate"
   (flet ((handle-error (msg)
            (error "Type validation error~@[ in ~a~]: ~a~@[~%Expected: ~a~]"
-                  context msg (gethash type *type-descriptions*))))
-    (cond 
+             context msg (gethash type *type-descriptions*))))
+    (cond
       ;; Simple type predicate
       ((symbolp type)
-       (let ((predicate (lookup-type-predicate type)))
-         (if predicate
-             (unless (funcall predicate value)
-               (handle-error (format nil "~S is not a valid ~a" value type)))
-             (handle-error (format nil "Unknown type ~S" type)))))
-      
+        (let ((predicate (lookup-type-predicate type)))
+          (if predicate
+            (unless (funcall predicate value)
+              (handle-error (format nil "~S is not a valid ~a" value type)))
+            (handle-error (format nil "Unknown type ~S" type)))))
+
       ;; Lists of form (or type1 type2)
       ((and (listp type) (eq (first type) 'or))
-       (let ((valid nil))
-         (dolist (subtype (rest type))
-           (handler-case
-               (progn
-                 (validate-type value subtype context)
-                 (setq valid t)
-                 (return))
-             (error (e) 
-               (declare (ignore e)))))
-         (unless valid
-           (handle-error (format nil "~S doesn't match any type in ~S" value type)))))
-      
+        (let ((valid nil))
+          (dolist (subtype (rest type))
+            (handler-case
+              (progn
+                (validate-type value subtype context)
+                (setq valid t)
+                (return))
+              (error (e)
+                (declare (ignore e)))))
+          (unless valid
+            (handle-error (format nil "~S doesn't match any type in ~S" value type)))))
+
       ;; Lists of form (and type1 type2)
       ((and (listp type) (eq (first type) 'and))
-       (dolist (subtype (rest type))
-         (validate-type value subtype context)))
-      
+        (dolist (subtype (rest type))
+          (validate-type value subtype context)))
+
       ;; Lists of form (list element-type)
       ((and (listp type) (eq (first type) 'list))
-       (unless (listp value)
-         (handle-error (format nil "~S is not a list" value)))
-       (let ((elem-type (second type)))
-         (loop for elem in value
-               for i from 0
-               do (validate-type elem elem-type 
-                                (if context
-                                    (format nil "~a[~a]" context i)
-                                    (format nil "list item ~a" i))))))
-      
+        (unless (listp value)
+          (handle-error (format nil "~S is not a list" value)))
+        (let ((elem-type (second type)))
+          (loop for elem in value
+            for i from 0
+            do (validate-type elem elem-type
+                 (if context
+                   (format nil "~a[~a]" context i)
+                   (format nil "list item ~a" i))))))
+
       ;; Lists of form (vector element-type)
       ((and (listp type) (eq (first type) 'vector))
-       (unless (vectorp value)
-         (handle-error (format nil "~S is not a vector" value)))
-       (let ((elem-type (second type)))
-         (loop for elem across value
-               for i from 0
-               do (validate-type elem elem-type
-                                (if context
-                                    (format nil "~a[~a]" context i)
-                                    (format nil "vector item ~a" i))))))
-      
+        (unless (vectorp value)
+          (handle-error (format nil "~S is not a vector" value)))
+        (let ((elem-type (second type)))
+          (loop for elem across value
+            for i from 0
+            do (validate-type elem elem-type
+                 (if context
+                   (format nil "~a[~a]" context i)
+                   (format nil "vector item ~a" i))))))
+
       ;; Other compound types
       (t (handle-error (format nil "Unsupported type specification: ~S" type)))))
   t)
@@ -149,7 +151,7 @@
 
 (defun register-enum-type (type-name allowed-values)
   "Register an enum type with the allowed values"
-  (register-type-predicate 
-   type-name
-   (make-enum-predicate allowed-values)
-   (format nil "Must be one of: ~{~S~^, ~}" allowed-values)))
+  (register-type-predicate
+    type-name
+    (make-enum-predicate allowed-values)
+    (format nil "Must be one of: ~{~S~^, ~}" allowed-values)))

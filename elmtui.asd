@@ -36,7 +36,6 @@
                   :pathname "state/"
                   :serial t
                   :components (
-                                (:file "utils")
                                 (:file "update")
                                 (:file "api")
                                 (:file "model")

@@ -1,6 +1,6 @@
 ;;; cl-state.asd
 (asdf:defsystem "cl-state"
-  :description "State container, patches, transactions, undo/redo, observers."
+  :description "State container, patches, transactions, undo/redo, observers, schema, validation."
   :license "MIT"
   :version "0.1.0"
   :author "Your Name <your.email@example.com>"
@@ -14,5 +14,7 @@
    (:file "src/state/tx")
    (:file "src/state/undo")
    (:file "src/state/observer")
+   (:file "src/state/schema")
+   (:file "src/state/validation")
    (:file "src/state/api"))
   :in-order-to ((test-op (test-op "cl-state-tests"))))

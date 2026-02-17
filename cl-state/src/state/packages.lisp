@@ -81,13 +81,37 @@
    #:remove-observer
    #:notify-observers))
 
+(uiop:define-package :cl-state.schema
+  (:use :cl)
+  (:export :register-type-predicate
+           :define-type-predicate
+           :lookup-type-predicate
+           :list-registered-types
+           :validate-type
+           :make-enum-predicate
+           :register-enum-type))
+
+(uiop:define-package :cl-state.validation
+  (:use :cl)
+  (:export :validate-nested
+           :validate-field
+           :with-validation
+           :define-validator
+           :register-type-validator
+           :validate-model-schema
+           :make-validator
+           :type-predicate
+           :validation-error))
+
 (uiop:define-package :cl-state.api
   (:use :cl
         :cl-state.utils
         :cl-state.core
         :cl-state.patch
         :cl-state.observer
-        :cl-state.tx)
+        :cl-state.tx
+        :cl-state.schema
+        :cl-state.validation)
   (:shadowing-import-from :cl-state.undo
     #:history
     #:make-history
@@ -160,4 +184,22 @@
    #:history-future
    #:push-snapshot
    #:history-undo
-   #:history-redo))
+   #:history-redo
+   ;; From cl-state.schema
+   #:register-type-predicate
+   #:define-type-predicate
+   #:lookup-type-predicate
+   #:list-registered-types
+   #:validate-type
+   #:make-enum-predicate
+   #:register-enum-type
+   ;; From cl-state.validation
+   #:validate-nested
+   #:validate-field
+   #:with-validation
+   #:define-validator
+   #:register-type-validator
+   #:validate-model-schema
+   #:make-validator
+   #:type-predicate
+   #:validation-error))
