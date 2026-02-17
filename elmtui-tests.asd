@@ -4,12 +4,13 @@
   :description "Test suite for the elmtui system"
   :author "User <user@archlinux>"
   :version "0.0.1"
-  :depends-on (#:elmtui #:fiveam #:cl-styles #:cl-inputs)
+  :depends-on (#:elmtui #:fiveam)
   :license "GPL"
   :serial t
   :components ((:module "tests"
                  :serial t
                  :components ((:file "elmtui-tests")
+                               (:file "component-metaclass-tests")
                                (:file "focus-simple-test")
                                (:file "rainbow-test")
                                (:file "defcomponent-tests")
