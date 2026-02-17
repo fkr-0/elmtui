@@ -17,6 +17,9 @@
                   (:file "tx-tests" :depends-on ("core-tests"))
                   (:file "observer-tests" :depends-on ("core-tests" "tx-tests"))
                   (:file "undo-tests")
+                  (:file "schema-tests")
+                  (:file "validation-tests")
                   (:file "cl-state-tests" :depends-on ("utils-tests" "core-tests"
                                                        "patch-tests" "tx-tests"
-                                                       "observer-tests" "undo-tests"))))))
+                                                       "observer-tests" "undo-tests"
+                                                       "schema-tests" "validation-tests"))))))

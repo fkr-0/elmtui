@@ -76,9 +76,9 @@
        (:keyword (keywordp value))
        (:symbol (symbolp value))
        (t (or (typep value type-spec)
-              (and (fboundp 'elmtui.state.schema:validate-type)
-                   (handler-case 
-                       (funcall (symbol-function 'elmtui.state.schema:validate-type) 
+              (and (fboundp 'cl-state.schema:validate-type)
+                   (handler-case
+                       (funcall (symbol-function 'cl-state.schema:validate-type)
                                 value type-spec)
                      (error () nil)))))))
     
