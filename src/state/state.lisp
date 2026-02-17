@@ -5,11 +5,11 @@
 (uiop:define-package :elmtui.state
   (:use :cl :cl-state.api :elmtui.state.api)
   (:reexport :cl-state.api
+             :cl-state.tx
+             :cl-state.observer
              :elmtui.state.api
              :elmtui.state.msg
              :elmtui.state.update
-             :elmtui.state.transactions
-             :elmtui.state.observers
              :elmtui.state.model))
 
 (in-package :elmtui.state)

@@ -13,7 +13,7 @@
     #:init #:update #:view)
   (:import-from :elmtui.state #:make-state #:state-ref
     #:apply-patches)
-  (:import-from :elmtui.state.transactions
+  (:import-from :elmtui.state
     #:with-transaction
     #:undo
     #:redo)
