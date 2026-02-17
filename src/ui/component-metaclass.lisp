@@ -4,8 +4,7 @@
 (uiop:define-package :elmtui.ui.component-metaclass
   (:use :cl)
   (:import-from :sb-mop
-    #:standard-class
-    #:class-direct-superclasses)
+    #:standard-class)
   (:export #:component-class
     #:class-metadata
     #:make-metadata))
@@ -30,13 +29,11 @@
 ;;; Initialize Instance Method
 ;;; ---------------------------------------------------------------
 
-(defmethod initialize-instance :after ((class component-class) &rest initargs &key &allow-other-keys)
-  "After initializing a component-class, extract and store the metadata if provided."
-  ;; The :metadata option might be in the class options, not as a direct initarg
-  ;; We need to handle both cases
-  (let ((metadata (getf initargs :metadata)))
-    (when metadata
-      (setf (slot-value class '%metadata) metadata)))
+(defmethod initialize-instance :after ((class component-class) &key metadata &allow-other-keys)
+  "After initializing a component-class, store the metadata if provided."
+  (declare (ignore metadata))
+  ;; Metadata is automatically stored via the %metadata slot's initarg
+  ;; This method exists for future extensibility (e.g., validation)
   (values))
 
 ;;; ---------------------------------------------------------------
