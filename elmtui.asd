@@ -90,8 +90,8 @@
                 (:module "ui"
                   :serial t
                   :pathname "ui/"
-                  :components (
-                                ;; Note: ui/api is loaded earlier in the API LAYER section to avoid duplication
+                  :components (;; Note: ui/api is loaded earlier in the API LAYER section to avoid duplication
+                                (:file "component-metaclass")
                                 (:file "defcomponent")
                                 (:module "widgets"
                                   :pathname "widgets/"
