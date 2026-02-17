@@ -10,12 +10,13 @@
     #:application-state
     #:make-state
     #:state-ref)
-  (:import-from :elmtui.state.transactions
-    #:with-transaction
+  (:import-from :elmtui.state
+    #:with-transaction) 
+  (:import-from :cl-state.tx
     #:apply-patches
     #:undo
     #:redo)
-  (:import-from :elmtui.state.observers
+  (:import-from :elmtui.state
     #:add-observer
     #:remove-observer)
   (:export :run-state-tests))
@@ -44,8 +45,8 @@
 (test state-with-transaction-basic
   (let ((state (make-state)))
     (with-transaction (state :name :add-user)
-      (elmtui.state.transactions:state-set state :name "Alice")
-      (elmtui.state.transactions:state-set state :age 30))
+      (elmtui.state:state-set state :name "Alice")
+      (elmtui.state:state-set state :age 30))
     (is (equal (get-state state :name) "Alice"))
     (is (= (get-state state :age) 30))
     (is (= (length (elmtui.state.api:application-state-history state)) 1))
@@ -57,7 +58,7 @@
   (let ((state (make-state)))
     (handler-case
       (with-transaction (state :name :fail)
-        (elmtui.state.transactions:state-set state :a 1)
+        (elmtui.state:state-set state :a 1)
         (error "Something went wrong"))
       (error ()))
     (is (null (get-state state :a)))
@@ -73,9 +74,9 @@
 (test state-undo-redo-basic
   (let ((state (make-state)))
     (with-transaction (state :name :tx1)
-      (elmtui.state.transactions:state-set state :a 1))
+      (elmtui.state:state-set state :a 1))
     (with-transaction (state :name :tx2)
-      (elmtui.state.transactions:state-set state :b 2))
+      (elmtui.state:state-set state :b 2))
 
     (is (= (get-state state :a) 1))
     (is (= (get-state state :b) 2))
@@ -109,12 +110,12 @@
                                  (setf observed-old-val old)
                                  (setf observed-new-val new)))
         (with-transaction (state :name :test-observers)
-          (elmtui.state.transactions:state-set state :a 10))
+          (elmtui.state:state-set state :a 10))
         (is (eq observed-old-val :not-present))
         (is (= observed-new-val 10))
 
         (with-transaction (state :name :test-observers-2)
-          (elmtui.state.transactions:state-set state :a 20))
+          (elmtui.state:state-set state :a 20))
         (is (= observed-old-val 10))
         (is (= observed-new-val 20))))
 
@@ -125,17 +126,17 @@
                              (declare (ignore old new))
                              (incf counter))))
           (add-observer state :a observer-fn)
-          (with-transaction (state) (elmtui.state.transactions:state-set state :a 1))
+          (with-transaction (state) (elmtui.state:state-set state :a 1))
           (is (= counter 1))
           (remove-observer state :a observer-fn)
-          (with-transaction (state) (elmtui.state.transactions:state-set state :a 2))
+          (with-transaction (state) (elmtui.state:state-set state :a 2))
           (is (= counter 1)))))
     (is (= (get-state state :b) 2))
     (is (= (length (elmtui.state.api:application-state-history state)) 2))
     (is (= (length (elmtui.state.api:application-state-undone state)) 0))))
 (test state-get-state-basic
   (let ((state (make-state)))
-    (elmtui.state.transactions:state-set state :name "Alice")
+    (elmtui.state:state-set state :name "Alice")
     (is (equal (get-state state :name) "Alice"))
     (is (null (get-state state :age)))
     (is (equal (get-state state :age 25) 25))))

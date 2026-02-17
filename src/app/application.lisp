@@ -33,7 +33,7 @@
     #:ur-patches
     #:ur-commands
     #:make-state)
-  (:import-from #:elmtui.state.transactions
+  (:import-from #:cl-state.tx
     #:apply-patches)
   (:import-from #:elmtui.ui.api                #:init #:view #:initialize-components-from-dsl
     #:instantiate-component-from-dsl)

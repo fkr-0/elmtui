@@ -17,10 +17,8 @@
   :components (
                 (:file "utils")
                 ;; (:file "state/utils")
-                
                 (:file "state/msg")
                 (:file "app/system-events")
-
                 (:file "tools/packager") ;; TODO move me
                 (:file "core/errors")
                 (:file "contracts")
@@ -29,45 +27,20 @@
                 (:file "core/globals")
                 (:file "api")
                 (:file "view/geo")
-                ;; (:file "view/style-lib/api") ; Defines stylable, selector base class, etc.
-                ;; Core Modules (load after foundational deps, before API layer)
                 (:file "view/position") ; Load position before focus manager
                 (:file "view/api")
                 (:file "view/base-elements" :depends-on ("view/api" "view/geo"))
                 (:file "view/element-protocol" :depends-on ("view/base-elements"))
-
                 (:file "core/conditions")
-                ;; Load state module early since focus manager needs it
                 (:module "state"
                   :pathname "state/"
                   :serial t
                   :components (
                                 (:file "utils")
-                                (:file "observers")
-                                (:file "transactions")
                                 (:file "update")
                                 (:file "api")
                                 (:file "model")
                                 (:file "state")))
-                ;; (:module "state"
-                ;;  :pathname "state/"
-                ;;  :serial t
-                ;;  :components ((:file "api")
-                ;;               ;; (:module "state-lib"
-                ;;               ;;  :serial t
-                ;;               ;;  :pathname "statelib/"
-                ;;               ;;  :components (
-                ;;               ;;               (:file "state")
-                ;;               ;;               (:file "observe")
-                ;;               ;;               (:file "transaction")
-                ;;               ;;               (:file "package")))
-
-                ;;               (:file "state")
-                ;;               (:file "model")
-                ;;               (:file "transactions") ; Added transactions.lisp
-                ;;               (:file "update")
-                ;;               ))
-                                        ; Moved here - loads after state implementation
                 (:module "core"
                   :pathname "./core/"
                   :serial t
@@ -110,45 +83,10 @@
                 (:file "ui/api") ; Imports: elmtui.state.api, elmtui.utils
                 (:file "app/api") ; Imports: elmtui.core.globals, elmtui.core.event-channels
                 (:file "app/tea-core")
-
                 (:file "platform/api") ; Imports: elmtui.utils, bordeaux-threads
-
-
-
-
                 (:file "view/core")
-                ;; (:module "view/style-lib"
-                ;;  :pathname "view/style-lib/"
-                ;;  :serial t
-                ;;  :components (
-                ;;               (:file "util")
-                ;;               (:file "types")
-                ;;               (:file "styles")
-                ;;               (:file "style-set")
-                ;;               (:file "macros")
-                ;;               (:file "selector")
-                ;;               (:file "properties")
-
-                ;;               ;; Selector implementations moved after view/styled
-                ;;               (:file "rule")
-                ;;               (:file "stylable") ; Implementation details? Might depend on api.
-                ;;               (:file "styled-strings")
-                ;;               (:file "stylesheet")
-                ;;               (:file "style-lib")
-                ;;               (:file "cl-styles-adapter")))
                 (:file "view/styled")
                 ;; --- View / UI Dependency Resolution ---
-                ;; Load core view definitions first
-                ;; Load the style library needed by styled nodes and UI
-                                        ; Main package file?
-
-                ;; Load the styled node definition (depends on style-lib/api)
-
-
-                ;; Load selector implementations (depends on view/styled)
-
-                ;; Load UI Components (depend on view/core, view/styled, view/style-lib)
-                ;; Load remaining View components (depend on UI widgets, layout etc)
                 (:file "view/memo")
                 (:module "ui"
                   :serial t
@@ -175,8 +113,7 @@
                                                 (:file "listbox")
                                                 (:file "counter")
                                                 (:file "scrollable-container")
-                                                (:file "scroll-panel")
-                                                ))
+                                                (:file "scroll-panel")))
                                 ;; Load the main package file AFTER the individual widget files
                                 (:file "widgets-pkg") ; Correct filename to load widgets.lisp
                                 (:file "widget-registry")))
@@ -190,17 +127,14 @@
                 (:file "view/layout/core" :depends-on ("view/layout/flex" "view/layout/grid"))
                 (:file "view/reactive")
                 (:file "view/tree-transforms" :depends-on ("view/base-elements" "view/layout/core"))
-
                 ;; Styling System (Moved here as it depends on view/style-lib)
                 (:module "style"
                   :serial t
                   :pathname "style/"
-                  :components ((:file "core")
-                                (:file "presets")
+                  :components ((:file "presets")
                                 (:file "manager")
                                 (:file "stylable-impl")))
                 ;; --- End View / UI ---
-
                 ;; Platform Abstraction (Moved here as it depends on view modules)
                 (:module "platform"
                   :serial t
@@ -217,11 +151,9 @@
                                 ;; Backend Implementations
                                 (:file "backend/faketerm/faketerm")
                                 (:file "backend/urxvt/urxvt")))
-
                 ;; Files loaded after modules
                 (:file "pipeline")
                 (:file "platform/driver" :depends-on ("app/system-events" "pipeline"))
-
                 ;; Development Utilities
                 ;;(:file "../dev-setup")
                 (:file "dev/dev")

@@ -11,7 +11,7 @@
                 #:<-)
   (:import-from :elmtui.state.api
                 #:application-state)
-  (:import-from :elmtui.state.observers
+  (:import-from :cl-state.observer
                 #:add-observer
                 #:remove-observer)
   (:import-from :elmtui.core.async
