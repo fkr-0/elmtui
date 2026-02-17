@@ -1,15 +1,16 @@
-(defpackage :elmtui.state.validation
+(uiop:define-package :cl-state.validation
   (:use :cl)
   (:export :validate-nested
            :validate-field
            :with-validation
            :define-validator
            :register-type-validator
-           :validate-model
+           :validate-model-schema
            :make-validator
-           :type-predicate))
+           :type-predicate
+           :validation-error))
 
-(in-package :elmtui.state.validation)
+(in-package :cl-state.validation)
 
 ;; Type predicates registry
 (defvar *type-validators* (make-hash-table :test #'equal)
@@ -64,9 +65,9 @@
     ((symbolp type)
      (let ((predicate (type-predicate type)))
        (if predicate
-           (funcall predicate value path)
+           (funcall predicate value)
            (error "No validator defined for type ~a" type))))
-    
+
     ;; Handle compound types like (or ...)
     ((and (listp type) (eq (first type) 'or))
      (let ((valid nil))
@@ -82,12 +83,12 @@
                 :message (format nil "Value ~S doesn't match any type in ~S" value type)
                 :path path
                 :value value))))
-    
+
     ;; Handle compound types like (and ...)
     ((and (listp type) (eq (first type) 'and))
      (dolist (sub-type (rest type))
        (validate-field value sub-type :path path)))
-    
+
     ;; Handle lists like (list type)
     ((and (listp type) (eq (first type) 'list))
      (unless (listp value)
@@ -98,11 +99,11 @@
      (let ((elem-type (second type)))
        (loop for item in value
              for i from 0
-             do (validate-field item elem-type 
-                                :path (if path
-                                          (format nil "~a[~a]" path i)
-                                          (format nil "[~a]" i))))))
-    
+             do (validate-field item elem-type
+                               :path (if path
+                                       (format nil "~a[~a]" path i)
+                                       (format nil "[~a]" i))))))
+
     ;; Handle vectors like (vector type)
     ((and (listp type) (eq (first type) 'vector))
      (unless (vectorp value)
@@ -114,10 +115,10 @@
        (loop for item across value
              for i from 0
              do (validate-field item elem-type
-                                :path (if path
-                                          (format nil "~a[~a]" path i)
-                                          (format nil "[~a]" i))))))
-    
+                               :path (if path
+                                       (format nil "~a[~a]" path i)
+                                       (format nil "[~a]" i))))))
+
     ;; Other compound types
     (t (error "Unsupported type specification: ~S" type))))
 
@@ -137,9 +138,9 @@
   "Execute forms with validation error handling"
   `(handler-bind
        ((validation-error
-         (lambda (c)
-           (format *error-output* "~&Validation error: ~a~%" c)
-           (invoke-debugger c))))
+          (lambda (c)
+            (format *error-output* "~&Validation error: ~a~%" c)
+            (invoke-debugger c))))
      ,@body))
 
 ;; Register common type validators
@@ -152,7 +153,7 @@
 (register-type-validator 'list #'listp "Must be a list")
 (register-type-validator 'hash-table #'hash-table-p "Must be a hash-table")
 
-(defun validate-model (model &optional (schema nil))
+(defun validate-model-schema (model &optional (schema nil))
   "Validate a model against its schema"
   (if schema
       (validate-nested model schema)

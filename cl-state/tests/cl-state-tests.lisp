@@ -51,7 +51,15 @@
                 #:make-history
                 #:history-past
                 #:history-future
-                #:push-snapshot)
+                #:push-snapshot
+                #:validate-type
+                #:list-registered-types
+                #:register-enum-type
+                #:validate-model-schema
+                #:validate-nested
+                #:validate-field
+                #:make-validator
+                #:type-predicate)
   (:export #:run-cl-state-tests
            #:run-all-cl-state-tests))
 
@@ -131,6 +139,14 @@
   (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
   (format t "Running Undo (History) Tests...~%")
   (cl-state-tests.undo:run-undo-tests)
+
+  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
+  (format t "Running Schema Tests...~%")
+  (cl-state-tests.schema:run-schema-tests)
+
+  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
+  (format t "Running Validation Tests...~%")
+  (cl-state-tests.validation:run-validation-tests)
 
   (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
   (format t "Running Legacy Tests...~%")
