@@ -10,7 +10,7 @@
     #:make-state
     #:make-update-result
     #:state-ref)
-  (:import-from :elmtui.state.transactions
+  (:import-from #:cl-state.tx
     #:apply-patches)
   (:import-from :elmtui.ui.api
     #:component)

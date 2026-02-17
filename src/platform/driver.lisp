@@ -24,7 +24,7 @@
     #:initialise
     #:process-key-event)
   (:import-from :elmtui.state.api #:get-path)
-  (:import-from :elmtui.state.transactions #:apply-patches)
+  (:import-from :cl-state.tx #:apply-patches)
   (:import-from :elmtui.platform.api
     #:initialize-backend #:shutdown-backend #:render-and-present
     #:term-w #:term-h #:handle-backend-resize #:get-screen-dimensions
