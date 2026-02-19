@@ -2,6 +2,8 @@
   (:use :cl #:log4cl)
   (:import-from :elmtui.state.api #:state-ref #:make-update-result)
   (:import-from :elmtui.utils #:ensure-keyword #:get-path)
+  (:import-from :elmtui.ui.dsl-resolution #:dsl-type #:resolve-dsl-type)
+  (:import-from :elmtui.ui.component-metaclass #:component-class #:class-metadata)
   (:export
    ;; Component Class & Generics
    #:initialize-components-from-dsl
@@ -18,6 +20,10 @@
    ;; Update Macro and its local functions
    #:with-update-patch #:add-patch #:add-command #:get-property
    #:normalize-update-args
+   ;; DSL Resolution
+   #:dsl-type #:resolve-dsl-type
+   ;; Metadata
+   #:class-metadata
    ;; Note: elmtui.state:update-result is the return type for update methods
    #:id ; Export the new generic function
    #:make-update-result
