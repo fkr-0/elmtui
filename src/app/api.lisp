@@ -1,27 +1,22 @@
 (uiop:define-package #:elmtui.app.api
   (:use #:cl)
   (:import-from :log4cl #:log-debug #:log-error #:log-info)
-  (:import-from #:bordeaux-threads #:mailbox) 
-  (:import-from #:elmtui.core.globals #:*applications* #:*dsl-type-to-component-class*)
-  (:import-from :elmtui.api #:get-component-class-for-dsl-type)
-
+  (:import-from #:bordeaux-threads #:mailbox)
+  (:import-from #:elmtui.core.globals #:*applications*)
   (:import-from #:elmtui.ui.api #:instantiate-component-from-dsl)
+  (:import-from #:elmtui.ui.dsl-resolution #:resolve-dsl-type)
   (:import-from :elmtui.core.event-channels
    :event-channel)
   (:import-from :elmtui.state.api :get-path)
   (:import-from :cl-state.core :application-state)
   (:export #:defapplication
-           #:with-temporary-dsl-component-registry
            #:run-application
-           #:registered-dsl-component-p
            #:get-component-instance
-           #:register-dsl-component-type #:get-component-class-for-dsl-type
            #:process-command-default #:render-view-default #:read-event-default
            #:app-config #:app-config-message-queue #:app-config-command-processor-fn #:app-config-renderer-fn
            #:app-config-name #:app-config-root-component-dsl #:app-config-initial-state-plist
            #:app-config-update-fn-sym #:app-config-view-fn-sym #:app-config-subscriptions-fn-form
-           #:validate-platform-options
-           #:clear-dsl-component-registry))
+           #:validate-platform-options))
 
 (in-package #:elmtui.app.api)
 
@@ -70,9 +65,9 @@
                             ;;         :initial-value components-root)
                             ))
       (if (and (hash-table-p component-state) (gethash :type component-state))
-          (let ((component-class
-                  (get-component-class-for-dsl-type
-                   (gethash :type component-state))))
+          (multiple-value-bind (component-class default-props)
+              (resolve-dsl-type (gethash :type component-state))
+            (declare (ignore default-props))
             (when component-class
               (make-instance component-class :id (gethash :id component-state))))
           (error
@@ -118,8 +113,6 @@
 
 ;;(declaim (ftype (function ((or symbol keyword)) (or null symbol)) get-component-class-for-dsl-type))
 
-(declaim (ftype (function ((or symbol keyword) symbol) t) register-dsl-component-type))
-
 (declaim (ftype (function (symbol list) t) validate-platform-options))
 
 ;;; ===================================================================
@@ -149,80 +142,37 @@ Signals:
 
 Workflow:
   1. Extracts the DSL type from the `dsl` form.
-  2. Looks up the corresponding Lisp class using `get-component-class-for-dsl-type`.
+  2. Resolves the corresponding Lisp class using `resolve-dsl-type` (polymorphic).
   3. If a class is found, creates an instance of it using `make-instance`,
      passing `id-path` (as :id) and the original `dsl` form (as :dsl)
      as initialization arguments.
   4. If no class is found, signals an error."
   (declare (type list dsl id-path))
   (log-debug "Attempting to instantiate component from DSL.~%  DSL: ~S~%  ID-PATH: ~S" dsl id-path)
-  (let* ((dsl-type (first dsl))
-         (component-class (get-component-class-for-dsl-type dsl-type)))
-    (log-debug "DSL Type: ~S, Resolved Component Class: ~S" dsl-type component-class)
-    (if component-class
-        (let ((instance (make-instance component-class :id id-path)))
-          (log-info "Successfully instantiated component of type ~S with ID-Path ~S."
-                    dsl-type id-path)
-          (log-debug "Instantiated instance: ~A" instance)
-          instance)
-        (progn
-          (log-error "Failed to instantiate component: No component class found for DSL type: ~S. DSL: ~S, ID-PATH: ~S"
-                     dsl-type dsl id-path)
-          nil
-          ;; (error "No component class found for DSL type: ~a" dsl-type)
-          ))))
+  (let* ((dsl-type (first dsl)))
+    ;; Use the new polymorphic resolution system
+    (multiple-value-bind (component-class default-props)
+        (resolve-dsl-type dsl-type)
+      (declare (ignore default-props))
+      (log-debug "DSL Type: ~S, Resolved Component Class: ~S" dsl-type component-class)
+      (if component-class
+          (let ((instance (make-instance component-class :id id-path)))
+            (log-info "Successfully instantiated component of type ~S with ID-Path ~S."
+                      dsl-type id-path)
+            (log-debug "Instantiated instance: ~A" instance)
+            instance)
+          (progn
+            (log-error "Failed to instantiate component: No component class found for DSL type: ~S. DSL: ~S, ID-PATH: ~S"
+                       dsl-type dsl id-path)
+            nil
+            ;; (error "No component class found for DSL type: ~a" dsl-type)
+            )))))
 
-(defmethod get-component-class-for-dsl-type ((dsl-type list))
-  "Retrieve the component class registered for a given DSL type."
-  (when (null dsl-type)
-    (log-error "DSL type is nil or empty. Cannot retrieve component class.")
-    (error "DSL type cannot be nil or empty."))
-  (get-component-class-for-dsl-type (first dsl-type)))
-
-
-(defmethod get-component-class-for-dsl-type ((dsl-type symbol))
-  "Retrieve the component class registered for a given DSL type."
-  (declare (type (or symbol keyword) dsl-type))
-  (let* ((keyword-dsl-type (intern (symbol-name dsl-type) :keyword))
-         (class (gethash keyword-dsl-type *dsl-type-to-component-class*)))
-    (if class
-        (progn
-          ;; (log-debug "Found component class ~S for DSL type ~S." class keyword-dsl-type)
-          class)
-        (progn
-          ;; (log-error "No component class registered for DSL type: ~S" keyword-dsl-type)
-          ;; (error (format nil "No component class registered for DSL type: ~S" keyword-dsl-type))
-          nil
-          ))))
-
-(defun register-dsl-component-type (dsl-type class-name)
-  "Registers a component class for a given DSL type keyword."
-  (declare (type (or symbol keyword) dsl-type) (type symbol class-name))
-  (setf (gethash (intern (symbol-name dsl-type) :keyword) *dsl-type-to-component-class*) class-name)
-  (log-info "Registered DSL type ~S with class ~S." dsl-type class-name))
-
-(defun registered-dsl-component-p (dsl-type)
-  "Check if a component class is registered for the given DSL type."
-  (declare (type (or symbol keyword) dsl-type))
-  (let ((keyword-dsl-type (intern (symbol-name dsl-type) :keyword)))
-    (if (gethash keyword-dsl-type *dsl-type-to-component-class*)
-        t nil
-        ;; (progn
-        ;;   (log-debug "Component class found for DSL type: ~S" keyword-dsl-type)
-        ;;   t)
-        ;; (progn
-        ;;   (log-debug "No component class registered for DSL type: ~S" keyword-dsl-type))
-        )))
-
-(defun clear-dsl-component-registry ()
-  "Clears the DSL component registry. Useful for testing."
-  (clrhash *dsl-type-to-component-class*))
-
-(defmacro with-temporary-dsl-component-registry (&body body)
-  "Executes BODY with a temporary DSL component registry.
-   This is useful for testing purposes to avoid polluting the global registry."
-  `(let ((*dsl-type-to-component-class* (make-hash-table :test 'equal)))
-     ,@body))
+;;; Note: Old registry functions (get-component-class-for-dsl-type,
+;;; register-dsl-component-type, registered-dsl-component-p,
+;;; clear-dsl-component-registry, with-temporary-dsl-component-registry)
+;;; have been removed in favor of the new polymorphic DSL resolution system
+;;; using resolve-dsl-type and dsl-type generic functions.
 
 (defun validate-platform-options (platform platform-options)
   "Validate PLATFORM-OPTIONS for the given PLATFORM, signalling an error on invalid keys."

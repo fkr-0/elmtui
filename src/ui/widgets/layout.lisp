@@ -10,6 +10,8 @@
                 #:view               ; For calling on children
                 #:destroy            ; For defining and calling on children
                 #:make-state-patch)  ; For manual patch creation (e.g. in destroy)
+  (:import-from :elmtui.ui.dsl-resolution
+                #:resolve-dsl-type) ; For resolving DSL types to classes
   (:import-from :elmtui.state.api
                 #:ur-patches       ; For collecting child patches
                 #:ur-commands       ; For collecting child commands
@@ -101,7 +103,11 @@
 
            ;; 1. Initialize children
            (loop for child-spec in (getf props :children) ; :children is the new standard
-                 for child-type =  (elmtui.app.api:get-component-class-for-dsl-type (first child-spec))
+                 for child-dsl-type = (first child-spec)
+                 for child-type = (multiple-value-bind (resolved-class default-props)
+                                     (resolve-dsl-type child-dsl-type)
+                                   (declare (ignore default-props))
+                                   resolved-class)
                  for raw-child-id = (second (cdr child-spec))
                  for child-id-segment = (ensure-keyword raw-child-id)
                  for child-initargs = (cddr (cdr child-spec))
