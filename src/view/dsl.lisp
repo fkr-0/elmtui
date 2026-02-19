@@ -100,10 +100,27 @@ If NIL, summaries are not truncated.")
                   "Ensure every keyword has a corresponding value"
                   "Example: (:width 100 :height 50) not (:width)"))
               (let ((v (second cursor)))
-                (if (eq k :children)
-                  (setf children v)
-                  (setf props (nconc (list k v) props ))))
-              (setf cursor (cddr cursor)))
+                (cond
+                  ((eq k :children)
+                   (setf children v)
+                   (setf cursor (cddr cursor)))
+                  ;; If v looks like a DSL element (list starting with keyword),
+                  ;; then (k v) is actually the first child, not a property
+                  ;; Check if k is a component type (child) vs a property key
+                  ;; Component types include layout elements, widgets, etc.
+                  ;; Property keys are structural: :id, :class, :style, etc.
+                  ((and (listp v) (keywordp (first v))
+                        (member k '(:row :column :text :container :vbox :hbox
+                                       :layout :viewport :root-viewport
+                                       :grid-container :scroll-panel
+                                       :button :label :input
+                                       :counter)))  ; Add more as needed
+                   ;; k looks like a component type, so (k v) is actually the first child
+                   (setf children cursor)
+                   (setf cursor nil))
+                  (t
+                   (setf props (nconc (list k v) props))
+                   (setf cursor (cddr cursor))))))
             (t
               (setf children cursor
                 cursor   nil)))))
@@ -162,32 +179,34 @@ If NIL, summaries are not truncated.")
                            "Check that no parent and child share the same ID"))
                        (if (ignore-errors (nth-value 0 (resolve-dsl-type type)))
                          ;; component → resolve view, attach as a PROP
-                         (progn
-                           (unless id
-                             (signal-dsl-validation-error spec 0
-                               (format nil "Component ~S requires an :id" type)
-                               "Add an :id property to all components"
-                               "Example: (:my-button :id :btn1 :label \"Click\")"))
-                           (setf resolved-something t)
-                           (handler-case
-                             (multiple-value-bind (klass default-props)
-                                 (resolve-dsl-type type)
-                               (declare (ignore default-props))
-                               (let* ((instance (make-instance klass))
-                                      (view     (elmtui.ui.api:view instance app-state
-                                                  :id-path new-path
-                                                  :children children))
-                                      (_ (when (null view)
-                                           (log-debug "Component ~A at ~A returned NIL view; delaying DSL resolution."
-                                             type new-path)
-                                           (return-from resolve (values nil nil))))
-                                      (rv       (process-node view new-path :in-children-p nil)))
-                                 (declare (ignore _))
-                                 (%emit-node type (append props (list :resolved-view rv)) nil)))
-                             (error (e)
-                               (progn (format t "Error resolving component ~S at path ~S: ~A~%" type new-path e)
-                                 (signal-dsl-validation-error spec 0
-                                   (format nil "Failed to resolve component ~S: ~A" type e))))))
+                         (if id
+                             ;; Has :id, so instantiate as a component
+                             (progn
+                               (setf resolved-something t)
+                               (handler-case
+                                 (multiple-value-bind (klass default-props)
+                                     (resolve-dsl-type type)
+                                   (declare (ignore default-props))
+                                   (let* ((instance (make-instance klass))
+                                          (view     (elmtui.ui.api:view instance app-state
+                                                              :id-path new-path
+                                                              :children children))
+                                          (_ (when (null view)
+                                               (log-debug "Component ~A at ~A returned NIL view; delaying DSL resolution."
+                                                 type new-path)
+                                               (return-from resolve (values nil nil))))
+                                          (rv       (process-node view new-path :in-children-p nil)))
+                                     (declare (ignore _))
+                                     (%emit-node type (append props (list :resolved-view rv)) nil)))
+                                 (error (e)
+                                   (progn (format t "Error resolving component ~S at path ~S: ~A~%" type new-path e)
+                                     (signal-dsl-validation-error spec 0
+                                       (format nil "Failed to resolve component ~S: ~A" type e))))))
+                             ;; No :id, treat as base element
+                             (%emit-node type props
+                               (when children
+                                 (mapcar (lambda (c) (process-node c new-path :in-children-p t))
+                                   children))))
                          ;; normal element → recurse only into CHILDREN
                          (%emit-node type props
                            (when children
