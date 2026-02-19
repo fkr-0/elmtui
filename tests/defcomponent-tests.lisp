@@ -11,6 +11,7 @@
                 #:make-update-result
                 #:make-state
                 #:ur-patches #:ur-commands)
+  (:import-from :elmtui.api #:dsl-type)
   (:export #:defcomponent-tests))
 
 (in-package :elmtui.tests.defcomponent)
@@ -329,3 +330,21 @@
 ;;   (let ((mock-app-state (make-state :initial (alexandria:plist-hash-table `(:components (:complete-test (:name "accessor-test" :data '(1 2 3) :active t)))))))
 ;;     (setf (component-id instance) :complete-test)
 ;;     (list '(1 2 3 ) (complete-data mock-app-state instance))))
+
+;; Test component for DSL type auto-generation
+(defcomponent test-auto-widget (component)
+  (:state
+   (data "auto-widget" :type string :documentation "Auto widget data")))
+
+(test defcomponent-auto-generates-dsl-type-method
+  "defcomponent automatically generates dsl-type method"
+  (multiple-value-bind (class props)
+      (dsl-type :test-auto-widget)
+    (is (eq class 'test-auto-widget))
+    (is (null props)))
+
+  ;; Test with props
+  (multiple-value-bind (class props)
+      (dsl-type :test-auto-widget '(:extra "data"))
+    (is (eq class 'test-auto-widget))
+    (is (equal (getf props :extra) "data"))))

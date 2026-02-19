@@ -3,9 +3,8 @@
   (:import-from #:log4cl #:log-debug)
   (:import-from #:elmtui.view.base-elements
     #:element-class)
-  (:import-from #:elmtui.app.api
-    #:get-component-class-for-dsl-type
-    #:registered-dsl-component-p)
+  (:import-from #:elmtui.ui.dsl-resolution
+    #:resolve-dsl-type)
   (:import-from #:elmtui.core.errors
     #:dsl-error #:signal-dsl-validation-error
     #:with-error-context #:error-with-context)
@@ -20,7 +19,7 @@ DSL-TYPE is a keyword representing the component type (e.g., :root-viewport).
 CLASS-NAME is the symbol naming the class associated with this component.
 
 This macro:
-+ Registers DSL-TYPE with CLASS-NAME using elmtui.app.api:register-dsl-component-type.
++ Defines a dsl-type method for DSL-TYPE that returns CLASS-NAME.
 + Defines a helper function named DSL-TYPE-VIEW (e.g., ROOT-VIEWPORT-VIEW) that constructs a DSL node of this type.
 + Exports the helper function from the current package.
 
@@ -38,7 +37,9 @@ Example:
 This macro is useful for building extensible DSLs, especially for UI or data structure construction."
   (let ((helper-fn-name (intern (string-upcase (format nil "~A-VIEW" dsl-type)) (find-package *package*))))
     `(progn
-       (elmtui.app.api:register-dsl-component-type ,dsl-type ',class-name)
+       ;; Define a dsl-type method for this component type
+       (defmethod elmtui.ui.dsl-resolution:dsl-type ((type (eql ,dsl-type)) &optional props)
+         (values ',class-name props))
        (defun ,helper-fn-name (id &rest args &key &allow-other-keys)
          (declare (ignore &allow-other-keys))
          (list* ,dsl-type :id id args))
@@ -145,8 +146,7 @@ If NIL, summaries are not truncated.")
                ;; potential DSL node: only if head is a known DSL tag
                ((and (listp spec)
                   (keywordp (first spec))
-                  (or (and (fboundp 'registered-dsl-component-p)
-                        (ignore-errors (registered-dsl-component-p (first spec))))
+                  (or (ignore-errors (nth-value 0 (resolve-dsl-type (first spec))))
                     (element-class (first spec)))) ;; (element-class :root-viewport)
                  (destructuring-bind (type &rest tail) spec
                    ;; shorthand (:TEXT "hello")
@@ -160,8 +160,7 @@ If NIL, summaries are not truncated.")
                            (format nil "Circular dependency for ID ~S detected in path ~S" id path)
                            "Use unique IDs within the component hierarchy"
                            "Check that no parent and child share the same ID"))
-                       (if (and (fboundp 'registered-dsl-component-p)
-                             (ignore-errors (registered-dsl-component-p type)))
+                       (if (ignore-errors (nth-value 0 (resolve-dsl-type type)))
                          ;; component → resolve view, attach as a PROP
                          (progn
                            (unless id
@@ -171,18 +170,20 @@ If NIL, summaries are not truncated.")
                                "Example: (:my-button :id :btn1 :label \"Click\")"))
                            (setf resolved-something t)
                            (handler-case
-                             (let* ((klass    (get-component-class-for-dsl-type type))
-                                     (instance (make-instance klass))
-                                     (view     (elmtui.ui.api:view instance app-state
-                                                 :id-path new-path
-                                                 :children children))
-                                     (_ (when (null view)
-                                          (log-debug "Component ~A at ~A returned NIL view; delaying DSL resolution."
-                                            type new-path)
-                                          (return-from resolve (values nil nil))))
-                                     (rv       (process-node view new-path :in-children-p nil)))
-                               (declare (ignore _))
-                               (%emit-node type (append props (list :resolved-view rv)) nil))
+                             (multiple-value-bind (klass default-props)
+                                 (resolve-dsl-type type)
+                               (declare (ignore default-props))
+                               (let* ((instance (make-instance klass))
+                                      (view     (elmtui.ui.api:view instance app-state
+                                                  :id-path new-path
+                                                  :children children))
+                                      (_ (when (null view)
+                                           (log-debug "Component ~A at ~A returned NIL view; delaying DSL resolution."
+                                             type new-path)
+                                           (return-from resolve (values nil nil))))
+                                      (rv       (process-node view new-path :in-children-p nil)))
+                                 (declare (ignore _))
+                                 (%emit-node type (append props (list :resolved-view rv)) nil)))
                              (error (e)
                                (progn (format t "Error resolving component ~S at path ~S: ~A~%" type new-path e)
                                  (signal-dsl-validation-error spec 0

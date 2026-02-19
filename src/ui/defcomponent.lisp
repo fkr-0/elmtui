@@ -1,5 +1,6 @@
 (uiop:define-package :elmtui.ui.defcomponent
   (:use :cl)
+  (:import-from :alexandria #:make-keyword)
   (:import-from :elmtui.state.api
     #:make-update-result
     #:ur-patches
@@ -17,6 +18,7 @@
     #:defcomponent-error
     #:suggest-fixes
     #:with-error-context)
+  (:import-from :elmtui.api #:dsl-type)
   (:export #:defcomponent #:cclass-name))
 
 (in-package :elmtui.ui.defcomponent)
@@ -71,6 +73,24 @@
                         :key (lambda (s) (getf s :name)))
                 (push slot inherited-slots)))))))
     (nreverse inherited-slots)))
+
+;;===================================================================
+;; DSL Type Inference Helper
+;;===================================================================
+
+(defun infer-dsl-type-from-class-name (class-name)
+  "Infer DSL keyword from class name.
+- my-button => :my-button
+- ui.widgets:label => :label (strips package)
+- my-component => :my-component"
+  (let ((name (symbol-name class-name)))
+    ;; Find the last colon if present (package qualifier)
+    (let ((colon-pos (position #\: name :from-end t)))
+      (if colon-pos
+          ;; Strip package prefix
+          (make-keyword (subseq name (1+ colon-pos)))
+          ;; No package, just keyword-ize
+          (make-keyword name)))))
 
 (defgeneric cclass-name (cls)
   (:documentation "Returns a keyword symbol representing the component class type, e.g., :my-button."))
@@ -643,6 +663,10 @@ SYNTAX:
                             ((listp comp-state)
                               (getf comp-state ,slot-keyword ,slot-initial-value))
                             (t ,slot-initial-value)))))
+
+         ;; Auto-generate dsl-type method for this component
+         (defmethod dsl-type ((type (eql ,(infer-dsl-type-from-class-name component-class-name))) &optional props)
+           (values ',component-class-name props))
 
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (setf (gethash ',component-class-name *component-state-slots*) ',parsed-state-slots))

@@ -7,6 +7,7 @@
     #:app-config
     #:app-config-name)
   (:import-from :elmtui.ui.defcomponent #:defcomponent)
+  (:import-from :elmtui.ui.dsl-resolution #:dsl-type)
   (:import-from #:elmtui.state #:get-path #:state-ref)
   (:import-from :elmtui.view.geo #:=?)
   (:export #:application-init-tests #:test-component #:test-parent-component
@@ -86,8 +87,11 @@
   ;;        (:test-parent-component :id :parent1 :child-initial-state
   ;;          "child state"))))
 
-  (elmtui.app.api:register-dsl-component-type :test-component 'test-component)
-  (elmtui.app.api:register-dsl-component-type :test-parent-component 'test-parent-component))
+  ;; Register DSL types for test components using the new polymorphic system
+  (defmethod dsl-type ((type (eql :test-component)) &optional props)
+    (values 'test-component props))
+  (defmethod dsl-type ((type (eql :test-parent-component)) &optional props)
+    (values 'test-parent-component props)))
 (def-suite application-init-tests
 
   :in elmtui.tests:elmtui-test

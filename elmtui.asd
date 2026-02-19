@@ -79,7 +79,10 @@
                 ;; ================= API LAYER =================
                 ;; These API files define the public interface for each module
                 ;; Each contains both the interface declarations and implementations
-                (:file "ui/api") ; Imports: elmtui.state.api, elmtui.utils
+                ;; Load DSL resolution and metaclass before ui/api since it depends on them
+                (:file "ui/component-metaclass")
+                (:file "ui/dsl-resolution")
+                (:file "ui/api") ; Imports: elmtui.state.api, elmtui.utils, elmtui.ui.dsl-resolution, elmtui.ui.component-metaclass
                 (:file "app/api") ; Imports: elmtui.core.globals, elmtui.core.event-channels
                 (:file "app/tea-core")
                 (:file "platform/api") ; Imports: elmtui.utils, bordeaux-threads
@@ -90,8 +93,7 @@
                 (:module "ui"
                   :serial t
                   :pathname "ui/"
-                  :components (;; Note: ui/api is loaded earlier in the API LAYER section to avoid duplication
-                                (:file "component-metaclass")
+                  :components (;; Note: ui/api, component-metaclass, and dsl-resolution are loaded earlier in the API LAYER section
                                 (:file "defcomponent")
                                 (:module "widgets"
                                   :pathname "widgets/"
