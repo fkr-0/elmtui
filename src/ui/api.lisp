@@ -284,9 +284,11 @@
     (labels ((process-node (node parent-path)
                (when (and (consp node) (keywordp (car node)))
                  (destructuring-bind (component-type &rest component-props) node
-                   (declare (ignore component-type))
-                   (let ((component-id (getf component-props :id)))
-                     (when component-id
+                   ;; Check if this is a component (has dsl-type method) or just an element
+                   (let ((is-component-p (ignore-errors (nth-value 0 (elmtui.ui.dsl-resolution:resolve-dsl-type component-type))))
+                         (component-id (getf component-props :id)))
+                     ;; Only instantiate if it's a component AND has an :id
+                     (when (and is-component-p component-id)
                        (let* ((current-path (append parent-path (list component-id)))
                               (full-id-path (cons :components current-path))
                               (component-instance (instantiate-component-from-dsl node full-id-path)))
@@ -295,7 +297,11 @@
                                (apply #'init component-instance :id-path full-id-path component-props)
                              (declare (ignore instance))
                              (setf patches (nconc patches init-patches))
-                             (setf commands (nconc commands init-commands))))
+                             (setf commands (nconc commands init-commands)))))
+                       ;; Set current-path for children even if not a component
+                       (let ((current-path (if component-id
+                                               (append parent-path (list component-id))
+                                               parent-path)))
                          ;; Recurse into children
                          (flet ((process-children (child-list)
                                   (when child-list

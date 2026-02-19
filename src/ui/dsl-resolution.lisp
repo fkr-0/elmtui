@@ -31,11 +31,30 @@ Example:
 ;;; ---------------------------------------------------------------
 
 (defmethod dsl-type ((type symbol) &optional props)
-  "TYPE is a class symbol - terminate recursion and return it.
+  "TYPE is a symbol - handle both keywords and non-keyword symbols.
 
-This is the default termination method. When TYPE is a symbol (but not
-a keyword), it's treated as a class name and returned directly."
-  (values type props))
+This is the default termination method. When TYPE is:
+- A keyword without a specific dsl-type method, return NIL to indicate
+  it's a base element (not a component), e.g., :container, :column
+- A non-keyword symbol, it's treated as a class name and returned directly"
+  (if (keywordp type)
+      ;; Keywords without specific methods are base elements, not components
+      (values nil props)
+      (values type props)))
+
+(defmethod no-applicable-method ((gf (eql #'dsl-type)) &rest args)
+  "Handle keywords and other types without specific dsl-type methods.
+
+This method is called when no specific method matches the arguments.
+For keywords (which are base elements), we return NIL to indicate
+they are not components."
+  (when args
+    (let ((type (first args)))
+      (when (keywordp type)
+        ;; Keywords without specific methods are base elements, not components
+        (return-from no-applicable-method (values nil (second args))))))
+  ;; For other cases, use the default error behavior
+  (call-next-method))
 
 (defmethod dsl-type ((type list) &optional props)
   "TYPE is a list - first element is the real type, rest are extra props.
