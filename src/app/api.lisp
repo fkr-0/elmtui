@@ -111,8 +111,6 @@
 
 ;; (declaim (ftype (function (list list) t) instantiate-component-from-dsl))
 
-;;(declaim (ftype (function ((or symbol keyword)) (or null symbol)) get-component-class-for-dsl-type))
-
 (declaim (ftype (function (symbol list) t) validate-platform-options))
 
 ;;; ===================================================================
@@ -168,11 +166,9 @@ Workflow:
             ;; (error "No component class found for DSL type: ~a" dsl-type)
             )))))
 
-;;; Note: Old registry functions (get-component-class-for-dsl-type,
-;;; register-dsl-component-type, registered-dsl-component-p,
-;;; clear-dsl-component-registry, with-temporary-dsl-component-registry)
-;;; have been removed in favor of the new polymorphic DSL resolution system
-;;; using resolve-dsl-type and dsl-type generic functions.
+;;; NOTE: The old registry-based DSL resolution system has been replaced
+;;; with a polymorphic system using CLOS generic functions (dsl-type).
+;;; See src/ui/dsl-resolution.lisp for the new implementation.
 
 (defun validate-platform-options (platform platform-options)
   "Validate PLATFORM-OPTIONS for the given PLATFORM, signalling an error on invalid keys."
