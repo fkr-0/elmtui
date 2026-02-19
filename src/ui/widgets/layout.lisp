@@ -340,4 +340,3 @@
 ;;     (push (elmtui.ui.api:make-state-patch id-path :elmtui-delete-path) all-patches)
 ;;     (values (nreverse all-patches) (nreverse all-commands))))
 ;; )
-;; (elmtui.app.api:registered-dsl-component-p :layout)

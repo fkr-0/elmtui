@@ -17,9 +17,7 @@
            #:*theme*
            #:*applications*
            #:*stylesheets*
-           #:*dsl-type-to-component-class*
-           #:*message-schemas*
-           #:*widget-registry*))
+           #:*message-schemas*))
 (in-package :elmtui.core.globals)
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -74,16 +72,9 @@
   (defvar *stylesheets* (make-hash-table :test 'equal))
   (declaim (type hash-table *stylesheets*))
 
-  (defvar *widget-registry* (make-hash-table :test 'equal)
-    "Registry of all widget classes, keyed by their DSL type keywords.
-   This is used to map DSL types to their corresponding component classes.")
-  (declaim (type hash-table *widget-registry*))
-
-  (defvar *dsl-type-to-component-class*
-    (make-hash-table :test 'equal)
-    "Maps DSL type keywords to their corresponding component class symbols.
-     This is used to resolve DSL types to actual component classes when rendering views.")
-  (declaim (type hash-table *dsl-type-to-component-class*))
+  ;; NOTE: Old registry variables (*widget-registry*, *dsl-type-to-component-class*)
+  ;; have been removed in favor of the new polymorphic DSL resolution system
+  ;; using CLOS generic functions (dsl-type). See src/ui/dsl-resolution.lisp
 
   (defvar *debug-layout-outlines* nil
     "If T, enables layout outlines for debugging purposes.
