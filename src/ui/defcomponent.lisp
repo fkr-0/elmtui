@@ -19,6 +19,9 @@
     #:suggest-fixes
     #:with-error-context)
   (:import-from :elmtui.api #:dsl-type)
+  (:import-from :elmtui.ui.component-metaclass
+    #:component-class
+    #:make-metadata)
   (:export #:defcomponent #:cclass-name))
 
 (in-package :elmtui.ui.defcomponent)
@@ -179,7 +182,7 @@
 (defun validate-clause-structure (clauses component-name)
   "Validate the overall structure of defcomponent clauses."
   (declare (ignorable component-name))
-  (let ((valid-clauses '(:state :init :update :view :on-unhandled-message :documentation)))
+  (let ((valid-clauses '(:state :init :update :view :on-unhandled-message :documentation :metadata)))
     (dolist (clause clauses)
       ;; Skip nil clauses (can happen with empty lists)
       (when clause
@@ -253,6 +256,58 @@ Returns a list of plists, each representing a slot:
 ;; Helper to find a specific clause in the defcomponent body
 (defun find-clause (clauses keyword)
   (find keyword clauses :key #'car))
+
+;; Helper to parse the :metadata clause
+(defun parse-metadata-clause (metadata-clause)
+  "Parses the :metadata clause and returns a make-metadata form.
+
+   The :metadata clause has the format:
+   (:metadata
+     (:props ((:prop1 type1 required1 :doc \"doc1\")
+              (:prop2 type2 required2 :default default2 :doc \"doc2\")))
+     (:documentation \"Component description\")
+     (:examples '((:my-component :prop1 val1) (:my-component :prop2 val2))))
+
+   Returns a form that evaluates to a metadata plist."
+  (let ((body (cdr metadata-clause)))
+    ;; Parse each sub-clause within :metadata
+    (let (props documentation examples)
+      (dolist (item body)
+        (unless (and (consp item) (keywordp (car item)))
+          (error 'defcomponent-error
+            :validation-type "invalid-metadata-item"
+            :macro-arg item
+            :context "Metadata items must be keyword-value pairs"
+            :suggestions "Use :props, :documentation, or :examples"))
+        (case (car item)
+          (:props
+            (setf props (cdr item)))
+          (:documentation
+            (unless (stringp (cadr item))
+              (error 'defcomponent-error
+                :validation-type "invalid-documentation"
+                :macro-arg item
+                :context ":documentation must be a string"
+                :suggestions "Example: (:documentation \"A button component\")"))
+            (setf documentation (cadr item)))
+          (:examples
+            (unless (and (listp (cadr item)) (every #'listp (cdr item)))
+              (error 'defcomponent-error
+                :validation-type "invalid-examples"
+                :macro-arg item
+                :context ":examples must be a list of list forms"
+                :suggestions "Example: (:examples '((:button :text \"Click\")))")
+            (setf examples (cadr item)))
+          (otherwise
+            (error 'defcomponent-error
+              :validation-type "unknown-metadata-item"
+              :macro-arg (car item)
+              :context (format nil "Unknown metadata item: ~A" (car item))
+              :suggestions "Valid items are :props, :documentation, and :examples")))))
+      `(make-metadata
+         ,@(when props `(:props ',props))
+         ,@(when documentation `(:documentation ,documentation))
+         ,@(when examples `(:examples ',examples))))))
 
 ;; Helper to get the body of a clause (everything after the keyword)
 (defun clause-body (clause)
@@ -408,9 +463,10 @@ SYNTAX:
           (init-clause (find-clause body :init))
           (update-clause (find-clause body :update))
           (view-clause (find-clause body :view))
+          (metadata-clause (find-clause body :metadata))
           (other-options (remove-if (lambda (item)
                                       (and (consp item)
-                                        (member (car item) '(:state :init :update :view :on-unhandled-message) :test #'eq)))
+                                        (member (car item) '(:state :init :update :view :on-unhandled-message :documentation :metadata) :test #'eq)))
                            body))
           (on-unhandled-message-option (assoc :on-unhandled-message body))
           (on-unhandled-behavior (if on-unhandled-message-option
@@ -420,7 +476,14 @@ SYNTAX:
                                (parse-state-clause (clause-body state-clause))
                                nil))
           (inherited-state-slots (collect-inherited-state-slots effective-superclasses))
-          (parsed-state-slots (merge-state-slots inherited-state-slots local-state-slots)))
+          (parsed-state-slots (merge-state-slots inherited-state-slots local-state-slots))
+          (has-metadata-p (not (null metadata-clause)))
+          (use-metaclass-p (or has-metadata-p
+                                (loop for super in effective-superclasses
+                                      thereis (and (symbolp super)
+                                                   (find-class super nil)
+                                                   (typep (find-class super nil) 'component-class))))))
+          (effective-metaclass (if use-metaclass-p 'component-class 'standard-class))
 
     ;; Validate update clause if present
     (when update-clause
@@ -456,7 +519,10 @@ SYNTAX:
       `(eval-when (:compile-toplevel :load-toplevel :execute)
          (defclass ,component-class-name ,effective-superclasses
            ()
+           (:metaclass ,(if use-metaclass-p 'component-class 'standard-class))
            (:documentation ,class-documentation-string)
+           ,@(when has-metadata-p
+               `(:metadata ,(parse-metadata-clause metadata-clause)))
            ,@other-class-options)
 
          (defmethod cclass-name ((instance ,component-class-name))
