@@ -270,7 +270,6 @@ Returns a list of plists, each representing a slot:
 
    Returns a form that evaluates to a metadata plist."
   (let ((body (cdr metadata-clause)))
-    ;; Parse each sub-clause within :metadata
     (let (props documentation examples)
       (dolist (item body)
         (unless (and (consp item) (keywordp (car item)))
@@ -281,33 +280,34 @@ Returns a list of plists, each representing a slot:
             :suggestions "Use :props, :documentation, or :examples"))
         (case (car item)
           (:props
-            (setf props (cdr item)))
+           (setf props (cadr item)))
           (:documentation
-            (unless (stringp (cadr item))
-              (error 'defcomponent-error
-                :validation-type "invalid-documentation"
-                :macro-arg item
-                :context ":documentation must be a string"
-                :suggestions "Example: (:documentation \"A button component\")"))
-            (setf documentation (cadr item)))
+           (unless (stringp (cadr item))
+             (error 'defcomponent-error
+               :validation-type "invalid-documentation"
+               :macro-arg item
+               :context ":documentation must be a string"
+               :suggestions "Example: (:documentation \"A button component\")"))
+           (setf documentation (cadr item)))
           (:examples
-            (unless (and (listp (cadr item)) (every #'listp (cdr item)))
-              (error 'defcomponent-error
-                :validation-type "invalid-examples"
-                :macro-arg item
-                :context ":examples must be a list of list forms"
-                :suggestions "Example: (:examples '((:button :text \"Click\")))")
-            (setf examples (cadr item)))
+           (unless (and (listp (cadr item))
+                        (every #'listp (cadr item)))
+             (error 'defcomponent-error
+               :validation-type "invalid-examples"
+               :macro-arg item
+               :context ":examples must be a list of list forms"
+               :suggestions "Example: (:examples '((:button :text \"Click\")))"))
+           (setf examples (cadr item)))
           (otherwise
-            (error 'defcomponent-error
-              :validation-type "unknown-metadata-item"
-              :macro-arg (car item)
-              :context (format nil "Unknown metadata item: ~A" (car item))
-              :suggestions "Valid items are :props, :documentation, and :examples")))))
-      `(make-metadata
-         ,@(when props `(:props ',props))
-         ,@(when documentation `(:documentation ,documentation))
-         ,@(when examples `(:examples ',examples))))))
+           (error 'defcomponent-error
+             :validation-type "unknown-metadata-item"
+             :macro-arg (car item)
+             :context (format nil "Unknown metadata item: ~A" (car item))
+             :suggestions "Valid items are :props, :documentation, and :examples"))))
+      (make-metadata
+       :props props
+       :documentation documentation
+       :examples examples))))
 
 ;; Helper to get the body of a clause (everything after the keyword)
 (defun clause-body (clause)
@@ -464,6 +464,7 @@ SYNTAX:
           (update-clause (find-clause body :update))
           (view-clause (find-clause body :view))
           (metadata-clause (find-clause body :metadata))
+          (documentation-clause (find-clause body :documentation))
           (other-options (remove-if (lambda (item)
                                       (and (consp item)
                                         (member (car item) '(:state :init :update :view :on-unhandled-message :documentation :metadata) :test #'eq)))
@@ -482,8 +483,8 @@ SYNTAX:
                                 (loop for super in effective-superclasses
                                       thereis (and (symbolp super)
                                                    (find-class super nil)
-                                                   (typep (find-class super nil) 'component-class))))))
-          (effective-metaclass (if use-metaclass-p 'component-class 'standard-class))
+                                                   (typep (find-class super nil) 'component-class)))))
+          (effective-metaclass (if use-metaclass-p 'component-class 'standard-class)))
 
     ;; Validate update clause if present
     (when update-clause
@@ -507,9 +508,8 @@ SYNTAX:
                                                (intern (symbol-name name))
                                                name)))
                                    state-initarg-params))
-            (doc-option (assoc :documentation other-options))
-            (class-documentation-string (if doc-option
-                                          (second doc-option)
+            (class-documentation-string (if documentation-clause
+                                          (second documentation-clause)
                                           (format nil "A UI component class ~A, defined with defcomponent." name)))
             (other-class-options (remove-if (lambda (item)
                                               (or (null item)
@@ -519,10 +519,10 @@ SYNTAX:
       `(eval-when (:compile-toplevel :load-toplevel :execute)
          (defclass ,component-class-name ,effective-superclasses
            ()
-           (:metaclass ,(if use-metaclass-p 'component-class 'standard-class))
+           (:metaclass ,effective-metaclass)
            (:documentation ,class-documentation-string)
            ,@(when has-metadata-p
-               `(:metadata ,(parse-metadata-clause metadata-clause)))
+               `((:metadata ,(parse-metadata-clause metadata-clause))))
            ,@other-class-options)
 
          (defmethod cclass-name ((instance ,component-class-name))
