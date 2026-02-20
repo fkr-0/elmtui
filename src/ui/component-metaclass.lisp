@@ -25,27 +25,44 @@
   (:documentation "Metaclass for component classes that stores metadata
                    in the class metaobject itself instead of a static registry."))
 
+(defun normalize-metadata (metadata)
+  "Normalize metadata shape so callers consistently get a plist."
+  (if (and (consp metadata)
+           (null (cdr metadata))
+           (consp (car metadata))
+           (keywordp (caar metadata)))
+      (car metadata)
+      metadata))
+
+(defmethod class-metadata :around ((class component-class))
+  (normalize-metadata (call-next-method)))
+
+(defmethod (setf class-metadata) :around (metadata (class component-class))
+  (call-next-method (normalize-metadata metadata) class))
+
 ;;; ---------------------------------------------------------------
 ;;; Initialize Instance Method
 ;;; ---------------------------------------------------------------
 
 (defmethod initialize-instance :after ((class component-class) &key metadata &allow-other-keys)
   "After initializing a component-class, store the metadata if provided."
-  (declare (ignore metadata))
-  ;; Metadata is automatically stored via the %metadata slot's initarg
-  ;; This method exists for future extensibility (e.g., validation)
+  (when metadata
+    ;; DEFCLASS class options pass option values as argument lists.
+    (setf (class-metadata class) metadata))
   (values))
 
 ;;; ---------------------------------------------------------------
 ;;; Validate Superclass Method
 ;;; ---------------------------------------------------------------
 
-(defmethod sb-mop:validate-superclass ((class component-class) (superclass sb-mop:standard-class))
-  "Allow component-class to be used with standard-class superclasses."
+(defmethod sb-mop:validate-superclass ((class component-class) (superclass standard-class))
+  "Allow component-class to have standard-class as a superclass."
+  (declare (ignore class superclass))
   t)
 
-(defmethod sb-mop:validate-superclass ((class sb-mop:standard-class) (superclass component-class))
-  "Allow standard-class to be used with component-class superclasses."
+(defmethod sb-mop:validate-superclass ((class standard-class) (superclass component-class))
+  "Allow standard-class to inherit from component-class."
+  (declare (ignore class superclass))
   t)
 
 ;;; ---------------------------------------------------------------
@@ -69,8 +86,7 @@
                  :on-click handle-click)
        :documentation \"A clickable button component\"
        :examples '((:button :text \"Submit\"
-                           :on-click submit-form)))
-  "
+                           :on-click submit-form)))"
   (let ((metadata '()))
     (when props
       (setf (getf metadata :props) props))

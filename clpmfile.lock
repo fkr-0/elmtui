@@ -16,7 +16,8 @@
 (:implicit-file :type :file-system :system-files ("cl-events/cl-events.asd"))
 (:implicit-file :type :file-system :system-files ("cl-inputs/cl-inputs.asd"))
 (:implicit-file :type :file-system :system-files ("cl-styles/cl-styles.asd"))
-(:implicit-file :type :file-system :system-files ("../cl-fzy/cl-fzy.asd"))
+(:implicit-file :type :file-system :system-files
+ ("/home/user/code/lisp/cl-fzy/cl-fzy.asd"))
 (:implicit-file :type :file-system :system-files
  ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"))
 (:implicit-vcs :type :vcs :projects
@@ -27,8 +28,8 @@
  (("asdf-viz" :github :path "guicho271828/asdf-viz")))
 (:implicit-vcs :type :vcs :projects (("fiveam" :github :path "lispci/fiveam")))
 (:implicit-vcs :type :vcs :projects (("sly" :github :path "joaotavora/sly")))
-("quicklisp" :url "https://beta.quicklisp.org/dist/quicklisp.txt" :type
- :quicklisp)
+("quicklisp" :url "https://quicklisp.common-lisp-project-index.org/" :type
+ :ql-clpi)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -57,7 +58,7 @@
 (:asd-file :name "cl-events/cl-events.asd")
 (:asd-file :name "cl-inputs/cl-inputs.asd")
 (:asd-file :name "cl-styles/cl-styles.asd")
-(:asd-file :name "../cl-fzy/cl-fzy.asd")
+(:asd-file :name "/home/user/code/lisp/cl-fzy/cl-fzy.asd")
 (:asd-file :name "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 
 
@@ -66,38 +67,38 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :releases
-("../cl-fzy/cl-fzy.asd" :version :newest :source :implicit-file :systems
- ("cl-fzy"))
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd" :version :newest
  :source :implicit-file :systems ("quicklisp"))
-("alexandria" :version "2024-10-12" :source "quicklisp" :systems ("alexandria"))
-("asdf-flv" :version "2023-10-21" :source "quicklisp" :systems
+("/home/user/code/lisp/cl-fzy/cl-fzy.asd" :version :newest :source
+ :implicit-file :systems ("cl-fzy"))
+("alexandria" :version "2022-07-08" :source "quicklisp" :systems ("alexandria"))
+("asdf-flv" :version "2016-04-21" :source "quicklisp" :systems
  ("net.didierverna.asdf-flv"))
 ("asdf-package-system" :version "2015-06-08" :source "quicklisp" :systems
  ("asdf-package-system"))
 ("asdf-viz" :version (:commit "33e5c97295b8284dca69128023359b21563a926d")
  :source :implicit-vcs :systems ("asdf-viz"))
-("bordeaux-threads" :version "2024-10-12" :source "quicklisp" :systems
+("bordeaux-threads" :version "2022-07-08" :source "quicklisp" :systems
  ("bordeaux-threads"))
-("cl-change-case" :version "2025-06-22" :source "quicklisp" :systems
+("cl-change-case" :version "2021-04-11" :source "quicklisp" :systems
  ("cl-change-case"))
-("cl-dot" :version "2024-10-12" :source "quicklisp" :systems ("cl-dot"))
+("cl-dot" :version "2022-07-08" :source "quicklisp" :systems ("cl-dot"))
 ("cl-events/cl-events.asd" :version :newest :source :implicit-file :systems
  ("cl-events"))
 ("cl-inputs/cl-inputs.asd" :version :newest :source :implicit-file :systems
  ("cl-inputs" "cl-inputs/tests"))
-("cl-ppcre" :version "2025-06-22" :source "quicklisp" :systems
+("cl-ppcre" :version "2022-02-20" :source "quicklisp" :systems
  ("cl-ppcre" "cl-ppcre-unicode"))
 ("cl-reexport" :version "2021-02-28" :source "quicklisp" :systems
  ("cl-reexport"))
 ("cl-state/cl-state.asd" :version :newest :source :implicit-file :systems
  ("cl-state"))
-("cl-str" :version "2025-06-22" :source "quicklisp" :systems ("str"))
+("cl-str" :version "2022-07-08" :source "quicklisp" :systems ("str"))
 ("cl-styles/cl-styles.asd" :version :newest :source :implicit-file :systems
  ("cl-styles" "cl-styles/tests"))
-("cl-unicode" :version "2024-10-12" :source "quicklisp" :systems ("cl-unicode"))
-("closer-mop" :version "2025-06-22" :source "quicklisp" :systems ("closer-mop"))
-("dissect" :version "2024-10-12" :source "quicklisp" :systems ("dissect"))
+("cl-unicode" :version "2021-02-28" :source "quicklisp" :systems ("cl-unicode"))
+("closer-mop" :version "2022-07-08" :source "quicklisp" :systems ("closer-mop"))
+("dissect" :version "2022-07-08" :source "quicklisp" :systems ("dissect"))
 ("elmtui-examples.asd" :version :newest :source :implicit-file :systems
  ("elmtui-examples" "elmtui-examples/legacy"))
 ("elmtui-tests.asd" :version :newest :source :implicit-file :systems
@@ -105,19 +106,17 @@
 ("elmtui.asd" :version :newest :source :implicit-file :systems ("elmtui"))
 ("fiveam" :version (:commit "e11dee752a8f59065033ef9d60641d4a2f1e8379") :source
  :implicit-vcs :systems ("fiveam" "fiveam/test"))
-("flexi-streams" :version "2024-10-12" :source "quicklisp" :systems
+("flexi-streams" :version "2022-02-20" :source "quicklisp" :systems
  ("flexi-streams"))
-("global-vars" :version "2014-11-06" :source "quicklisp" :systems
- ("global-vars"))
-("introspect-environment" :version "2024-10-12" :source "quicklisp" :systems
+("introspect-environment" :version "2022-02-20" :source "quicklisp" :systems
  ("introspect-environment"))
 ("iterate" :version "2021-05-31" :source "quicklisp" :systems ("iterate"))
-("lisp-namespace" :version "2022-11-07" :source "quicklisp" :systems
+("lisp-namespace" :version "2021-10-21" :source "quicklisp" :systems
  ("lisp-namespace"))
-("log4cl" :version "2023-06-18" :source "quicklisp" :systems ("log4cl"))
-("rove" :version "2025-06-22" :source "quicklisp" :systems ("rove"))
-("slime" :version "2025-06-22" :source "quicklisp" :systems ("swank"))
-("sly" :version (:commit "63131ef965d8ff3a6b79cc7aff8e8f5fc1a82aec") :source
+("log4cl" :version "2021-12-09" :source "quicklisp" :systems ("log4cl"))
+("rove" :version "2022-04-01" :source "quicklisp" :systems ("rove"))
+("slime" :version "2022-02-20" :source "quicklisp" :systems ("swank"))
+("sly" :version (:commit "b01993cf1d6626d541998a77dd802483c9687789") :source
  :implicit-vcs :systems
  ("slynk" "slynk/arglists" "slynk/fancy-inspector" "slynk/indentation"
   "slynk/mrepl" "slynk/package-fu" "slynk/profiler" "slynk/retro"
@@ -129,20 +128,16 @@
   "standard-test"))
 ("sly-quicklisp" :version (:commit "34c73d43dd9066262387c626c17a9b486db07b2d")
  :source :implicit-vcs :systems ("slynk-quicklisp"))
-("trivia" :version "2024-10-12" :source "quicklisp" :systems
+("trivia" :version "2022-07-08" :source "quicklisp" :systems
  ("trivia" "trivia.balland2006" "trivia.level0" "trivia.level1" "trivia.level2"
   "trivia.trivial"))
-("trivial-backtrace" :version "2023-02-15" :source "quicklisp" :systems
+("trivial-backtrace" :version "2020-06-10" :source "quicklisp" :systems
  ("trivial-backtrace"))
 ("trivial-cltl2" :version "2021-12-30" :source "quicklisp" :systems
  ("trivial-cltl2"))
-("trivial-features" :version "2025-06-22" :source "quicklisp" :systems
- ("trivial-features"))
-("trivial-garbage" :version "2023-10-21" :source "quicklisp" :systems
- ("trivial-garbage"))
-("trivial-gray-streams" :version "2024-10-12" :source "quicklisp" :systems
+("trivial-gray-streams" :version "2021-01-24" :source "quicklisp" :systems
  ("trivial-gray-streams"))
-("type-i" :version "2023-02-15" :source "quicklisp" :systems ("type-i"))
+("type-i" :version "2022-07-08" :source "quicklisp" :systems ("type-i"))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -150,15 +145,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :reverse-dependencies
-("../cl-fzy/cl-fzy.asd"
- ((:system :name "elmtui-examples") (:system :name "cl-fzy"))
- (t (:asd-file :name "../cl-fzy/cl-fzy.asd")))
-
 ("/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd"
  ((:system :name "slynk-quicklisp") (:system :name "quicklisp"))
  (t
   (:asd-file :name
    "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")))
+
+("/home/user/code/lisp/cl-fzy/cl-fzy.asd"
+ ((:system :name "elmtui-examples") (:system :name "cl-fzy"))
+ (t (:asd-file :name "/home/user/code/lisp/cl-fzy/cl-fzy.asd")))
 
 ("alexandria" ((:system :name "type-i") (:system :name "alexandria"))
  ((:system :name "trivia.level0") (:system :name "alexandria"))
@@ -188,6 +183,7 @@
 ("bordeaux-threads" ((:system :name "rove") (:system :name "bordeaux-threads"))
  ((:system :name "log4cl") (:system :name "bordeaux-threads"))
  ((:system :name "elmtui") (:system :name "bordeaux-threads"))
+ ((:system :name "cl-state") (:system :name "bordeaux-threads"))
  ((:system :name "cl-inputs") (:system :name "bordeaux-threads"))
  ((:system :name "cl-events") (:system :name "bordeaux-threads"))
  (t (:system :name "bordeaux-threads")))
@@ -252,9 +248,6 @@
 
 ("flexi-streams" (t (:system :name "flexi-streams")))
 
-("global-vars"
- ((:system :name "bordeaux-threads") (:system :name "global-vars")))
-
 ("introspect-environment"
  ((:system :name "type-i") (:system :name "introspect-environment")))
 
@@ -285,7 +278,7 @@
  ((:system :name "slynk-asdf") (:system :name "slynk"))
  (t (:system :name "slynk"))
  (t
-  (:project :name "sly" :commit "63131ef965d8ff3a6b79cc7aff8e8f5fc1a82aec"
+  (:project :name "sly" :commit "b01993cf1d6626d541998a77dd802483c9687789"
    :source :implicit-vcs)))
 
 ("sly-asdf"
@@ -315,12 +308,6 @@
 
 ("trivial-cltl2"
  ((:system :name "trivia.level2") (:system :name "trivial-cltl2")))
-
-("trivial-features"
- ((:system :name "bordeaux-threads") (:system :name "trivial-features")))
-
-("trivial-garbage"
- ((:system :name "bordeaux-threads") (:system :name "trivial-garbage")))
 
 ("trivial-gray-streams"
  ((:system :name "rove") (:system :name "trivial-gray-streams"))

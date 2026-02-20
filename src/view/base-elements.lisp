@@ -273,8 +273,16 @@ Avoids running validation during initialize-instance to keep control over timing
   ;; Base rule: nothing special to validate here – subclasses add checks
   t)
 
-;; Weak-key hash to hold *computed* props (size/layout/dirty/prev-*)
-(defparameter *computed* (trivial-garbage:make-weak-hash-table :weakness :key :test 'eq))
+;; Weak-key hash to hold *computed* props (size/layout/dirty/prev-*).
+;; Falls back to a regular EQ hash table when trivial-garbage is unavailable.
+(defun make-computed-table ()
+  (let* ((pkg (find-package :trivial-garbage))
+         (maker (and pkg (find-symbol "MAKE-WEAK-HASH-TABLE" pkg))))
+    (if (and maker (fboundp maker))
+        (funcall maker :weakness :key :test 'eq)
+        (make-hash-table :test 'eq))))
+
+(defparameter *computed* (make-computed-table))
 
 (defun %props (el)
   (or (gethash el *computed*)
