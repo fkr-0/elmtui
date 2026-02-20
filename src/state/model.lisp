@@ -219,9 +219,9 @@
                           ,@trans-body)))
                    transactions))
 
-       ;; Register observers
+       ;; Register observers (convert to function objects)
        ,@(when observers
-           `((dolist (observer ',observers)
+           `((dolist (observer (list ,@(mapcar (lambda (obs) `(function ,obs)) observers)))
                (add-state-observer ',name observer))))
 
        ;; Export public interface if requested
