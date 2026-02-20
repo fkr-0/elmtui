@@ -25,7 +25,7 @@ The API modules are loaded in the following order in the ASDF system:
 
 1. **elmtui.app.api**: Application definition and lifecycle
    - Imports from: `elmtui.core.globals`, `elmtui.core.event-channels`
-   - Provides: `defapplication`, component instantiation, DSL registry
+   - Provides: `defapplication`, component instantiation, app lifecycle wiring
    
 2. **elmtui.state.api**: State management and transactions
    - Imports from: `elmtui.core.globals`

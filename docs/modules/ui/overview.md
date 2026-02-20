@@ -31,7 +31,7 @@ The `ui` module provides the component system and widget library for Elmtui appl
 - **Props Management:** Property passing and validation system
 - **Local State:** Component-specific state management independent of global state
 - **Event Handling:** Component-level event processing and message emission
-- **Widget Registry:** Registration and lookup system for available widgets
+- **Metaclass Metadata:** Per-component metadata (`:props`, docs, examples) stored on class metaobjects
 - **DSL Integration:** All components store their originating DSL form in state under `:dsl` key
 
 <!-- AI-CONTEXT-START:type=architecture -->
@@ -41,8 +41,8 @@ The `ui` module implements a component-based architecture where UI elements are 
 
 ### Key Components
 - **Component Definition ([`src/ui/defcomponent.lisp`](src/ui/defcomponent.lisp:1)):** Macro for defining new UI components
+- **Component Metaclass ([`src/ui/component-metaclass.lisp`](src/ui/component-metaclass.lisp:1)):** Stores component metadata directly on classes
 - **Widget Library ([`src/ui/widgets/`](src/ui/widgets/:1)):** Collection of standard UI elements
-- **Widget Registry ([`src/ui/widget-registry.lisp`](src/ui/widget-registry.lisp:1)):** Component registration and discovery
 - **Component API ([`src/ui/api.lisp`](src/ui/api.lisp:1)):** Public interface for component operations
 
 ### Component Structure
@@ -158,15 +158,21 @@ Every component defined with `defcomponent` includes:
                    (getf local-state :todos))))))
 ```
 
-### Widget Registration
+### Component Metadata
 
 ```lisp
-;; Register custom widget
-(elmtui.ui:register-widget 'my-custom-widget 
-                          'my-custom-widget-component)
+;; Declare metadata in defcomponent
+(defcomponent my-widget ()
+  (:state
+   (label "Hello" :type string))
+  (:metadata
+   (:props ((:label string t :doc "Label text")))
+   (:documentation "Demo widget")
+   (:examples ((:my-widget :label "Hi")))))
 
-;; Look up widget
-(elmtui.ui:find-widget 'button) ; => button-component class
+;; Read metadata from class metaobject
+(let ((class (find-class 'my-widget)))
+  (elmtui.ui.component-metaclass:class-metadata class))
 ```
 <!-- AI-CONTEXT-END -->
 

@@ -6,6 +6,7 @@
   (:use :cl :fiveam)
   (:import-from :elmtui.ui.defcomponent #:defcomponent #:cclass-name)
   (:import-from :elmtui.ui.api #:component #:component-id #:id-from-path #:init #:update #:view)
+  (:import-from :elmtui.ui.component-metaclass #:class-metadata)
   (:import-from :elmtui.state.api #:get-path)
   (:import-from :elmtui.state.api
                 #:make-update-result
@@ -102,6 +103,16 @@
 (defcomponent test-child (test-simple)
   (:state
    (child-prop "child" :type string :documentation "Child property")))
+
+;; Component with metadata clause
+(defcomponent test-with-metadata ()
+  (:state
+   (label "metadata" :type string))
+  (:documentation "Metadata-aware test component")
+  (:metadata
+   (:props ((:label string t :doc "Visible label")))
+   (:documentation "Metadata for docs")
+   (:examples ((:test-with-metadata :label "Example")))))
 ;;; Tests
 
 (test defcomponent-class-creation
@@ -291,6 +302,38 @@
   (let ((class (find-class 'test-complete)))
     (is (string= "A complete test component"
                  (documentation class t)))))
+
+(test defcomponent-metadata-stored-on-metaclass
+  "Test that :metadata is persisted on class metaobject"
+  (let* ((class (find-class 'test-with-metadata))
+         (metadata (class-metadata class)))
+    (is (string= "Metadata-aware test component" (documentation class t)))
+    (is (listp metadata))
+    (is (equal '((:label string t :doc "Visible label"))
+               (getf metadata :props)))
+    (is (string= "Metadata for docs"
+                (getf metadata :documentation)))
+    (is (equal '((:test-with-metadata :label "Example"))
+               (getf metadata :examples)))))
+
+(test defcomponent-does-not-require-widget-registry-registration
+  "Test that defcomponent works without mutating legacy widget registry"
+  (let* ((widgets-sym (find-symbol "*WIDGETS*" :elmtui.ui.widget-registry))
+         (registry (and widgets-sym (boundp widgets-sym) (symbol-value widgets-sym)))
+         (before-count (and (hash-table-p registry)
+                            (hash-table-count registry))))
+    (finishes
+      (eval
+       '(defcomponent test-no-registry-side-effect ()
+          (:state
+           (enabled t :type boolean))
+          (:documentation "Temporary test component"))))
+    (multiple-value-bind (class props)
+        (dsl-type :test-no-registry-side-effect)
+      (is (eq class 'test-no-registry-side-effect))
+      (is (null props)))
+    (when (hash-table-p registry)
+      (is (= before-count (hash-table-count registry))))))
 
 
 (test defcomponent-inheritance
