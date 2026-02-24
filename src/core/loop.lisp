@@ -13,8 +13,6 @@
   (:import-from :elmtui.state.msg #:make-keyevent-appmsg)
   (:import-from :bordeaux-threads
                 #:make-thread #:thread-alive-p #:join-thread #:destroy-thread)
-  (:import-from :elmtui.core.conditions
-                #:event-loop-dispatch-error #:async-task-error)
   (:import-from :cl-events.channel
                 #:make-channel #:chan-close #:-> #:<- #:no-wait #:channel-length)
   (:import-from :elmtui.core.event-channels
@@ -166,77 +164,63 @@ as well as the view function for the application.")
    3) metrics bookkeeping."
   (log-info "PROCESS-CHANNEL-EVENT: Called with event ~S from channel ~S"
             event (elmtui.core.event-channels:name source-event-channel-object))
-
-  ;; ─── phase 1 ─ channel-local handlers ──────────────────────────
-  (let* ((start-time   (get-internal-real-time))
-         (event*       event)                                ; mutable copy
+  (let* ((start-time (get-internal-real-time))
+         (event* event)
          (channel-name (elmtui.core.event-channels:name source-event-channel-object)))
-
+    ;; phase 1: channel-local handlers
     (dolist (handler (elmtui.core.event-channels:handlers source-event-channel-object))
       (handler-case
-          ;; Handlers get the (possibly normalised) event first, *then* the raw event.
           (funcall handler (maybe-normalise-style event*) event*)
         (error (e)
           (log-error "EVENT-CONSUMER: Handler error for ~S on ~A: ~A"
                      event* channel-name e))))
 
     ;; basic metrics
-    (setf (gethash :last-event      *event-loop-metrics*) event*
+    (setf (gethash :last-event *event-loop-metrics*) event*
           (gethash :last-event-time *event-loop-metrics*) (get-universal-time))
 
-    ;; ─── phase 2 ─ global routing ────────────────────────────────
-    (case event*
-
-      ;; 2-a keyword command
-      (:shutdown-command
+    ;; phase 2: global routing
+    (cond
+      ((eq event* :shutdown-command)
        (log-info "Received :shutdown-command. Stopping application loop.")
        (elm-stop-loop))
+      ((typep event* 'elmtui.core.event-types:key-event)
+       (if elmtui.core.globals:*app-message-processor*
+           (progn
+             (log-info "EVENT-CONSUMER: Processing event with ~A" event)
+             (funcall elmtui.core.globals:*app-message-processor*
+                      (keymsg-from-event event*)))
+           (log-error "*app-message-processor* not set—cannot process key-event: ~S" event*)))
+      ((not (consp event*))
+       (log-warn "Ignoring malformed non-list event ~S on channel ~S" event* channel-name))
+      (t
+       (destructuring-bind (tag &rest payload) event*
+         (case tag
+           (:terminal-resized
+            (log-info "Routing :terminal-resized ~S to *app-message-processor*" payload)
+            (if elmtui.core.globals:*app-message-processor*
+                (funcall elmtui.core.globals:*app-message-processor* event*)
+                (log-error "*app-message-processor* not set—cannot process resize: ~S" payload)))
+           (:app-message
+            (let ((msg (first payload)))
+              (log-info "Routing :app-message ~S to *app-message-processor*" msg)
+              (if elmtui.core.globals:*app-message-processor*
+                  (funcall elmtui.core.globals:*app-message-processor*
+                           (if (typep msg 'elmtui.core.event-types:key-event)
+                               (keymsg-from-event msg)
+                               msg))
+                  (log-error "*app-message-processor* not set—cannot process: ~S" msg))))
+           ((:async :recurring-task :batch :dispatch)
+            (log-debug "Handling async command ~S" event*)
+            (handle-async-command event* elmtui.core.globals:*app-state*))
+           (otherwise
+            (log-warn "Unknown event tag ~S on channel ~S" tag channel-name))))))
 
-      ;; 2-b compound events (lists)
-      (otherwise
-       (if (typep event* 'elmtui.core.event-types:key-event)
-           (if elmtui.core.globals:*app-message-processor*
-               (progn
-                 (log-info "EVENT-CONSUMER: Processing event with ~A"
-                           event)
-                 (funcall elmtui.core.globals:*app-message-processor*
-                          (keymsg-from-event event*)))
-               (log-error "*app-message-processor* not set—cannot process key-event: ~S" event*))
-           (destructuring-bind (tag &rest payload) event*
-             (case tag
-               ;; (1) terminal resize = forward WHOLE event
-               (:terminal-resized
-                (log-info "Routing :terminal-resized ~S to *app-message-processor*" payload)
-                (if elmtui.core.globals:*app-message-processor*
-                    (funcall elmtui.core.globals:*app-message-processor* event*)
-                    (log-error "*app-message-processor* not set—cannot process resize: ~S" payload)))
-
-               ;; (2) application message = forward first payload element
-               (:app-message
-                (let ((msg (first payload)))
-                  (log-info "Routing :app-message ~S to *app-message-processor*" msg)
-                  (if elmtui.core.globals:*app-message-processor*
-                      (funcall elmtui.core.globals:*app-message-processor* (if (typep msg 'elmtui.core.event-types:key-event)
-                                                                               (keymsg-from-event msg)
-                                                                               msg))
-
-                      (log-error "*app-message-processor* not set—cannot process: ~S" msg))))
-
-               ;; (3) async commands
-               ((:async :async-task :recurring-task)
-                (log-debug "Handling async command ~S" event*)
-                (handle-async-command event* elmtui.core.globals:*app-state*))
-
-               ;; (4) fallback
-               (otherwise
-                (log-warn "Unknown event tag ~S on channel ~S" tag channel-name)))))))
-
-    ;; ─── phase 3 ─ accounting ────────────────────────────────────
-    (let* ((ms (/ (* (- (get-internal-real-time) start-time) 1000.0)
-                  internal-time-units-per-second)))
+    ;; phase 3: accounting
+    (let ((ms (/ (* (- (get-internal-real-time) start-time) 1000.0)
+                 internal-time-units-per-second)))
       (log-debug "EVENT-CONSUMER: Event processed in ~,2F ms." ms)
       (vector-push-extend ms *event-processing-time-history*)
-      ;; keep only the last 100 samples
       (when (> (fill-pointer *event-processing-time-history*) 100)
         (setf *event-processing-time-history*
               (make-array 100
@@ -244,8 +228,8 @@ as well as the view function for the application.")
                                                     (- (fill-pointer *event-processing-time-history*) 100))
                           :fill-pointer 100
                           :adjustable t)))
-      (setf (gethash :processed-event-count  *event-loop-metrics*)
-            (1+ (or (gethash :processed-event-count  *event-loop-metrics*) 0)))
+      (setf (gethash :processed-event-count *event-loop-metrics*)
+            (1+ (or (gethash :processed-event-count *event-loop-metrics*) 0)))
       (setf (gethash :total-processing-time *event-loop-metrics*)
             (+ (or (gethash :total-processing-time *event-loop-metrics*) 0)
                ms)))))
@@ -265,78 +249,6 @@ as well as the view function for the application.")
         (setf (getf clone :style) (as-plist style))
         clone)
       evt))
-;; (defun process-channel-event (event source-event-channel-object)
-;;   "Process an event received from an event-channel. Invokes handlers registered on the
-;; source-event-channel-object, then processes the event further."
-;;   (log-info "PROCESS-CHANNEL-EVENT: Called with event ~S from channel ~S"
-;;             event (elmtui.core.event-channels:name source-event-channel-object))
-;;   (let ((start-time (get-internal-real-time))
-;;         (event-to-process event)
-;;         (channel-name (elmtui.core.event-channels:name source-event-channel-object)))
-;;     (log-info "EVENT-CONSUMER: Processing event ~S from channel ~S"
-;;               event-to-process channel-name)
-
-;;     (dolist (handler (elmtui.core.event-channels:handlers source-event-channel-object))
-;;       (handler-case
-;;           ;; Pass potentially modified event first, then original event.
-;;           ;; Consider if handlers truly need both or just the (potentially modified) event.
-;;           (funcall handler
-;;                    (if (and (consp event-to-process)
-;;                             (find :style event-to-process)
-;;                             (let ((style-val (getf event-to-process :style)))
-;;                               (and style-val (not (listp style-val)))))
-;;                        (let* ((style-val (getf event-to-process :style))
-;;                               (style-plist (as-plist style-val))
-;;                               (copy (copy-list event-to-process)))
-;;                          (setf (getf copy :style) style-plist)
-;;                          copy)
-;;                        event-to-process)
-;;                    event-to-process)
-;;         (error (e)
-;;           (log-error "EVENT-CONSUMER: Error in channel-specific handler for ~S on channel ~S: ~A"
-;;                      event-to-process channel-name e))))
-
-;;     (setf (gethash :last-event *event-loop-metrics*) event-to-process)
-;;     (setf (gethash :last-event-time *event-loop-metrics*) (get-universal-time))
-
-;;     (etypecase event
-;;       ((eql :shutdown-command)
-;;        (log-info "Received :shutdown-command. Stopping application loop.")
-;;        (elm-stop-loop))
-;;       (cons
-;;        (destructuring-bind (tag &rest payload) event
-;;          (case tag
-;;            (:app-message
-;;             (:terminal-resized
-;;              (log-info "PROCESS-CHANNEL-EVENT: Dispatching :terminal-resized ~S to *app-message-processor*" payload)
-;;              (if elmtui.core.globals:*app-message-processor*
-;;                  (funcall elmtui.core.globals:*app-message-processor* event)
-;;                  (log-error "PROCESS-CHANNEL-EVENT: *app-message-processor* is not set—cannot process resize: ~S" payload)))
-;;             (:app-message
-;;              (let ((msg (first payload)))
-;;                (log-info "PROCESS-CHANNEL-EVENT: Dispatching :app-message ~S to *app-message-processor* (~A)"
-;;                          msg elmtui.core.globals:*app-message-processor*)
-;;                (if elmtui.core.globals:*app-message-processor*
-;;                    (funcall elmtui.core.globals:*app-message-processor* msg)
-;;                    (log-error "PROCESS-CHANNEL-EVENT: *app-message-processor* is not set—cannot process: ~S" msg))))
-;;             ((:async :async-task :cmd-async :recurring-task)
-;;              (log-debug "Handling async command ~S" event)
-;;              (handle-async-command event elmtui.core.globals:*app-state*))
-;;             (otherwise
-;;              (log-warn "Unknown event tag ~S on channel ~S" tag channel-name))))))
-
-;;       (let* ((processing-time-ms (/ (* (- (get-internal-real-time) start-time) 1000.0)
-;;                                     internal-time-units-per-second)))
-;;         (log-debug "EVENT-CONSUMER: Event processed. Processing time: ~,2Fms." processing-time-ms)
-;;         (vector-push-extend processing-time-ms *event-processing-time-history*)
-;;         ;; Keep only the last 100 entries
-;;         (when (> (fill-pointer *event-processing-time-history*) 100)
-;;           (setf *event-processing-time-history*
-;;                 (make-array 100 :initial-contents (subseq *event-processing-time-history*
-;;                                                           (- (fill-pointer *event-processing-time-history*) 100))
-;;                                 :fill-pointer 100 :adjustable t)))
-;;         (incf (gethash :processed-event-count *event-loop-metrics* 0))
-;;         (incf (gethash :total-processing-time *event-loop-metrics* 0.0) processing-time-ms))))
 
 (defun subscribe (event-type handler)
   "Subscribe a HANDLER to a specific EVENT-TYPE.
@@ -394,12 +306,6 @@ as well as the view function for the application.")
     (setf *active-event-channels* nil)
     (log-info "LOOP: *active-event-channels* set to NIL.")
 
-    ;; 4. Clean up legacy event loop if it exists.
-    ;; (when *event-loop*
-    ;;   (log-info "LOOP: Stopping legacy cleve-elm.event-loop instance.")
-    ;;   (cleve-elm.event-loop:stop-loop *event-loop*)
-    ;;   (setf *event-loop* nil))
-
     (log-info "LOOP: Event system shutdown sequence complete.")))
 
 
@@ -439,8 +345,8 @@ Returns T on success, NIL on drop. Safe after shutdown."
       (let* ((primary-tag (and (listp event) (first event)))
              (event* (if (or (eq event :shutdown-command)
                              (member primary-tag
-                                     '(:app-message :async :async-task
-                                       :cmd-async :recurring-task)))
+                                     '(:app-message :async :recurring-task
+                                       :batch :dispatch)))
                          event
                          (list :app-message event))))
         (handler-case
@@ -451,44 +357,6 @@ Returns T on success, NIL on drop. Safe after shutdown."
           (error (e)
             ;; Log outside of the critical section to avoid deadlock with Log4CL
             nil))))))
-;; (defun publish (event &key target-channel-name)
-;;   "Publish an event to a specified or default event channel. Safe to call after shutdown."
-;;   (when *shutdown-requested*
-;;     ;; (log-warn "PUBLISH: Shutdown in progress. Dropping event: ~S" event)
-;;     (return-from publish nil))
-;;   (log-info "PUBLISH: Called for event ~S. Target: ~A." event target-channel-name)
-;;   (let* ((effective-target-name
-;;            (cond
-;;              ((null target-channel-name) :system-channel)
-;;              ((and (symbolp target-channel-name) (not (keywordp target-channel-name)))
-;;               (intern (symbol-name target-channel-name) :keyword))
-;;              (t target-channel-name)))
-;;          (channel-obj
-;;            (find effective-target-name *active-event-channels*
-;;                  :key #'elmtui.core.event-channels:name
-;;                  :test #'eq)))
-;;     (if channel-obj
-;;         (let ((the-channel (elmtui.core.event-channels:channel-of channel-obj)))
-;;           (if (and the-channel (not (cleve-elm.channel:channel-closed the-channel)))
-;;               (let ((event-to-send event)
-;;                     (ch-name (elmtui.core.event-channels:name channel-obj)))
-;;                 (unless (or (eq event-to-send :shutdown-command)
-;;                             (and (listp event-to-send)
-;;                                  (member (first event-to-send)
-;;                                          '(:app-message :async :async-task :cmd-async :recurring-task))))
-;;                   (setf event-to-send (list :app-message event-to-send)))
-;;                 (log-info "PUBLISH: Enqueuing to channel ~S: ~S" ch-name event-to-send)
-;;                 (handler-case
-;;                     (cleve-elm.channel:-> the-channel event-to-send)
-;;                   (error (e)
-;;                     (log-error "PUBLISH: Failed to enqueue to channel ~S: ~A. Event: ~S"
-;;                                ch-name e event-to-send))))
-;;               (log-warn "PUBLISH: Target channel ~S is not active or is closed. Dropping event: ~S"
-;;                         effective-target-name event)))
-;;         (log-warn "PUBLISH: Target channel ~S not found. Dropping event: ~S"
-;;                   effective-target-name event))))
-;; (setf *SHUTDOWN-REQUESTED* nil)
-                                        ; Reset shutdown flag on publish
 ;; Status and metrics functions
 (defun get-event-loop-status ()
   "Get the current status of the event loop."

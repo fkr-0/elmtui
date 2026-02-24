@@ -14,6 +14,8 @@
                 #:remove-path)
   (:import-from :cl-state.tx
                 #:with-transaction)
+  (:import-from :elmtui.core.async
+                #:interpret-cmd)
   (:import-from :elmtui.core.globals #:*app-sender*)
   (:import-from :log4cl #:log-debug #:log-warn #:log-info)
   (:export
@@ -196,34 +198,12 @@
   "Create a command that dispatches a payload to a specific topic."
   (list :topic-dispatch topic payload))
 
-(defun %interpret-core-async-command (command)
-  "Dispatch COMMAND to elmtui.core.async:interpret-cmd at runtime.
-Used to avoid compile-time package dependency/order coupling."
-  (let ((pkg (find-package "ELMTUI.CORE.ASYNC")))
-    (unless pkg
-      (error "Cannot execute async command ~S: package ELMTUI.CORE.ASYNC is not loaded." command))
-    (multiple-value-bind (sym status)
-        (find-symbol "INTERPRET-CMD" pkg)
-      (unless (and sym (eq status :external) (fboundp sym))
-        (error "Cannot execute async command ~S: ELMTUI.CORE.ASYNC:INTERPRET-CMD is unavailable." command))
-      (funcall (symbol-function sym) command))))
-
 (defmethod handle-async-command (command app-state)
   "Handle asynchronous commands and feed results back to update cycle via *app-sender*."
   (declare (ignorable app-state))
   (case (first command)
     (:async
-     (%interpret-core-async-command command))
-    (:async-task
-     ;; Legacy shape kept as migration compatibility path.
-     (let ((task-fn (second command))
-           (on-complete-msg-constructor (third command)))
-       (bt:make-thread
-        (lambda ()
-          (let ((result (funcall task-fn)))
-            (when on-complete-msg-constructor
-              (let ((msg (funcall on-complete-msg-constructor result)))
-                (funcall elmtui.core.globals:*app-sender* msg))))))))
+     (interpret-cmd command))
     (:log-message
      (log-info "Command: ~S" (second command)))
     (t (log-warn "Unknown command structure passed to handle-async-command: ~S" command))))
