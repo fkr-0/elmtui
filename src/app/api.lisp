@@ -16,6 +16,7 @@
            #:app-config #:app-config-message-queue #:app-config-command-processor-fn #:app-config-renderer-fn
            #:app-config-name #:app-config-root-component-dsl #:app-config-initial-state-plist
            #:app-config-update-fn-sym #:app-config-view-fn-sym #:app-config-subscriptions-fn-form
+           #:app-config-binary-options #:app-config-cli-options #:app-config-configure-fn
            #:validate-platform-options))
 
 (in-package #:elmtui.app.api)
@@ -35,7 +36,10 @@
   (subscriptions-fn-form nil :type (or symbol list) :read-only t)
   (command-processor-fn nil :type (or symbol function) :read-only t)
   (message-queue (error "Message queue must be provided.") :type event-channel :read-only t)
-  (renderer-fn nil :type (or symbol function) :read-only t))
+  (renderer-fn nil :type (or symbol function) :read-only t)
+  (binary-options nil :type (or null list) :read-only t)
+  (cli-options nil :type list :read-only t)
+  (configure-fn nil :type (or null symbol function) :read-only t))
 
 ;; Generic function signatures with improved type declarations
 ;;(declaim (ftype (function (list t) t) get-component-instance))

@@ -18,6 +18,7 @@
                                (:file "defcomponent-tests")
                                (:file "keymaps-tests")
                                (:file "application-init-tests")
+                               (:file "application-extension-tests")
                                (:file "component-init-tests")
                                (:file "rendering-pipeline-tests")
                                (:file "dsl-props-normalization-tests")
