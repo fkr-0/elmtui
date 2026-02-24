@@ -356,6 +356,7 @@ Returns T on success, NIL on drop. Safe after shutdown."
               t)                                 ;; success
           (error (e)
             ;; Log outside of the critical section to avoid deadlock with Log4CL
+            (declare (ignore e))
             nil))))))
 ;; Status and metrics functions
 (defun get-event-loop-status ()

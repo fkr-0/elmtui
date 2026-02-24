@@ -464,7 +464,7 @@
     (dotimes (i iterations)
       (validate-base-dsl '(:container
                            :children ((:text :content "Test")
-                                      (:button :text "Button")))))
+                                      (:button :content "Button")))))
 
     (let* ((end-time (get-internal-real-time))
            (elapsed (/ (- end-time start-time) internal-time-units-per-second)))
@@ -512,7 +512,7 @@
 
   ;; Test missing required properties
   (signals base-dsl-error
-    (expand-base-dsl '(:button :id :btn)))) ; Missing :text
+    (expand-base-dsl '(:button :id :btn)))) ; Missing :content
 
 (test state-error-conditions
   "Test state model error condition handling"
@@ -527,4 +527,3 @@
   ;; Test custom validation
   (signals error
     (validate-test-user-model '(:name "Child" :email "child@example.com" :age 10 :active nil))))
-
