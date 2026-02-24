@@ -3,7 +3,7 @@
 (asdf:defsystem "elmtui-tests"
   :description "Test suite for the elmtui system"
   :author "User <user@archlinux>"
-  :version "0.0.1"
+  :version "0.2.0"
   :depends-on (#:elmtui #:fiveam)
   :license "GPL"
   :serial t

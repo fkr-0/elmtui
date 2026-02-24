@@ -162,6 +162,7 @@
 
 (defun make-terminal-instance-for-device (&key device publish-fn (initial-clear nil))
   "Construct a terminal-instance around a cl-inputs DEVICE."
+  (declare (ignore initial-clear))
   (let ((stream (or (and device (device-output-stream device))
                   (error "cl-inputs device did not provide an output stream."))))
     (let ((instance (make-terminal-instance
@@ -315,7 +316,7 @@
   t)
 
 (defmethod backend-name ((instance terminal-instance)) "Standard Terminal Backend")
-(defmethod backend-version ((instance terminal-instance)) "0.1.0")
+(defmethod backend-version ((instance terminal-instance)) "0.2.0")
 
 ;;;---------------------------------------------------------------
 ;;; Resize Handling
