@@ -117,12 +117,12 @@
 ;;; Style Application
 ;;;-----------------------------------------------------------------------------
 
-(defmethod stylable-id ((node list))
-  "Fallback for stylable-id on raw DSL lists. Returns :id if present, else NIL."
-  (getf node :id))
-(defmethod stylable-id ((node base-element))
-  "Fallback for stylable-id on raw DSL lists. Returns :id if present, else NIL."
-  (elmtui.view.element:el/id node))
+;; Keep raw plist/list fallback local; stylable-id protocol methods for
+;; base-element live in src/style/stylable-impl.lisp.
+(defun %raw-node-id (node)
+  "Return :id from a raw plist/list DSL NODE, or NIL."
+  (when (listp node)
+    (getf node :id)))
 
 (defmethod classes ((node base-element))
   "Returns the classes of the styled node from its props."

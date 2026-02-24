@@ -353,7 +353,7 @@
          (start-time (get-internal-real-time))
          (delay-internal (round (* delay-ms internal-time-units-per-second) 1000))
          (timer-thread
-           (create-thread
+           (make-thread
             (lambda ()
               (loop
                 ;; Calculate time to sleep
