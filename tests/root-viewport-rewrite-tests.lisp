@@ -99,11 +99,13 @@ PATH is a list of keywords like (:app :rv :width)."
       (let* ((canonical-path (cons :components id-path))
               (canon-state (mark-ready state canonical-path)))
         (is (consp (view rv canon-state :id-path canonical-path))
-          "Canonical state path must produce DSL once ready."))
-      ;; legacy path without :components prefix
+          "Canonical state path must produce DSL once ready.")
+        (is (consp (view rv canon-state :id-path id-path))
+          "Non-canonical ID-PATH is normalized to canonical component state path."))
+      ;; legacy state path without :components prefix is no longer supported
       (let* ((legacy-state (mark-ready state id-path)))
-        (is (consp (view rv legacy-state :id-path id-path))
-          "Legacy state path must also produce DSL once ready.")))))
+        (is (null (view rv legacy-state :id-path id-path))
+          "Legacy non-components state path should not resolve.")))))
 
 ;;;; --------------------------------------------------------------------------
 ;;;; 2) Anchoring math: position semantics & growth labels

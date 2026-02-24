@@ -65,6 +65,12 @@
          (evt (cl-inputs-token->event token)))
     (is-false evt)))
 
+(test cl-inputs-key-token-with-missing-code-produces-event-with-nil-code
+  (let* ((token (make-token :key '(:mods (:alt) :char #\x :type :key-down)))
+         (evt (cl-inputs-token->event token)))
+    (is-true (key-event-p evt))
+    (is (char= #\x (key-event-char evt)))))
+
 (test style-manager-overlays-style-variables
   (let* ((sheet (make-stylesheet :rules nil
                                  :variables '(("--accent" . :blue))
@@ -75,6 +81,10 @@
     (is (equal '(("--accent" . :orange)
                  ("--gap" . 1))
                (stylesheet-variables computed)))))
+
+(test style-manager-falls-back-to-default-sheet-when-current-is-not-cl-styles
+  (let ((computed (compute-active-stylesheet '(:current-stylesheet :not-a-sheet))))
+    (is (null (stylesheet-variables computed)))))
 
 (test message-schema-registry-shared-between-state-and-core-globals
   (is (eq elmtui.state.msg::*message-schemas*
@@ -124,4 +134,15 @@
     (setf (view-invalidated-p view) nil)
     (setf (state-ref state :count) 2)
     (is-false (view-invalidated-p view))
+    (is-false (application-state-observers state))))
+
+(test reactive-view-register-cleanup-repeated-does-not-leak-observers
+  (let ((state (make-state :initial '(:count 0) :backend :plist)))
+    (dotimes (_ 3)
+      (let ((view (create-reactive-view :integration-view-loop state
+                                        (lambda (_state _dispatch)
+                                          (declare (ignore _state _dispatch))
+                                          nil))))
+        (register-view-dependency view :count)
+        (cleanup-reactive-view view)))
     (is-false (application-state-observers state))))

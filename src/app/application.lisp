@@ -21,12 +21,18 @@
     #:make-app-config
     #:app-config-name
     #:app-config-message-queue
+    #:app-config-cli-options
+    #:app-config-configure-fn
     #:app-config-command-processor-fn
     #:app-config-update-fn-sym
     #:app-config-view-fn-sym
     #:app-config-renderer-fn
     #:app-config-subscriptions-fn-form     ; <— newly imported
     #:get-component-instance)
+  (:import-from #:elmtui.app.extension
+    #:validate-cli-option-specs
+    #:normalize-binary-options
+    #:parse-cli-options)
   (:import-from #:elmtui.state.api                 #:merge-patches
     #:update-result
     #:ur-handled
@@ -268,7 +274,8 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
   "Define an ElmTUI application called NAME."
   (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
                   :update-fn :view-fn :command-processor-fn
-                  :subscriptions-fn :root-viewport-id :platform-options)))
+                  :subscriptions-fn :root-viewport-id :platform-options
+                  :binary :cli-options :configure-fn)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
                                         ; Should be the DSL form itself
@@ -279,6 +286,14 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
               ;; Optional
               (initial-state-plist (getf kw-plist :initial-state-plist '()))
               (initial-state-fn (getf kw-plist :initial-state-fn nil))
+              (cli-options (let* ((raw (getf kw-plist :cli-options))
+                                  (specs (if (and (consp raw) (eq (car raw) 'quote))
+                                             (cadr raw)
+                                             raw)))
+                             (when specs (validate-cli-option-specs specs))
+                             (or specs '())))
+              (binary-options (normalize-binary-options (getf kw-plist :binary) name))
+              (configure-fn (getf kw-plist :configure-fn nil))
               ;; Normalise FN designators to symbols
               (state (if initial-state-fn
                        `(funcall ,initial-state-fn)
@@ -331,6 +346,9 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                :command-processor-fn ,cmd-proc-fn
                :subscriptions-fn-form ,subs-fn-form
                :message-queue (make-message-channel :capacity 20) ; Create proper event-channel
+               :binary-options ',binary-options
+               :cli-options ',cli-options
+               :configure-fn ,(if configure-fn `',configure-fn nil)
                ))
 
 
@@ -424,9 +442,27 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
            ;; --------------------------------------------------------------
            ;; RUN-<app>
            ;; --------------------------------------------------------------
-           (defun ,run-fn-sym (&key (platform :tty) platform-options
+           (defun ,run-fn-sym (&key (platform :tty) platform-options argv
                                 &allow-other-keys)
              (let* ((cfg (gethash ',name *applications*))
+                     (cli-options (app-config-cli-options cfg))
+                     (argv* (or argv #+sbcl (cdr sb-ext:*posix-argv*) #-sbcl nil))
+                     (cli-platform-options (if cli-options
+                                               (parse-cli-options cli-options argv*)
+                                               nil))
+                     (merged-platform-options (append cli-platform-options platform-options))
+                     (configure-fn (app-config-configure-fn cfg))
+                     (configure-fn* (cond
+                                      ((null configure-fn) nil)
+                                      ((functionp configure-fn) configure-fn)
+                                      ((symbolp configure-fn) (symbol-function configure-fn))
+                                      ((and (consp configure-fn) (eq (car configure-fn) 'lambda))
+                                       (coerce configure-fn 'function))
+                                      (t (error "Invalid :configure-fn in app config: ~S" configure-fn))))
+                     (effective-platform-options
+                       (if configure-fn*
+                           (funcall configure-fn* cli-platform-options merged-platform-options)
+                           merged-platform-options))
                      (app-spec-for-driver
                        (list :name ',name
                          :init-fn #',init-fn-sym
@@ -439,7 +475,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                (elmtui.app.api:run-application
                  app-spec-for-driver
                  :backend-type platform
-                 :platform-options (append platform-options ,other-keys))))
+                 :platform-options (append effective-platform-options ,other-keys))))
            ',name)))))
 
 ;;; ---------------------------------------------------------------------------

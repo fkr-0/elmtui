@@ -255,9 +255,6 @@ geometry.  NIL means the value should remain unchanged."
       path
       (append +component-state-root+ path))))
 
-(defun rv-id-path-canonical-p (id-path)
-  (and id-path (eq (first id-path) (first +component-state-root+))))
-
 (defun rv-component-state-path (id-path &rest segments)
   "Return a full state path rooted under :components for this ID-PATH."
   (let ((path (rv-ensure-components-prefix id-path)))
@@ -265,16 +262,7 @@ geometry.  NIL means the value should remain unchanged."
       (setf path (append path (ensure-list segment))))))
 
 (defun rv-primary-path (id-path rel-path)
-  (let ((rel (ensure-list rel-path)))
-    (if (rv-id-path-canonical-p id-path)
-      (rv-component-state-path id-path rel)
-      (append id-path rel))))
-
-(defun rv-secondary-path (id-path rel-path)
-  (let ((rel (ensure-list rel-path)))
-    (if (rv-id-path-canonical-p id-path)
-      (append (rest (rv-ensure-components-prefix id-path)) rel)
-      (rv-component-state-path id-path rel))))
+  (rv-component-state-path id-path (ensure-list rel-path)))
 
 (defun rv-make-patch (id-path rel-path value)
   (list (rv-primary-path id-path rel-path) value))
@@ -282,16 +270,10 @@ geometry.  NIL means the value should remain unchanged."
 (defparameter +rv-missing+ (gensym "RV-MISSING"))
 
 (defun rv-get-state-value (state id-path rel-path &optional default)
-  "Read REL-PATH from STATE honoring canonical and legacy component paths."
+  "Read REL-PATH from STATE via canonical :components path."
   (let* ((primary (rv-primary-path id-path rel-path))
           (value (get-path primary state +rv-missing+)))
-    (if (eq value +rv-missing+)
-      (let* ((alternate (rv-secondary-path id-path rel-path))
-              (fallback (get-path alternate state +rv-missing+)))
-        (if (eq fallback +rv-missing+)
-          default
-          fallback))
-      value)))
+    (if (eq value +rv-missing+) default value)))
 
 (defun rv-plist-lookup (plist key)
   "Return VALUE and PRESENT-P for KEY in PLIST."

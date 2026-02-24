@@ -84,6 +84,7 @@
                 (:file "ui/dsl-resolution")
                 (:file "ui/api") ; Imports: elmtui.state.api, elmtui.utils, elmtui.ui.dsl-resolution, elmtui.ui.component-metaclass
                 (:file "app/api") ; Imports: elmtui.core.globals, elmtui.core.event-channels
+                (:file "app/application-extension")
                 (:file "app/tea-core")
                 (:file "platform/api") ; Imports: elmtui.utils, bordeaux-threads
                 (:file "view/core")
