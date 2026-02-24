@@ -12,8 +12,6 @@
   (:import-from :elmtui.state.api #:state-ref)
   (:import-from :elmtui.state.msg
     #:msg-data #:msg-type)
-  (:import-from :elmtui.app.api
-    #:get-component-instance)
   (:export #:root-viewport
     #:make-root-viewport
     #:anchor-type
@@ -227,10 +225,20 @@ geometry.  NIL means the value should remain unchanged."
       (values off-y off-x (cons pos-r pos-c) grow (cons w h)))))
 
 (defun child-instance (state id-path)
-  "Return the live child component instance, or NIL when absent."
-  (let* ((child-spec (rv-get-state-value state id-path '(:child))))
-    (when (and (consp child-spec) (keywordp (car child-spec)))
-      (get-component-instance (append id-path (list (car child-spec))) state))))
+  "Return child component instance and canonical child id-path derived from child DSL.
+Returns two values: INSTANCE and CHILD-ID-PATH."
+  (let ((child-spec (rv-get-state-value state id-path '(:child-dsl-spec))))
+    (when (and (consp child-spec) (keywordp (first child-spec)))
+      (let* ((props (rest child-spec))
+              (child-id (and (listp props)
+                          (evenp (length props))
+                          (getf props :id)))
+              (child-id-path (and (keywordp child-id)
+                               (rv-component-state-path id-path child-id))))
+        (when child-id-path
+          (values
+            (instantiate-component-from-dsl child-spec child-id-path)
+            child-id-path))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Factory
@@ -627,10 +635,11 @@ for state updates, and COMMANDS is a list of render command plists."
                   (push `(:render :set-cursor ,row ,col) render-commands)))))
           (otherwise
             (setf (sref ctx :unrecognized-message) message*))))
-      (let ((child (child-instance state* id-path)))
+      (multiple-value-bind (child child-id-path)
+        (child-instance state* id-path)
         (when child
           (let* ((result (elmtui.ui.api:update child message* state*
-                           :id-path (append id-path (list (slot-value child 'id)))))
+                           :id-path child-id-path))
                   (child-patches (elmtui.state.api:ur-patches result))
                   (child-cmds (elmtui.state.api:ur-commands result)))
             (when child-patches

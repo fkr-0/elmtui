@@ -2,9 +2,7 @@
 ;;; File: src/platform/input.lisp
 ;;; Platform Input Adapter
 (uiop:define-package :elmtui.platform.input
-  (:use :cl
-    :elmtui.core.loop ; Ensure this is present if elmtui.core.loop:publish was used directly, though now it will be passed in
-    )
+  (:use :cl)
   (:import-from :log4cl #:log-debug #:log-warn #:log-info) ; Added log-info
   (:import-from :elmtui.core.threads
     #:with-interruptable-signal #:cond-message)
