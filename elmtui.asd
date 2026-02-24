@@ -81,10 +81,6 @@
                 (:file "ui/component-metaclass")
                 (:file "ui/dsl-resolution")
                 (:file "ui/api")
-                ;; App API needs ui/api + ui/dsl-resolution and is required by root-viewport.
-                (:file "app/api")
-                (:file "app/application-extension")
-                (:file "app/tea-core")
                 (:file "platform/api")
 
                 ;; ----------------------------------------------------------------
@@ -128,12 +124,14 @@
                                                 (:file "counter")
                                                 (:file "scrollable-container")
                                                 (:file "scroll-panel")))
-                                (:file "widgets-pkg")
-                                (:file "widget-registry")))
+                                ))
 
                 ;; ----------------------------------------------------------------
                 ;; 7) Application runtime subsystem
                 ;; ----------------------------------------------------------------
+                (:file "app/api")
+                (:file "app/application-extension")
+                (:file "app/tea-core")
                 (:file "app/application")
                 (:file "app/dsl-type-registry")
 

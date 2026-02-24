@@ -1,6 +1,5 @@
 (uiop:define-package :elmtui.platform.backend.common.virtual-buffer
   (:use :cl :alexandria)
-  (:import-from :elmtui.core.loop #:as-plist) ; Keep for existing uses if any, or review if shadowed by ansi-styling's as-plist
   (:import-from :elmtui.view.geo #:=?)
   (:import-from :bordeaux-threads #:make-recursive-lock #:with-recursive-lock-held)
   (:import-from :elmtui.platform.backend.common.ansi-styling
@@ -13,8 +12,7 @@
                 #:terminal-style
                 #:terminal-style-fg-color
                 #:terminal-style-bg-color
-
-                #:as-plist ; This might be specific to ansi-styling, ensure no conflict if elmtui.core.loop also exports it.
+                #:as-plist
                 #:as-style #:make-termcolor #:copy-term-style #:make-terminal-style) ; Added copy-term-style, make-terminal-style if needed by new fns
   (:export
    #:make-buffer-cell

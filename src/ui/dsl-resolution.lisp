@@ -3,28 +3,11 @@
 
 (uiop:define-package :elmtui.ui.dsl-resolution
   (:use :cl)
+  (:import-from :elmtui.api #:dsl-type)
   (:export #:dsl-type
     #:resolve-dsl-type))
 
 (in-package :elmtui.ui.dsl-resolution)
-
-;;; ---------------------------------------------------------------
-;;; Core Generic Function for DSL Type Resolution
-;;; ---------------------------------------------------------------
-
-(defgeneric dsl-type (type &optional props)
-  (:documentation "Resolve DSL TYPE to a component class.
-
-Returns (values class props) where CLASS is the component class symbol
-and PROPS are accumulated/default properties.
-
-Methods can be defined for specific keywords to implement variants:
-- A method for :my-variant can add default props
-- Methods can chain by calling dsl-type recursively with modified props
-
-Example:
-  (defmethod dsl-type ((type (eql :primary-button)) &optional props)
-    (values 'button (append props '(:color :blue))))"))
 
 ;;; ---------------------------------------------------------------
 ;;; Default Methods

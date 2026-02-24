@@ -50,3 +50,9 @@
     (dsl-type :chained)
     (is (eq class 'base-widget))
     (is (equal (getf props :added) :value))))
+
+(test dsl-type-symbol-is-shared-across-api-packages
+  "elmtui.api:dsl-type and elmtui.ui.dsl-resolution:dsl-type must be the same symbol."
+  (let ((api-sym (find-symbol "DSL-TYPE" :elmtui.api))
+        (ui-sym (find-symbol "DSL-TYPE" :elmtui.ui.dsl-resolution)))
+    (is (eq api-sym ui-sym))))

@@ -18,6 +18,17 @@
 (def-suite elmtui/root-vp/behavior)
 (in-suite elmtui/root-vp/behavior)
 
+(defclass root-vp-mock-child (elmtui.ui.api:component) ())
+
+(defmethod elmtui.ui.dsl-resolution:dsl-type ((type (eql :root-vp-mock-child)) &optional props)
+  (declare (ignore props))
+  (values 'root-vp-mock-child nil))
+
+(defmethod elmtui.ui.api:update ((component root-vp-mock-child) msg app-state &key id-path)
+  (declare (ignore component app-state))
+  (elmtui.state.api:make-update-result
+    :patches (list (list (append id-path '(:child-handled-msg)) msg))))
+
 ;;; minimal hash-table state utils
 (defun %get (ht keys &optional default)
   (if (null keys) ht
@@ -145,6 +156,38 @@
         (upd rv idp state '(:appshutdown))
       (declare (ignore s k))
       (is-true (has-render-cmd-p cmds :scroll-up 5)))))
+
+(test child-update-is-derived-from-child-dsl-not-app-api-lookup
+  (multiple-value-bind (rv idp _ state) (init-root :below-cursor 80 24 12 10)
+    (declare (ignore _))
+    (setf (state-ref state (append idp '(:child-dsl-spec)))
+          '(:root-vp-mock-child :id :child1))
+    (let ((original-get-component-instance
+            (fdefinition 'elmtui.app.api:get-component-instance)))
+      (unwind-protect
+           (progn
+             (setf (fdefinition 'elmtui.app.api:get-component-instance)
+                   (lambda (&rest args)
+                     (declare (ignore args))
+                     (error "root-viewport should not call get-component-instance")))
+             (multiple-value-bind (patches _new-state _cmds)
+                 (upd rv idp state '(:custom :value 42))
+               (declare (ignore _new-state _cmds))
+               (is-true
+                 (state-patch-p patches
+                   (append idp '(:child1))
+                   '(:child-handled-msg)
+                   '(:custom :value 42)))))
+        (setf (fdefinition 'elmtui.app.api:get-component-instance)
+              original-get-component-instance)))))
+
+(test malformed-child-dsl-spec-is-ignored
+  (multiple-value-bind (rv idp _ state) (init-root :below-cursor 80 24 12 10)
+    (declare (ignore _))
+    ;; Matches inline viewport integration shape used by existing tests.
+    (setf (state-ref state (append idp '(:child-dsl-spec))) '(:view nil))
+    (finishes
+      (upd rv idp state '(:cursorposition :col 1 :row 2)))))
 
 (defun run-root-viewport-anchor-behavior-tests ()
   (run! :elmtui/root-vp/behavior))

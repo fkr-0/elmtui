@@ -326,3 +326,9 @@
     state
     ;; This tests that the :id slot in the base 'component' class was set via :default-initargs
     (is (eq :my-defaulted-id (test-default-initargs-component-id state instance)))))
+
+(test viewport-no-longer-imports-app-api-component-lookup
+  (multiple-value-bind (sym status)
+      (find-symbol "GET-COMPONENT-INSTANCE" :elmtui.ui.widgets.viewport)
+    (declare (ignore sym))
+    (is (null status))))

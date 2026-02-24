@@ -246,6 +246,18 @@
 ;;; ---------------------------------------------------------------------------
 (defgeneric instantiate-component-from-dsl (dsl id-path))
 
+(defmethod instantiate-component-from-dsl (dsl id-path)
+  "Instantiate a component instance from DSL at ID-PATH.
+Returns NIL for non-component/base-element DSL types."
+  (declare (type list dsl id-path))
+  (log-debug "Instantiate from DSL ~S at path ~S" dsl id-path)
+  (let ((dsl-type (first dsl)))
+    (multiple-value-bind (component-class default-props)
+        (resolve-dsl-type dsl-type)
+      (declare (ignore default-props))
+      (when component-class
+        (make-instance component-class :id id-path)))))
+
 ;; (defun initialize-components-from-dsl (dsl)
 ;;   "Recursively traverses a component DSL, instantiates components,
 ;;    and returns the accumulated patches and commands."

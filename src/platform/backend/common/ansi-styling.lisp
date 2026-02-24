@@ -2,7 +2,6 @@
   (:use :cl :log4cl)
   (:import-from :elmtui.platform.api :with-lock :lockable)
   (:import-from :elmtui.utils :hex-str-to-rgb)
-  (:import-from :elmtui.core.loop :as-plist)
   (:import-from :elmtui.view.geo :=?)
   (:export
    #:fuzz-color
@@ -42,6 +41,9 @@
    #:terminal-color
    ))
 (in-package :elmtui.platform.backend.common.ansi-styling)
+
+(defgeneric as-plist (style)
+  (:documentation "Convert STYLE to plist representation for terminal rendering."))
 
 (defstruct terminal-color red green blue simple bg color-256)
 (defstruct terminal-style
