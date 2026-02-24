@@ -273,9 +273,6 @@ Stub for richer contract registration and enforcement."
    Signals message-validation-error if invalid."
   (let* ((m-type-name (message-type msg)) ; This is the message type symbol, e.g., 'AppMsg
          (explicit-contract (gethash m-type-name *message-contracts*)))
-    (format t (format nil "Validating message type ~S with explicit contract: ~S" m-type-name explicit-contract))
-    (when explicit-contract
-      (format t "Explicit contract: ~S" (funcall explicit-contract msg)))
     (cond
       (explicit-contract
        (unless (funcall explicit-contract msg)
