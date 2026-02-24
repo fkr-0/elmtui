@@ -48,12 +48,12 @@
                                 (:file "threads")
                                 (:file "event-channels")
                                 (:file "message-bus")
+                                (:file "event-pipeline")
                                 (:file "topics")
                                 (:file "topic-registry")
                                 (:file "event-types") ; Event type definitions
                                 (:file "keymaps")
                                 (:file "events")
-                                (:file "event-compat") ; Event compatibility layer
                                 (:file "event-propagation") ; Event propagation system
                                 (:file "event-async") ; Async event handling
                                 ;; (:file "base-keymap")
@@ -108,7 +108,6 @@
                                                 (:file "label")
                                                 (:file "textinput")
                                                 (:file "grid-container")
-                                                (:file "form") ; Using v2 form widget
                                                 (:file "keytester")
                                                 (:file "keytester-map")
                                                 (:file "listbox")

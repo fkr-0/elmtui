@@ -1,8 +1,8 @@
 ;; src/core/event-pipeline.lisp
 ;; Pipeline for event preprocessing and transformation
 
-(uiop:define-package :cleve-elm.core.event-pipeline
-  (:nicknames :elmtui.core.event-pipeline)
+(uiop:define-package :elmtui.core.event-pipeline
+  (:nicknames :cleve-elm.core.event-pipeline)
   (:use :cl :log4cl)
   (:import-from :cl-events.channel
                 #:->)
@@ -17,7 +17,7 @@
            :broadcast-pipe
            :conditional-pipe))
 
-(in-package :cleve-elm.core.event-pipeline)
+(in-package :elmtui.core.event-pipeline)
 
 ;; Base pipe class
 (defclass pipe ()
@@ -128,7 +128,7 @@
   "Process an event through the pipeline"
   (let ((result event))
     (dolist (pipe (pipes pipeline))
-      (let ((pipe-result (process-event pipe event)))
+      (let ((pipe-result (process-pipe pipe result)))
         (setf result pipe-result)
         (when (and (not (fallthrough-p pipeline)) (null pipe-result))
           ;; If not fallthrough and a pipe returned nil, stop processing

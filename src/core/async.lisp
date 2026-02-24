@@ -71,10 +71,7 @@
    The progress-callback can be called with arbitrary data to report progress."
   (elmtui.core.conditions:with-recovery (elmtui.core.conditions:async-task-error :restarts '(:ignore-task :retry))
     (let* ((task-id (gensym "TASK-"))
-           (promise (make-promise :cancellation-fn cancellation-fn))
-           (_timeout-thread (when timeout
-                              (schedule-after
-                               timeout (lambda () (promise-cancel promise)))))
+           (promise (make-promise))
            (progress-callback
              (lambda (progress-data)
                ;; Sends progress updates to the app
@@ -112,6 +109,13 @@
                    (error e)))))
            (task (new-task wrapped-function))) ; Create task with the wrapper
 
+      (when timeout
+        (schedule-after
+         timeout
+         (lambda ()
+           (when cancellation-fn
+             (ignore-errors (funcall cancellation-fn)))
+           (promise-cancel promise))))
       ;; Store task ID along with the task object in the command
       ;; The command structure is now (:async :task <task-obj> :id <task-id> :promise <promise>)
       (list :async :task task :id task-id :promise promise :on-complete on-complete :on-error on-error))))

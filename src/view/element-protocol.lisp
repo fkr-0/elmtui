@@ -7,7 +7,9 @@
    #:element-size
                 :element-style :element-type :element-id)
   (:import-from :elmtui.view.geo
-   :rectangle #:make-size)
+   :rectangle #:make-size #:make-rectangle #:make-pos)
+  (:import-from :sb-mop
+                #:class-slots #:slot-definition-name)
   (:export
    ;; predicates
    #:element-p
@@ -38,6 +40,19 @@
 (defgeneric el/styles-of   (el  style &optional default))
 (defgeneric el/display  (el))
 
+(defun %find-slot-symbol (obj slot-name)
+  "Return the actual slot symbol of OBJ whose name matches SLOT-NAME, or NIL."
+  (let ((target (string-upcase (string slot-name))))
+    (loop for slot-def in (sb-mop:class-slots (class-of obj))
+          for slot-sym = (sb-mop:slot-definition-name slot-def)
+          when (string= (symbol-name slot-sym) target)
+            do (return slot-sym))))
+
+(defun %slot-value-if-bound (obj slot-name)
+  (let ((slot-sym (%find-slot-symbol obj slot-name)))
+    (when (and slot-sym (slot-boundp obj slot-sym))
+      (slot-value obj slot-sym))))
+
 (defmacro with-element ((var obj) &body body)
   "Assert OBJ is an element (via protocol); bind VAR to OBJ for BODY."
   `(let ((,var (ensure-element ,obj)))
@@ -49,9 +64,11 @@
 ;; == elmtui/core/element-base-impl.lisp ==
 
 (defmethod element-p ((x base-element)) t)
+(defmethod element-p ((x t)) nil)
 (defmethod ensure-element ((x base-element)) x)
 
-(defmethod el/size ((el base-element)) (element-size el))
+(defmethod el/size ((el base-element))
+  (or (element-size el) (make-size :w 0 :h 0)))
 (defmethod (setf el/size) (x (el base-element)) (setf (element-size el) x))
 (defmethod (setf el/size) ((wh list) (el base-element))
   (if (= 2 (length wh))
@@ -59,7 +76,19 @@
       (error "Expected a list of two elements for size, got ~A" wh)))
 (defmethod el/children ((el base-element)) (element-children el))
 (defmethod (setf el/children) (x (el base-element)) (setf (element-children el) x))
-(defmethod el/props    ((el base-element)) (element-props el))
+(defmethod el/props ((el base-element))
+  "Return declarative properties from bound slots (not computed cache props)."
+  (let ((plist nil))
+    (dolist (slot-def (sb-mop:class-slots (class-of el)))
+      (let* ((slot-sym (sb-mop:slot-definition-name slot-def))
+             (name (symbol-name slot-sym)))
+        (when (and (slot-boundp el slot-sym)
+                   ;; Expose useful element props; skip internal bookkeeping slots.
+                   (not (member name '("CHILDREN" "LAYOUT-RECT" "CONTENT-MODEL")
+                                :test #'string=)))
+          (setf (getf plist (intern name :keyword))
+                (slot-value el slot-sym)))))
+    plist))
 (defmethod el/styles   ((el base-element)) (elmtui.view.base-elements:element-style el))
 (defmethod (setf el/styles) (x (el base-element))
   (setf (elmtui.view.base-elements:element-style el) x))
@@ -73,14 +102,18 @@
   (setf (getf (elmtui.view.base-elements:element-style el) style) x))
 (defmethod el/type     ((el base-element)) (element-type el))
 (defmethod el/id       ((el base-element)) (element-id el))
-(let ((a nil))(setf (getf a :dud) :b) a)
 (defmethod el/content       ((el text-element)) (elmtui.view.base-elements:text-content el))
-(defmethod el/content       ((el base-element)) nil)
+(defmethod el/content ((el base-element))
+  ;; Slot symbols live in the defining package, so resolve by slot-name string.
+  (%slot-value-if-bound el :content))
 
 (defmethod (setf el/content) (txt (el text-element))
   (setf (elmtui.view.base-elements:text-content el) txt))
 (defmethod el/layout-rect ((el base-element))
-  (elmtui.view.base-elements:element-layout-rect el))
+  (or (elmtui.view.base-elements:element-layout-rect el)
+      (elmtui.view.geo:make-rectangle
+       :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+       :size (make-size :w 0 :h 0))))
 
 (defmethod (setf el/layout-rect) ((rect rectangle) (el base-element))
   (setf (elmtui.view.base-elements:element-layout-rect el) rect))
@@ -100,6 +133,11 @@
     (make-size :w (length (princ-to-string s)) :h 1)))
 
 (defmethod intrinsic-size-of ((node base-element) parent-content-rect)
-  "Default intrinsic for non-text leaves: zero unless overridden."
-  (declare (ignore parent-content-rect node))
-  (make-size :w 0 :h 0))
+  "Default intrinsic:
+   - if NODE exposes textual content, size to one-line text width
+   - otherwise zero unless overridden."
+  (declare (ignore parent-content-rect))
+  (let ((content (el/content node)))
+    (if content
+        (make-size :w (length (princ-to-string content)) :h 1)
+        (make-size :w 0 :h 0))))
