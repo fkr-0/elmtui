@@ -107,6 +107,8 @@ See Also:
       (setf (application-state-data state) data*)
       (push (list key old value) (application-state-log state))
       (incf (application-state-version state))
+      (ignore-errors
+        (cl-state.observer:notify-observers state key old value))
       value)))
 
 (defmethod (setf state-ref) (value (state hash-table) (key t))

@@ -1,8 +1,8 @@
 ;; src/core/message-bus.lisp
 ;; Central message dispatcher with priority support
 
-(uiop:define-package :cleve-elm.core.message-bus
-  (:nicknames :elmtui.core.message-bus)
+(uiop:define-package :elmtui.core.message-bus
+  (:nicknames :cleve-elm.core.message-bus)
   (:use :cl :log4cl)
   (:import-from :cl-events.channel
    :make-channel :-> :<- :select)
@@ -10,7 +10,7 @@
    :message :message-type)
   (:import-from :bordeaux-threads
    :make-thread)
-  (:import-from :cleve-elm.core.event-channels
+  (:import-from :elmtui.core.event-channels
    :event-channel :send-event :receive-event)
   (:export :message-bus
    :make-message-bus
@@ -25,7 +25,7 @@
            :with-message-priority
    :routing-rule))
 
-(in-package :cleve-elm.core.message-bus)
+(in-package :elmtui.core.message-bus)
 
 (defvar *current-message-priority* :normal
   "Dynamic variable to set the priority for messages sent within its scope")

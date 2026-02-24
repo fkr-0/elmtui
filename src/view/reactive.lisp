@@ -56,6 +56,7 @@
    (render-fn :initarg :render-fn :accessor view-render-fn)
    (invalidated :initform t :accessor view-invalidated-p)
    (update-channel :initform (make-channel) :reader view-update-channel)
+   ;; Stores (state-path . callback-fn) pairs for cleanup.
    (observers :initform nil :accessor view-observers)
    (last-render :initform nil :accessor view-last-render)
    (debounce-timer :initform nil :accessor view-debounce-timer)))
@@ -140,18 +141,13 @@
     (pushnew state-path (gethash view-id *view-dependencies*) :test 'equal)
 
     ;; Add observer for this state path
-    (let ((observer-id (add-observer
-                        app-state
-                        state-path
-                        (lambda (path old-value new-value)
-                          (declare (ignore path old-value new-value))
-                          (invalidate-view view)))))
-
-      ;; Store the observer ID so we can remove it later
-      (push observer-id (view-observers view))
-
-      ;; Return the observer ID
-      observer-id)))
+    (let ((callback (lambda (old-value new-value)
+                      (declare (ignore old-value new-value))
+                      (invalidate-view view))))
+      (add-observer app-state state-path callback)
+      ;; Store binding so cleanup can remove the exact observer.
+      (push (cons state-path callback) (view-observers view))
+      callback)))
 
 (defun make-view-task (view dispatch-fn)
   "Creates a task function that handles rendering for a reactive view.
@@ -206,8 +202,8 @@
     (remhash view-id *view-dependencies*)
 
     ;; Remove all observers
-    (dolist (observer-id (view-observers view))
-      (remove-observer app-state observer-id (lambda () 0)))
+    (dolist (binding (view-observers view))
+      (remove-observer app-state (car binding) (cdr binding)))
 
     ;; Send shutdown message to the view's channel
     (-> (view-update-channel view) :shutdown)))

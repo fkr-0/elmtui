@@ -1,5 +1,7 @@
 (uiop:define-package :elmtui.core.globals
   (:use :cl)
+  (:import-from :elmtui.state.msg
+                #:*message-schemas*)
   (:nicknames :et.glob)
   (:export #:*debug-mode*
            #:*config*
@@ -20,10 +22,6 @@
            #:*message-schemas*))
 (in-package :elmtui.core.globals)
 (eval-when (:compile-toplevel :load-toplevel :execute)
-
-  (defvar *message-schemas* (make-hash-table :test 'eq)
-    "Global registry for message types and their variants defined by defmsg.")
-
   (defvar *debug-mode* nil "Enable extensive debugging output if T.")
   (declaim (type boolean *debug-mode*))
 
