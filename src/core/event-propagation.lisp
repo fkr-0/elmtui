@@ -6,6 +6,7 @@
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-debug #:log-info #:log-warn)
   (:import-from :cl-styles.api  #:stylable-id)
+  (:import-from :cl-styles.protocols #:stylable-children)
   (:import-from :elmtui.core.event-types
                 #:mouse-event
                 #:ui-event
@@ -16,10 +17,6 @@
                 #:key-event-p
                 #:mouse-event-p
                 #:stop-propagation)
-  (:import-from :elmtui.view.api
-                #:ui-node
-                #:ui-node-parent
-                #:ui-node-children)
   (:export 
    #:find-event-target
    #:find-ui-node-by-id
@@ -43,7 +40,7 @@
   (when root-node
     (when (funcall visitor-fn root-node)
       (return-from traverse-ui-tree-down t))
-    (loop for child in (ui-node-children root-node)
+    (loop for child in (stylable-children root-node)
           when (traverse-ui-tree-down child visitor-fn)
             return t)))
 
@@ -55,7 +52,7 @@
   (when root-node
     (if (equal (stylable-id root-node) id)
         root-node
-        (loop for child in (ui-node-children root-node)
+        (loop for child in (stylable-children root-node)
               for found = (find-ui-node-by-id child id)
               when found return found))))
 
@@ -66,7 +63,7 @@
   (when root-node
     (if (equal (stylable-id root-node) target-id)
         (list root-node)
-        (loop for child in (ui-node-children root-node)
+        (loop for child in (stylable-children root-node)
               for path = (get-ui-tree-path child target-id)
               when path return (cons root-node path)))))
 

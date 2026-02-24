@@ -316,24 +316,19 @@
     (is (equal '((:test-with-metadata :label "Example"))
                (getf metadata :examples)))))
 
-(test defcomponent-does-not-require-widget-registry-registration
-  "Test that defcomponent works without mutating legacy widget registry"
-  (let* ((widgets-sym (find-symbol "*WIDGETS*" :elmtui.ui.widget-registry))
-         (registry (and widgets-sym (boundp widgets-sym) (symbol-value widgets-sym)))
-         (before-count (and (hash-table-p registry)
-                            (hash-table-count registry))))
-    (finishes
-      (eval
-       '(defcomponent test-no-registry-side-effect ()
-          (:state
-           (enabled t :type boolean))
-          (:documentation "Temporary test component"))))
-    (multiple-value-bind (class props)
-        (dsl-type :test-no-registry-side-effect)
-      (is (eq class 'test-no-registry-side-effect))
-      (is (null props)))
-    (when (hash-table-p registry)
-      (is (= before-count (hash-table-count registry))))))
+(test defcomponent-does-not-require-legacy-widget-registry
+  "defcomponent registration is independent of the removed widget registry package."
+  (is (null (find-package :elmtui.ui.widget-registry)))
+  (finishes
+    (eval
+     '(defcomponent test-no-registry-side-effect ()
+        (:state
+         (enabled t :type boolean))
+        (:documentation "Temporary test component"))))
+  (multiple-value-bind (class props)
+      (dsl-type :test-no-registry-side-effect)
+    (is (eq class 'test-no-registry-side-effect))
+    (is (null props))))
 
 
 (test defcomponent-inheritance

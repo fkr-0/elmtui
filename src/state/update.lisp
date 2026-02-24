@@ -14,9 +14,6 @@
                 #:remove-path)
   (:import-from :cl-state.tx
                 #:with-transaction)
-  (:import-from :elmtui.core.async
-                #:interpret-cmd)
-  (:import-from :elmtui.core.globals #:*app-sender*)
   (:import-from :log4cl #:log-debug #:log-warn #:log-info)
   (:export
    #:*log-update-results*
@@ -39,6 +36,16 @@
 
 (defvar *log-update-results* nil
   "When T, logs the patches and commands returned by update functions.")
+
+(defun %resolve-symbol (package-name symbol-name)
+  (let ((pkg (find-package package-name)))
+    (and pkg (find-symbol symbol-name pkg))))
+
+(defun %interpret-async-command (command)
+  (let ((sym (%resolve-symbol :elmtui.core.async "INTERPRET-CMD")))
+    (unless (and sym (fboundp sym))
+      (error "Async command interpreter unavailable: ELMTUI.CORE.ASYNC:INTERPRET-CMD is not loaded"))
+    (funcall (symbol-function sym) command)))
 
 (defstruct (update-context (:constructor %make-update-context))
   state
@@ -203,7 +210,7 @@
   (declare (ignorable app-state))
   (case (first command)
     (:async
-     (interpret-cmd command))
+     (%interpret-async-command command))
     (:log-message
      (log-info "Command: ~S" (second command)))
     (t (log-warn "Unknown command structure passed to handle-async-command: ~S" command))))

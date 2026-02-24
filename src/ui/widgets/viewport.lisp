@@ -1,7 +1,7 @@
 (uiop:define-package :elmtui.ui.widgets.viewport
   (:use :cl :log4cl)
   (:import-from :elmtui.utils
-    #:ensure-keyword #:get-path #:set-path)
+    #:get-path #:set-path)
   (:import-from :elmtui.state.update
     #:make-update-context
     #:sref
@@ -9,12 +9,11 @@
     #:context-commands)
   (:import-from :elmtui.state.msg
     #:msg-data #:msg-type)
-  (:import-from :elmtui.app.api
-    #:get-component-instance #:destroy-component-state)
   (:import-from :elmtui.ui.api #:id-from-path
     #:view #:init #:update
     #:component #:make-state-patch
-    #:component-state-map-path)
+    #:component-state-map-path
+    #:instantiate-component-from-dsl)
   (:import-from :elmtui.view.geo #:rectangle)
   (:import-from :elmtui.core.errors
     #:component-error #:signal-component-not-found
@@ -80,6 +79,21 @@ It stores the ID of its child component in app-state under :child."))
 (defun make-viewport (&key id)
   (make-instance 'viewport :id id))
 
+(defun %child-spec-id (child-spec)
+  "Extract :id from CHILD-SPEC DSL list when props form a proper plist."
+  (let ((props (and (consp child-spec) (rest child-spec))))
+    (and (listp props)
+      (evenp (length props))
+      (getf props :id))))
+
+(defun %valid-child-dsl-spec-p (child-spec)
+  "Return true when CHILD-SPEC has a keyword tag and a well-formed plist tail."
+  (let ((props (and (consp child-spec) (rest child-spec))))
+    (and (consp child-spec)
+      (keywordp (first child-spec))
+      (listp props)
+      (evenp (length props)))))
+
 ;;;---------------------------------------------------------------
 ;;; Component API Implementation (New TEA-aligned)
 ;;;---------------------------------------------------------------
@@ -90,24 +104,20 @@ It stores the ID of its child component in app-state under :child."))
            (child-commands nil)
            (child-id nil)) ; To store child ID for state
       (when initial-child-spec
-        (let* ((child-type (first initial-child-spec))
-                (id-key (second initial-child-spec))
-                (c-id (if (and id-key (eq id-key :id))
-                        (third initial-child-spec)
-                        (error-with-context
-                          'component-error
-                          :component-type "viewport"
-                          :operation "init"
-                          :component-id component-id
-                          :context (format nil "child-spec ~S missing :id keyword or value." initial-child-spec)
-                          :suggestions '("Ensure child-spec has format: (type :id child-id &rest args)"
-                                          "Check that :id keyword is provided and has a value"
-                                          "Example: (:my-button :id :my-btn :label \"Click\")"))))
+        (let* ((c-id (or (%child-spec-id initial-child-spec)
+                       (error-with-context
+                         'component-error
+                         :component-type "viewport"
+                         :operation "init"
+                         :component-id component-id
+                         :context (format nil "child-spec ~S missing :id keyword or value." initial-child-spec)
+                         :suggestions '("Ensure child-spec has format: (type :id child-id &rest args)"
+                                         "Check that :id keyword is provided and has a value"
+                                         "Example: (:my-button :id :my-btn :label \"Click\")"))))
                 (child-initargs (cdddr initial-child-spec))
-
-                (child-instance (make-instance child-type :id c-id))
                 ;; Child's canonical id-path for its own init is (:components <child-id>)
-                (child-id-path-for-child-init (list :components c-id)))
+                (child-id-path-for-child-init (list :components c-id))
+                (child-instance (instantiate-component-from-dsl initial-child-spec child-id-path-for-child-init)))
 
           (unless (keywordp c-id)
             (error-with-context
@@ -120,12 +130,13 @@ It stores the ID of its child component in app-state under :child."))
                               "Component IDs should start with a colon (:)"
                               "Example: :my-component-id")))
 
-          (multiple-value-bind (initialized-child current-child-patches current-child-commands) ; Renamed to avoid conflict
-            (apply #'init child-instance :id-path child-id-path-for-child-init child-initargs)
-            (declare (ignore initialized-child))
-            (setf child-id c-id)          ; Store ID for state
-            (setf child-patches current-child-patches)
-            (setf child-commands current-child-commands))))
+          (when child-instance
+            (multiple-value-bind (initialized-child current-child-patches current-child-commands) ; Renamed to avoid conflict
+              (apply #'init child-instance :id-path child-id-path-for-child-init child-initargs)
+              (declare (ignore initialized-child))
+              (setf child-id c-id)          ; Store ID for state
+              (setf child-patches current-child-patches)
+              (setf child-commands current-child-commands)))))
 
       (values component
         (append
@@ -144,6 +155,7 @@ It stores the ID of its child component in app-state under :child."))
                      :size-known nil
                      :pos-known nil
                      :dsl ,dsl
+                     :child-dsl-spec ,initial-child-spec
                      ;; Store child ID directly under the viewport's component state
                      :child-id ,child-id
                      )))
@@ -151,104 +163,91 @@ It stores the ID of its child component in app-state under :child."))
         child-commands))))
 
 (defmethod update ((component viewport) message state &key id-path)
+  (declare (ignore component))
   (log-info "viewport: update id-path=~a message=~a" id-path message)
   (let* ((ctx (make-update-context state :base-path (component-state-map-path id-path)))
-          (render-commands '())
-          (extra-patches nil)
-          (extra-commands nil))
-    (labels
-      ((apply-overflow ()
-         "Apply overflow effects and collect scroll commands."
-         (let* ((height (sref ctx :height 24))
-                 (overflow-policy (sref ctx :overflow-policy :scroll))
-                 (issued (sref ctx :issued-scroll-net 0)))
-           (multiple-value-bind (new-height new-issued cmds)
-             (%overflow-effects height 100 overflow-policy issued) ; Assume 100 rows for simplicity
-             (when new-height (setf (sref ctx :height) new-height))
-             (when new-issued (setf (sref ctx :issued-scroll-net) new-issued))
-             (dolist (cmd cmds)
-               (when cmd (push cmd render-commands))))))
-        (propagate-to-child ()
-          "Propagate message to child if it exists."
-          (let ((child-id (sref ctx :child-id)))
-            (when child-id
-              (let* ((child-canonical-id-path (list :components child-id))
-                      (child-instance (get-component-instance child-canonical-id-path state)))
-                (when child-instance
-                  (multiple-value-bind (c1 c2)
-                    (update child-instance message state :id-path child-canonical-id-path)
-                    (let ((child-patches nil)
-                           (child-commands nil))
-                      (cond
-                        ((typep c1 'elmtui.state.api:update-result)
-                          (setf child-patches (elmtui.state.api:ur-patches c1))
-                          (setf child-commands (elmtui.state.api:ur-commands c1)))
-                        ((and (listp c1) (listp c2))
-                          (setf child-patches c1)
-                          (setf child-commands c2)))
-                      (when child-patches
-                        (setf extra-patches (nconc extra-patches child-patches)))
-                      (when child-commands
-                        (setf extra-commands (nconc extra-commands child-commands)))))))))))
+         (render-commands '())
+         (extra-patches nil)
+         (extra-commands nil))
+    (labels ((apply-overflow ()
+               (let* ((height (sref ctx :height 24))
+                      (overflow-policy (sref ctx :overflow-policy :scroll))
+                      (issued (sref ctx :issued-scroll-net 0)))
+                 (multiple-value-bind (new-height new-issued cmds)
+                     (%overflow-effects height 100 overflow-policy issued)
+                   (when new-height (setf (sref ctx :height) new-height))
+                   (when new-issued (setf (sref ctx :issued-scroll-net) new-issued))
+                   (dolist (cmd cmds)
+                     (push cmd render-commands)))))
+             (propagate-to-child ()
+               (let* ((child-spec (sref ctx :child-dsl-spec))
+                      (child-id (%child-spec-id child-spec)))
+                 (when (and (%valid-child-dsl-spec-p child-spec) (keywordp child-id))
+                   (let* ((child-id-path (list :components child-id))
+                          (child-instance (instantiate-component-from-dsl child-spec child-id-path)))
+                     (when child-instance
+                       (let* ((result (update child-instance message state :id-path child-id-path))
+                              (child-patches (and (typep result 'elmtui.state.api:update-result)
+                                               (elmtui.state.api:ur-patches result)))
+                              (child-commands (and (typep result 'elmtui.state.api:update-result)
+                                                (elmtui.state.api:ur-commands result))))
+                         (when child-patches
+                           (setf extra-patches (nconc extra-patches child-patches)))
+                         (when child-commands
+                           (setf extra-commands (nconc extra-commands child-commands))))))))))
       (when (listp message)
         (case (msg-type message)
           (:scroll-to
-            (let ((new-x (msg-data message :x 0))
-                   (new-y (msg-data message :y 0)))
-              (setf (sref ctx :offset-x) new-x)
-              (setf (sref ctx :offset-y) new-y)
-              (apply-overflow)))
+           (setf (sref ctx :offset-x) (msg-data message :x 0))
+           (setf (sref ctx :offset-y) (msg-data message :y 0))
+           (apply-overflow))
           (:set-child
-            (let* ((new-child-spec (msg-data message :spec))
-                    (old-child-id (sref ctx :child-id))
-                    (new-child-id (when new-child-spec (getf new-child-spec :id))))
-              (when old-child-id
-                (push `(:destroy-component-state ,(list :components old-child-id)) render-commands))
-              (if new-child-spec
-                (let* ((child-type (first new-child-spec))
-                        (child-id-keyword (ensure-keyword (getf new-child-spec :id)))
-                        (child-props (loop for (k v) on (cddr new-child-spec) by #'cddr
-                                       collect k collect v))
-                        (child-instance (make-instance child-type :id child-id-keyword))
-                        (child-id-path-for-init (list :components child-id-keyword)))
-                  (multiple-value-bind (init-comp init-patches init-commands)
-                    (apply #'init child-instance :id-path child-id-path-for-init child-props)
-                    (declare (ignore init-comp))
-                    (when init-patches
-                      (setf extra-patches (nconc extra-patches init-patches)))
-                    (when init-commands
-                      (setf extra-commands (nconc extra-commands init-commands)))))
-                (setf new-child-id nil))
-              (setf (sref ctx :child-id) new-child-id)))
+           (let* ((raw-child-spec (msg-data message :spec))
+                  (new-child-spec (and (%valid-child-dsl-spec-p raw-child-spec) raw-child-spec))
+                  (old-child-id (sref ctx :child-id))
+                  (new-child-id (%child-spec-id new-child-spec)))
+             (when old-child-id
+               (push `(:destroy-component-state ,(list :components old-child-id)) render-commands))
+             (when (and new-child-spec (keywordp new-child-id))
+               (let* ((child-props (cddr new-child-spec))
+                      (child-id-path (list :components new-child-id))
+                      (child-instance (instantiate-component-from-dsl new-child-spec child-id-path)))
+                 (when child-instance
+                   (multiple-value-bind (_ init-patches init-commands)
+                       (apply #'init child-instance :id-path child-id-path child-props)
+                     (declare (ignore _))
+                     (when init-patches
+                       (setf extra-patches (nconc extra-patches init-patches)))
+                     (when init-commands
+                       (setf extra-commands (nconc extra-commands init-commands)))))))
+             (setf (sref ctx :child-dsl-spec) new-child-spec)
+             (setf (sref ctx :child-id) new-child-id)))
           (:set-dimensions
-            (let ((new-width (msg-data message :width))
-                   (new-height (msg-data message :height)))
-              (when new-width (setf (sref ctx :width) new-width))
-              (when new-height (setf (sref ctx :height) new-height))
-              (let ((w (sref ctx :width nil))
-                     (h (sref ctx :height nil)))
-                (when (and w h (> w 0) (> h 0))
-                  (setf (sref ctx :size-known) t)))
-              (apply-overflow)))
+           (let ((new-width (msg-data message :width))
+                 (new-height (msg-data message :height)))
+             (when new-width (setf (sref ctx :width) new-width))
+             (when new-height (setf (sref ctx :height) new-height))
+             (let ((w (sref ctx :width nil))
+                   (h (sref ctx :height nil)))
+               (when (and w h (> w 0) (> h 0))
+                 (setf (sref ctx :size-known) t)))
+             (apply-overflow)))
           (:set-clipping
-            (let ((flag (msg-data message :enabled)))
-              (setf (sref ctx :clipping) (and flag t))))
+           (setf (sref ctx :clipping) (and (msg-data message :enabled) t)))
           (:scroll-by
-            (let ((dx (or (msg-data message :dx) 0))
-                   (dy (or (msg-data message :dy) 0)))
-              (setf (sref ctx :scroll-x) (+ (sref ctx :scroll-x 0) dx))
-              (setf (sref ctx :scroll-y) (+ (sref ctx :scroll-y 0) dy))
-              (apply-overflow)))
+           (let ((dx (or (msg-data message :dx) 0))
+                 (dy (or (msg-data message :dy) 0)))
+             (setf (sref ctx :scroll-x) (+ (sref ctx :scroll-x 0) dx))
+             (setf (sref ctx :scroll-y) (+ (sref ctx :scroll-y 0) dy))
+             (apply-overflow)))
           (otherwise
-            (propagate-to-child)))))
-    (let* ((ctx-patches (context-patches ctx))
-            (ctx-commands (context-commands ctx))
-            (all-commands (nconc (nreverse render-commands) ctx-commands extra-commands)))
-      (log-info "viewport ~A produced ~A patches and ~A commands."
-        id-path (length ctx-patches) (length all-commands))
-      (elmtui.state.api:make-update-result
-        :patches (append ctx-patches extra-patches)
-        :commands all-commands))))
+           (propagate-to-child))))
+      (let* ((ctx-patches (context-patches ctx))
+             (ctx-commands (context-commands ctx))
+             (all-commands (nconc (nreverse render-commands) ctx-commands extra-commands)))
+        (elmtui.state.api:make-update-result
+          :patches (append ctx-patches extra-patches)
+          :commands all-commands)))))
 
 (defmethod view ((component viewport) state &key id-path (children nil) &allow-other-keys)
   (declare (type list id-path) (type t state))
@@ -268,8 +267,7 @@ It stores the ID of its child component in app-state under :child."))
             (final-children (or children-from-args
                               (cond
                                 ((null child-from-state) nil)
-                                ((and (listp child-from-state)
-                                   (keywordp (first child-from-state)))
+                                ((%valid-child-dsl-spec-p child-from-state)
                                   (list child-from-state))
                                 (t (list child-from-state)))))
             (width (or width 1))

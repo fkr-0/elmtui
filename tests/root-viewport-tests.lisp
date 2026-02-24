@@ -8,7 +8,6 @@
                 #:root-viewport-initial-cursor-col)
   (:import-from :elmtui.ui.api
                 #:init #:update #:view #:id-from-path #:get-path)
-  (:import-from :elmtui.app.api #:get-component-instance)
   (:import-from :elmtui.state #:application-state-plist) ; For accessing state in a structured way
   (:import-from :elmtui.core.event-types #:key-event) ; For :terminal-resized structure
   (:shadowing-import-from :elmtui.ui.widgets.root-viewport ;; Ensure we are testing the correct compute functions
@@ -172,10 +171,15 @@
   (list (list (append id-path '(:type)) (type-of component))
         (list (append id-path '(:id)) (elmtui.ui.api:component-id component))))
 
-(defmethod elmtui.ui.api:update ((component mock-child-component) state message &key id-path)
+(defmethod elmtui.ui.dsl-resolution:dsl-type ((type (eql :mock-child)) &optional props)
+  (declare (ignore props))
+  (values 'mock-child-component nil))
+
+(defmethod elmtui.ui.api:update ((component mock-child-component) message state &key id-path)
   (declare (ignore state id-path))
   (setf (mock-child-update-called-with component) message)
-  `((,(append (list :mock-child-updated (elmtui.ui.api:component-id component))) ,message)))
+  (elmtui.state.api:make-update-result
+    :patches `((,(append (list :mock-child-updated (elmtui.ui.api:component-id component))) ,message))))
 
 (defmethod elmtui.ui.api:view ((component mock-child-component) state &key id-path)
   (declare (ignore state id-path))
@@ -235,32 +239,15 @@
 
 
       (let* ((child-id :my-child)
-             (child-instance (make-instance 'mock-child-component :id child-id))
-             (app-state-with-child (setup-initial-state initial-anchor initial-term-dims initial-cur-pos))
-             (child-id-path (append id-path (list child-id))))
-
-        (setf (gethash (append id-path '(:child-id)) app-state-with-child) child-id)
-        (setf (gethash child-id-path app-state-with-child) child-instance)
-
-        (let ((original-get-component-instance (fdefinition 'elmtui.app.api:get-component-instance)))
-          (unwind-protect
-               (progn
-                 (setf (fdefinition 'elmtui.app.api:get-component-instance)
-                       (lambda (path state)
-                         (declare (ignore state))
-                         (if (equal path child-id-path)
-                             child-instance
-                             nil)))
-
-                 (let* ((test-message '(:custom-message :data "hello"))
-                        (update-result (update rvp app-state-with-child test-message :id-path id-path))
-                        (update-patches (elmtui.state.api:ur-patches update-result)))
-                   (is-true (mock-child-update-called-with child-instance) "Child update should have been called.")
-                   (is (equal test-message (mock-child-update-called-with child-instance)) "Child update called with wrong message.")
-                   (is (listp update-patches) "Update patches from child should be a list.")
-                   (is (equal `((:mock-child-updated ,child-id) ,test-message) (first update-patches))
-                       "Expected patch from mock child not found.")))
-            (setf (fdefinition 'elmtui.app.api:get-component-instance) original-get-component-instance))))
+             (app-state-with-child (setup-initial-state initial-anchor initial-term-dims initial-cur-pos)))
+        (setf (gethash (append id-path '(:child-dsl-spec)) app-state-with-child)
+              `(:mock-child :id ,child-id))
+        (let* ((test-message '(:custom-message :data "hello"))
+               (update-result (update rvp app-state-with-child test-message :id-path id-path))
+               (update-patches (elmtui.state.api:ur-patches update-result)))
+          (is (listp update-patches) "Update patches from child should be a list.")
+          (is (equal `((:mock-child-updated (:components :my-rvp :my-child)) ,test-message) (first update-patches))
+              "Expected patch from mock child not found.")))
 
       (let* ((app-state-no-child (setup-initial-state initial-anchor initial-term-dims initial-cur-pos))
              (test-message '(:another-message))
