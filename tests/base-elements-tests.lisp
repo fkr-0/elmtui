@@ -86,4 +86,15 @@
     (is (string= "Confirm" (elmtui.view.base-elements::button-content btn*)))
     (is-true (elmtui.view.base-elements::button-disabled-p btn*))))
 
+(test base-elements-constructor-unknown-type-errors
+  (signals error
+    (make-dsl-element :unknown-widget :id :x)))
+
+(test base-elements-validate-children-through-object-path
+  (signals error
+    (validate-base-dsl
+      '(:container :id :root
+        :children ((:label :id :ok :content "ok")
+                    (:unknown-widget :id :bad))))))
+
 ;;; --- End of file ------------------------------------------------

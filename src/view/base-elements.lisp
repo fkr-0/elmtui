@@ -919,7 +919,7 @@ It inspects the class metaobject directly to collect supported initargs."
   t)
 
 (defun validate-base-dsl (dsl &optional (context "base DSL"))
-  "Accept either legacy plist DSL or objects."
+  "Validate class-backed base DSL nodes (objects or keyword-form elements)."
   (cond
     ((base-element-p dsl)
      (validate-element dsl context))
@@ -933,7 +933,7 @@ It inspects the class metaobject directly to collect supported initargs."
   dsl)
 
 (defun validate-dsl-element (element context)
-  "Legacy plist element validation (kept for compatibility)."
+  "Validate one keyword-form DSL element."
   (let* ((element-type (first element))
          (cls (element-class element-type)))
     (unless cls
@@ -959,10 +959,11 @@ It inspects the class metaobject directly to collect supported initargs."
                  :reason (format nil "Invalid properties ~A for element type ~A"
                                  missing element-type)
                  :context context)))
-      ;; Delegate further validation to the object instance
-      ;; (log-info "Validating element ~A in context ~A" (first element) (rest element))
       (let ((obj (apply #'make-instance (append (list cls) (rest element)))))
-        (validate-element obj context)))))
+        (validate-element obj context)
+        (let ((children (getf (rest element) :children)))
+          (when children
+            (validate-children children obj context)))))))
 
 ;; Object path
 
@@ -971,20 +972,6 @@ It inspects the class metaobject directly to collect supported initargs."
   t)
 
 (defmethod validate-children ((children list) (e base-element) context)
-  (dolist (child children)
-    (validate-base-dsl child (format nil "~A > children" context))))
-
-;; compatibility stubs for old plist path
-(defmethod validate-content-model (element content-model context)
-  (declare (ignore content-model))
-  ;; recurse for :children if present
-  (let ((children (getf (rest element) :children)))
-    (when children
-      (validate-children children element context)))
-  t)
-
-(defmethod validate-children (children element-type context)
-  (declare (ignore element-type))
   (dolist (child children)
     (validate-base-dsl child (format nil "~A > children" context))))
 
@@ -1068,8 +1055,7 @@ It inspects the class metaobject directly to collect supported initargs."
       ((cls (element-class type)))
     (if cls
         (apply #'make-instance-validated cls properties)
-        ;; fall back to legacy
-        (list* type properties))))
+        (error "Unknown DSL element type: ~A" type))))
 
 (defun update-dsl-element (element &rest property-updates)
   (cond
@@ -1102,10 +1088,9 @@ It inspects the class metaobject directly to collect supported initargs."
      (let ((kids (element-children node)))
        (when kids (dolist (k kids) (funcall fn k)))))
     ((listp node)
-     (if (keywordp (first node)) ; It's a legacy dsl element
+     (if (keywordp (first node))
          (let ((kids (getf (rest node) :children)))
            (when kids (dolist (k kids) (funcall fn k))))
-         ;; It's a list of nodes
          (dolist (n node) (funcall fn n))))))
 
 (defun map-dsl-elements (function dsl)
