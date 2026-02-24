@@ -32,6 +32,7 @@
                 (:file "view/base-elements" :depends-on ("view/api" "view/geo"))
                 (:file "view/element-protocol" :depends-on ("view/base-elements"))
                 (:file "core/conditions")
+                (:file "core/async")
                 (:module "state"
                   :pathname "state/"
                   :serial t
@@ -44,7 +45,6 @@
                   :pathname "./core/"
                   :serial t
                   :components (
-                                (:file "async")
                                 (:file "threads")
                                 (:file "event-channels")
                                 (:file "message-bus")

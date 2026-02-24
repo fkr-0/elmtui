@@ -16,6 +16,8 @@
   (:import-from :elmtui.core.event-types
                 #:key-event-p
                 #:key-event-char)
+  (:import-from :elmtui.core.event-channels
+                #:make-message-channel)
   (:import-from :cl-styles.sheet
                 #:make-stylesheet
                 #:stylesheet-variables)
@@ -77,6 +79,25 @@
 (test message-schema-registry-shared-between-state-and-core-globals
   (is (eq elmtui.state.msg::*message-schemas*
           elmtui.core.globals:*message-schemas*)))
+
+(test validate-message-does-not-write-to-standard-output
+  (let* ((msg (make-message :type 'AdapterTestMsg
+                            :data (make-setvalue-adaptertestmsg :value 3)))
+         (result nil)
+         (out (with-output-to-string (s)
+                (let ((*standard-output* s))
+                  (setf result (validate-message msg))))))
+    (is-true result)
+    (is (string= "" out))))
+
+(test process-channel-event-ignores-malformed-event-shapes
+  (let ((channel (make-message-channel))
+        (ok t))
+    (handler-case
+        (elmtui.core.loop::process-channel-event nil channel)
+      (error ()
+        (setf ok nil)))
+    (is-true ok)))
 
 (test reactive-view-registers-and-cleans-observers-with-cl-state
   (let* ((state (make-state :initial '(:count 0) :backend :plist))

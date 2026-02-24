@@ -201,10 +201,10 @@
   "Test sending a complex command"
   (let* ((state (plist-to-application-state '()))
           (ctx (make-update-context state)))
-    (send-command ctx '(:async-task (lambda () 42) nil))
+    (send-command ctx '(:async :task :fake-task :id :fake-id :promise :fake-promise))
     (let ((commands (context-commands ctx)))
       (is (= 1 (length commands)))
-      (is (= 3 (length (first commands)))))))
+      (is (= 7 (length (first commands)))))))
 
 ;;;=============================================================================
 ;;; Topic Command Tests
@@ -362,14 +362,6 @@
              (is (equal command captured)))
         (setf (symbol-function 'elmtui.core.async:interpret-cmd) original)))))
 
-(test handle-async-command-legacy-async-task-still-sends-result
-  "Legacy :async-task command remains supported during migration."
-  (let ((received nil)
-        (elmtui.core.globals:*app-sender* (lambda (msg) (setf received msg))))
-    (handle-async-command
-     (list :async-task
-           (lambda () 7)
-           (lambda (result) (list :done result)))
-     nil)
-    (sleep 0.05)
-    (is (equal '(:done 7) received))))
+(test handle-async-command-unknown-shape-does-not-error
+  "Unknown async command shapes should be ignored safely."
+  (is-false (handle-async-command '(:unknown-async-shape :payload 7) nil)))
