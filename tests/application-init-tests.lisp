@@ -102,7 +102,7 @@
 ;; Basic smoke test
 (test app-config-creation
   "Test that app-config can be created"
-  (let ((config (elmtui.app:make-app-config :name 'test-app :message-queue (cleve-elm.core.event-channels:make-message-channel))))
+  (let ((config (elmtui.app:make-app-config :name 'test-app :message-queue (elmtui.core.event-channels:make-message-channel))))
     (is (eq 'test-app (app-config-name config)))))
 
 

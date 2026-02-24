@@ -2,7 +2,7 @@
 
 (uiop:define-package :elmtui.app.tea-core
   (:use :cl)
-  (:import-from :cleve-elm.core.event-channels
+  (:import-from :elmtui.core.event-channels
     #:make-message-channel)
   (:import-from :elmtui.app.api
     #:run-application)

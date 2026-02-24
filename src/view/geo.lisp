@@ -353,6 +353,7 @@ Set the length component (:w or :h) of a rectangle's dimension."))
 (defmethod w ((s size)) (size-w s))
 (defmethod h ((s size)) (size-h s))
 (defmethod (setf w) (new-value (s size)) (setf (size-w s) new-value))
+(defmethod (setf h) (new-value (s size)) (setf (size-h s) new-value))
 
 ;; Accessors (Rectangle)
 (defmethod pos ((r rectangle)) (rectangle-pos r))
@@ -437,7 +438,7 @@ Set the length component (:w or :h) of a rectangle's dimension."))
 (defgeneric difference (obj1 obj2)
   (:documentation "Calculate the difference between two objects (e.g., positions)."))
 (defmethod difference ((p1 pos) (p2 pos))
-  (make-instance 'pos :x (- (x p1) (x p2)) :y (- (y p1) (y p2))))
+  (make-pos :x (- (x p1) (x p2)) :y (- (y p1) (y p2))))
 
 ;; Rectangle Between Points
 (defgeneric rectangle-between (p1 p2)
@@ -447,7 +448,7 @@ Set the length component (:w or :h) of a rectangle's dimension."))
         (y (min (y p1) (y p2)))
         (x2 (max (x p1) (x p2)))
         (y2 (max (y p1) (y p2))))
-    (make-instance 'rectangle :x x :y y :w (- x2 x) :h (- y2 y))))
+    (make-rectangle :pos (make-pos :x x :y y) :size (make-size :w (- x2 x) :h (- y2 y)))))
 
 ;; Delta Operations (Non-mutating)
 (defgeneric dx (obj delta)
@@ -455,10 +456,10 @@ Set the length component (:w or :h) of a rectangle's dimension."))
 (defgeneric dy (obj delta)
   (:documentation "Return a new object shifted vertically by delta."))
 
-(defmethod dx ((p pos) delta) (make-instance 'pos :x (+ (x p) delta) :y (y p)))
-(defmethod dy ((p pos) delta) (make-instance 'pos :x (x p) :y (+ (y p) delta)))
-(defmethod dx ((r rectangle) delta) (make-instance 'rectangle :pos (dx (pos r) delta) :size (size r)))
-(defmethod dy ((r rectangle) delta) (make-instance 'rectangle :pos (dy (pos r) delta) :size (size r)))
+(defmethod dx ((p pos) delta) (make-pos :x (+ (x p) delta) :y (y p)))
+(defmethod dy ((p pos) delta) (make-pos :x (x p) :y (+ (y p) delta)))
+(defmethod dx ((r rectangle) delta) (make-rectangle :pos (dx (pos r) delta) :size (size r)))
+(defmethod dy ((r rectangle) delta) (make-rectangle :pos (dy (pos r) delta) :size (size r)))
 
 ;; Delta Operations (Mutating)
 (defgeneric dx! (obj delta)
@@ -495,7 +496,7 @@ Set the length component (:w or :h) of a rectangle's dimension."))
         (y (min (y r1) (y r2)))
         (x2 (max (x2 r1) (x2 r2)))
         (y2 (max (y2 r1) (y2 r2))))
-    (make-instance 'rectangle :x x :y y :w (- x2 x) :h (- y2 y))))
+    (make-rectangle :pos (make-pos :x x :y y) :size (make-size :w (- x2 x) :h (- y2 y)))))
 
 (defgeneric rectangle-union-list (rectangles)
   (:documentation "Calculate the union of a list of rectangles."))
@@ -512,7 +513,7 @@ Set the length component (:w or :h) of a rectangle's dimension."))
          (x2 (min (x2 r1) (x2 r2)))
          (y2 (min (y2 r1) (y2 r2))))
     (when (and (< x x2) (< y y2)) ; Check for positive width and height
-      (make-instance 'rectangle :x x :y y :w (- x2 x) :h (- y2 y)))))
+      (make-rectangle :pos (make-pos :x x :y y) :size (make-size :w (- x2 x) :h (- y2 y))))))
 
 ;; Contains Point
 (defmethod contains-p ((r rectangle) (p pos))
@@ -525,7 +526,7 @@ Set the length component (:w or :h) of a rectangle's dimension."))
   "Check if the rectangle contains the point specified as (x y) list."
   (and (= (length p) 2)
        (every #'numberp p)
-       (contains-p r (make-instance 'pos :x (first p) :y (second p)))))
+       (contains-p r (make-pos :x (first p) :y (second p)))))
 
 ;; Contains Rectangle
 (defmethod contains-p ((r1 rectangle) (r2 rectangle))
@@ -579,10 +580,10 @@ Set the length component (:w or :h) of a rectangle's dimension."))
 (defmethod corner ((r rectangle) corner-keyword)
   "Get the position of a specified corner (:top-left, :top-right, :bottom-left, :bottom-right)."
   (case corner-keyword
-    (:top-left     (make-instance 'pos :x (x r) :y (y r)))
-    (:top-right    (make-instance 'pos :x (x2 r) :y (y r)))
-    (:bottom-left  (make-instance 'pos :x (x r) :y (y2 r)))
-    (:bottom-right (make-instance 'pos :x (x2 r) :y (y2 r)))
+    (:top-left     (make-pos :x (x r) :y (y r)))
+    (:top-right    (make-pos :x (x2 r) :y (y r)))
+    (:bottom-left  (make-pos :x (x r) :y (y2 r)))
+    (:bottom-right (make-pos :x (x2 r) :y (y2 r)))
     (otherwise (error "Invalid corner keyword: ~A" corner-keyword))))
 
 ;; Line (Axis-aligned)
@@ -596,7 +597,7 @@ Set the length component (:w or :h) of a rectangle's dimension."))
           (y (min (y p1) (y p2)))
           (w (if (zerop dx) 1 (1+ (abs dx)))) ; Width is 1 if vertical, else dx+1
           (h (if (zerop dy) 1 (1+ (abs dy))))) ; Height is 1 if horizontal, else dy+1
-      (make-instance 'rectangle :x x :y y :w w :h h))))
+      (make-rectangle :pos (make-pos :x x :y y) :size (make-size :w w :h h)))))
 
 ;; Rectangle Difference (Subtract r2 from r1)
 (defmethod rect-diff ((r1 rectangle) (r2 rectangle))
@@ -615,16 +616,16 @@ Set the length component (:w or :h) of a rectangle's dimension."))
 
       ;; Top part
       (when (> oy y)
-        (push (make-instance 'rectangle :x x :y y :w (w r1) :h (- oy y)) rects))
+        (push (make-rectangle :pos (make-pos :x x :y y) :size (make-size :w (w r1) :h (- oy y))) rects))
       ;; Bottom part
       (when (< oy2 y2)
-        (push (make-instance 'rectangle :x x :y oy2 :w (w r1) :h (- y2 oy2)) rects))
+        (push (make-rectangle :pos (make-pos :x x :y oy2) :size (make-size :w (w r1) :h (- y2 oy2))) rects))
       ;; Left part (within the vertical bounds of the overlap)
       (when (> ox x)
-        (push (make-instance 'rectangle :x x :y oy :w (- ox x) :h (h overlap-rect)) rects))
+        (push (make-rectangle :pos (make-pos :x x :y oy) :size (make-size :w (- ox x) :h (h overlap-rect))) rects))
       ;; Right part (within the vertical bounds of the overlap)
       (when (< ox2 x2)
-        (push (make-instance 'rectangle :x ox2 :y oy :w (- x2 ox2) :h (h overlap-rect)) rects))
+        (push (make-rectangle :pos (make-pos :x ox2 :y oy) :size (make-size :w (- x2 ox2) :h (h overlap-rect))) rects))
 
       (nreverse rects))))
 
@@ -635,16 +636,16 @@ Set the length component (:w or :h) of a rectangle's dimension."))
   "Get the border(s) of the rectangle as a list of rectangles."
   (let ((x (x r)) (y (y r)) (w (w r)) (h (h r)))
     (flet ((make-border (bx by bw bh)
-             (overlap r (make-instance 'rectangle :x bx :y by :w bw :h bh)))) ; Ensure border is within original rect bounds
+             (overlap r (make-rectangle :pos (make-pos :x bx :y by) :size (make-size :w bw :h bh))))) ; Ensure border is within original rect bounds
       (case side
         (:all (remove nil (list (make-border x y w width)          ; Top
                                 (make-border x (- (+ y h) width) w width) ; Bottom
                                 (make-border x y width h)          ; Left
                                 (make-border (- (+ x w) width) y width h)))) ; Right
-        (:top (make-border x y w width))
-        (:bottom (make-border x (- (+ y h) width) w width))
-        (:left (make-border x y width h))
-        (:right (make-border (- (+ x w) width) y width h))
+        (:top (list (make-border x y w width)))
+        (:bottom (list (make-border x (- (+ y h) width) w width)))
+        (:left (list (make-border x y width h)))
+        (:right (list (make-border (- (+ x w) width) y width h)))
         (otherwise (error "Invalid border side: ~A" side))))))
 
 ;;;-----------------------------------------------------------------------------

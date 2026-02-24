@@ -24,6 +24,9 @@
          (pair (assoc key observers)))
     (when (and pair (member fn (cdr pair)))
       (setf (cdr pair) (remove fn (cdr pair)))
+      (when (null (cdr pair))
+        (setf (application-state-observers app)
+              (remove pair (application-state-observers app) :test #'eq)))
       t)))
 
 (defun notify-observers (app key old new)

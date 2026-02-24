@@ -35,6 +35,7 @@
 (test dsl-type-variant-adds-default-props
   "Variant adds default props"
   (defmethod dsl-type ((type (eql :variant)) &optional props)
+    (declare (ignore props))
     (values 'base-widget '(:default "value")))
   (multiple-value-bind (class props)
     (dsl-type :variant)

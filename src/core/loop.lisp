@@ -223,7 +223,7 @@ as well as the view function for the application.")
                       (log-error "*app-message-processor* not set—cannot process: ~S" msg))))
 
                ;; (3) async commands
-               ((:async :async-task :cmd-async :recurring-task)
+               ((:async :async-task :recurring-task)
                 (log-debug "Handling async command ~S" event*)
                 (handle-async-command event* elmtui.core.globals:*app-state*))
 

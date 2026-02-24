@@ -1,8 +1,8 @@
 ;; src/core/event-channels.lisp
 ;; Enhanced definition of standard event channel types with filtering and priority support
 
-(uiop:define-package :cleve-elm.core.event-channels
-  (:nicknames :elmtui.core.event-channels)
+(uiop:define-package :elmtui.core.event-channels
+  (:nicknames :cleve-elm.core.event-channels)
   (:use :cl :log4cl)
   (:import-from :cl-events.channel
    :make-channel :make-filtered-channel :channel-add-filter :-> :<- :select :no-wait)
@@ -22,7 +22,7 @@
    #:register-event-handler #:unregister-event-handler
    #:send-event #:receive-event #:try-receive-event
    #:channel-priority #:set-channel-priority))
-(in-package #:cleve-elm.core.event-channels)
+(in-package #:elmtui.core.event-channels)
 
 ;;; ------------------------------------------------------------------
 ;;; Basic event-channel prototype
