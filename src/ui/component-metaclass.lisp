@@ -15,7 +15,8 @@
 ;;; Component Metaclass
 ;;; ---------------------------------------------------------------
 
-(defclass component-class (standard-class)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass component-class (standard-class)
   ((%metadata
      :initarg :metadata
      :accessor class-metadata
@@ -23,7 +24,7 @@
      :documentation "Metadata associated with this component class.
                    Contains properties, documentation, and examples."))
   (:documentation "Metaclass for component classes that stores metadata
-                   in the class metaobject itself instead of a static registry."))
+                   in the class metaobject itself instead of a static registry.")))
 
 (defun normalize-metadata (metadata)
   "Normalize metadata shape so callers consistently get a plist."

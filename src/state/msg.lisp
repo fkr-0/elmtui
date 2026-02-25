@@ -10,7 +10,7 @@
     #:msg-data #:msg-type
     #:defmsg #:message-variant-p #:canonicalize-message-variant
     :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
-    #:make-focusnext-appmsg #:make-focusprevious-appmsg
+    #:make-focusnext-appmsg #:make-focusprevious-appmsg #:make-keyevent-appmsg
     :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
     :arg-def #:arg-def-type #:arg-def-keyword
     :AppMsg :StateChangeMsg))
