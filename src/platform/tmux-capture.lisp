@@ -5,7 +5,7 @@
 
 (uiop:define-package :elmtui.platform.tmux
   (:use :cl)
-  (:import-from :alexandria #:clamp)
+  (:import-from :alexandria #:clamp #:split-string)
   (:import-from :uiop
     #:find-program*
     #:run-program
@@ -105,6 +105,178 @@
     (if lines
       (coerce lines 'vector)
       #())))
+
+;;;----------------------------------------------------------------
+;;; ANSI Sequence Parsing
+;;;----------------------------------------------------------------
+
+(defun %esc-p (char)
+  "Check if CHAR is the ESC character."
+  (char= char #\Escape))
+
+(defun split-by-ansi-sequences (content)
+  "Split CONTENT into segments separated by ANSI escape sequences.
+Returns a list of alternating plain text and ANSI sequences."
+  (unless content
+    (return-from split-by-ansi-sequences '()))
+  (let ((result '())
+        (current-segment (make-string-output-stream))
+        (in-escape nil)
+        (i 0)
+        (len (length content)))
+    (loop
+      (when (>= i len)
+        (let ((seg (get-output-stream-string current-segment)))
+          (when (plusp (length seg))
+            (push seg result)))
+        (return))
+      (let ((char (aref content i)))
+        (cond
+          ;; Start of escape sequence
+          ((and (not in-escape) (%esc-p char))
+           ;; Flush current segment
+           (let ((seg (get-output-stream-string current-segment)))
+             (when (plusp (length seg))
+               (push seg result)))
+           ;; Start new segment for escape sequence
+           (setf current-segment (make-string-output-stream))
+           (write-char char current-segment)
+           (setf in-escape t)
+           (incf i))
+          ;; Inside escape sequence - look for terminator
+          (in-escape
+           (write-char char current-segment)
+           ;; Check for ANSI terminator (letter a-z or @)
+           (when (alpha-char-p char)
+             (let ((seg (get-output-stream-string current-segment)))
+               (push seg result))
+             (setf current-segment (make-string-output-stream))
+             (setf in-escape nil))
+           (incf i))
+          ;; Regular character
+          (t
+           (write-char char current-segment)
+           (incf i)))))
+    (nreverse result)))
+
+(defun %sgr-code->color (code kind)
+  "Convert SGR color CODE to keyword.
+KIND is :fg for foreground (30-37, 90-97) or :bg for background (40-47, 100-107)."
+  (let ((base (ecase kind (:fg 30) (:bg 40))))
+    (cond
+      ;; High intensity colors (90-97, 100-107)
+      ((and (>= code 90) (<= code 97))
+       (let ((offset (- code (if (eq kind :fg) 90 100))))
+         (ecase offset
+           (0 :bright-black)
+           (1 :bright-red)
+           (2 :bright-green)
+           (3 :bright-yellow)
+           (4 :bright-blue)
+           (5 :bright-magenta)
+           (6 :bright-cyan)
+           (7 :bright-white))))
+      ;; Normal colors (30-37, 40-47)
+      ((and (>= code base) (<= code (+ base 7)))
+       (let ((offset (- code base)))
+         (ecase offset
+           (0 :black)
+           (1 :red)
+           (2 :green)
+           (3 :yellow)
+           (4 :blue)
+           (5 :magenta)
+           (6 :cyan)
+           (7 :white))))
+      (t nil))))
+
+(defun %sgr-code->attr (code)
+  "Convert SGR attribute CODE to keyword."
+  (case code
+    (0 :reset)
+    (1 :bold)
+    (2 :dim)
+    (3 :italic)
+    (4 :underline)
+    (5 :blink)
+    (7 :inverse)
+    (22 :normal-intensity)
+    (23 :not-italic)
+    (24 :not-underline)
+    (27 :not-inverse)
+    (t nil)))
+
+(defun parse-ansi-sgr (sequence)
+  "Parse an ANSI SGR (Select Graphic Rendition) sequence into a style plist.
+Returns NIL if the sequence is a reset, or a plist with :fg, :bg, :attrs keys.
+SEQUENCE should be a string like \"\\e[31m\" or \"\\e[1;31;42m\"."
+  (unless (and sequence (> (length sequence) 2))
+    (return-from parse-ansi-sgr nil))
+  ;; Verify it's an SGR sequence
+  (unless (and (char= (aref sequence 0) #\Escape)
+               (char= (aref sequence 1) #\[)
+               (alpha-char-p (aref sequence (1- (length sequence)))))
+    (return-from parse-ansi-sgr nil))
+  ;; Extract the part between [ and final letter
+  (let* ((end (1- (length sequence)))
+         (params (subseq sequence 2 end)))
+    (when (string= params "")
+      (return-from parse-ansi-sgr nil))
+    ;; Parse semicolon-separated codes
+    (let ((codes (mapcar #'parse-integer
+                         (split-string params :separator '(#\;))))
+          (fg nil)
+          (bg nil)
+          (attrs '()))
+      (dolist (code codes)
+        (cond
+          ;; Reset
+          ((= code 0)
+           (return-from parse-ansi-sgr nil))
+          ;; Foreground colors
+          ((or (and (>= code 30) (<= code 37))
+               (and (>= code 90) (<= code 97)))
+           (setf fg (%sgr-code->color code :fg)))
+          ;; Background colors
+          ((or (and (>= code 40) (<= code 47))
+               (and (>= code 100) (<= code 107)))
+           (setf bg (%sgr-code->color code :bg)))
+          ;; Attributes
+          (t
+           (let ((attr (%sgr-code->attr code)))
+             (when attr
+               (push attr attrs))))))
+      ;; Build result plist
+      (let ((result '()))
+        (when fg (setf (getf result :fg) fg))
+        (when bg (setf (getf result :bg) bg))
+        (when attrs (setf (getf result :attrs) (nreverse attrs)))
+        (when (or fg bg attrs)
+          result)))))
+
+(defun parse-ansi-string (content)
+  "Parse CONTENT into a list of (substring . style) pairs.
+ANSI escape sequences are extracted and converted to style plists.
+Returns list like ((\"text\" . NIL) (\"red\" . (:FG :RED)) ...)."
+  (unless content
+    (return-from parse-ansi-string '()))
+  (let ((segments (split-by-ansi-sequences content))
+        (result '())
+        (current-style nil))
+    (dolist (seg segments)
+      (if (and (> (length seg) 0) (%esc-p (aref seg 0)))
+          ;; This is an ANSI sequence - parse it
+          (let ((parsed (parse-ansi-sgr seg)))
+            (if (null parsed)
+                ;; Reset sequence
+                (setf current-style nil)
+                ;; Update current style
+                (setf current-style
+                      (append parsed current-style))))
+          ;; This is plain text
+          (when (plusp (length seg))
+            (push (cons seg current-style) result))))
+    (nreverse result)))
 
 ;;;----------------------------------------------------------------
 ;;; Buffer population
