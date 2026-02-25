@@ -16,6 +16,7 @@
     (:file "src/sheet")
     (:file "src/engine")
     (:file "src/properties")
+    (:file "src/adapters")
     (:file "src/api"))
   ;; :in-order-to ((test-op (test-op "cl-styles/tests")))
   )

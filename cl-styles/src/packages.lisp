@@ -60,8 +60,16 @@
     #:match-rules #:compute-style #:inherit-properties
     #:apply-stylesheet #:apply-stylesheet-to-tree))
 
+(uiop:define-package :cl-styles.adapters
+  (:use :cl)
+  (:import-from :cl-styles.properties
+                #:normalize-declarations)
+  (:export #:normalize-tui-style-plist))
+
 (uiop:define-package :cl-styles.api
   (:use :cl :cl-styles.protocols :cl-styles.tokens :cl-styles.selector
-    :cl-styles.rule :cl-styles.sheet :cl-styles.engine :cl-styles.properties)
+    :cl-styles.rule :cl-styles.sheet :cl-styles.engine :cl-styles.properties
+    :cl-styles.adapters)
   (:reexport :cl-styles.protocols :cl-styles.tokens :cl-styles.selector
-    :cl-styles.rule :cl-styles.sheet :cl-styles.engine :cl-styles.properties))
+    :cl-styles.rule :cl-styles.sheet :cl-styles.engine :cl-styles.properties
+    :cl-styles.adapters))
