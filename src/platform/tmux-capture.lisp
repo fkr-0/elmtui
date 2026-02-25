@@ -7,7 +7,7 @@
   (:use :cl)
   (:import-from :alexandria #:clamp)
   (:import-from :uiop
-    #:find-program
+    #:find-program*
     #:run-program
     #:getenv)
   (:import-from :elmtui.platform.api
@@ -40,10 +40,16 @@
 ;;; Environment helpers
 ;;;----------------------------------------------------------------
 (defun %tmux-program ()
-  "Locate the tmux binary if available."
-  (or 
-    (let ((path (probe-file "/usr/bin/tmux")))
-      (when path (namestring path)))))
+  "Locate the tmux binary if available using PATH search."
+  (ignore-errors
+    (or (find-program* "tmux")
+        ;; Fallback: try using 'command -v' or 'which'
+        (let ((output (run-program '("command" "-v" "tmux")
+                                   :output :string
+                                   :error nil
+                                   :ignore-error-status t)))
+          (when (and output (plusp (length output)))
+            (string-trim '(#\Newline #\Return) output))))))
 
 (defun tmux-available-p ()
   "Return true when tmux is available and current process is running inside tmux."

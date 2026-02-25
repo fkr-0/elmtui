@@ -275,6 +275,10 @@ Avoids running validation during initialize-instance to keep control over timing
 
 ;; Weak-key hash to hold *computed* props (size/layout/dirty/prev-*).
 ;; Falls back to a regular EQ hash table when trivial-garbage is unavailable.
+;; Intentional optional probe:
+;; - This is an optimization hook only (GC-friendly cache behavior).
+;; - Runtime semantics stay identical when trivial-garbage is not present.
+;; - Kept as a bounded extension point, not a cross-layer dispatch mechanism.
 (defun make-computed-table ()
   (let* ((pkg (find-package :trivial-garbage))
          (maker (and pkg (find-symbol "MAKE-WEAK-HASH-TABLE" pkg))))

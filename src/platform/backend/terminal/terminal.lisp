@@ -32,6 +32,8 @@
   (:import-from #:cl-inputs.util
     #:string-to-utf-8-bytes)
   (:import-from #:elmtui.platform.api #:term-w #:term-h #:term-style #:term-stream)
+  (:import-from :cl-styles.adapters
+    #:normalize-tui-style-plist)
   (:import-from :elmtui.view.styled #:styled-ui-node #:styles)
   (:import-from :elmtui.view.geo #:x #:y #:w #:h #:rectangle-pos)
   (:import-from #:elmtui.platform.backend.common.ansi-styling
@@ -47,7 +49,7 @@
   (:import-from #:elmtui.platform.api
     #:clear-screen)
 
-  (:import-from :elmtui.app.system-events #:make-terminalresized-systemevent
+  (:import-from :elmtui.core.system-events #:make-terminalresized-systemevent
     #:make-cursorposition-systemevent)
   (:import-from :elmtui.core.errors
     #:backend-error #:signal-backend-operation-failed
@@ -595,14 +597,11 @@
 ;;;---------------------------------------------------------------
 (defun style-to-terminal-style (style-plist)
   (log-info "Converting style plist to terminal style: ~S" style-plist)
-  (when style-plist
+  (let ((normalized (when style-plist
+                      (normalize-tui-style-plist style-plist))))
+    (when normalized
     (let ((ts (make-terminal-style)))
-      ;; Support both :bg and :bg-color keys, and terminal-color instances
-      ;; Extract background color allowing uppercase or lowercase keys
-      (let ((bg (or (getf style-plist :bg)
-                  (getf style-plist :bg-color)
-                  (getf style-plist :BG)
-                  (getf style-plist :BG-COLOR))))
+      (let ((bg (getf normalized :bg-color)))
         (cond
           ((typep bg 'elmtui.platform.backend.common.ansi-styling:terminal-color)
             (setf (terminal-style-bg-color ts) bg))
@@ -622,12 +621,7 @@
           (t
             ;; No background color specified; leave as default
             )))
-      ;; Support both :fg and :fg-color keys, and terminal-color instances
-      ;; Extract foreground color allowing uppercase or lowercase keys
-      (let ((fg (or (getf style-plist :fg)
-                  (getf style-plist :fg-color)
-                  (getf style-plist :FG)
-                  (getf style-plist :FG-COLOR))))
+      (let ((fg (getf normalized :fg-color)))
         (cond
           ((typep fg 'elmtui.platform.backend.common.ansi-styling:terminal-color)
             (setf (terminal-style-fg-color ts) fg))
@@ -647,13 +641,13 @@
           (t
             ;; No foreground color specified; leave default
             )))
-      (let ((attrs (getf style-plist :attrs)))
+      (let ((attrs (getf normalized :attrs)))
         (when (member :bold attrs) (setf (terminal-style-bold ts) t))
         (when (member :italic attrs) (setf (terminal-style-italic ts) t))
         (when (member :underline attrs) (setf (terminal-style-underline ts) t))
         (when (member :inverse attrs) (setf (terminal-style-inverse ts) t)))
       (log:debug "APPLY-STYLE-DIFF CALLED. Current: conveeeert tadaaaaa  ~A" ts)
-      ts)))
+      ts))))
 
 (defun write-style-to-stream (stream style)
   "Write ANSI escape sequences for STYLE to STREAM. STYLE may be a style plist or a terminal-style instance."

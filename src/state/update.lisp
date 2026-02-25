@@ -14,6 +14,10 @@
                 #:remove-path)
   (:import-from :cl-state.tx
                 #:with-transaction)
+  (:import-from :elmtui.cl-state.path-context
+                #:compose-state-path)
+  (:import-from :elmtui.core.async
+                #:interpret-cmd)
   (:import-from :log4cl #:log-debug #:log-warn #:log-info)
   (:export
    #:*log-update-results*
@@ -37,15 +41,8 @@
 (defvar *log-update-results* nil
   "When T, logs the patches and commands returned by update functions.")
 
-(defun %resolve-symbol (package-name symbol-name)
-  (let ((pkg (find-package package-name)))
-    (and pkg (find-symbol symbol-name pkg))))
-
 (defun %interpret-async-command (command)
-  (let ((sym (%resolve-symbol :elmtui.core.async "INTERPRET-CMD")))
-    (unless (and sym (fboundp sym))
-      (error "Async command interpreter unavailable: ELMTUI.CORE.ASYNC:INTERPRET-CMD is not loaded"))
-    (funcall (symbol-function sym) command)))
+  (interpret-cmd command))
 
 (defstruct (update-context (:constructor %make-update-context))
   state
@@ -53,15 +50,6 @@
   draft
   patches
   commands)
-
-(defun %full-path (ctx path)
-  (let ((base (update-context-base-path ctx)))
-    (cond
-      ((null base) path)
-      ((null path) base)
-      ((symbolp path) (append base (list path)))
-      ((listp path) (append base path))
-      (t path))))
 
 (defun make-update-context (state &key base-path)
   "Create an update context with an isolated draft for mutations."
@@ -84,13 +72,15 @@
 (defgeneric sref (obj path &optional default))
 
 (defmethod sref ((ctx update-context) path &optional default)
-  (get-path (%full-path ctx path) (update-context-draft ctx) default))
+  (get-path (compose-state-path (update-context-base-path ctx) path)
+            (update-context-draft ctx)
+            default))
 
 (defmethod sref (obj path &optional default)
   (state-ref obj path default))
 
 (defmethod (setf sref) (value (ctx update-context) path)
-  (let* ((full-path (%full-path ctx path))
+  (let* ((full-path (compose-state-path (update-context-base-path ctx) path))
          (draft (update-context-draft ctx)))
     (if (eq value :elmtui-delete-path)
         (multiple-value-bind (draft* _) (remove-path draft full-path)
@@ -98,7 +88,8 @@
           (setf (update-context-draft ctx) draft*))
         (setf (update-context-draft ctx)
               (set-path draft full-path value))))
-  (push (list (%full-path ctx path) value) (update-context-patches ctx))
+  (push (list (compose-state-path (update-context-base-path ctx) path) value)
+        (update-context-patches ctx))
   value)
 
 (defmethod (setf sref) (value obj path)

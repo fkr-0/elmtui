@@ -54,9 +54,9 @@ Every component defined with `defcomponent` includes:
 
 ### Standard Widgets
 - **Layout Widgets:** [`viewport`](src/ui/widgets/viewport.lisp:1), [`root-viewport`](src/ui/widgets/root-viewport.lisp:1), [`grid-container`](src/ui/widgets/grid-container.lisp:1)
-- **Input Widgets:** [`button`](src/ui/widgets/button.lisp:1), [`textinput`](src/ui/widgets/textinput.lisp:1), [`form`](src/ui/widgets/form.lisp:1)
+- **Input Widgets:** [`button`](src/ui/widgets/button.lisp:1), [`textinput`](src/ui/widgets/textinput.lisp:1)
 - **Display Widgets:** [`label`](src/ui/widgets/label.lisp:1), [`drawable-content`](src/ui/widgets/drawable-content.lisp:1)
-- **Container Widgets:** [`listbox`](src/ui/widgets/listbox.lisp:1), [`scrollable-container`](src/ui/widgets/scrollable-container.lisp:1)
+- **Container Widgets:** [`listbox`](src/ui/widgets/listbox.lisp:1), [`scrollable-container`](src/ui/widgets/scrollable-container.lisp:1), [`scroll-panel`](src/ui/widgets/scroll-panel.lisp:1)
 <!-- AI-CONTEXT-END -->
 
 <!-- AI-CONTEXT-START:type=development -->
@@ -118,14 +118,6 @@ Every component defined with `defcomponent` includes:
    :on-change (lambda (new-text) (update-text new-text))
    :max-length 100))
 
-;; Form widget
-(elmtui.ui:form
-  (:on-submit handle-form-submit)
-  (elmtui.ui:label () "Name:")
-  (elmtui.ui:textinput (:name "name" :required t))
-  (elmtui.ui:label () "Email:")
-  (elmtui.ui:textinput (:name "email" :type :email))
-  (elmtui.ui:button (:type :submit) "Submit"))
 ```
 
 ### Component Composition

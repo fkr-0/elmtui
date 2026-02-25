@@ -8,7 +8,7 @@
     #:symbolicate)
   (:export
     #:msg-data #:msg-type
-    #:defmsg #:message-variant-p
+    #:defmsg #:message-variant-p #:canonicalize-message-variant
     :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
     #:make-focusnext-appmsg #:make-focusprevious-appmsg
     :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
@@ -125,13 +125,22 @@
 
 (defun message-variant-p (message-type message-instance)
   "Check whether MESSAGE-INSTANCE uses a registered variant keyword for MESSAGE-TYPE."
+  (not (null (canonicalize-message-variant message-type message-instance))))
+
+(defun canonicalize-message-variant (message-type message-instance)
+  "Return MESSAGE-INSTANCE with canonical keyword variant head for MESSAGE-TYPE.
+Accepts symbol heads from any package as long as their names match a declared variant.
+Returns NIL when MESSAGE-INSTANCE is not a recognized variant for MESSAGE-TYPE."
   (let ((schema (gethash message-type *message-schemas*)))
-    (when schema
-      (and (listp message-instance)
-           (keywordp (car message-instance))
-           (find (car message-instance)
-                 (message-schema-variants schema)
-                 :key #'variant-definition-name)))))
+    (when (and schema (listp message-instance) (symbolp (car message-instance)))
+      (let* ((head-name (string-upcase (symbol-name (car message-instance))))
+             (variant
+               (find head-name
+                     (message-schema-variants schema)
+                     :key (lambda (v) (string-upcase (symbol-name (variant-definition-name v))))
+                     :test #'string=)))
+        (when variant
+          (cons (variant-definition-name variant) (cdr message-instance)))))))
 
 (defun msg-data (msg &optional key default)
   "Return the data part of message MSG.

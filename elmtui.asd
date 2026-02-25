@@ -16,19 +16,21 @@
   :pathname "./src/"
   :components (
                 ;; ----------------------------------------------------------------
-                ;; 0) Foundation: shared contracts, errors, globals, system events
+                ;; 0) Foundation: shared contracts, errors, globals, core system events
                 ;; ----------------------------------------------------------------
                 (:file "utils")
                 ;; contracts import message schema predicates from state/msg
                 (:file "state/msg")
+                (:file "state/message-normalization")
+                (:file "state/path-context")
                 (:file "core/errors")
                 (:file "contracts")
                 (:file "core/logging")
                 (:file "core/defaults")
                 (:file "core/conditions")
                 (:file "core/globals")
+                (:file "core/system-events")
                 (:file "api")
-                (:file "app/system-events")
 
                 ;; ----------------------------------------------------------------
                 ;; 1) State subsystem
@@ -54,8 +56,6 @@
 
                 ;; ----------------------------------------------------------------
                 ;; 3) Core event/loop subsystem
-                ;; event-propagation imports ui-node from view/api, so view contracts
-                ;; must be available before this module compiles.
                 ;; ----------------------------------------------------------------
                 (:module "core"
                   :pathname "./core/"
@@ -124,16 +124,20 @@
                                                 (:file "counter")
                                                 (:file "scrollable-container")
                                                 (:file "scroll-panel")))
-                                ))
+                                )
+                  )
+                ;; UI-owned built-in DSL aliases (e.g. :root-viewport, :viewport, :text).
+                ;; Loaded after widget classes so methods can reference concrete classes.
+                (:file "ui/dsl-type-builtins")
 
                 ;; ----------------------------------------------------------------
                 ;; 7) Application runtime subsystem
                 ;; ----------------------------------------------------------------
                 (:file "app/api")
+                (:file "runtime/protocol")
                 (:file "app/application-extension")
                 (:file "app/tea-core")
                 (:file "app/application")
-                (:file "app/dsl-type-registry")
 
                 ;; ----------------------------------------------------------------
                 ;; 8) Style subsystem
@@ -166,7 +170,7 @@
                 ;; 10) Integration and entrypoints
                 ;; ----------------------------------------------------------------
                 (:file "pipeline")
-                (:file "platform/driver" :depends-on ("app/system-events" "pipeline"))
+                (:file "platform/driver" :depends-on ("core/system-events" "pipeline"))
                 (:file "tools/packager")
                 (:file "dev/dev")
                 (:file "elmtui"))

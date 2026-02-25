@@ -35,7 +35,7 @@ Example:
   ;; => (:ROOT-VIEWPORT :ID \"main\" :WIDTH 800 :HEIGHT 600)
 
 This macro is useful for building extensible DSLs, especially for UI or data structure construction."
-  (let ((helper-fn-name (intern (string-upcase (format nil "~A-VIEW" dsl-type)) (find-package *package*))))
+  (let ((helper-fn-name (intern (string-upcase (format nil "~A-VIEW" dsl-type)) *package*)))
     `(progn
        ;; Define a dsl-type method for this component type
        (defmethod elmtui.ui.dsl-resolution:dsl-type ((type (eql ,dsl-type)) &optional props)

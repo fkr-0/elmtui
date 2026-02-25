@@ -1,7 +1,11 @@
 (uiop:define-package :elmtui.contracts
   (:use :cl)
+  (:import-from :elmtui.cl-state.message-normalization
+    #:message-variant-p
+    #:canonicalize-message-variant)
   (:import-from :elmtui.state.msg
-    #:message-variant-p #:*message-schemas* #:message-schema)
+    #:*message-schemas*
+    #:message-schema)
   (:export
     ;; transform macros
     #:deftransform
@@ -309,22 +313,14 @@
       :expected-type "message type specification"
       :actual-value nil
       :context context))
-  (let ((is-variant (message-variant-p message-type message)))
-    (unless is-variant
-      (when (and (listp message) (keywordp (first message)))
-        (let* ((symbol-name (symbol-name (first message)))
-                (pkg (symbol-package message-type)))
-          (when pkg
-            (let ((sym (find-symbol (string-upcase symbol-name) pkg)))
-              (when sym
-                (setq is-variant (message-variant-p message-type (cons sym (rest message))))))))))
-    (unless is-variant
+  (let ((canonical-message (canonicalize-message-variant message-type message)))
+    (unless canonical-message
       (error 'message-contract-violation
         :function-name 'validate-typed-message
         :expected-type (format nil "valid ~A message variant" message-type)
         :actual-value message
-        :context context)))
-  message)
+        :context context))
+    canonical-message))
 
 (defun validate-hybrid-message (message message-type &optional (context "hybrid message validation"))
   "Validates message in hybrid mode - accepts both typed and flexible messages"

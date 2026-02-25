@@ -6,10 +6,7 @@
   #:elmtui.app
   (:use #:cl)
   (:import-from #:log4cl
-    #:log-info #:log-warn)
-  (:import-from #:elmtui.app.system-events
-    #:make-app-shutdown-system-event
-    #:make-terminal-resized-system-event)
+    #:log-info)
   (:import-from #:elmtui.core.globals          :*applications*)
   (:import-from #:elmtui.utils                 #:ensure-keyword
     #:coerce-fn)
@@ -43,7 +40,8 @@
     #:apply-patches)
   (:import-from #:elmtui.ui.api                #:init #:view #:initialize-components-from-dsl
     #:instantiate-component-from-dsl)
-  (:import-from #:elmtui.ui.widgets.root-viewport #:root-viewport)
+  (:import-from #:elmtui.runtime.protocol
+    #:dispatch-root-message)
   (:import-from #:elmtui.keymaps
     #:add-keybinding
     #:define-keymap
@@ -60,37 +58,6 @@
 ;;; ---------------------------------------------------------------------------
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun dispatch-to-root (msg state root-id)
-    "Deliver MSG to the component tree rooted at ROOT-ID.
-   Returns two values: PATCHES and COMMANDS."
-
-    (let* ((id-path (list :components root-id))
-            (root    (elmtui.app.api:get-component-instance id-path state)))
-      (log-info "Dispatching message ~S to root component ~A with id-path ~S"
-        msg root-id id-path)
-      (if (null root)
-        (progn
-          (log-warn "Root component ~A not found – message dropped: ~S"
-            root-id msg)
-          (values nil nil))
-        (let ((raw-result (multiple-value-list
-                            (elmtui.ui.api:update root msg state :id-path id-path))))
-          (cond
-            ((and raw-result
-                  (= (length raw-result) 1)
-                  (typep (first raw-result) 'update-result))
-             (values (ur-patches (first raw-result))
-                     (ur-commands (first raw-result))))
-            ((>= (length raw-result) 2)
-             (values (first raw-result) (second raw-result)))
-            (t
-             (log-warn "Component ~A returned unexpected update result: ~S"
-               root-id raw-result)
-             (values nil nil)))))))
-
-
-
-
   (defun maybe-wrap-with-root-viewport (dsl
                                          &key (root-id :root-viewport)
                                          ;; (term-size  '(1 1))
@@ -414,7 +381,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                          (values state nil) ; Event consumed by keymap system
                          ;; If not handled, fall through to the component tree
                          (multiple-value-bind (comp-patches comp-cmds)
-                           (dispatch-to-root msg state ',root-vp-id)
+                           (dispatch-root-message msg state ',root-vp-id)
                            (apply-patches state comp-patches)
                            (values state comp-cmds))))))
 
@@ -433,7 +400,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                      (multiple-value-bind (comp-patches comp-cmds)
                        (if (ur-handled ur)
                          (values nil nil)
-                         (dispatch-to-root msg state ',root-vp-id))
+                         (dispatch-root-message msg state ',root-vp-id))
 
                        (let* ((all-patches (nconc (ur-patches ur) comp-patches))
                                (all-cmds    (nconc (ur-commands ur) comp-cmds)))

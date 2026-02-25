@@ -20,7 +20,7 @@
                 #:standard-event-channels)
   (:import-from :elmtui.state.update ; Assuming this is the correct package for handle-async-command
                 #:handle-async-command)
-  (:import-from :elmtui.app.system-events #:terminalresized-system-event)
+  (:import-from :elmtui.core.system-events #:terminalresized-system-event)
   (:export :start-loop :elm-stop-loop :publish :subscribe :*event-loop* #:as-plist
            :get-event-loop-status :get-event-queue-length :instrument-event-loop
            ;; Make *consumer-thread* accessible for joining in driver.lisp
