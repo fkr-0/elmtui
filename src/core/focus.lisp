@@ -3,11 +3,7 @@
 ;;; Consolidated Focus Management System
 ;;;
 ;;; This is a consolidated version of the focus management system that
-;;; combines functionality from:
-;;;   - src/core/focus-manager.lisp (now in src/core/focus/legacy/)
-;;;   - src/core/keymap/focus-integration.lisp (now in src/core/focus/legacy/)
-;;;   - src/core/focus/directional.lisp (functionality merged, file removed)
-;;;   - src/core/focus/context.lisp (functionality merged, file removed)
+;;; combines historical focus/context/directional concerns in one module.
 ;;;===============================================================
 (uiop:define-package :elmtui.core.focus
   (:use :cl :log4cl)
@@ -46,7 +42,7 @@
                 #:state-ref)
   (:import-from :cl-state.core
                 #:application-state)
-  ;; Imports for keymap integration (from legacy focus-integration.lisp)
+  ;; Imports for keymap integration.
   (:import-from :elmtui.keymaps
    #:key-event->normalized-key
    #:keymap-context-name

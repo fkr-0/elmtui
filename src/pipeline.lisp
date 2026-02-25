@@ -50,9 +50,8 @@
       (values 0 0))))
 
 (defun %root-viewport-id-path (ctx)
-  "Return the root viewport id-path when it can be derived from the DSL or driver."
-  (or (%root-viewport-id-path-from-dsl ctx)
-    (%root-viewport-id-path-from-driver)))
+  "Return the root viewport id-path derived from the current DSL tree."
+  (%root-viewport-id-path-from-dsl ctx))
 
 (defun %root-viewport-id-path-from-dsl (ctx)
   (let* ((tree (ctx-dsl-tree ctx))
@@ -64,12 +63,6 @@
         (let ((id (getf props :id)))
           (when id
             (list :components id)))))))
-
-(defun %root-viewport-id-path-from-driver ()
-  (let* ((pkg (find-package :elmtui.platform.driver))
-          (sym (and pkg (find-symbol "*ROOT-VIEWPORT-ID-PATH*" pkg)))
-          (rv-path (and sym (boundp sym) (symbol-value sym))))
-    rv-path))
 
 (defun %root-viewport-rect (ctx)
   "Return a viewport rect sized to the root viewport state, clamped to the terminal."

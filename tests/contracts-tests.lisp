@@ -184,6 +184,13 @@
   (is (equalp '(:complex-message :name "test" :count 5 :flags (:flag1 :flag2))
               (validate-typed-message (make-complex-message-testmsg :name "test" :count 5 :flags '(:flag1 :flag2)) 'TestMsg))))
 
+(test contracts-typed-message-validation-canonicalizes-symbol-head
+  "Typed validation should canonicalize non-keyword variant heads by name."
+  (is (equalp '(:simple-message)
+              (validate-typed-message '(simple-message) 'TestMsg)))
+  (is (equalp '(:parameterized-message :value 9)
+              (validate-typed-message '(parameterized-message :value 9) 'TestMsg))))
+
 (test contracts-typed-message-validation-invalid
   "Test typed message validation rejects invalid messages"
   ;; No message type specified

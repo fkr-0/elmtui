@@ -8,7 +8,7 @@
     #:thread #:thread-alive-p #:join-thread #:destroy-thread)
   (:import-from :log4cl
     #:log-debug #:log-info #:log-warn #:log-error)
-  (:import-from :elmtui.app.system-events
+  (:import-from :elmtui.core.system-events
     #:make-appshutdown-systemevent
     #:make-terminalresized-systemevent
     #:make-cursorposition-systemevent)
@@ -38,14 +38,14 @@
   (:import-from :cl-inputs.device.api
     #:enable-raw-mode
     #:disable-raw-mode)
-  (:import-from :elmtui.app.api #:run-application
-    #:get-component-instance #:app-config-message-queue)
+  (:import-from :elmtui.runtime.protocol
+    #:run-application
+    #:get-component-instance
+    #:dispatch-root-message)
   (:import-from :elmtui.core.loop
     #:publish #:start-loop #:elm-stop-loop #:event-loop)
   (:import-from :elmtui.core.async
     #:interpret-cmd)
-  (:import-from :elmtui.ui.widgets.root-viewport
-    #:root-viewport)
   ;; (:import-from :elmtui.style-lib.api #:stylesheet) ; legacy
   (:import-from :elmtui.style.manager #:compute-active-stylesheet)
   (:import-from :elmtui.platform.input #:start-reader #:cl-inputs-token->event)
@@ -184,8 +184,8 @@
 ;;; ---------------------------------------------------------------------------
 ;;; == Application Entry Point ==
 ;;; ---------------------------------------------------------------------------
-;; Method for elmtui.app.api:run-application
-(defmethod elmtui.app.api:run-application ((app-spec list)
+;; Method for elmtui.runtime.protocol:run-application
+(defmethod elmtui.runtime.protocol:run-application ((app-spec list)
                                             &key (backend-type :tty)
                                             platform-options)
   "Entry point for running an application from an APP-SPEC plist."
@@ -405,7 +405,7 @@
 Returns T if rendering-related state changed enough to warrant a re-render."
   (when (and root-id *current-app-model*)
     (multiple-value-bind (patches commands)
-      (elmtui.app::dispatch-to-root msg *current-app-model* root-id)
+      (dispatch-root-message msg *current-app-model* root-id)
       (let ((changed (not (null patches))))
         (when patches
           (apply-patches *current-app-model* patches))
