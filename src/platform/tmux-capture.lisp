@@ -32,7 +32,10 @@
     #:prefill-buffer-from-string
     #:prefill-backend-from-tmux
     #:make-buffer-from-tmux
-    #:capture-lines))
+    #:capture-lines
+    #:split-by-ansi-sequences
+    #:parse-ansi-sgr
+    #:parse-ansi-string))
 
 (in-package :elmtui.platform.tmux)
 
