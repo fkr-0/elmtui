@@ -5,9 +5,8 @@
 
 (uiop:define-package :elmtui.platform.tmux
   (:use :cl)
-  (:import-from :alexandria #:clamp #:split-string)
+  (:import-from :alexandria #:clamp)
   (:import-from :uiop
-    #:find-program*
     #:run-program
     #:getenv)
   (:import-from :elmtui.platform.api
@@ -45,14 +44,13 @@
 (defun %tmux-program ()
   "Locate the tmux binary if available using PATH search."
   (ignore-errors
-    (or (find-program* "tmux")
-        ;; Fallback: try using 'command -v' or 'which'
-        (let ((output (run-program '("command" "-v" "tmux")
-                                   :output :string
-                                   :error nil
-                                   :ignore-error-status t)))
-          (when (and output (plusp (length output)))
-            (string-trim '(#\Newline #\Return) output))))))
+    ;; Fallback: use 'command -v' to find tmux in PATH
+    (let ((output (run-program '("command" "-v" "tmux")
+                               :output :string
+                               :error nil
+                               :ignore-error-status t)))
+      (when (and output (plusp (length output)))
+        (string-trim '(#\Newline #\Return) output)))))
 
 (defun tmux-available-p ()
   "Return true when tmux is available and current process is running inside tmux."
@@ -223,11 +221,15 @@ SEQUENCE should be a string like \"\\e[31m\" or \"\\e[1;31;42m\"."
     (when (string= params "")
       (return-from parse-ansi-sgr nil))
     ;; Parse semicolon-separated codes
-    (let ((codes (mapcar #'parse-integer
-                         (split-string params :separator '(#\;))))
-          (fg nil)
-          (bg nil)
-          (attrs '()))
+    (let* ((parts (loop for start = 0 then (1+ end)
+                        while start
+                        for end = (position #\; params :start start)
+                        collect (subseq params start end)
+                        unless end do (loop-finish)))
+           (codes (mapcar #'parse-integer parts))
+           (fg nil)
+           (bg nil)
+           (attrs '()))
       (dolist (code codes)
         (cond
           ;; Reset
