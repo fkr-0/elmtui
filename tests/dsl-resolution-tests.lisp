@@ -56,3 +56,17 @@
   (let ((api-sym (find-symbol "DSL-TYPE" :elmtui.api))
         (ui-sym (find-symbol "DSL-TYPE" :elmtui.ui.dsl-resolution)))
     (is (eq api-sym ui-sym))))
+
+(test resolve-dsl-type-root-viewport-builtin
+  "Built-in :root-viewport alias resolves via UI-owned dsl-type method."
+  (multiple-value-bind (class props)
+      (resolve-dsl-type :root-viewport)
+    (is (eq class 'elmtui.ui.widgets.root-viewport:root-viewport))
+    (is (null props))))
+
+(test resolve-dsl-type-text-alias-builtin
+  "Built-in :text alias resolves to label component for compatibility."
+  (multiple-value-bind (class props)
+      (resolve-dsl-type :text)
+    (is (eq class 'elmtui.ui.widgets.label:label))
+    (is (null props))))

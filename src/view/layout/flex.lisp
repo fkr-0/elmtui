@@ -296,18 +296,9 @@ Returns either a plist, hash-table, or NIL."
              (setf (y (rect-of it)) (round (+ new-top (margin-main-start it :column)))))))))))
 
 (defun %layout-child (child child-rect)
-  "Dispatch layout for CHILD given its rect. Falls back gracefully if APIs differ."
+  "Dispatch layout for CHILD given its rect via canonical layout API."
   (setf (el/layout-rect child) child-rect)
-  (cond
-    ((and (find-package :elmtui.view.base-elements)
-          (fboundp (intern "COMPUTE-LAYOUT" :elmtui.view.base-elements)))
-     (funcall (intern "COMPUTE-LAYOUT" :elmtui.view.base-elements)
-              child child-rect))
-    ((and (find-package :elmtui.view.layout)
-          (fboundp (intern "LAYOUT-NODE" :elmtui.view.layout)))
-     (funcall (intern "LAYOUT-NODE" :elmtui.view.layout)
-              child child-rect nil))
-    (t child)))
+  (layout-node child child-rect nil))
 
 (defun px-or (v fallback)
   (if (or (null v) (eql v :auto)) fallback v))

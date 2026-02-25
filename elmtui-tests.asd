@@ -12,6 +12,7 @@
                  :components ((:file "elmtui-tests")
                                (:file "component-metaclass-tests")
                                (:file "dsl-resolution-tests")
+                               (:file "cleanup-regression-tests")
                                (:file "api-tests")
                                (:file "focus-simple-test")
                                (:file "rainbow-test")
