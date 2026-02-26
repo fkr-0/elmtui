@@ -24,13 +24,18 @@
     #:set-buffer-cell-at
     #:clear-buffer
     #:with-virtual-buffer-lock)
+  (:import-from :elmtui.platform.backend.common.ansi-styling
+    #:style-to-terminal-style)
   (:export
     #:tmux-available-p
     #:capture-pane-string
     #:capture-screen-string
     #:prefill-buffer-from-string
+    #:prefill-buffer-from-styled-content
     #:prefill-backend-from-tmux
+    #:prefill-backend-from-tmux-styled
     #:make-buffer-from-tmux
+    #:make-buffer-from-tmux-styled
     #:capture-lines
     #:split-by-ansi-sequences
     #:parse-ansi-sgr
@@ -87,10 +92,11 @@
       (nreverse result))))
 
 (defun capture-pane-string (&key (mode :pane))
-  "Capture the current tmux pane (MODE :pane or :screen) and return it as a string."
+  "Capture the current tmux pane (MODE :pane or :screen) and return it as a string.
+The -e flag ensures escape sequences are included for style preservation."
   (case mode
     (:screen (%run-tmux "capture-pane" "-e" "-J" "-p"))
-    (otherwise (%run-tmux "capture-pane" "-p"))))
+    (otherwise (%run-tmux "capture-pane" "-e" "-p"))))
 
 (defun capture-screen-string ()
   "Shortcut for capturing the entire tmux screen."
@@ -114,7 +120,8 @@
 
 (defun split-by-ansi-sequences (content)
   "Split CONTENT into segments separated by ANSI escape sequences.
-Returns a list of alternating plain text and ANSI sequences."
+Returns a list of alternating plain text and ANSI sequences.
+Consecutive plain text segments are merged together."
   (unless content
     (return-from split-by-ansi-sequences '()))
   (let ((result '())
@@ -155,7 +162,23 @@ Returns a list of alternating plain text and ANSI sequences."
           (t
            (write-char char current-segment)
            (incf i)))))
-    (nreverse result)))
+    ;; Merge consecutive plain text segments (non-ANSI segments)
+    (let ((merged '())
+          (current-plain ""))
+      (dolist (seg (nreverse result))
+        (if (and (> (length seg) 0) (%esc-p (aref seg 0)))
+            ;; This is an ANSI sequence - flush current plain and add ANSI
+            (progn
+              (when (plusp (length current-plain))
+                (push current-plain merged))
+              (setf current-plain "")
+              (push seg merged))
+            ;; This is plain text - accumulate
+            (setf current-plain (concatenate 'string current-plain seg))))
+      ;; Flush remaining plain text
+      (when (plusp (length current-plain))
+        (push current-plain merged))
+      (nreverse merged))))
 
 (defun %sgr-code->color (code kind)
   "Convert SGR color CODE to keyword.
@@ -343,4 +366,68 @@ Returns a virtual buffer copy that can be used as the driver's previous frame."
             (prefill-buffer-from-string back content :width width :height height))
           (let ((snapshot (make-virtual-buffer width height)))
             (prefill-buffer-from-string snapshot content :width width :height height)
+            snapshot))))))
+
+;;;----------------------------------------------------------------
+;;; Styled Buffer Operations
+;;;----------------------------------------------------------------
+
+(defun prefill-buffer-from-styled-content (buffer runs width height)
+  "Fill BUFFER (virtual-terminal-buffer) with styled RUNS from parse-ansi-string.
+RUNS is a list of (substring . style) pairs where style is a plist or NIL.
+WIDTH and HEIGHT specify the buffer dimensions for wrapping."
+  (when (and buffer runs)
+    (with-virtual-buffer-lock (buffer)
+      (clear-buffer buffer)
+      (let ((row 0)
+            (col 0))
+        (dolist (run runs)
+          (let* ((text (car run))
+                 (style-plist (cdr run))
+                 ;; Convert plist to terminal-style struct for the buffer
+                 (style (when style-plist
+                         (style-to-terminal-style style-plist)))
+                 (text-len (length text)))
+            (loop for i from 0 below text-len
+                  when (and (< row height) (< col width))
+                  do (let ((char (aref text i)))
+                       (set-buffer-cell-at buffer row col char style)
+                       (incf col)
+                       ;; Wrap to next line if needed
+                       (when (>= col width)
+                         (setf col 0)
+                         (incf row)
+                         (when (>= row height)
+                           (return)))))))))
+    buffer))
+
+(defun make-buffer-from-tmux-styled (width height &key (mode :pane))
+  "Create a virtual buffer populated from tmux output with ANSI styles parsed.
+Returns NIL if tmux is not available, or the populated buffer otherwise."
+  (when (tmux-available-p)
+    (let ((content (capture-pane-string :mode mode)))
+      (when content
+        (let* ((runs (parse-ansi-string content))
+               (buffer (make-virtual-buffer width height)))
+          (prefill-buffer-from-styled-content buffer runs width height)
+          buffer)))))
+
+(defun prefill-backend-from-tmux-styled (backend &key (mode :pane))
+  "Prefill terminal backend buffers from current tmux capture with ANSI style parsing.
+Returns a virtual buffer snapshot that can be used as the driver's previous frame."
+  (when (and (tmux-available-p)
+          (typep backend 'terminal-instance))
+    (let* ((width (term-w backend))
+            (height (term-h backend))
+            (content (capture-pane-string :mode mode)))
+      (when (and content width height)
+        (let* ((runs (parse-ansi-string content))
+               (front (terminal-instance-front-buffer backend))
+               (back (terminal-instance-back-buffer backend)))
+          (when front
+            (prefill-buffer-from-styled-content front runs width height))
+          (when back
+            (prefill-buffer-from-styled-content back runs width height))
+          (let ((snapshot (make-virtual-buffer width height)))
+            (prefill-buffer-from-styled-content snapshot runs width height)
             snapshot))))))
