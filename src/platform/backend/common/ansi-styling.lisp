@@ -605,6 +605,10 @@ the escape sequence as byte stream."
         :strike (slot-value style-val 'strike)
         :invisible (slot-value style-val 'invisible)))
 
+(defmethod as-plist ((style list))
+  "Convert a plist (property list) style directly - assumes it's already in plist format."
+  style)
+
 (defmethod is-term-style ((style1 terminal-style))
   "Check if STYLE1 is a terminal-style object and matches STYLE-VAL.
    Returns a list of attributes that differ, or NIL if they match."
