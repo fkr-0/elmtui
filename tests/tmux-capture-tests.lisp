@@ -16,9 +16,12 @@
 
 (test split-by-ansi-simple
   "Splitting a string with ANSI escape sequences works correctly"
-  (let* ((input "Hello\e[31mWorld\e[0m!")
+  (let* ((input (concatenate 'string "Hello" (format nil "~C[31m" #\Escape) "World" (format nil "~C[0m" #\Escape) "!"))
          (result (split-by-ansi-sequences input)))
-    (is (= (length result) 3))
+    ;; Result: ("Hello" "^[31m" "World" "^[0m" "!")
+    (is (= (length result) 5))
     (is (string= (first result) "Hello"))
-    (is (string= (second result) "\e[31m"))
-    (is (string= (third result) "World\e[0m!"))))
+    (is (string= (second result) (format nil "~C[31m" #\Escape)))
+    (is (string= (third result) "World"))
+    (is (string= (fourth result) (format nil "~C[0m" #\Escape)))
+    (is (string= (fifth result) "!"))))

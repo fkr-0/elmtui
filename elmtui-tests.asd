@@ -53,6 +53,8 @@
                                (:file "async-tests")
                                (:file "event-pipeline-tests")
                                (:file "style-tests")
+                               (:file "tmux-capture-tests")
+                               (:file "tmux-capture-integration-tests")
                                ;; Commented out until proper tests for actual APIs are written
                                ;; (:file "app-tests")
                                ;; (:file "ui-widgets-tests")
