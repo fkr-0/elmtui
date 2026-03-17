@@ -1,126 +1,73 @@
-;;;===============================================================
-;;; File: examples/scroll-panel-demo.lisp
-;;; Scroll Panel Demo
-;;;
-;;; Demonstrates the virtual scroll panel component with scrollbar.
-;;;===============================================================
+;;; Scroll panel demo with keyboard-driven component commands.
 
 (uiop:define-package :elmtui.examples.scroll-panel-demo
   (:use :cl)
-  (:import-from :elmtui.app
-                #:defapplication-contracted)
-  (:import-from :elmtui.ui.widgets.scroll-panel
-                #:make-scroll-panel)
-  (:export #:run-scroll-panel-demo))
+  (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.app.api #:run-application)
+  (:import-from :elmtui.state.api #:make-update-result)
+  (:import-from :elmtui.core.event-types #:key-event #:key-event-key)
+  (:export #:run-scroll-panel-demo #:main))
 
 (in-package :elmtui.examples.scroll-panel-demo)
 
-;;;---------------------------------------------------------------
-;;; Application State
-;;;---------------------------------------------------------------
-
 (defun make-initial-content ()
-  "Generate a list of text items for scrolling."
-  (loop for i from 1 to 50
+  (loop for i from 1 to 80
         collect `(:text
                   :id ,(intern (format nil "ITEM-~D" i) :keyword)
-                  :content ,(format nil "Line ~2,'0D: This is scrollable content" i)
-                  :style (:padding-left 2))))
+                  :content ,(format nil "Line ~2,'0D: Scroll panel content" i)
+                  :style (:padding-left 1))))
 
-;;;---------------------------------------------------------------
-;;; Application Definition
-;;;---------------------------------------------------------------
+(defun scroll-panel-update (message state)
+  (declare (ignore state))
+  (labels ((quit ()
+             (make-update-result :patches '(((:should-quit) t))))
+           (cmd (payload)
+             (make-update-result :commands (list `(:component-message :main-panel ,payload)))))
+    (cond
+      ((typep message 'key-event)
+       (case (key-event-key message)
+         ((:escape #\q #\Q) (quit))
+         (:up (cmd '(:scroll-up 1)))
+         (:down (cmd '(:scroll-down 1)))
+         (:pageup (cmd '(:page-up)))
+         (:pagedown (cmd '(:page-down)))
+         (:home (cmd '(:scroll-to-top)))
+         (:end (cmd '(:scroll-to-bottom)))
+         (t (make-update-result))))
+      ((and (listp message) (eq (first message) :app-quit-requested))
+       (quit))
+      (t
+       (make-update-result)))))
 
-(defapplication-contracted scroll-panel-demo
-  :root-dsl '(:scroll-panel
-              :id :main-panel
-              :width 60
-              :height 20
-              :content-height 50
-              :show-scrollbar t
-              :border-style :double
-              :title "Scroll Panel Demo"
-              :border-color :cyan
-              :children ((:container
-                          :id :content-container
-                          :style (:flex-direction :column)
-                          :children nil))) ; Will be set in init
-  
-  :initial-state (:scroll-position 0
-                  :content-items nil)
-  
-  :message-schema scroll-panel-demo-msg
-  :messages ((KeyPress :key keyword)
-             (ScrollTo :position integer)
-             (Quit))
-  
-  :update
-  (case (first message)
-    (:key-press
-     (let ((key (second message)))
-       (case key
-         (:down
-          (values model
-                  (list `(:component-message :main-panel (:scroll-down 1)))))
-         (:up
-          (values model
-                  (list `(:component-message :main-panel (:scroll-up 1)))))
-         (:page-down
-          (values model
-                  (list `(:component-message :main-panel (:page-down)))))
-         (:page-up
-          (values model
-                  (list `(:component-message :main-panel (:page-up)))))
-         (:home
-          (values model
-                  (list `(:component-message :main-panel (:scroll-to-top)))))
-         (:end
-          (values model
-                  (list `(:component-message :main-panel (:scroll-to-bottom)))))
-         (#\q
-          (values (list* :should-quit t model) nil))
-         (otherwise
-          (values model nil)))))
-    
-    (otherwise
-     (values model nil)))
-  
-  :view
-  (let ((content-items (make-initial-content)))
-    `(:container
-      :id :root
-      :style (:flex-direction :column
-              :background-color :black)
-      :children ((:scroll-panel
-                  :id :main-panel
-                  :width 60
-                  :height 20
-                  :content-height 50
-                  :show-scrollbar t
-                  :border-style :double
-                  :title "Scroll Panel Demo - Use Arrow Keys to Scroll"
-                  :border-color :cyan
-                  :children ,content-items)
-                 
-                 (:text
-                  :id :help
-                  :content "Keys: ↑/↓=Line  PgUp/PgDn=Page  Home/End=Top/Bottom  Q=Quit"
-                  :style (:margin-top 1
-                          :color :yellow)))))
-  
-  :subscriptions
-  (declare (ignore model))
-  nil)
+(defun scroll-panel-view (_state)
+  (declare (ignore _state))
+  `(:container
+    :id :scroll-demo-root
+    :style (:display :flex :flex-direction :column :width :fill :height :fill)
+    :children
+    ((:scroll-panel
+      :id :main-panel
+      :width 60
+      :height 20
+      :content-height 80
+      :show-scrollbar t
+      :border-style :double
+      :title "Scroll Panel Demo"
+      :children ,(make-initial-content))
+     (:text
+      :id :help
+      :content "Keys: Up/Down, PageUp/PageDown, Home/End, q/Esc to quit"
+      :style (:margin-top 1)))))
 
-;;;---------------------------------------------------------------
-;;; Run Demo
-;;;---------------------------------------------------------------
+(defapplication scroll-panel-demo-app
+  :root-viewport-id :scroll-demo-root
+  :root-component-dsl '(:layout :id :scroll-demo-root)
+  :initial-state-plist '(:should-quit nil)
+  :update-fn #'scroll-panel-update
+  :view-fn #'scroll-panel-view)
 
-(defun run-scroll-panel-demo ()
-  "Run the scroll panel demonstration."
-  (format t "Starting scroll panel demo...~%")
-  (format t "Use arrow keys to scroll, Page Up/Down for pages, Home/End for top/bottom~%")
-  (format t "Press Q to quit~%~%")
-  ;; Implementation would call the application runner
-  ;;(run-application 'scroll-panel-demo)
-  )
+(defun run-scroll-panel-demo (&key (backend-type :terminal))
+  (run-application 'scroll-panel-demo-app :backend-type backend-type))
+
+(defun main ()
+  (run-scroll-panel-demo))

@@ -114,7 +114,7 @@
                '(label :id *info-label-id*
                  :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit.")
                '(counter :id *counter-a-id* :value 10)))
-  :initial-state-plist (app-init)
+  :initial-state-fn #'app-init
   :update-fn #'app-update
   :view-fn #'app-view
   :command-processor-fn #'(lambda (command mq state cfg) (declare (ignore command mq state cfg)) nil))

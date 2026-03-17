@@ -28,8 +28,11 @@
     #:get-component-instance)
   (:import-from #:elmtui.app.extension
     #:validate-cli-option-specs
+    #:normalize-simple-args-specs
+    #:merge-cli-option-specs
     #:normalize-binary-options
-    #:parse-cli-options)
+    #:parse-cli-options
+    #:extract-platform-options)
   (:import-from #:elmtui.state.api                 #:merge-patches
     #:update-result
     #:ur-handled
@@ -242,7 +245,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
   (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
                   :update-fn :view-fn :command-processor-fn
                   :subscriptions-fn :root-viewport-id :platform-options
-                  :binary :cli-options :configure-fn)))
+                  :binary :cli-options :args :configure-fn)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
                                         ; Should be the DSL form itself
@@ -259,6 +262,13 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                                              raw)))
                              (when specs (validate-cli-option-specs specs))
                              (or specs '())))
+              (simple-args (let* ((raw (getf kw-plist :args))
+                                  (specs (if (and (consp raw) (eq (car raw) 'quote))
+                                             (cadr raw)
+                                             raw)))
+                             (when specs (normalize-simple-args-specs specs))
+                             (or specs '())))
+              (all-cli-options (merge-cli-option-specs cli-options simple-args))
               (binary-options (normalize-binary-options (getf kw-plist :binary) name))
               (configure-fn (getf kw-plist :configure-fn nil))
               ;; Normalise FN designators to symbols
@@ -314,7 +324,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                :subscriptions-fn-form ,subs-fn-form
                :message-queue (make-message-channel :capacity 20) ; Create proper event-channel
                :binary-options ',binary-options
-               :cli-options ',cli-options
+               :cli-options ',all-cli-options
                :configure-fn ,(if configure-fn `',configure-fn nil)
                ))
 
@@ -326,9 +336,12 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
            ;; --------------------------------------------------------------
            (defun ,init-fn-sym (&key (initial-terminal-dimensions '(80 24))
                                  (initial-cursor-position '(0 0))
+                                 (cli-args nil)
                                  &allow-other-keys) ; Allow other platform-options
-             (declare (ignorable initial-terminal-dimensions initial-cursor-position))
-            (let* ((app-state (make-state :initial (alexandria:plist-hash-table ,initial-state-plist))))
+             (declare (ignorable initial-terminal-dimensions initial-cursor-position cli-args))
+            (let* ((initial-state* (copy-list ,state)))
+               (setf (getf initial-state* :cli) (or cli-args '()))
+               (let* ((app-state (make-state :initial (alexandria:plist-hash-table initial-state*))))
                (multiple-value-bind (patches commands)
                  (initialize-components-from-dsl
                    ;; (maybe-wrap-with-root-viewport
@@ -338,7 +351,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                  ;; :cursor-pos initial-cursor-position))
                  ;; (format t "~A ~A~%" app-state patches)
                  (apply-patches app-state patches)
-                 (values app-state commands))))
+                   (values app-state commands)))))
 
 
            ;; --------------------------------------------------------------
@@ -414,8 +427,11 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
              (let* ((cfg (gethash ',name *applications*))
                      (cli-options (app-config-cli-options cfg))
                      (argv* (or argv #+sbcl (cdr sb-ext:*posix-argv*) #-sbcl nil))
+                     (parsed-cli-args (if cli-options
+                                          (parse-cli-options cli-options argv*)
+                                          nil))
                      (cli-platform-options (if cli-options
-                                               (parse-cli-options cli-options argv*)
+                                               (extract-platform-options cli-options parsed-cli-args)
                                                nil))
                      (merged-platform-options (append cli-platform-options platform-options))
                      (configure-fn (app-config-configure-fn cfg))
@@ -438,6 +454,7 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                          :subscriptions-fn (app-config-subscriptions-fn-form cfg)
                          :command-processor-fn (app-config-command-processor-fn cfg)
                          :message-queue (app-config-message-queue cfg)
+                         :cli-args parsed-cli-args
                          :root-viewport-id ,root-vp-id)))
                (elmtui.app.api:run-application
                  app-spec-for-driver
@@ -527,17 +544,17 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
        ;; Contract-enforced update function
        ,(ecase (or validation-mode :hybrid)
           (:flexible
-            `(elmtui.contracts:defupdate-flexible ,update-fn-name (model message)
+            `(elmtui.contracts:defupdate-flexible ,update-fn-name (message model)
                ,@(if update (list update)
                    `((declare (ignore model message))
                       (values nil nil)))))
           (:typed
-            `(elmtui.contracts:defupdate-typed ,update-fn-name (model message) ,app-msg-type
+            `(elmtui.contracts:defupdate-typed ,update-fn-name (message model) ,app-msg-type
                ,@(if update (list update)
                    `((declare (ignore model message))
                       (values nil nil)))))
           (:hybrid
-            `(elmtui.contracts:defupdate-hybrid ,update-fn-name (model message)
+            `(elmtui.contracts:defupdate-hybrid ,update-fn-name (message model)
                :message-type ,app-msg-type
                ,@(if update (list update)
                    `((declare (ignore model message))
