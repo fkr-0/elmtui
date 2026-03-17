@@ -217,7 +217,7 @@
 (defapplication cursor-inspector-app
   :root-viewport-id :cursor-inspector-root
   :root-component-dsl '(:root-viewport :id :cursor-inspector-root)
-  :initial-state-plist (initial-inspector-state)
+  :initial-state-fn #'initial-inspector-state
   :update-fn #'cursor-inspector-update
   :view-fn #'cursor-inspector-view)
 

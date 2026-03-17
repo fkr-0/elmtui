@@ -134,13 +134,13 @@
                          :display :flex :flex-direction ,flex-dir
                          :fg-color ,(rand-color)
                          :bg-color ,(rand-color))
-                :content " "))
+                :content "#"))
            (row-node (row)
              `(:container
                  :id ,(intern (format nil "ROW-~D" row) :keyword)
                  :style (:box :ascii
                           :height 3 :min-height 3
-                          :width :fill :min-width 3
+                          :width 9 :min-width 9
                           :border-style :ascii :border-width 1
                           :display :flex :flex-direction :row
                           :bg-color ,(rand-color)
@@ -152,7 +152,7 @@
                  :id ,(intern (format nil "COL-~D" col) :keyword)
                  :style (:box :ascii
                           :width 3 :min-width 3
-                          :height :fill :min-height 3
+                          :height 9 :min-height 9
                           :border-style :ascii :border-width 1
                           :display :flex :flex-direction :column
                           :bg-color ,(rand-color)
@@ -166,14 +166,20 @@
       `(:container
           :id :main
           :style (:box :ascii
-                   :width :auto
-                   :height 34
+                   :width ,(if row-major 11 23)
+                   :height ,(if row-major 23 11)
                    :display :flex
                    :flex-direction ,(if row-major :column :row)
                    :padding 0 :margin 0 :spacing 0 :gap 0
                    :border-style :double :border-width 1
                    :fg-color ,(rand-color))
           :children ,(if row-major rows columns)))))
+
+(defun %mini-rainbow-initial-state ()
+  (list :current-stylesheet rainbow-stylesheet
+        :should-quit nil
+        :orientation :row
+        :switch-count 0))
 
 (defapplication mini-rainbow
   :root-component-dsl
@@ -183,10 +189,7 @@
   ;; :stylesheet rainbow-stylesheet
   :view-fn #'view
   :root-viewport-id :root
-  :initial-state-plist (list :current-stylesheet rainbow-stylesheet
-                         :should-quit nil
-                         :orientation :row
-                         :switch-count 0))
+  :initial-state-fn #'%mini-rainbow-initial-state)
 
 ;; (defun run-mini-rainbow ()
 ;;   "Run the mini-rainbow example."

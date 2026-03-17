@@ -113,7 +113,7 @@
 
 (defapplication focus-simple-app
   :root-viewport-id :focus-root
-  :initial-state-plist (%initial-state)
+  :initial-state-fn #'%initial-state
   :root-component-dsl '(:layout :id :root)
   :update-fn 'app-update
   :view-fn 'app-view)

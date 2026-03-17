@@ -24,31 +24,40 @@
     #:initialise
     #:process-key-event)
   (:import-from :elmtui.state.api #:get-path)
-  (:import-from :cl-state.tx #:apply-patches)
   (:import-from :elmtui.platform.api
     #:initialize-backend #:shutdown-backend #:render-and-present
     #:term-w #:term-h #:handle-backend-resize #:get-screen-dimensions
     #:flush-output #:get-cursor-position #:set-cursor-position #:clear-lines #:scroll-up #:scroll-down
+    #:term-stream
     #:backend-input-device #:backend-input-source)
   (:import-from :elmtui.platform.backend.terminal.diff-renderer
-    #:*compute-buffer-diff-first-call*)
+    #:*compute-buffer-diff-first-call*
+    #:compute-buffer-diff
+    #:apply-diff-to-backend)
+  (:import-from :elmtui.platform.backend.terminal
+    #:terminal-instance-front-buffer
+    #:terminal-instance-back-buffer)
+  (:import-from :elmtui.platform.backend.common.virtual-buffer
+    #:copy-virtual-buffer)
   (:import-from :elmtui.platform.tmux
     #:tmux-available-p
-    #:prefill-backend-from-tmux)
-  (:import-from :cl-inputs.device.api
-    #:enable-raw-mode
-    #:disable-raw-mode)
+    #:prefill-backend-from-tmux
+    #:save-tmux-capture
+    #:restore-to-tmux-capture)
+  (:import-from :cl-inputs.device.api)
   (:import-from :elmtui.runtime.protocol
     #:run-application
-    #:get-component-instance
-    #:dispatch-root-message)
+    #:get-component-instance)
+  (:import-from :elmtui.runtime.effects
+    #:run-commands-with-policy
+    #:apply-update-effects
+    #:reconcile-model-subscriptions
+    #:clear-subscription-registry)
   (:import-from :elmtui.core.loop
-    #:publish #:start-loop #:elm-stop-loop #:event-loop)
-  (:import-from :elmtui.core.async
-    #:interpret-cmd)
+    #:publish #:start-loop #:elm-stop-loop #:event-loop #:*shutdown-requested*)
   ;; (:import-from :elmtui.style-lib.api #:stylesheet) ; legacy
   (:import-from :elmtui.style.manager #:compute-active-stylesheet)
-  (:import-from :elmtui.platform.input #:start-reader #:cl-inputs-token->event)
+  (:import-from :elmtui.platform.input #:cl-inputs-token->event)
   (:import-from :bordeaux-threads #:mailbox)
   (:import-from :cl-events.channel #:->)
   (:import-from :elmtui.core.event-channels #:channel-of)
@@ -129,65 +138,66 @@
 (defvar *focus-manager* nil
   "Holds the application's focus manager instance.")
 
+(defvar *active-app-subscriptions* (make-hash-table :test 'equal)
+  "Driver-managed active app subscriptions keyed by canonical descriptor.")
+
+(defvar *preserve-underlay* nil
+  "When true, render pipeline preserves prefilled terminal content under app drawing.")
+
+(defvar *use-alternate-screen* nil
+  "When true, run app rendering inside terminal alternate screen mode.")
+
 (defvar *initial-render-done* nil
   "Tracks if the initial render has been performed after terminal size and cursor position are known.")
-
-(defvar *got-initial-terminal-resized* nil
-  "Tracks if a :terminal-resized event has been received after startup.")
-
-(defvar *got-initial-cursor-position* nil
-  "Tracks if a :cursorpositionchanged event has been received after startup.")
 
 (defvar *last-cursor-pos* '(0 . 0)
   "Last known cursor position as a cons (row . col). Used for anchoring.")
 
-;; Bootstrap buffering for early system events before the real processor is ready
-(defvar *real-app-message-processor* nil)
-(defvar *bootstrap-event-queue* nil)
+(defparameter +runtime-startup-phases+ '(:booting :awaiting-terminal-info :running :shutting-down)
+  "Allowed startup/runtime phase values for the driver lifecycle.")
 
-(defun %driver-bootstrap-processor (msg)
-  "Temporary app-message processor used during bootstrap. Buffers events until
-  the real processor is installed and both initial terminal-resized and
-  cursor-position events have been observed."
-  (log-info "Bootstrap processor received message: ~A" msg)
-  (handler-case
-    (progn
-      ;; Track readiness flags from system messages
-      (when (and (listp msg))
-        (let ((tag (first msg)))
-          (cond
-            ((member tag '(:terminalresized :terminal-resized :TERMINALRESIZED :TERMINAL-RESIZED))
-              (progn
-                (setf *got-initial-terminal-resized* t)
-                (log-info "Init term set") ))
-            ((member tag '(:cursorpositionchanged :cursorposition :cursor-position :cursor-position-changed
-                            :CURSORPOSITIONCHANGED :CURSORPOSITION :CURSOR-POSITION :CURSOR-POSITION-CHANGED))
+(defvar *runtime-phase* :booting
+  "Current driver runtime phase.")
 
-              (progn
-                (setf *got-initial-cursor-position* t)
-                (log-info "Init term set") )))))
+(defstruct (startup-message-buffer-state
+             (:constructor make-startup-message-buffer-state
+                 (&key (queue '()))))
+  "Temporary queue for app messages that arrive before the real processor is bound."
+  (queue '() :type list))
 
-      ;; Buffer the message
-      (push msg *bootstrap-event-queue*)
+(defun startup-message-buffer-processor (state)
+  "Return a processor function that buffers incoming messages into STATE."
+  (lambda (msg)
+    (push msg (startup-message-buffer-state-queue state))
+    nil))
 
-      ;; If the real processor is installed and both signals observed, flush
-      (when (and *real-app-message-processor*
-              *got-initial-terminal-resized*
-              *got-initial-cursor-position*)
-        (let ((events (nreverse *bootstrap-event-queue*)))
-          (setf *bootstrap-event-queue* nil)
-          (dolist (e events)
-            (funcall *real-app-message-processor* e)))))
-    (error (e)
-      (log-error "Bootstrap processor error: ~A" e))))
+(defun startup-message-buffer-count (state)
+  (length (startup-message-buffer-state-queue state)))
+
+(defun drain-startup-message-buffer (state processor-fn)
+  "Replay buffered messages in arrival order into PROCESSOR-FN and clear STATE."
+  (let ((buffered (nreverse (startup-message-buffer-state-queue state))))
+    (setf (startup-message-buffer-state-queue state) nil)
+    (dolist (msg buffered)
+      (funcall processor-fn msg))
+    (length buffered)))
+
+(defun %set-runtime-phase (next-phase &key reason)
+  "Transition runtime phase to NEXT-PHASE with optional REASON for diagnostics."
+  (unless (member next-phase +runtime-startup-phases+)
+    (error "DRIVER: Invalid runtime phase transition target: ~S" next-phase))
+  (let ((old-phase *runtime-phase*))
+    (setf *runtime-phase* next-phase)
+    (log-debug "DRIVER: runtime phase ~S -> ~S~@[ (~A)~]" old-phase next-phase reason))
+  *runtime-phase*)
 
 ;;; ---------------------------------------------------------------------------
 ;;; == Application Entry Point ==
 ;;; ---------------------------------------------------------------------------
 ;; Method for elmtui.runtime.protocol:run-application
 (defmethod elmtui.runtime.protocol:run-application ((app-spec list)
-                                            &key (backend-type :tty)
-                                            platform-options)
+                                                     &key (backend-type :tty)
+                                                     platform-options)
   "Entry point for running an application from an APP-SPEC plist."
   (declare (type list app-spec platform-options)
     (type keyword backend-type))
@@ -246,13 +256,20 @@
       (getf app-spec :name) root-viewport-id)
     (log:info "Running init-fn ~S for app-spec ~S" init-fn app-spec)
     ;; Call the application's init function to get the initial model and commands
-    (multiple-value-bind (initial-model initial-cmds) (funcall init-fn)
+    (let ((cli-args (getf app-spec :cli-args)))
+      (multiple-value-bind (initial-model initial-cmds)
+          (if cli-args
+              (funcall init-fn :cli-args cli-args)
+              (funcall init-fn))
       ;; Store the initial model in global state
-      (setf *current-app-model* initial-model)
+      (setf *current-app-model* initial-model
+            elmtui.core.globals:*app-state* initial-model)
       ;; Set up the global app message processor lambda
       (setf elmtui.core.globals:*app-message-processor*
         (lambda (msg)
-          (log:info "DRIVER: *app-message-processor* received ~S" msg)
+          (log:debug "DRIVER: *app-message-processor* received ~S" msg)
+          ;; Ignore messages once shutdown has been requested to prevent double-appshutdown.
+          (unless elmtui.core.loop:*shutdown-requested*
           ;; Handle quit request
           (if (and (listp msg) (eq (car msg) :app-quit-requested))
             (let ((update-fn (getf app-spec :update-fn)))
@@ -261,47 +278,64 @@
                 (handler-case
                   (multiple-value-bind (next-model commands)
                     (funcall update-fn '(:appshutdown) *current-app-model*)
-                    (setf *current-app-model* next-model)
-                    (let ((render-cmds (remove-if-not (lambda (c) (and (consp c) (eq (car c) :render))) commands)))
-                      (dolist (rc render-cmds)
-                        (ignore-errors (execute-render-command rc *backend*)))))
+                    (setf *current-app-model* next-model
+                          elmtui.core.globals:*app-state* next-model)
+                    (run-commands-with-policy
+                     commands
+                     :render-command-fn (lambda (cmd)
+                                          (ignore-errors (execute-render-command cmd *backend*)))))
                   (error (e)
                     (log-warn "DRIVER: appshutdown cleanup failed: ~A" e))))
               (log:info "DRIVER: Setting *shutdown-requested* flag.")
-              (setf elmtui.core.loop::*shutdown-requested* t))
+              (setf elmtui.core.loop:*shutdown-requested* t))
             ;; Otherwise, process the message with update-fn and command processor
             (let ((update-fn (getf app-spec :update-fn))
                    (cmd-proc-fn (getf app-spec :command-processor-fn))
                    (message-queue (getf app-spec :message-queue))
                    (app-cfg-for-cmd (gethash (getf app-spec :name) elmtui.core.globals:*applications*)))
-              (log-info "DRIVER: calling update")
               (multiple-value-bind (next-model commands)
                 (funcall update-fn msg *current-app-model*)
                 ;; Update global model
-                (setf *current-app-model* next-model)
-                (log-info "DRIVER: update phase done")
+                (setf *current-app-model* next-model
+                      elmtui.core.globals:*app-state* next-model)
                 ;; Check for shutdown flag in model
                 (when (get-path '(:should-quit) next-model)
                   (log:info "DRIVER: :should-quit flag is true in model. Setting *shutdown-requested*.")
-                  (setf elmtui.core.loop::*shutdown-requested* t))
-                ;; Process commands if a command processor is present
-                ;; Execute :render commands synchronously before view
-                (let ((render-cmds (remove-if-not (lambda (c) (and (consp c) (eq (car c) :render))) commands))
-                       (other-cmds  (remove-if (lambda (c) (and (consp c) (eq (car c) :render))) commands)))
-                  (dolist (rc render-cmds)
-                    (ignore-errors (execute-render-command rc *backend*)))
-                  ;; Process remaining commands via app's command processor
-                  (when cmd-proc-fn
-                    (dolist (c other-cmds)
-                      (funcall cmd-proc-fn c message-queue next-model app-cfg-for-cmd))))
+                  ;; Run appshutdown cleanup on model-driven exit as well, so
+                  ;; root-viewport and other components can restore terminal state.
+                  (handler-case
+                      (multiple-value-bind (shutdown-model shutdown-commands)
+                          (funcall update-fn '(:appshutdown) next-model)
+                        (setf *current-app-model* shutdown-model
+                              elmtui.core.globals:*app-state* shutdown-model
+                              next-model shutdown-model)
+                        (run-commands-with-policy
+                         shutdown-commands
+                         :render-command-fn (lambda (cmd)
+                                              (ignore-errors (execute-render-command cmd *backend*)))))
+                    (error (e)
+                      (log-warn "DRIVER: model-driven appshutdown cleanup failed: ~A" e)))
+                  (setf elmtui.core.loop:*shutdown-requested* t))
+                ;; Runtime effect manager: command execution + subscription refresh.
+                (ignore-errors
+                  (apply-update-effects
+                   :commands commands
+                   :render-command-fn (lambda (cmd)
+                                        (ignore-errors (execute-render-command cmd *backend*)))
+                   :command-processor-fn cmd-proc-fn
+                   :message-queue message-queue
+                   :model next-model
+                   :app-config app-cfg-for-cmd
+                   :subscriptions-reconciler (lambda (model)
+                                              (%refresh-app-subscriptions app-spec model))))
 
                 ;; Render the current frame unless we're shutting down.
-                (unless elmtui.core.loop::*shutdown-requested*
-                  (log-info "DRIVER: Rendering frame.")
+                (unless elmtui.core.loop:*shutdown-requested*
                   (let ((ctx (make-context-from-spec app-spec next-model *backend*)))
                     (handler-case
                       (progn
-                        (setf *last-ctx* (full-view-pipeline ctx))
+                        (let ((elmtui.pipeline::*preserve-underlay* *preserve-underlay*))
+                          (setf *last-ctx* (full-view-pipeline ctx)))
                         (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*))
                         (setf *initial-render-done* t))
                       (elmtui.contracts:pipeline-contract-violation (e)
@@ -309,9 +343,9 @@
                         (setf *last-ctx* (or *last-ctx* ctx)))
                       (error (e)
                         (log:error "DRIVER: Pipeline error ~A; keeping previous ctx." e)
-                        (setf *last-ctx* (or *last-ctx* ctx)))))))))))
-      (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
-      (values initial-model initial-cmds))))
+                        (setf *last-ctx* (or *last-ctx* ctx))))))))))))
+        (log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
+        (values initial-model initial-cmds)))))
 
 ;;; Helper: execute :render commands synchronously prior to view
 (defun execute-render-command (cmd backend)
@@ -333,29 +367,29 @@
           (elmtui.platform.api:clear-screen backend arg1))
         (:blank-viewport
           (let* ((rect arg1)
-                 (w (elmtui.view.geo:w rect))
-                 (h (elmtui.view.geo:h rect))
-                 (ox (elmtui.view.geo:x rect))
-                 (oy (elmtui.view.geo:y rect)))
+                  (w (elmtui.view.geo:w rect))
+                  (h (elmtui.view.geo:h rect))
+                  (ox (elmtui.view.geo:x rect))
+                  (oy (elmtui.view.geo:y rect)))
             (when (and (numberp w) (numberp h) (> w 0) (> h 0))
               (cond
                 ((typep backend 'elmtui.platform.backend.terminal:terminal-instance)
-                 (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
-                   (let* ((front (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
-                          (back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
-                          (diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front back)))
-                     (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend oy ox)
-                     (elmtui.platform.api:flush-output backend))))
+                  (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
+                    (let* ((front (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
+                            (back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
+                            (diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front back)))
+                      (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend oy ox)
+                      (elmtui.platform.api:flush-output backend))))
                 ((typep backend 'elmtui.backend.faketerm:faketerm-instance)
-                 (let ((stream (elmtui.backend.faketerm::faketerm-instance-stream backend))
-                       (buffer (elmtui.backend.faketerm::faketerm-instance-screen-buffer backend)))
-                   (when stream
-                     (format stream "; BLANK_VIEWPORT Row: ~D Col: ~D Height: ~D Width: ~D~%"
-                       oy ox h w)
-                     (finish-output stream))
-                   (elmtui.platform.api:fill-rectangle backend buffer oy ox h w :char #\Space)))
+                  (let ((stream (elmtui.backend.faketerm::faketerm-instance-stream backend))
+                         (buffer (elmtui.backend.faketerm::faketerm-instance-screen-buffer backend)))
+                    (when stream
+                      (format stream "; BLANK_VIEWPORT Row: ~D Col: ~D Height: ~D Width: ~D~%"
+                        oy ox h w)
+                      (finish-output stream))
+                    (elmtui.platform.api:fill-rectangle backend buffer oy ox h w :char #\Space)))
                 ((fboundp 'elmtui.platform.api:clear-area)
-                 (elmtui.platform.api:clear-area backend nil oy ox h w))
+                  (elmtui.platform.api:clear-area backend nil oy ox h w))
                 (t
                   (log-warn "blank-viewport not implemented for backend ~S" backend))))))
         (:scroll
@@ -388,7 +422,8 @@
     (let ((ctx (make-context-from-spec app-spec *current-app-model* *backend*)))
       (handler-case
         (progn
-          (setf *last-ctx* (full-view-pipeline ctx))
+          (let ((elmtui.pipeline::*preserve-underlay* *preserve-underlay*))
+            (setf *last-ctx* (full-view-pipeline ctx)))
           (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*))
           (setf *initial-render-done* t))
         (elmtui.contracts:pipeline-contract-violation (e)
@@ -400,20 +435,34 @@
                                         ;(log:info "DRIVER: Initial model: ~S, initial commands: ~S" initial-model initial-cmds)
                                         ;(values initial-model initial-cmds))))
 
-(defun synchronous-root-message (msg root-id)
-  "Deliver MSG to the root component synchronously and apply resulting patches.
-Returns T if rendering-related state changed enough to warrant a re-render."
-  (when (and root-id *current-app-model*)
-    (multiple-value-bind (patches commands)
-      (dispatch-root-message msg *current-app-model* root-id)
-      (let ((changed (not (null patches))))
-        (when patches
-          (apply-patches *current-app-model* patches))
-        (dolist (cmd commands)
-          (when (and (consp cmd) (eq (first cmd) :render))
-            (execute-render-command cmd *backend*)
-            (setf changed t)))
-        changed))))
+(defun %emit-startup-terminalresized (backend proc)
+  "Emit one startup :terminalresized message through PROC. Always emits."
+  (let ((width 80)
+         (height 24))
+    (handler-case
+      (multiple-value-bind (w h) (get-screen-dimensions backend)
+        (when (and w h (> w 0) (> h 0))
+          (setf width w
+                height h)))
+      (error (e)
+        (log-warn "DRIVER: Failed to read screen dimensions during startup: ~A" e)))
+    (funcall proc `(:terminalresized :width ,width :height ,height))
+    t))
+
+(defun %emit-startup-cursorposition (backend proc)
+  "Emit one startup :cursorposition message through PROC. Always emits."
+  (let ((row 0)
+         (col 0))
+    (handler-case
+      (multiple-value-bind (r c) (get-cursor-position backend)
+        (when (and c r (>= c 0) (>= r 0))
+          (setf row r
+                col c)))
+      (error (e)
+        (log-warn "DRIVER: Failed to read cursor position during startup: ~A" e)))
+    (setf *last-cursor-pos* (cons row col))
+    (funcall proc `(:cursorposition :col ,col :row ,row))
+    t))
 
 (defun process-initial-commands (cmds app-spec)
   "Process a list of initial commands for an application, using an app-specific processor if available.
@@ -429,11 +478,45 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
               (app-cfg-for-cmd (when name
                                  (gethash name elmtui.core.globals:*applications*))))
         (loop for cmd in cmds
-          do (cond
-               (cmd-proc-fn
-                 (funcall cmd-proc-fn cmd msg-queue *current-app-model* app-cfg-for-cmd))
-               (t
-                 (interpret-cmd cmd))))))))
+          do (run-commands-with-policy
+              (list cmd)
+              :command-processor-fn cmd-proc-fn
+              :message-queue msg-queue
+              :model *current-app-model*
+              :app-config app-cfg-for-cmd))))))
+
+(defun %unwrap-quoted-form (form)
+  "Recursively unwrap nested (quote ...) forms."
+  (if (and (consp form)
+        (eq (first form) 'quote)
+        (consp (rest form))
+        (null (cddr form)))
+      (%unwrap-quoted-form (second form))
+      form))
+
+(defun %resolve-subscriptions-fn (app-spec)
+  "Resolve the :subscriptions-fn designator from APP-SPEC into a function."
+  (let ((raw (%unwrap-quoted-form (getf app-spec :subscriptions-fn))))
+    (cond
+      ((null raw)
+        (lambda (model) (declare (ignore model)) nil))
+      ((functionp raw) raw)
+      ((and (symbolp raw) (fboundp raw))
+        (symbol-function raw))
+      ((and (consp raw) (eq (first raw) 'lambda))
+        (coerce raw 'function))
+      (t
+        (log-warn "DRIVER: Invalid subscriptions function designator ~S, ignoring subscriptions." raw)
+        (lambda (model) (declare (ignore model)) nil)))))
+
+(defun %clear-app-subscriptions ()
+  "Cancel and clear all active driver-managed subscriptions."
+  (clear-subscription-registry *active-app-subscriptions*))
+
+(defun %refresh-app-subscriptions (app-spec model)
+  "Refresh active app subscriptions according to APP-SPEC and MODEL."
+  (let ((subs-fn (%resolve-subscriptions-fn app-spec)))
+    (reconcile-model-subscriptions subs-fn model *active-app-subscriptions*)))
 ;;; ---------------------------------------------------------------------------
 ;;; == Context Construction ==
 ;;; ---------------------------------------------------------------------------
@@ -451,39 +534,28 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
 
 (defun driver-context-input-loop (ctx)
   "Main loop that pulls tokens, converts them, and publishes the result.
-   This function ensures raw mode is properly enabled during input reading
-   and disabled on cleanup, even if errors occur."
+   Input mode lifecycle is owned by cl-inputs input-source setup/teardown."
   (let* ((backend (driver-context-backend ctx))
           (device (or (driver-context-device ctx)
                     (and backend (backend-input-device backend))))
           (source (driver-context-input-source ctx)))
+    (declare (ignore device))
     (unless source
-      (log-warn "DRIVER: No input source available for driver context; input loop exiting.")
-      (return-from driver-context-input-loop nil))
-
-    (when device
-      ;; Enable raw mode before starting the input loop
-      (enable-raw-mode device)
-      (log-info "DRIVER: Raw mode enabled for input target: ~A" (type-of device)))
-
-    (unwind-protect
-      (loop
-        (when (or (driver-context-stop-flag ctx)
-                elmtui.core.loop::*shutdown-requested*)
-          (return))
-        (let ((token (cl-inputs.loop:next-token source :timeout 0.1)))
-          (when token
-            (let ((event (cl-inputs-token->event token)))
-              (when (and event (driver-context-publish-fn ctx))
-                (funcall (driver-context-publish-fn ctx) event)))))
-        (sleep 0.01))
-      ;; Cleanup: Always disable raw mode, even on error
-      (when device
-        (ignore-errors (disable-raw-mode device))
-        (log-info "DRIVER: Raw mode disabled for input target")))))
+      (error "DRIVER: Missing cl-inputs input-source in driver context."))
+    (loop
+      (when (or (driver-context-stop-flag ctx)
+              elmtui.core.loop:*shutdown-requested*)
+        (return))
+      (let ((token (cl-inputs.loop:next-token source :timeout 0.1)))
+        (when token
+          (let ((event (cl-inputs-token->event token)))
+            (when (and event (driver-context-publish-fn ctx))
+              (funcall (driver-context-publish-fn ctx) event))))))))
 
 (defun start-driver-input-loop (ctx)
   "Begin the driver input thread; returns the thread object."
+  (unless (and ctx (driver-context-input-source ctx))
+    (error "DRIVER: start-driver-input-loop requires a cl-inputs input-source."))
   (let ((thread (bt:make-thread (lambda ()
                                   (driver-context-input-loop ctx))
                   :name "elmtui.driver.input")))
@@ -497,7 +569,8 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
     (let ((thread (driver-context-input-thread ctx)))
       (when thread
         (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted.")))
-        (bt:join-thread thread)
+        ;; Do not hard-block on JOIN here: input thread may be in a device read path.
+        ;; Shutdown will poll and force-destroy as a bounded fallback.
         (setf (driver-context-input-thread ctx) nil)))
     (setf (driver-context-stop-flag ctx) nil)
     ctx))
@@ -526,8 +599,45 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
 ;;; == Platform Shutdown Logic ==
 ;;; ---------------------------------------------------------------------------
 
+(defun %restore-saved-tmux-capture-on-backend (backend)
+  "Restore saved tmux capture onto BACKEND and present it."
+  (when (and backend
+          (elmtui.platform.tmux:has-saved-tmux-capture)
+          (terminal-instance-front-buffer backend))
+    (let* ((front (terminal-instance-front-buffer backend))
+            (before (and front (copy-virtual-buffer front))))
+      (when (and before front)
+        (elmtui.platform.tmux:restore-to-tmux-capture front)
+        (let ((diff (compute-buffer-diff before front)))
+          (ignore-errors (apply-diff-to-backend diff backend 0 0)))
+        (setf (terminal-instance-back-buffer backend) (copy-virtual-buffer front))))
+    t))
+
+(defun %set-alternate-screen-mode (backend enabled-p)
+  "Enter or leave terminal alternate screen mode for BACKEND."
+  (when backend
+    (let* ((seq (if enabled-p
+                    (format nil "~C[?1049h~C[H" #\Escape #\Escape)
+                    (format nil "~C[?1049l~C[1G" #\Escape #\Escape)))
+           (dev (ignore-errors (backend-input-device backend)))
+           (stream (ignore-errors (term-stream backend))))
+      (cond
+        ((and dev (fboundp 'cl-inputs.device.api:device-write-bytes))
+         (let ((bytes (make-array (length seq) :element-type '(unsigned-byte 8))))
+           (loop for i from 0 below (length seq)
+                 do (setf (aref bytes i) (char-code (char seq i))))
+           (ignore-errors
+             (cl-inputs.device.api:device-write-bytes dev bytes 0 (length bytes))
+             (flush-output backend))))
+        ((and stream (output-stream-p stream))
+         (ignore-errors
+           (write-string seq stream)
+           (finish-output stream)))))))
+
 (defun shutdown-platform ()
   (log:info "DRIVER: Shutting down platform...")
+  (%set-runtime-phase :shutting-down :reason "shutdown-platform called")
+  (%clear-app-subscriptions)
   ;; Stop the input thread if a stop function is available
   (when *stop-input-fn*
     (log-info
@@ -539,12 +649,16 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   ;; Wait for the input thread to terminate, forcibly destroy if needed
   (when (and *input-thread* (bt:thread-alive-p *input-thread*))
     (log:info "DRIVER: Waiting for input thread to terminate...")
-    (if (bt:join-thread *input-thread*) ; :timeout 0.5
-      (log:info "DRIVER: Input thread terminated gracefully.")
-      (progn
-        (log:warn "DRIVER: Input thread failed to terminate in time. Forcing termination.")
-        (when (bt:thread-alive-p *input-thread*)
-          (bt:destroy-thread *input-thread*))))
+    ;; Bordeaux threads does not provide a portable join timeout.
+    ;; Poll liveness with a bounded wait, then force-destroy if still alive.
+    (loop repeat 20
+          while (bt:thread-alive-p *input-thread*)
+          do (sleep 0.01))
+    (if (bt:thread-alive-p *input-thread*)
+        (progn
+          (log:warn "DRIVER: Input thread did not terminate within 200ms. Forcing termination.")
+          (ignore-errors (bt:destroy-thread *input-thread*)))
+        (log:info "DRIVER: Input thread terminated gracefully."))
     (setf *input-thread* nil))
 
   ;; Attempt to clean up the root viewport instance if present
@@ -558,14 +672,25 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
 
   ;; Shutdown the backend and clear the backend global
   (when *backend*
-    (shutdown-backend *backend*)
-    (setf *backend* nil))
+    ;; Restore tmux capture before shutdown (seamless return to original state)
+    ;; Skip this when alternate screen was enabled; terminal will restore main screen.
+    (when (and (not *use-alternate-screen*)
+               (elmtui.platform.tmux:has-saved-tmux-capture))
+      (log-info "DRIVER: Restoring original tmux capture for seamless exit")
+      (%restore-saved-tmux-capture-on-backend *backend*))
 
-  ;; Reset global state for app model, viewport, and buffer diff flag
-  (setf *current-app-model* nil
-    *root-viewport-id-path* nil ; Reset root viewport path
-    elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t)
-  (log:info "DRIVER: Platform shutdown complete."))
+    (when *use-alternate-screen*
+      (%set-alternate-screen-mode *backend* nil))
+
+    (shutdown-backend *backend*)
+    (setf *backend* nil)
+
+    ;; Reset global state for app model, viewport, and buffer diff flag
+    (setf *current-app-model* nil
+      elmtui.core.globals:*app-state* nil
+      *root-viewport-id-path* nil ; Reset root viewport path
+      elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t)
+    (log:info "DRIVER: Platform shutdown complete.")))
 
 (defun run-app-platform (APP-SPEC
                           &key (BACKEND-TYPE :tty)
@@ -599,25 +724,32 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
     *root-viewport-id-path* nil
     elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t
     *initial-render-done* nil
-    *got-initial-terminal-resized* nil
-    *got-initial-cursor-position* nil
-    *focus-manager* nil)
+    *focus-manager* nil
+    *preserve-underlay* nil
+    *use-alternate-screen* nil
+    *runtime-phase* :booting
+    elmtui.core.globals:*app-state* nil
+    elmtui.core.globals:*app-message-processor* nil)
+  (clrhash *active-app-subscriptions*)
+  ;; Clear any tmux capture from a previous run so restore targets fresh content.
+  (elmtui.platform.tmux:clear-saved-tmux-capture)
   (log-info "Globals reset for new application run.")
 
   (let ((initial-commands nil)
+         (startup-buffer-state (make-startup-message-buffer-state))
          (prefill-from-tmux (getf platform-options :prefill-from-tmux))
-         (tmux-prefill-mode (getf platform-options :tmux-prefill-mode :pane)))
+         (tmux-prefill-mode (getf platform-options :tmux-prefill-mode :pane))
+         (use-alternate-screen (getf platform-options :use-alternate-screen nil)))
+    (setf *preserve-underlay* (and prefill-from-tmux (tmux-available-p)))
+    (setf *use-alternate-screen* use-alternate-screen)
     (unwind-protect
       (progn
         ;; 1. Start the event loop. This sets up channels and the consumer thread.
         (start-loop)
+        ;; Install a bootstrap processor so backend events emitted during startup are not lost.
+        (setf elmtui.core.globals:*app-message-processor*
+              (startup-message-buffer-processor startup-buffer-state))
         (log-info "Event loop and channels are active.")
-        ;; 1a. Install bootstrap app-message processor to buffer early events
-        (setf elmtui.core.globals:*app-message-processor* #'%driver-bootstrap-processor)
-        (setf *real-app-message-processor* nil
-          *bootstrap-event-queue* nil
-          *got-initial-terminal-resized* nil
-          *got-initial-cursor-position* nil)
 
         ;; 2. Now that channels exist, set up all event subscriptions.
         (elmtui.keymaps:initialise)
@@ -665,6 +797,9 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
           (unless *backend*
             (error "Backend initialization returned NIL for ~A" backend-type))
 
+          (when *use-alternate-screen*
+            (%set-alternate-screen-mode *backend* t))
+
           ;; Query initial terminal state in a device-independent manner
           (log-debug "DRIVER: Querying initial terminal state...")
           ;; (handler-case
@@ -691,87 +826,70 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
                   (tmux-available-p))
             (let ((snapshot (prefill-backend-from-tmux *backend* :mode tmux-prefill-mode)))
               (when snapshot
-                (setf *previous-frame-buffer* snapshot))))
+                ;; Save for restore on exit (seamless return to original state)
+                (save-tmux-capture snapshot)
+                (setf *previous-frame-buffer* snapshot)
+                ;; Prefill already synchronized visible state; do not force full redraw.
+                (setf elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* nil))))
 
           ;; 4. Initialize the application model. This sets *app-message-processor*.
           (multiple-value-bind (im ic) (initialize-app-model app-spec)
             (log:debug "DRIVER: Initial model: ~S, initial commands: ~S..binding" im ic)
             (setf *current-app-model* im)
             (setf initial-commands ic))
+          (let ((proc elmtui.core.globals:*app-message-processor*))
+            (when proc
+              (let ((replayed (drain-startup-message-buffer startup-buffer-state proc)))
+                (when (> replayed 0)
+                  (log-info "DRIVER: Replayed ~D startup message(s)." replayed)))))
           (log-info "Application model and message processor are initialized.")
+          (ignore-errors
+            (%refresh-app-subscriptions app-spec *current-app-model*))
 
-          ;; 4a. Install the real app-message processor by wrapping the one set in initialize-app-model
-          ;;     We capture it and leave the bootstrap shim in place to drain the queue safely.
-          (let ((real-proc elmtui.core.globals:*app-message-processor*))
-            ;; Install real processor now
-            (setf elmtui.core.globals:*app-message-processor* real-proc)
-            ;; Replay buffered events in order, then clear the bootstrap queue
-            (let ((events (nreverse *bootstrap-event-queue*)))
+          ;; Ensure startup terminal signals flow through the canonical app update path.
+          (%set-runtime-phase :awaiting-terminal-info :reason "model initialized")
+          (let ((proc elmtui.core.globals:*app-message-processor*))
+            (when proc
+              (%emit-startup-terminalresized *backend* proc)
+              (%emit-startup-cursorposition *backend* proc))
+            (%set-runtime-phase :running :reason "startup terminal signals delivered"))
 
-              (dolist (e events) (ignore-errors (funcall real-proc e)))
-              (setf *bootstrap-event-queue* nil)))
-
-          ;; Ensure the application receives the current terminal geometry now that
-          ;; the real processor and component tree are configured.
-          (let ((root-id (getf app-spec :root-viewport-id)))
-            (let ((re-render-needed nil))
-              (ignore-errors
-                (multiple-value-bind (w h) (get-screen-dimensions *backend*)
-                  (when (and w h (> w 0) (> h 0))
-                    (setf *got-initial-terminal-resized* t)
-                    (setf re-render-needed
-                      (or re-render-needed
-                        (synchronous-root-message
-                          `(:terminalresized :width ,w :height ,h)
-                          root-id))))))
-              (ignore-errors
-                (multiple-value-bind (row col) (get-cursor-position *backend*)
-                  (when (and col row (>= col 0) (>= row 0))
-                    (setf *got-initial-cursor-position* t)
-                    (setf re-render-needed
-                      (or re-render-needed
-                        (synchronous-root-message
-                          `(:cursorposition :col ,col :row ,row)
-                          root-id))))))
-              (when re-render-needed
-                (force-render-current-frame app-spec)
-                (setf *initial-render-done* t)))))))
+          ;; Always produce an initial frame even when startup messages do not trigger one.
+          (unless *initial-render-done*
+            (force-render-current-frame app-spec))))
 
     ;; 5. Build the driver context and start the driver-managed input loop when the backend exposes cl-inputs handles.
-    (let ((device (backend-input-device *backend*))
-           (input-source (backend-input-source *backend*))
-           (event-handler (lambda (ev) (publish ev))))
-      (log-info "DRIVER: Setting up input handling. Device: ~A, Input Source: ~A" device input-source)
-      (if (and device input-source)
+    ;; Guarded by (when *backend* ...) so that a failed setup (nil backend) does not error here.
+    (when *backend*
+      (let ((device (backend-input-device *backend*))
+             (input-source (backend-input-source *backend*))
+             (event-handler (lambda (ev) (publish ev))))
+        (log-info "DRIVER: Setting up input handling. Device: ~A, Input Source: ~A" device input-source)
+        (unless input-source
+          (error "DRIVER: Backend ~S must expose cl-inputs input-source for runtime loop." (type-of *backend*)))
         (let ((ctx (make-driver-context
                      :backend *backend*
                      :device device
                      :input-source input-source
                      :publish-fn event-handler)))
           (setf *driver-context* ctx
-            *stop-input-fn* (lambda ()
-                              (ignore-errors (stop-driver-input-loop ctx))
-                              (setf *input-thread* nil)
-                              t)
-            *input-thread* (start-driver-input-loop ctx)))
-        (multiple-value-bind (thread stop-fn)
-          (start-reader *backend* :event-handler event-handler)
-          (setf *input-thread* thread
-            *stop-input-fn* stop-fn
-            *driver-context* nil)
-          (log-info "Fallback input reader started: ~A" *input-thread*)))
-      (when (and device input-source)
-        (log-info "Driver input loop started: ~A" *input-thread*)))
+                *stop-input-fn* (lambda ()
+                                  (ignore-errors (stop-driver-input-loop ctx))
+                                  (setf *input-thread* nil)
+                                  t)
+                *input-thread* (start-driver-input-loop ctx))
+          (log-info "Driver input loop started: ~A" *input-thread*)))))
 
-    ;; 6. Process any initial commands from the app's init function.
-    (when initial-commands
-      (process-initial-commands initial-commands app-spec))
-    (log:info "Initial commands processed. Starting main wait loop.")
-
-    ;; 7. Wait for shutdown signal.
-    (loop until elmtui.core.loop::*shutdown-requested* do (sleep 0.1))
-    (log:info "DRIVER: Shutdown signal received, exiting loop.")
-    ;; Cleanup
-    (shutdown-platform)
-    (elm-stop-loop)
-    (log:info "DRIVER: Application ~A has shut down." (getf app-spec :name))))
+    ;; 6-7. Run application main loop with guaranteed terminal cleanup on any exit.
+    (unwind-protect
+      (progn
+        (when initial-commands
+          (process-initial-commands initial-commands app-spec))
+        (log:info "Initial commands processed. Starting main wait loop.")
+        ;; 7. Wait for shutdown signal.
+        (loop until elmtui.core.loop:*shutdown-requested* do (sleep 0.1))
+        (log:info "DRIVER: Shutdown signal received, exiting loop."))
+      ;; Cleanup: always executes even if an unhandled condition escapes the main loop.
+      (shutdown-platform)
+      (elm-stop-loop)
+      (log:info "DRIVER: Application ~A has shut down." (getf app-spec :name)))))

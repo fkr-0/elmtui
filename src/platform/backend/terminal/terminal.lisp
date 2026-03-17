@@ -252,19 +252,34 @@
           (when (not sigint-fired)
             (setf sigint-fired t)
             (log:info "TERMINAL: SIGINT detected. Publishing :app-quit-requested (latched)")
-            (funcall publish-fn '(:app-quit-requested (:source :sigint)))))))))
+            (funcall publish-fn '(:app-quit-requested (:source :sigint))))))
+      ;; SIGTERM - Termination signal (e.g. from kill or process manager)
+      ;; Route through the same quit machinery so the app gets a clean shutdown.
+      (sb-sys:enable-interrupt sb-unix:sigterm
+        (lambda (signal code scp)
+          (declare (ignore signal code scp))
+          (log:info "TERMINAL: SIGTERM detected. Publishing :app-quit-requested")
+          (funcall publish-fn '(:app-quit-requested (:source :sigterm))))))))
 
 (defun teardown-terminal-signal-handlers ()
   (log:info "TERMINAL: Disabling signal handlers for terminal")
   ;; Disable SIGWINCH handler
   (sb-sys:enable-interrupt sb-unix:sigwinch :default)
   ;; After we latched SIGINT once we ignore further signals to avoid log spam during teardown
-  (sb-sys:enable-interrupt sb-unix:sigint :ignore))
+  (sb-sys:enable-interrupt sb-unix:sigint :ignore)
+  ;; Restore default SIGTERM behaviour
+  (sb-sys:enable-interrupt sb-unix:sigterm :default))
 
 
 ;;;---------------------------------------------------------------
 ;;; Backend Lifecycle
 ;;;---------------------------------------------------------------
+(defmethod initialize-backend ((backend-type (eql :terminal))
+                                &rest initargs &key &allow-other-keys)
+  "Compatibility alias: :TERMINAL behaves the same as :TTY."
+  (declare (ignore backend-type))
+  (apply #'initialize-backend :tty initargs))
+
 (defmethod initialize-backend ((backend-type (eql :tty))
                                 &key publish-fn (tty-path "/dev/tty") (device nil) (initial-clear nil) &allow-other-keys)
   (handler-case
@@ -580,16 +595,16 @@
   t)
 
 (defmethod clear-area ((instance terminal-instance) target-buffer row col height width &key style)
+  ;; Only update the virtual buffer. Terminal I/O is handled upstream (clear-screen calls
+  ;; cl-inputs.terminal.api:clear-area before calling this) or by the diff renderer.
+  ;; Previously this method also emitted ANSI escape sequences directly, causing double-writes
+  ;; when called from clear-screen with a rect.
   (%log-terminal-clear "clear-area"
                        (list :row row :col col :height height :width width :style style))
   (log:debug "BUFFER: clear-area on target-buffer - Row: ~A, Col: ~A, H: ~A, W: ~A, Style: ~S" row col height width style)
   (when target-buffer
     (with-virtual-buffer-lock (target-buffer)
-      (fill-buffer-region target-buffer row col width height #\Space style)
-      (send-sequence instance :erase-in-line 2)
-      (dotimes (i height)
-        (send-sequence instance :cursor-set-position (+ row i) col)
-        (send-sequence instance :erase-in-line 2))))
+      (fill-buffer-region target-buffer row col width height #\Space style)))
   t)
 
 ;;;---------------------------------------------------------------

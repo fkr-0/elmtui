@@ -136,12 +136,15 @@
 ;;;--------------------------------------------------------------
 ;;; Application Definition
 ;;;--------------------------------------------------------------
+(defun %rainbow-initial-state ()
+  (list :current-stylesheet rainbow-stylesheet
+        :should-quit nil
+        :orientation :row
+        :switch-count 0))
+
 (defapplication rainbow-example-app
   :root-viewport-id :rainbow-root-vp
-  :initial-state-plist (list :current-stylesheet rainbow-stylesheet
-                         :should-quit nil
-                         :orientation :row
-                         :switch-count 0)
+  :initial-state-fn #'%rainbow-initial-state
   ;; :root-component-dsl `(:column)
   :root-component-dsl
   '(:layout :id :rainbow-main-container

@@ -146,10 +146,13 @@
                  (:text :style (:width :fill) :content
                         "Press 'q' to quit. Try Backspace and Escape.")))))
 
+(defun %key-tester-initial-state ()
+  (list :component (make-key-tester)))
+
 ;; Define the application using the modern `defapplication` macro.
 (defapplication key-tester-app
   :root-viewport-id :key-tester-root
-  :initial-state-plist `(:component ,(make-key-tester))
+  :initial-state-fn #'%key-tester-initial-state
   ;; The root component DSL must define the component that the view function renders.
   :root-component-dsl '(:layout :id :key-tester-widget)
   :update-fn 'key-tester-update
