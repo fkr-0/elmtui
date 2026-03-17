@@ -39,11 +39,14 @@
         (make-update-result :patches '(((:should-quit) t)))))
     (t (make-update-result))))
 
+(defun %minimal-initial-state ()
+  (list :should-quit nil :last-key "slurp"))
+
 (defapplication minimal
   :root-component-dsl
   '(:root-viewport :id :minimal-root :anchor :below-cursor :child-dsl-spec (:view nil))
   :view-fn #'minimal-view
   :update-fn #'minimal-update
   :root-viewport-id :minimal-root
-  :initial-state-plist (list :should-quit nil :last-key "slurp"))
+  :initial-state-fn #'%minimal-initial-state)
 

@@ -66,97 +66,80 @@
 (defun app-update (message app-state)
   "Handle application messages following Elm architecture."
   (labels
-    ;; Helper: Create quit result
-    ((quit-result ()
-       (make-update-result :patches '((:should-quit t))))
-
-     ;; Helper: Navigate to a directory
-     (navigate-to-directory (path)
-       (handler-case
-           (let* ((new-items (list-directory-contents path))
-                  (lb-model (state-ref app-state :listbox-model))
-                  (new-lb-model (regenerate-listbox-model
-                                  lb-model
-                                  :items new-items
-                                  :selected-index (when new-items 0))))
-             (make-update-result
-               :patches `(((:listbox-model) ,new-lb-model)
-                         (:current-path ,path)
-                         (:status-message
-                          ,(format nil "Directory: ~A"
-                                   (enough-namestring
-                                     path
-                                     (uiop:pathname-parent-directory-pathname path)))))))
-         (error (e)
-           (status-message-result (format nil "Error: ~A" e))))))
-
-    (etypecase message
-      ;; --- Key Events ---
-      (key-event
+      ((quit-result ()
+         (make-update-result :patches '((:should-quit t))))
+       (navigate-to-directory (path)
+         (handler-case
+             (let* ((new-items (list-directory-contents path))
+                    (lb-model (state-ref app-state :listbox-model))
+                    (new-lb-model (regenerate-listbox-model
+                                   lb-model
+                                   :items new-items
+                                   :selected-index (when new-items 0))))
+               (make-update-result
+                :patches `(((:listbox-model) ,new-lb-model)
+                           (:current-path ,path)
+                           (:status-message
+                            ,(format nil "Directory: ~A"
+                                     (enough-namestring
+                                      path
+                                      (uiop:pathname-parent-directory-pathname path)))))))
+           (error (e)
+             (status-message-result (format nil "Error: ~A" e))))))
+    (cond
+      ((typep message 'key-event)
        (let ((key (key-event-key message)))
-         (cond
-           ;; C-q to quit
-           ((and (or (eql key :q) (string= key "q"))
-                 (member :control (key-event-modifiers message)))
-            (quit-result))
-           ;; Pass navigation keys to listbox
-           (t
-            (let* ((lb-model (state-ref app-state :listbox-model)))
-              (multiple-value-bind (new-lb-model lb-cmds)
-                  (update-listbox `(:listbox-key-press :key ,key) lb-model)
-                (make-update-result
+         (if (or (member key '(:q :Q #\q #\Q) :test #'eql)
+                 (and (stringp key) (or (string= key "q") (string= key "Q")))
+                 (and (characterp key)
+                      (or (char= key #\q) (char= key #\Q))
+                      (member :control (key-event-modifiers message))))
+             (quit-result)
+             (let* ((lb-model (state-ref app-state :listbox-model)))
+               (multiple-value-bind (new-lb-model lb-cmds)
+                   (update-listbox `(:listbox-key-press :key ,key) lb-model)
+                 (make-update-result
                   :patches `(((:listbox-model) ,new-lb-model))
                   :commands lb-cmds))))))
-
-      ;; --- Application Messages ---
-      ;; Item selected (Enter pressed in listbox)
-      ((eql :item-selected)
+      ((eq message :item-selected)
        (let* ((lb-model (state-ref app-state :listbox-model))
               (selected-idx (listbox-model-selected-index lb-model))
               (item (when selected-idx
-                     (nth selected-idx (listbox-model-items lb-model))))
+                      (nth selected-idx (listbox-model-items lb-model))))
               (current-path (state-ref app-state :current-path)))
          (cond
-           ;; No item selected
            ((not item)
             (status-message-result "No item selected"))
            (t
             (let ((new-path (merge-pathnames item current-path)))
               (cond
-                ;; Parent directory - navigate up
                 ((string= item "../")
                  (navigate-to-directory
-                   (uiop:pathname-parent-directory-pathname current-path)))
-                ;; Directory - navigate into it
+                  (uiop:pathname-parent-directory-pathname current-path)))
                 ((uiop:directory-exists-p new-path)
                  (navigate-to-directory new-path))
-                ;; File - just show status
                 ((uiop:file-exists-p new-path)
                  (status-message-result (format nil "File: ~A" item)))
-                ;; Can't access
                 (t
                  (status-message-result
-                   (format nil "Cannot access: ~A" item))))))))
-
-      ;; Terminal resized - update listbox height
-      ((cons (eql :terminal-resized))
+                  (format nil "Cannot access: ~A" item)))))))))
+      ((and (consp message) (eq (first message) :terminal-resized))
        (let* ((msg-data (rest message))
               (term-height (getf msg-data :height))
               (available-height (max 5 (- term-height 5)))
               (lb-model (state-ref app-state :listbox-model))
               (current-height (listbox-model-height lb-model)))
          (if (= available-height current-height)
-             (make-update-result) ; No change needed
+             (make-update-result)
              (let ((new-lb-model (regenerate-listbox-model
-                                   lb-model
-                                   :height available-height)))
+                                  lb-model
+                                  :height available-height)))
                (make-update-result
-                 :patches `(((:listbox-model) ,new-lb-model)
+                :patches `(((:listbox-model) ,new-lb-model)
                            (:terminal-width ,(getf msg-data :width))
                            (:terminal-height ,(getf msg-data :height))))))))
-
-      ;; Default: no-op
-      (t (make-update-result)))))
+      (t
+       (make-update-result)))))
 
 ;;;===============================================================
 ;;; View Function
@@ -209,9 +192,7 @@
 ;;; Application Definition
 ;;;===============================================================
 
-(defapplication dirli-app
-  :root-viewport-id :root
-  :initial-state-plist
+(defun %dirli-initial-state ()
   (let* ((current-path (uiop:getcwd))
          (items (list-directory-contents current-path)))
     (list :current-path current-path
@@ -224,7 +205,11 @@
           :status-message "Welcome to Dirli! Navigate directories with arrow keys."
           :should-quit nil
           :terminal-width 80
-          :terminal-height 24))
+          :terminal-height 24)))
+
+(defapplication dirli-app
+  :root-viewport-id :root
+  :initial-state-fn #'%dirli-initial-state
   :root-component-dsl '(:container :id :root)
   :update-fn 'app-update
   :view-fn 'app-view)

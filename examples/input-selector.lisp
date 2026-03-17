@@ -1,9 +1,10 @@
 (uiop:define-package :elmtui.examples.input-selector
   (:use :cl :alexandria :log4cl)
-  (:import-from :log4cl #:log-info #:log-debug)
-  (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
+  (:import-from :log4cl #:log-info)
+  (:import-from :cl-styles.api #:defrule #:defstylesheet #:cls> #:rgb)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.app.api #:run-application)
   (:export #:run-input-selector-app))
 
 (in-package :elmtui.examples.input-selector)
@@ -11,30 +12,39 @@
 ;;;--------------------------------------------------------------
 ;;; Stylesheet Definition
 ;;;--------------------------------------------------------------
-(defstylesheet input-selector-stylesheet
-  (defrule ("selector-container") :background-color (rgb 25 25 25) :color (rgb 200 200 200))
-  (defrule ("input-field")        :background-color (rgb 50 50 50) :color (rgb 255 255 255) :padding 1 :height 1)
-  (defrule ("item")               :padding-left 1 :padding-right 1 :height 1)
-  (defrule ("selected-item")      :background-color (rgb 50 100 150) :color (rgb 255 255 255)
-           :padding-left 1 :padding-right 1 :height 1)
-  (defrule ("status-bar")         :background-color (rgb 50 50 50) :color (rgb 255 255 255) :padding 1 :height 1))
-
-;;;--------------------------------------------------------------
-;;; Sample Data
-;;;--------------------------------------------------------------
+(defparameter input-selector-stylesheet
+  (defstylesheet
+    (defrule (cls> "selector-container")
+      :background-color (rgb 25 25 25)
+      :color (rgb 200 200 200))
+    (defrule (cls> "input-field")
+      :background-color (rgb 50 50 50)
+      :color (rgb 255 255 255)
+      :padding 1
+      :height 1)
+    (defrule (cls> "item")
+      :padding-left 1
+      :padding-right 1
+      :height 1)
+    (defrule (cls> "selected-item")
+      :background-color (rgb 50 100 150)
+      :color (rgb 255 255 255)
+      :padding-left 1
+      :padding-right 1
+      :height 1)
+    (defrule (cls> "status-bar")
+      :background-color (rgb 50 50 50)
+      :color (rgb 255 255 255)
+      :padding 1
+      :height 1)))
 
 (defun generate-sample-items ()
-  "Generate a list of sample items. In a real application, this might read from stdin."
+  "Generate a list of sample items."
   (append
-   (loop for i from 1 to 20
-         collect (format nil "Option ~A" i))
+   (loop for i from 1 to 20 collect (format nil "Option ~A" i))
    (list "Apple" "Banana" "Cherry" "Date" "Elderberry" "Fig" "Grape" "Honeydew")
    (list "Red" "Green" "Blue" "Yellow" "Purple" "Orange" "Pink" "Brown" "Black" "White")
    (list "One" "Two" "Three" "Four" "Five" "Six" "Seven" "Eight" "Nine" "Ten")))
-
-;;;--------------------------------------------------------------
-;;; Application Definition
-;;;--------------------------------------------------------------
 
 (defun %initial-state ()
   (let ((items (generate-sample-items)))
@@ -47,7 +57,6 @@
           :selected-item nil)))
 
 (defun filter-items (items query)
-  "Filter items based on the query string."
   (if (string= query "")
       items
       (remove-if-not
@@ -56,55 +65,62 @@
        items)))
 
 (defun app-update (message app-state)
-  (let ((items          (state-ref app-state :items))
+  (let ((items (state-ref app-state :items))
         (filtered-items (state-ref app-state :filtered-items))
         (selected-index (state-ref app-state :selected-index))
-        (query          (state-ref app-state :query)))
+        (query (state-ref app-state :query)))
     (labels ((ret (&key patch) (make-update-result :patches patch)))
       (cond
         ((and (listp message) (eq (first message) :key-event))
          (let ((key (second message)) (ch (third message)))
            (cond
              ((eql key :arrow-up)
-              (ret :patch `((:selected-index ,(max 0 (1- selected-index))))))
+              (ret :patch `(((:selected-index) ,(max 0 (1- selected-index))))))
              ((eql key :arrow-down)
-              (ret :patch `((:selected-index ,(min (max 0 (1- (length filtered-items))) (1+ selected-index))))))
+              (ret :patch `(((:selected-index)
+                             ,(min (max 0 (1- (length filtered-items))) (1+ selected-index))))))
              ((eql key :return)
               (if (plusp (length filtered-items))
-                  (ret :patch `((:selected-item ,(nth selected-index filtered-items)) (:should-quit t)))
+                  (ret :patch `(((:selected-item) ,(nth selected-index filtered-items))
+                                ((:should-quit) t)))
                   (ret)))
-             ((eql key :escape) (ret :patch '((:should-quit t))))
+             ((eql key :escape) (ret :patch '(((:should-quit) t))))
              ((eql key :backspace)
               (let* ((q (if (plusp (length query)) (subseq query 0 (1- (length query))) ""))
                      (fi (filter-items items q)))
-                (ret :patch `((:query ,q) (:filtered-items ,fi)
-                              (:selected-index ,(min selected-index (max 0 (1- (length fi)))))))))
+                (ret :patch `(((:query) ,q) ((:filtered-items) ,fi)
+                              ((:selected-index) ,(min selected-index (max 0 (1- (length fi)))))))))
              ((and ch (graphic-char-p ch))
               (let* ((q (concatenate 'string query (string ch)))
                      (fi (filter-items items q)))
-                (ret :patch `((:query ,q) (:filtered-items ,fi)
-                              (:selected-index ,(min selected-index (max 0 (1- (length fi)))))))))
+                (ret :patch `(((:query) ,q) ((:filtered-items) ,fi)
+                              ((:selected-index) ,(min selected-index (max 0 (1- (length fi)))))))))
              (t (ret)))))
         ((typep message 'elmtui.core.event-types:key-event)
          (let ((key (elmtui.core.event-types:key-event-key message))
-               (ch  (elmtui.core.event-types:key-event-char message)))
+               (ch (elmtui.core.event-types:key-event-char message)))
            (cond
-             ((eql key :arrow-up)   (ret :patch `((:selected-index ,(max 0 (1- selected-index))))))
-             ((eql key :arrow-down) (ret :patch `((:selected-index ,(min (max 0 (1- (length filtered-items))) (1+ selected-index))))))
-             ((eql key :return)     (if (plusp (length filtered-items))
-                                        (ret :patch `((:selected-item ,(nth selected-index filtered-items)) (:should-quit t)))
-                                        (ret)))
-             ((eql key :escape)     (ret :patch '((:should-quit t))))
+             ((eql key :arrow-up)
+              (ret :patch `(((:selected-index) ,(max 0 (1- selected-index))))))
+             ((eql key :arrow-down)
+              (ret :patch `(((:selected-index)
+                             ,(min (max 0 (1- (length filtered-items))) (1+ selected-index))))))
+             ((eql key :return)
+              (if (plusp (length filtered-items))
+                  (ret :patch `(((:selected-item) ,(nth selected-index filtered-items))
+                                ((:should-quit) t)))
+                  (ret)))
+             ((eql key :escape) (ret :patch '(((:should-quit) t))))
              ((eql key :backspace)
               (let* ((q (if (plusp (length query)) (subseq query 0 (1- (length query))) ""))
                      (fi (filter-items items q)))
-                (ret :patch `((:query ,q) (:filtered-items ,fi)
-                              (:selected-index ,(min selected-index (max 0 (1- (length fi)))))))))
+                (ret :patch `(((:query) ,q) ((:filtered-items) ,fi)
+                              ((:selected-index) ,(min selected-index (max 0 (1- (length fi)))))))))
              ((and ch (graphic-char-p ch))
               (let* ((q (concatenate 'string query (string ch)))
                      (fi (filter-items items q)))
-                (ret :patch `((:query ,q) (:filtered-items ,fi)
-                              (:selected-index ,(min selected-index (max 0 (1- (length fi)))))))))
+                (ret :patch `(((:query) ,q) ((:filtered-items) ,fi)
+                              ((:selected-index) ,(min selected-index (max 0 (1- (length fi)))))))))
              (t (ret)))))
         (t (ret))))))
 
@@ -129,10 +145,8 @@
 
 (defapplication input-selector-app
   :root-viewport-id :selector-root
-  :initial-state-plist (%initial-state)
-  :root-component-dsl '(:layout :id :selector-container)
+  :initial-state-fn #'%initial-state
+  :root-component-dsl '(:root-viewport :id :selector-root)
   :update-fn 'app-update
   :view-fn 'input-selector-view)
 
-(defun run-input-selector-app ()
-  (log-info "Input selector app registered. Launch via your runner (e.g., run.sh)."))

@@ -204,7 +204,7 @@
 
 (defapplication fzy-picker
   :root-viewport-id :fzy-root
-  :initial-state-plist (initial-state)
+  :initial-state-fn #'initial-state
   :root-component-dsl '(:root-viewport :id :fzy-root :anchor :below-cursor
                          :height 12 :child-dsl-spec (:view nil))
   :update-fn 'fzy-update
