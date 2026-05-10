@@ -6,9 +6,8 @@
   :author       "User <user@archlinux>"
   :license      "GNU GPL, version 3"
   :depends-on   (:elmtui)
-  :pathname "./src/tools/"
-  :components ((:file "packager"))
+  :components ((:module "src/tools"
+                 :components ((:file "packager"))))
   :build-operation "program-op"
   :build-pathname "elmtui-packager"
   :entry-point "elmtui.packager:main")
-

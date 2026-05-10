@@ -11,10 +11,9 @@
                 :command-execution-error)
   (:import-from :elmtui.core.globals
    :*app-sender*)
+  (:import-from :elmtui.cl-state.message-normalization
+                #:validate-message-instance)
   (:import-from :elmtui.state.msg
-   :message-schema #:message-schema-name #:message-schema-variants #:message-schema-docstring
-   :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
-                :arg-def #:arg-def-type #:arg-def-keyword
    :*message-schemas*)
 
   (:import-from :elmtui.core.event-types
@@ -220,53 +219,15 @@ Stub for richer contract registration and enforcement."
 
 (defun validate-message-via-schema (msg message-type-name schema)
   "Validates MSG data (a list) against the schema from DEFMSG."
-  (unless (listp (message-data msg))
-    (signal 'elmtui.core.conditions:message-validation-error
-            :message msg
-            :reason (format nil "Message data for ~S is not a list: ~S" message-type-name (message-data msg)))
-    (return-from validate-message-via-schema nil))
-
-  (let* ((msg-data-list (message-data msg))
-         (variant-key (first msg-data-list))
-         (variant-def (find variant-key (message-schema-variants schema) :key #'variant-definition-name)))
-
-    (unless variant-def
+  (declare (ignore schema))
+  (multiple-value-bind (canonical reason)
+      (validate-message-instance message-type-name (message-data msg))
+    (unless canonical
       (signal 'elmtui.core.conditions:message-validation-error
               :message msg
-              :reason (format nil "Unknown variant ~S for message type ~S." variant-key message-type-name))
+              :reason reason)
       (return-from validate-message-via-schema nil))
-
-    (let ((expected-args (variant-definition-args variant-def))
-          (provided-args-plist (rest msg-data-list)))
-
-      ;; Check for correct number of arguments (keyword pairs)
-      (unless (= (length provided-args-plist) (* 2 (length expected-args)))
-        (signal 'elmtui.core.conditions:message-validation-error
-                :message msg
-                :reason (format nil "Incorrect number of arguments for variant ~S of ~S. Expected ~A, got ~A."
-                                variant-key message-type-name (* 2 (length expected-args)) (length provided-args-plist)))
-        (return-from validate-message-via-schema nil))
-
-
-      ;; Check keywords and types
-      (loop for arg-def in expected-args
-            for expected-keyword = (arg-def-keyword arg-def)
-            for expected-type = (arg-def-type arg-def)
-            for value = (getf provided-args-plist expected-keyword :not-found)
-            do
-               (when (eq value :not-found)
-                 (signal 'elmtui.core.conditions:message-validation-error
-                         :message msg
-                         :reason (format nil "Missing keyword argument ~S for variant ~S of ~S."
-                                         expected-keyword variant-key message-type-name))
-                 (return-from validate-message-via-schema nil))
-               (unless (typep value expected-type)
-                 (signal 'elmtui.core.conditions:message-validation-error
-                         :message msg
-                         :reason (format nil "Type error for argument ~S in variant ~S of ~S. Expected ~S, got ~S (value: ~S)."
-                                         expected-keyword variant-key message-type-name expected-type (type-of value) value))
-                 (return-from validate-message-via-schema nil))))
-    t)) ; Validation passed
+    t))
 
 (defun validate-message (msg)
   "Validate MSG against its explicit contract or its schema from DEFMSG.

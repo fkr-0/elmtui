@@ -16,7 +16,8 @@
            #:app-config-name #:app-config-root-component-dsl #:app-config-initial-state-plist
            #:app-config-update-fn-sym #:app-config-view-fn-sym #:app-config-subscriptions-fn-form
            #:app-config-binary-options #:app-config-cli-options #:app-config-configure-fn
-           #:validate-platform-options))
+           #:validate-platform-options
+           #:get-cli-arg))
 
 (in-package #:elmtui.app.api)
 
@@ -96,6 +97,13 @@
 ;;(declaim (ftype (function (t &key (:backend-type keyword) (:platform-options list)) t) run-application))
 (defgeneric run-application (app-spec &key backend-type platform-options)
   (:documentation "Run the application with the given app-spec and platform options."))
+
+(defun get-cli-arg (state key &optional default)
+  "Read CLI argument KEY from STATE at (:cli KEY), returning DEFAULT when absent."
+  (let* ((k (%kw key))
+         (marker (list :missing))
+         (value (get-path (list :cli k) state marker)))
+    (if (eq value marker) default value)))
 
 ;;(declaim (ftype (function (t t &key (:id-path list)) t) process-command-default))
 (defgeneric process-command-default (command state &key id-path)

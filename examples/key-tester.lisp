@@ -86,6 +86,9 @@
       ((and (typep message 'key-event) (eq (key-event-key message) #\q))
        (make-update-result :patches '((:should-quit t))))
 
+      ((and (listp message) (eq (first message) :app-quit-requested))
+       (make-update-result :patches '((:should-quit t))))
+
       ;; --- Messages from our Keymap Actions ---
       ((equal message '(:delete-last-char))
        (let ((new-comp (kt-handle-delete-last (copy-structure component))))
@@ -153,8 +156,13 @@
 (defapplication key-tester-app
   :root-viewport-id :key-tester-root
   :initial-state-fn #'%key-tester-initial-state
-  ;; The root component DSL must define the component that the view function renders.
-  :root-component-dsl '(:layout :id :key-tester-widget)
+  ;; Make the root viewport explicit so this app behaves like an inline terminal tool
+  ;; instead of inheriting whatever the default wrapper happens to do.
+  :root-component-dsl '(:root-viewport
+                        :id :key-tester-root
+                        :anchor :below-cursor
+                        :blank-on-exit t
+                        :children (:layout :id :key-tester-widget))
   :update-fn 'key-tester-update
   :view-fn 'key-tester-view)
 

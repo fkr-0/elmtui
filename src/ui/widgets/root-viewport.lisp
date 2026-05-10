@@ -294,6 +294,8 @@ Returns two values: INSTANCE and CHILD-ID-PATH."
                                 initial-child-spec
                                 child-dsl-spec
                                 dsl
+                                initial-terminal-dimensions
+                                initial-cursor-pos
                                 width
                                 height
                                 style
@@ -310,7 +312,7 @@ Returns two values: INSTANCE and CHILD-ID-PATH."
           (anchor (normalize-anchor (or anchor
                                       (getf plist :anchor)
                                       (and style (getf style :anchor))
-                                      :top-left)))
+                                      :below-cursor)))
           (overflow-policy (or overflow-policy
                              (getf plist :overflow-policy)
                              (and style (getf style :overflow-policy))
@@ -323,6 +325,28 @@ Returns two values: INSTANCE and CHILD-ID-PATH."
                                   (getf plist :height)
                                   (and style (getf style :height)))))
                          (and (numberp h) h)))
+          (initial-term-size
+            (let* ((raw (or initial-terminal-dimensions
+                          (getf plist :initial-terminal-dimensions)
+                          '(80 24)))
+                    (cols (if (and (listp raw) (numberp (first raw)))
+                              (first raw)
+                              80))
+                    (rows (if (and (listp raw) (numberp (second raw)))
+                              (second raw)
+                              24)))
+              (list (max 1 cols) (max 1 rows))))
+          (initial-cursor
+            (let* ((raw (or initial-cursor-pos
+                          (getf plist :initial-cursor-pos)
+                          '(0 0)))
+                    (col (if (and (listp raw) (numberp (first raw)))
+                             (first raw)
+                             0))
+                    (row (if (and (listp raw) (numberp (second raw)))
+                             (second raw)
+                             0)))
+              (list (max 0 col) (max 0 row))))
           (blank-on-exit (multiple-value-bind (plist-val plist-present-p)
                            (rv-plist-lookup plist :blank-on-exit)
                            (multiple-value-bind (style-val style-present-p)
@@ -347,7 +371,11 @@ Returns two values: INSTANCE and CHILD-ID-PATH."
           (rv-make-patch id-path '(:anchor-pos) ap)
           (rv-make-patch id-path '(:anchor-growth) growth)
           ;; env info
-          (rv-make-patch id-path '(:initial-cursor-pos) nil)
+          (rv-make-patch id-path '(:initial-cursor-pos) initial-cursor)
+          (rv-make-patch id-path '(:cursor-pos) initial-cursor)
+          (rv-make-patch id-path '(:pos-known) t)
+          (rv-make-patch id-path '(:terminal-size) initial-term-size)
+          (rv-make-patch id-path '(:size-known) t)
           ;; policies / book-keeping
           (rv-make-patch id-path '(:overflow-policy) overflow-policy)
           (rv-make-patch id-path '(:issued-scroll-net) 0)

@@ -141,9 +141,10 @@ Returns the message, or NIL on timeout / no data."
                       (+ (get-internal-real-time)
                          (* timeout internal-time-units-per-second)))))
     (loop
-      ;; fast path: data already waiting?
-      (when (no-wait raw :send nil)
-        (return (receive-event chan)))
+      ;; non-blocking receive; NO-WAIT consumes one message when present.
+      (let ((msg (no-wait raw :send nil)))
+        (when msg
+          (return msg)))
       ;; timed-out?
       (when (and deadline ; Only check deadline if it was calculated
                  (> (get-internal-real-time) deadline))
@@ -205,31 +206,21 @@ Returns the message, or NIL on timeout / no data."
    Use timeout to limit the wait duration in case you want to realize some
    responsiveness in your application. If TIMEOUT is NIL or not positive,
     the function will block indefinitely until an event is received."
-  (let* ((sorted-event-channels (stable-sort (copy-seq event-channels) ; Sort the wrapper objects
-                                             #'<
-                                             :key (lambda (ec) ; ec is an event-channel object
-                                                    (%priority-weight (priority ec)))))
-         (deadline  (when (and timeout (plusp timeout)) ; Ensure timeout is positive
+  (let* ((deadline  (when (and timeout (plusp timeout)) ; Ensure timeout is positive
                       (+ (get-internal-real-time)
                          (* timeout internal-time-units-per-second)))))
-    (log-debug :event-channels.wait "WAIT-FOR-EVENT: Start poll. Timeout: ~A s. Deadline: ~A" timeout deadline)
     (loop named event-poll-loop
           ;; 1) scan in priority order ---------------------------------
-          do (dolist (ec sorted-event-channels) ; ec is an event-channel wrapper object
+          do (dolist (ec event-channels) ; caller should pass channels in priority order
                (let ((raw-channel (channel-of ec)))
-                 (if (no-wait raw-channel :send nil) ; Use channel-of to get raw channel
-                     (progn
-                       (log-debug :event-channels.wait "WAIT-FOR-EVENT: Data ready on ~S; receiving." (name ec))
-                       (let ((event (receive-event ec)))
-                         (log-debug :event-channels.wait "WAIT-FOR-EVENT: Received ~S from ~S." event (name ec))
-                         (return-from event-poll-loop (values event ec))))
-                     nil
-                     )))
+                 ;; NO-WAIT performs the receive itself when data is available.
+                 (let ((event (no-wait raw-channel :send nil)))
+                   (when event
+                     (return-from event-poll-loop (values event ec))))))
              ;; 2) maybe timeout? -----------------------------------------
           when (and deadline ; Only check deadline if it was calculated
                     (> (get-internal-real-time) deadline))
             do (progn
-                 (log-debug :event-channels.wait "WAIT-FOR-EVENT: Timeout expired.")
                  (return-from event-poll-loop nil))
                ;; 3) short pause – avoids pegging a core --------------------
           do (progn

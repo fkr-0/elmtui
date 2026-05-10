@@ -1,85 +1,127 @@
 ;;; src/tools/packager.lisp
-;;; Simple packager to dump a fast-boot executable Lisp image (SBCL)
+;;; Packager for dumping a fast-boot executable image (SBCL)
 
 (uiop:define-package :elmtui.packager
   (:use :cl)
   (:import-from :asdf #:load-system)
-  (:import-from :uiop #:command-line-arguments)
+  (:import-from :uiop #:command-line-arguments #:ensure-pathname #:quit)
   (:export #:main))
 
 (in-package :elmtui.packager)
 
 (defun print-usage (&optional (stream *standard-output*))
   (format stream
-    "Usage: elmtui-packager [options]\n\n~
-           Options:\n~
-             --system|-s <asdf-system>    Load ASDF system before dumping\n~
-             --file|-f   <file.lisp>      Load a Lisp file before dumping\n~
-             --eval|-e   <form>           Eval a Lisp form before dumping\n~
-             --entry|-E  <pkg:sym>        Entry function for dumped image\n~
-             --output|-o <path>           Output binary path\n~
-           Examples:\n~
-             elmtui-packager -s elmtui -E elmtui:dev-main -o ./elmtui-dev\n~
-             elmtui-packager -s elmtui -f examples/fzy-picker.lisp \\\n+                              -E elmtui.examples.fzy-picker:run-fzy-picker -o ./fzy\n"))
+          "Usage: elmtui-packager [options]~%~%~
+Options:~%~
+  --system|-s <asdf-system>    Load ASDF system before dumping~%~
+  --file|-f   <file.lisp>      Load a Lisp file before dumping~%~
+  --eval|-e   <form>           Eval a Lisp form before dumping~%~
+  --entry|-E  <pkg:sym>        Entry function for dumped image~%~
+  --output|-o <path>           Output binary path~%~
+  --help|-h                    Print this help~%~%~
+Examples:~%~
+  elmtui-packager -s elmtui -E my-app:run -o ./my-app~%~
+  elmtui-packager -s elmtui -f examples/fzy-picker.lisp -E elmtui.examples.fzy-picker:run-fzy-picker -o ./fzy~%"))
 
-(defun parse-args (argv)
-  (let ((systems '()) (files '()) (evals '()) (entry nil) (output nil))
-    (loop for (opt val . rest) on argv by #'cddr do
-      (flet ((ensure-value () (or val (error "Missing value for option ~A" opt))))
-        (case (intern (string-upcase opt) :keyword)
-          ((:--SYSTEM :-S) (push (ensure-value) systems))
-          ((:--FILE   :-f) (push (uiop:ensure-pathname (ensure-value)) files))
-          ((:--EVAL   :-e) (push (ensure-value) evals))
-          ((:--ENTRY  :-X :--ENTRYPOINT)
-            (setf entry (ensure-value)))
-          ((:--OUTPUT :-o) (setf output (uiop:ensure-pathname (ensure-value))))
-          (t (error "Unknown option: ~A" opt)))))
-    (values (nreverse systems) (nreverse files) (nreverse evals) entry output)))
-
-(defun maybe-read-symbol (s)
-  (when s
-    (multiple-value-bind (sym pos) (ignore-errors (read-from-string s))
+(defun %read-form (text)
+  (let ((*read-eval* nil))
+    (multiple-value-bind (form pos)
+        (read-from-string text nil nil)
       (declare (ignore pos))
-      (unless sym (error "Cannot read entry symbol from ~S" s))
-      sym)))
+      (unless form
+        (error "Could not read Lisp form from ~S" text))
+      form)))
 
-(defun ensure-entry-fn (entry-spec)
-  (let* ((sym (maybe-read-symbol entry-spec))
-          (fn  (and sym (symbol-function sym))))
-    (unless (and sym (fboundp sym))
+(defun %parse-args (argv)
+  "Return plist with keys :systems :files :evals :entry :output." 
+  (let ((systems '())
+        (files '())
+        (evals '())
+        (entry nil)
+        (output nil)
+        (help nil)
+        (i 0)
+        (n (length argv)))
+    (labels ((at-end-p () (>= i n))
+             (current () (elt argv i))
+             (next-value ()
+               (when (>= (1+ i) n)
+                 (error "Missing value for option ~A" (current)))
+               (prog1 (elt argv (1+ i))
+                 (incf i 2))))
+      (loop until (at-end-p) do
+        (let ((arg (current)))
+          (cond
+            ((or (string= arg "-h") (string= arg "--help"))
+             (setf help t)
+             (incf i 1))
+            ((or (string= arg "-s") (string= arg "--system"))
+             (push (next-value) systems))
+            ((or (string= arg "-f") (string= arg "--file"))
+             (push (ensure-pathname (next-value)) files))
+            ((or (string= arg "-e") (string= arg "--eval"))
+             (push (next-value) evals))
+            ((or (string= arg "-E") (string= arg "--entry")
+                 (string= arg "-X") (string= arg "--entrypoint"))
+             (setf entry (next-value)))
+            ((or (string= arg "-o") (string= arg "--output"))
+             (setf output (ensure-pathname (next-value))))
+            (t
+             (error "Unknown option: ~A" arg)))))
+    (list :systems (nreverse systems)
+          :files (nreverse files)
+          :evals (nreverse evals)
+          :entry entry
+          :output output
+          :help help))))
+
+(defun %resolve-entry-function (entry-spec)
+  (let ((sym (%read-form entry-spec)))
+    (unless (and (symbolp sym) (fboundp sym))
       (error "Entry function not fbound: ~A" entry-spec))
-    fn))
+    (symbol-function sym)))
 
-(defun do-dump (output entry-fn)
+(defun %run-load-phase (cfg)
+  (dolist (sys (getf cfg :systems))
+    (load-system sys))
+  (dolist (file (getf cfg :files))
+    (load file))
+  (dolist (form-text (getf cfg :evals))
+    (eval (%read-form form-text))))
+
+(defun %dump-image (output entry-fn)
   #+sbcl
   (progn
     (format t "Dumping image to ~A ...~%" output)
     (finish-output)
     (sb-ext:save-lisp-and-die (namestring output)
-      :toplevel entry-fn
-      :executable t
-      :compression 9))
+                              :toplevel entry-fn
+                              :executable t
+                              :compression 9))
   #-sbcl
-  (error "Image dumping currently supported only on SBCL."))
+  (error "Image dumping is currently supported only on SBCL."))
+
+(defun %validate-required-options (cfg)
+  (unless (getf cfg :entry)
+    (error "--entry|-E is required"))
+  (unless (getf cfg :output)
+    (error "--output|-o is required")))
+
+(defun run-packager (&optional (argv (command-line-arguments)))
+  (let ((cfg (%parse-args argv)))
+    (when (or (null argv) (getf cfg :help))
+      (print-usage)
+      (return-from run-packager 0))
+    (%validate-required-options cfg)
+    (%run-load-phase cfg)
+    (let ((entry-fn (%resolve-entry-function (getf cfg :entry))))
+      (%dump-image (getf cfg :output) entry-fn))
+    0))
 
 (defun main ()
-  (let ((argv (command-line-arguments)))
-    (handler-case
-      (progn
-        (when (or (null argv) (member "-h" argv :test #'string=)
-                (member "--help" argv :test #'string=))
-          (print-usage)
-          (uiop:quit 0))
-        (multiple-value-bind (systems files evals entry-spec output)
-          (parse-args argv)
-          (dolist (sys systems) (load-system sys))
-          (dolist (f files) (load f))
-          (dolist (form evals) (eval (read-from-string form)))
-          (unless entry-spec (error "--entry is required"))
-          (unless output (error "--output is required"))
-          (let ((entry (ensure-entry-fn entry-spec)))
-            (do-dump output entry))))
-      (error (e)
-        (format *error-output* "Packager error: ~A~%" e)
-        (print-usage *error-output*)
-        (uiop:quit 2)))))
+  (handler-case
+      (quit (run-packager))
+    (error (e)
+      (format *error-output* "Packager error: ~A~%" e)
+      (print-usage *error-output*)
+      (quit 2))))

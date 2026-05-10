@@ -114,7 +114,8 @@ the same (row,col) ordering as the backend cursor API."
                  (lambda (&key device)
                    (declare (ignore device))
                    :mock-input-source))
-           ;; Canonical order for cursor API is (row, col).
+           ;; get-cursor-position returns 0-indexed (row, col);
+           ;; the publish event adds 1 to convert to 1-indexed for root-viewport.
            (setf (symbol-function 'cl-inputs.terminal.api:get-cursor-position)
                  (lambda (_dev)
                    (declare (ignore _dev))
@@ -143,8 +144,10 @@ the same (row,col) ordering as the backend cursor API."
                                                (eq (car evt) :cursorposition)))
                                         (reverse events))))
              (is-true cursor-event)
-             (is (= 7 (getf (cdr cursor-event) :row)))
-             (is (= 33 (getf (cdr cursor-event) :col)))))
+             (is (= 8 (getf (cdr cursor-event) :row))
+               "row must be 1-indexed (0-indexed 7 + 1 = 8) for root-viewport %cursor->index")
+             (is (= 34 (getf (cdr cursor-event) :col))
+               "col must be 1-indexed (0-indexed 33 + 1 = 34) for root-viewport %cursor->index")))
       (setf (symbol-function 'cl-inputs.device.api:device-output-stream) orig-device-output-stream
             (symbol-function 'cl-inputs.api:make-ready-input-source) orig-make-ready-input-source
             (symbol-function 'cl-inputs.terminal.api:get-cursor-position) orig-get-cursor-position

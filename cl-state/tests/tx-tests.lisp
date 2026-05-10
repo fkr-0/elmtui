@@ -71,6 +71,17 @@
       (state-set state '(:outer :inner) 42))
     (is (= 42 (state-ref state '(:outer :inner))))))
 
+(test with-transaction-preserves-multiple-values
+  "with-transaction should preserve all values produced by the wrapped body."
+  (let ((state (make-state)))
+    (multiple-value-bind (a b c)
+        (with-transaction (state :name :multi-values)
+          (state-set state :a 1)
+          (values :x :y :z))
+      (is (eq :x a))
+      (is (eq :y b))
+      (is (eq :z c)))))
+
 ;;; undo tests
 
 (test undo-single-change
