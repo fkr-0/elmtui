@@ -21,6 +21,8 @@
 (defparameter *counter-a-id* :counter-a)
 (defparameter *info-label-id* :info-label)
 
+(declaim (ftype (function () list) app-component-keymaps))
+
 ;;;--------------------------------------------------------------
 ;;; Application Definition
 ;;;--------------------------------------------------------------
@@ -93,28 +95,31 @@
     (make-update-result :patches (nreverse patches) :commands commands)))
 
 (defun app-view (app-state)
-  "Main application view function. Uses the elmtui.view.dsl:view macro."
-  (list :layout (list :display :flex :flex-direction :row :spacing 1)
-        (list :label (list :id *info-label-id*
-                           :text (get-path (list :components *info-label-id* :text) app-state )))
-        (let* ((counter-st (get-path (list :components *counter-a-id*) app-state)))
-          (list :counter (list :id *counter-a-id*
-                               :value (getf counter-st :value))))))
+  "Main application view function using current keyword-headed DSL nodes."
+  (let ((counter-st (get-path (list :components *counter-a-id*) app-state)))
+    `(:layout :style (:display :flex :flex-direction :row :spacing 1)
+      :children
+      ((:label :id ,*info-label-id*
+               :text ,(get-path (list :components *info-label-id* :text) app-state))
+       (:counter :id ,*counter-a-id*
+                 :value ,(getf counter-st :value))))))
 
-(defun main ()
-  "Run the keymap example application."
-  (run-keymap-example-app)) ; Corrected to call the generated run function
 (defapplication keymap-example-app
-  :root-viewport-id :my-root-viewport ; Changed from :rid for clarity
+  :root-viewport-id :my-root-viewport
   :root-component-dsl
-  '(box-layout ; Root component DSL should be a quoted list
-    :orientation :vertical
-    :spacing 1
-    :children (list ; Explicit list for children
-               '(label :id *info-label-id*
-                 :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit.")
-               '(counter :id *counter-a-id* :value 10)))
+  '(:layout :id :keymap-root-layout
+    :style (:display :flex :flex-direction :column :spacing 1)
+    :children
+    ((:label :id :info-label
+             :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit.")
+     (:counter :id :counter-a :value 10)))
   :initial-state-fn #'app-init
   :update-fn #'app-update
   :view-fn #'app-view
-  :command-processor-fn #'(lambda (command mq state cfg) (declare (ignore command mq state cfg)) nil))
+  :command-processor-fn #'(lambda (command mq state cfg)
+                            (declare (ignore command mq state cfg))
+                            nil))
+
+(defun main ()
+  "Run the keymap example application."
+  (run-keymap-example-app))
