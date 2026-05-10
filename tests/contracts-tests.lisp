@@ -203,7 +203,11 @@
 
   ;; Wrong format
   (signals message-contract-violation
-    (validate-typed-message :simple-keyword 'TestMsg)))
+    (validate-typed-message :simple-keyword 'TestMsg))
+
+  ;; Wrong argument type
+  (signals message-contract-violation
+    (validate-typed-message '(:parameterized-message :value "bad") 'TestMsg)))
 
 (test contracts-hybrid-message-validation
   "Test hybrid message validation accepts both typed and flexible"
@@ -237,19 +241,26 @@
   (signals message-contract-violation
     (validate-strict-message '(:invalid-variant) 'TestMsg)))
 
+(test contracts-update-signature-order-guardrails
+  "Regression guard: detect obvious (model message) ordering drift."
+  (signals error
+    (macroexpand-1
+     '(defupdate-flexible bad-order-update (model message)
+        (values model nil)))))
+
 ;;;--------------------------------------------------------------
 ;;; Update Function Contract Tests
 ;;;--------------------------------------------------------------
 
 ;; Mock update functions for testing
-(defupdate-flexible test-flexible-update (model message)
+(defupdate-flexible test-flexible-update (message model)
   "Test flexible update function"
   (case message
     (:increment (values (list :count (1+ (getf model :count 0))) nil))
     (:decrement (values (list :count (1- (getf model :count 0))) nil))
     (t (values nil nil))))
 
-(defupdate-typed test-typed-update (model message) TestMsg
+(defupdate-typed test-typed-update (message model) TestMsg
   "Test typed update function"
   (let ((new-model (copy-list model)))
     (case (first message)
@@ -259,7 +270,7 @@
        (values (append new-model (list :value (getf (rest message) :value))) nil))
       (t (values model nil)))))
 
-(defupdate-hybrid test-hybrid-update (model message)
+(defupdate-hybrid test-hybrid-update (message model)
                   :message-type TestMsg :prefer-typed t
                   "Test hybrid update function"
 
@@ -280,19 +291,19 @@
 
     ;; Valid operations
     (multiple-value-bind (new-model commands)
-        (test-flexible-update test-model :increment)
+        (test-flexible-update :increment test-model)
       (is (equal '(:count 6) new-model))
       (is (null commands)))
 
     ;; Unknown message handling
     (multiple-value-bind (new-model commands)
-        (test-flexible-update test-model :unknown)
+        (test-flexible-update :unknown test-model)
       (is (null new-model))
       (is (null commands)))
 
     ;; Invalid model input
     (signals update-contract-violation
-      (test-flexible-update "invalid-model" :increment))))
+      (test-flexible-update :increment "invalid-model"))))
 
 (test contracts-typed-update-contracts
   "Test typed update function contract enforcement"
@@ -300,23 +311,23 @@
 
     ;; Valid typed message
     (multiple-value-bind (new-model commands)
-        (test-typed-update test-model (make-simple-message-testmsg))
+        (test-typed-update (make-simple-message-testmsg) test-model)
       (is (equalp '(:count 5 :triggered t) new-model))
       (is (null commands)))
 
     ;; Valid parameterized message
     (multiple-value-bind (new-model commands)
-        (test-typed-update test-model (make-parameterized-message-testmsg :value 42))
+        (test-typed-update (make-parameterized-message-testmsg :value 42) test-model)
       (is (equalp '(:count 5 :value 42) new-model))
       (is (null commands)))
 
     ;; Invalid message type
     (signals message-contract-violation
-      (test-typed-update test-model :invalid-message))
+      (test-typed-update :invalid-message test-model))
 
     ;; Invalid model input
     (signals update-contract-violation
-      (test-typed-update '(:invalid :model :structure) (make-simple-message-testmsg)))))
+      (test-typed-update (make-simple-message-testmsg) '(:invalid :model :structure)))))
 
 (test contracts-hybrid-update-contracts
   "Test hybrid update function contract enforcement"
@@ -324,19 +335,19 @@
 
     ;; Typed message
     (multiple-value-bind (new-model commands)
-        (test-hybrid-update test-model (make-simple-message-testmsg))
+        (test-hybrid-update (make-simple-message-testmsg) test-model)
       (is (equalp '(:count 11) new-model))
       (is (null commands)))
 
     ;; Flexible message
     (multiple-value-bind (new-model commands)
-        (test-hybrid-update test-model :increment)
+        (test-hybrid-update :increment test-model)
       (is (equalp '(:count 11) new-model))
       (is (null commands)))
 
     ;; Unknown message
     (multiple-value-bind (new-model commands)
-        (test-hybrid-update test-model :unknown)
+        (test-hybrid-update :unknown test-model)
       (is (equalp new-model test-model))
       (is (null commands)))))
 
@@ -431,7 +442,7 @@
   (enable-contract-debugging t)
 
   ;; Execute some operations to generate logs
-  (test-flexible-update '(:count 1) :increment)
+  (test-flexible-update :increment '(:count 1))
   (test-view-function '(:count 1))
   (test-subscriptions '(:active t))
 
@@ -456,11 +467,11 @@
   (enable-contract-debugging t)
 
   ;; Generate some message activity
-  (test-flexible-update '(:count 1) :increment)
-  (test-flexible-update '(:count 2) :decrement)
-  (test-typed-update '(:value 0) (make-simple-message-testmsg))
-  (test-hybrid-update '(:count 3) :increment)
-  (test-hybrid-update '(:count 4) (make-simple-message-testmsg))
+  (test-flexible-update :increment '(:count 1))
+  (test-flexible-update :decrement '(:count 2))
+  (test-typed-update (make-simple-message-testmsg) '(:value 0))
+  (test-hybrid-update :increment '(:count 3))
+  (test-hybrid-update (make-simple-message-testmsg) '(:count 4))
 
   ;; Analyze usage patterns
   (let ((analysis (analyze-message-usage)))
@@ -530,15 +541,15 @@
 
     ;; Flexible -> Typed -> Hybrid chain
     (multiple-value-bind (model1 _)
-        (test-flexible-update model :increment)
+        (test-flexible-update :increment model)
       (declare (ignore _))
 
       (multiple-value-bind (model2 _)
-          (test-typed-update model1 (make-simple-message-testmsg))
+          (test-typed-update (make-simple-message-testmsg) model1)
         (declare (ignore _))
 
         (multiple-value-bind (model3 _)
-            (test-hybrid-update model2 :increment)
+            (test-hybrid-update :increment model2)
           (declare (ignore _))
 
           ;; Final model should reflect all changes
@@ -557,7 +568,7 @@
 
     ;; Run many contract-enforced operations
     (dotimes (i iterations)
-      (test-flexible-update test-model :increment))
+      (test-flexible-update :increment test-model))
 
     (let* ((end-time (get-internal-real-time))
            (elapsed (/ (- end-time start-time) internal-time-units-per-second)))

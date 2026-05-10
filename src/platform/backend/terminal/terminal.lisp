@@ -172,20 +172,39 @@
                       :cl-device device
                       :input-source (and device (cl-inputs.api:make-ready-input-source :device device))
                       :publish-fn publish-fn)))
-      (multiple-value-bind (col row) (cl-inputs.terminal.api:get-cursor-position device)
-        (setf (terminal-instance-cursor-row instance) (or row 0)
-          (terminal-instance-cursor-start-row instance) (or row 0)
-          (terminal-instance-cursor-start-col instance) (or col 0)
-          (terminal-instance-cursor-col instance) (or col 0))
+      (let* ((row 0)
+             (col 0)
+             (width 80)
+             (height 24))
+        ;; Cursor probes can time out on some pseudo terminals; keep sane defaults.
+        (handler-case
+            (multiple-value-bind (r c) (cl-inputs.terminal.api:get-cursor-position device)
+              (when (and (numberp r) (>= r 0))
+                (setf row r))
+              (when (and (numberp c) (>= c 0))
+                (setf col c)))
+          (error (e)
+            (log-warn "TERMINAL: Failed to read initial cursor position; using defaults: ~A" e)))
+        ;; Dimension probes can also fail in non-interactive environments.
+        (handler-case
+            (multiple-value-bind (w h) (cl-inputs.terminal.api:get-terminal-size device)
+              (when (and (numberp w) (> w 0))
+                (setf width w))
+              (when (and (numberp h) (> h 0))
+                (setf height h)))
+          (error (e)
+            (log-warn "TERMINAL: Failed to read initial terminal size; using defaults: ~A" e)))
+        (setf (terminal-instance-cursor-row instance) row
+              (terminal-instance-cursor-start-row instance) row
+              (terminal-instance-cursor-start-col instance) col
+              (terminal-instance-cursor-col instance) col
+              (terminal-instance-width instance) width
+              (terminal-instance-height instance) height)
         (when publish-fn
-          (funcall publish-fn (make-cursorposition-systemevent :col col :row row))))
-      (multiple-value-bind (w h) (cl-inputs.terminal.api:get-terminal-size device)
-        (setf (terminal-instance-width instance) w
-          (terminal-instance-height instance) h)
-        (when publish-fn
-          (funcall publish-fn (make-terminalresized-systemevent :width w :height h)))
-        (let ((front (make-virtual-buffer w h))
-               (back (make-virtual-buffer w h)))
+          (funcall publish-fn (make-cursorposition-systemevent :col (1+ col) :row (1+ row)))
+          (funcall publish-fn (make-terminalresized-systemevent :width width :height height)))
+        (let ((front (make-virtual-buffer width height))
+               (back (make-virtual-buffer width height)))
           (setf (terminal-instance-front-buffer instance) front
             (terminal-instance-back-buffer instance) back)))
       (setup-terminal-signal-handlers instance publish-fn)
@@ -325,7 +344,7 @@
       (log-info "TERMINAL: Shutdown Error: " e )
       (log:error "TERMINAL: Error during primary shutdown: ~A" e)))
 
-  (handler-case (sb-ext:run-program "/bin/stty" '("sane") :search t :input nil :output nil :error :output)
+  (handler-case (sb-ext:run-program "/bin/stty" '("sane") :search t :input nil :output nil :error nil)
     (error (e)
       (log-info "TERMINAL: stty sane Error: " e )
       (log:error "TERMINAL: stty sane failed: ~A" e)))

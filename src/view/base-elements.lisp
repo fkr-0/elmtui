@@ -287,13 +287,18 @@ Avoids running validation during initialize-instance to keep control over timing
         (make-hash-table :test 'eq))))
 
 (defparameter *computed* (make-computed-table))
+(defparameter *computed-lock*
+  (bordeaux-threads:make-recursive-lock "elmtui.view.base-elements.computed-lock")
+  "Protects concurrent access to *computed* and per-element computed property plists.")
 
 (defun %props (el)
-  (or (gethash el *computed*)
-      (setf (gethash el *computed*) nil)))
+  (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
+    (or (gethash el *computed*)
+        (setf (gethash el *computed*) nil))))
 
 (defun (setf %props) (plist el)
-  (setf (gethash el *computed*) plist))
+  (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
+    (setf (gethash el *computed*) plist)))
 
 (defun element-props (el) (%props el))
 (defun (setf element-props) (plist el) (setf (%props el) plist))
@@ -305,20 +310,25 @@ Avoids running validation during initialize-instance to keep control over timing
 ;; (defun (setf element-layout) (val el)
 ;;   (setf (getf (%props el) :layout) val))
 
-(defun element-dirty-p (el) (getf (%props el) :dirty))
+(defun element-dirty-p (el)
+  (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
+    (getf (%props el) :dirty)))
 (defun (setf element-dirty-p) (flag el)
-  (setf (getf (%props el) :dirty) (and flag t)))
+  (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
+    (setf (getf (%props el) :dirty) (and flag t))))
 
 (defun snapshot-props-for-diff (el)
-  (let* ((p (%props el)))
-    (setf (getf p :prev-size)   (getf p :size))
-    (setf (getf p :prev-layout) (getf p :layout))
-    p))
+  (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
+    (let* ((p (%props el)))
+      (setf (getf p :prev-size)   (getf p :size))
+      (setf (getf p :prev-layout) (getf p :layout))
+      p)))
 
 (defun element-changed-p (el)
-  (let* ((p (%props el)))
-    (or (not (equal (getf p :size)   (getf p :prev-size)))
-        (not (equal (getf p :layout) (getf p :prev-layout))))))
+  (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
+    (let* ((p (%props el)))
+      (or (not (equal (getf p :size)   (getf p :prev-size)))
+          (not (equal (getf p :layout) (getf p :prev-layout)))))))
 
 
 ;;;----------------------------------------------------------------

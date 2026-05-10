@@ -207,6 +207,34 @@
     :backend-type backend-type
     :platform-options platform-options))
 
+(defun %resolve-generated-runner (app-name)
+  "Resolve DEFAPPLICATION-generated RUN-<APP-NAME> function symbol."
+  (let* ((runner-name (format nil "RUN-~A" app-name))
+         (runner-sym (find-symbol runner-name (symbol-package app-name))))
+    (and runner-sym (fboundp runner-sym) runner-sym)))
+
+(defmethod elmtui.runtime.protocol:run-application ((app-spec symbol)
+                                                     &key (backend-type :tty)
+                                                     platform-options)
+  "Dispatch symbolic app specs via generated DEFAPPLICATION runner."
+  (let ((runner (%resolve-generated-runner app-spec)))
+    (unless runner
+      (error "RUN-APPLICATION: no generated runner found for app symbol ~S" app-spec))
+    (funcall runner :platform backend-type :platform-options platform-options)))
+
+(defmethod elmtui.runtime.protocol:run-application ((app-spec standard-object)
+                                                     &key (backend-type :tty)
+                                                     platform-options)
+  "Dispatch app instances via their class name runner.
+This keeps compatibility with older examples that pass app instances."
+  (let ((app-name (class-name (class-of app-spec))))
+    (unless (symbolp app-name)
+      (error "RUN-APPLICATION: cannot resolve symbolic app name from class ~S"
+             (class-of app-spec)))
+    (elmtui.runtime.protocol:run-application app-name
+                                             :backend-type backend-type
+                                             :platform-options platform-options)))
+
 
 ;;; ---------------------------------------------------------------------------
 ;;; == Backend Initialization Utilities ==
@@ -439,13 +467,21 @@
   "Emit one startup :terminalresized message through PROC. Always emits."
   (let ((width 80)
          (height 24))
-    (handler-case
-      (multiple-value-bind (w h) (get-screen-dimensions backend)
-        (when (and w h (> w 0) (> h 0))
-          (setf width w
-                height h)))
-      (error (e)
-        (log-warn "DRIVER: Failed to read screen dimensions during startup: ~A" e)))
+    ;; Prefer cached backend dimensions first to avoid blocking probes in weak TTYs.
+    (let ((cached-w (ignore-errors (term-w backend)))
+          (cached-h (ignore-errors (term-h backend))))
+      (when (and (numberp cached-w) (numberp cached-h)
+                 (> cached-w 0) (> cached-h 0))
+        (setf width cached-w
+              height cached-h)))
+    (when (or (<= width 0) (<= height 0))
+      (handler-case
+          (multiple-value-bind (w h) (get-screen-dimensions backend)
+            (when (and (numberp w) (numberp h) (> w 0) (> h 0))
+              (setf width w
+                    height h)))
+        (error (e)
+          (log-warn "DRIVER: Failed to read screen dimensions during startup: ~A" e))))
     (funcall proc `(:terminalresized :width ,width :height ,height))
     t))
 
@@ -453,15 +489,27 @@
   "Emit one startup :cursorposition message through PROC. Always emits."
   (let ((row 0)
          (col 0))
-    (handler-case
-      (multiple-value-bind (r c) (get-cursor-position backend)
-        (when (and c r (>= c 0) (>= r 0))
-          (setf row r
-                col c)))
-      (error (e)
-        (log-warn "DRIVER: Failed to read cursor position during startup: ~A" e)))
+    ;; Reuse cached cursor from terminal backend when available.
+    (when (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
+      (let ((cached-row (ignore-errors
+                          (elmtui.platform.backend.terminal:terminal-instance-cursor-row backend)))
+            (cached-col (ignore-errors
+                          (elmtui.platform.backend.terminal:terminal-instance-cursor-col backend))))
+        (when (and (numberp cached-row) (>= cached-row 0))
+          (setf row cached-row))
+        (when (and (numberp cached-col) (>= cached-col 0))
+          (setf col cached-col))))
+    ;; Probe only if cache looked invalid.
+    (when (and (= row 0) (= col 0))
+      (handler-case
+          (multiple-value-bind (r c) (get-cursor-position backend)
+            (when (and (numberp r) (numberp c) (>= r 0) (>= c 0))
+              (setf row r
+                    col c)))
+        (error (e)
+          (log-warn "DRIVER: Failed to read cursor position during startup: ~A" e))))
     (setf *last-cursor-pos* (cons row col))
-    (funcall proc `(:cursorposition :col ,col :row ,row))
+    (funcall proc `(:cursorposition :col ,(1+ col) :row ,(1+ row)))
     t))
 
 (defun process-initial-commands (cmds app-spec)
@@ -563,7 +611,7 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
     thread))
 
 (defun stop-driver-input-loop (ctx)
-  "Signal the driver input loop to stop and wait for the thread."
+  "Signal the driver input loop to stop and leave the stop flag set until teardown completes."
   (when ctx
     (setf (driver-context-stop-flag ctx) t)
     (let ((thread (driver-context-input-thread ctx)))
@@ -571,8 +619,8 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
         (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted.")))
         ;; Do not hard-block on JOIN here: input thread may be in a device read path.
         ;; Shutdown will poll and force-destroy as a bounded fallback.
+        ;; Keep the stop flag set so the loop can observe it on the next timeout wakeup.
         (setf (driver-context-input-thread ctx) nil)))
-    (setf (driver-context-stop-flag ctx) nil)
     ctx))
 
 (defun make-context-from-spec (app-spec state backend)
@@ -665,10 +713,12 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   (when (and *root-viewport-id-path* *current-app-model* *backend*)
     (let* ((rv-instance (get-component-instance *root-viewport-id-path* *current-app-model*)))
       (when rv-instance
-        ;; (Potential cleanup logic for root viewport could go here)
         (log:debug "DRIVER: Root viewport cleanup for instance: ~S" rv-instance)
-        ;; Example: (set-cursor-position *backend* (getf cleanup-info :initial-cursor-row 0) 0)
-        )))
+        (let ((saved-row (car *last-cursor-pos*))
+              (saved-col (cdr *last-cursor-pos*)))
+          (when (and (integerp saved-row) (integerp saved-col))
+            (ignore-errors
+              (set-cursor-position *backend* saved-row saved-col)))))))
 
   ;; Shutdown the backend and clear the backend global
   (when *backend*

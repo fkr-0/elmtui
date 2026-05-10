@@ -22,4 +22,7 @@
                   (:file "cl-state-tests" :depends-on ("utils-tests" "core-tests"
                                                        "patch-tests" "tx-tests"
                                                        "observer-tests" "undo-tests"
-                                                       "schema-tests" "validation-tests"))))))
+                                                       "schema-tests" "validation-tests")))))
+  :perform (test-op (o c)
+             (declare (ignore o c))
+             (uiop:symbol-call :cl-state-tests :run-all-cl-state-tests)))

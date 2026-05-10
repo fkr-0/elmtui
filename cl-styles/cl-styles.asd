@@ -18,8 +18,7 @@
     (:file "src/properties")
     (:file "src/adapters")
     (:file "src/api"))
-  ;; :in-order-to ((test-op (test-op "cl-styles/tests")))
-  )
+  :in-order-to ((test-op (test-op "cl-styles/tests"))))
 
 (asdf:defsystem "cl-styles/tests"
   :depends-on (#:cl-styles #:fiveam)
@@ -33,5 +32,5 @@
                 (:file "tests/integration")
                 (:file "tests/edge-cases"))
   :perform (test-op (o c)
-             (uiop:symbol-call '#:fiveam '#:run!
-               (find-symbol (string :suite) :cl-styles/tests))))
+             (declare (ignore o c))
+             (uiop:symbol-call :cl-styles.tests :run-all-cl-styles-tests)))

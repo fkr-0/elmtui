@@ -137,7 +137,7 @@
                        (incf cur-y))))))))))
 
 (defun render-node (node buffer parent-x parent-y)
-  (log-info "Rendering node ~A of type ~A, typep ~A"
+  (log-debug "Rendering node ~A of type ~A, typep ~A"
             node
             (type-of node)
             (typep node 'base-element))
@@ -146,7 +146,7 @@
         (render-node n buffer parent-x parent-y))
       (if (typep node 'base-element)
           (let ((rect (elmtui.view.element:el/layout-rect node)))
-            (log-info "Rendering node ~A at parent pos (~A, ~A) with rect ~A"
+            (log-debug "Rendering node ~A at parent pos (~A, ~A) with rect ~A"
                       node parent-x parent-y rect)
             (when rect
               (let* ((abs-x (+ parent-x (x rect)))
@@ -169,10 +169,11 @@
                         (render-content node buffer cx cy cw ch ts))))
                   (dolist (child (elmtui.view.element:el/children node))
                     (render-node child buffer abs-x abs-y))))))
-          (log-info "Skipping non-element node ~A of type ~A" node (type-of node)))))
+          (log-debug "Skipping non-element node ~A of type ~A" node (type-of node)))))
 
-(defun render-laid-out-tree-to-buffer (laid-out-tree &key buffer (origin-x 0) (origin-y 0))
+(defun render-laid-out-tree-to-buffer (laid-out-tree &key buffer (origin-x 0) (origin-y 0) (clear-buffer-p t))
   (check-type buffer virtual-terminal-buffer)
-  (clear-buffer buffer)
+  (when clear-buffer-p
+    (clear-buffer buffer))
   (render-node laid-out-tree buffer origin-x origin-y)
   buffer)

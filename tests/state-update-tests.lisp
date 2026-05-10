@@ -21,6 +21,7 @@
     #:dispatch-to-topic
     #:process-update-result
     #:handle-async-command
+    #:defupdate
     #:update-context)
   (:import-from :elmtui.state.api
     #:plist-to-application-state)
@@ -365,3 +366,28 @@
 (test handle-async-command-unknown-shape-does-not-error
   "Unknown async command shapes should be ignored safely."
   (is-false (handle-async-command '(:unknown-async-shape :payload 7) nil)))
+
+(defupdate test-defupdate-no-direct-effect-execution (state msg)
+  (progn state msg)
+  (values nil (list '(:async :task :fake-task :id :fake-id :promise :fake-promise))))
+
+(test defupdate-does-not-execute-commands-directly
+  "DEFUPDATE should only produce commands; runtime effect manager executes them."
+  (let ((state (plist-to-application-state '()))
+        (called nil))
+    (let ((original (symbol-function 'elmtui.state.update:handle-async-command)))
+      (unwind-protect
+           (progn
+             (setf (symbol-function 'elmtui.state.update:handle-async-command)
+                   (lambda (_command _state)
+                     (declare (ignore _command _state))
+                     (setf called t)
+                     :unexpected))
+             (multiple-value-bind (patches commands)
+                 (test-defupdate-no-direct-effect-execution state :ping)
+               (is-false patches)
+               (is (= 1 (length commands)))
+               (is (equal '(:async :task :fake-task :id :fake-id :promise :fake-promise)
+                          (first commands))))
+             (is-false called))
+        (setf (symbol-function 'elmtui.state.update:handle-async-command) original)))))

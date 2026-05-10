@@ -16,10 +16,12 @@
   "Wrap changes in a transaction named NAME."
   `(let* ((app# ,app)
            (start-log-len# (length (application-state-log app#)))
-           (successp nil))
+           (successp nil)
+           (result-values# nil))
      (unwind-protect
        (multiple-value-prog1
-         (let ((result (progn ,@body)))
+         (progn
+           (setf result-values# (multiple-value-list (progn ,@body)))
            (let* ((full-log (application-state-log app#))
                    (changes (subseq full-log 0 (- (length full-log) start-log-len#)))
                    (tx# (make-tx :id (gensym "TX-")
@@ -33,7 +35,7 @@
                       (new (third chg)))
                  (dolist (fn (%alist-get key (application-state-observers app#)))
                    (funcall fn old new))))
-             result))
+             (values-list result-values#)))
          (setq successp t))
        (let* ((full-log (application-state-log app#))
                (new-changes (subseq full-log 0 (- (length full-log) start-log-len#))))

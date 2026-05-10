@@ -614,10 +614,10 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
   "Main dispatcher – converts EVT to NORMALIZED-KEY, runs registry lookup.
    Binds *dispatch-fn* to DISPATCH-FN for the duration of the call."
   (declare (ignore focus-manager))       ; focus integration stays external
-  (log-info "KEYMAPS>Processing key event: ~S" evt)
+  (log-debug "KEYMAPS>Processing key event: ~S" evt)
   (let ((nk (key-event->normalized-key evt)))
     (unless nk (return-from process-key-event nil))
-    (log-info "KEYMAPS>Processing nkey event: ~S" nk)
+    (log-debug "KEYMAPS>Processing nkey event: ~S" nk)
     (let ((*dispatch-fn* dispatch-fn))
       (declare (special *dispatch-fn*))
       ;; 1) Focused component keymap (from app-state)
@@ -674,4 +674,3 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
                   :source (keymap-name km))))))
 
 ;;; == end/keymaps.lisp ======================================================
-

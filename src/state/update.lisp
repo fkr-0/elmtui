@@ -178,13 +178,8 @@
            (when patches
              (dolist (p patches)
                (state-set ,state-var (first p) (second p))))
-           (let ((remaining-commands nil))
-             (dolist (cmd commands)
-               (if (topic-command-p cmd)
-                   (publish-to-topic (topic-command-topic cmd) (topic-command-payload cmd))
-                   (push cmd remaining-commands)))
-             (dolist (cmd remaining-commands)
-               (handle-async-command cmd ,state-var)))
+           ;; Effect execution is owned by the runtime effect manager.
+           ;; DEFUPDATE only produces commands.
            (values patches commands))))))
 
 (defmethod publish-to-topic (topic-name message)

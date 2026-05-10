@@ -97,4 +97,33 @@
         :children ((:label :id :ok :content "ok")
                     (:unknown-widget :id :bad))))))
 
+(test base-elements-computed-props-concurrency-regression
+  "Regression test for concurrent access to computed props used by element-changed-p."
+  (let* ((elements (loop for i from 0 below 48
+                         collect (make-instance 'container-element
+                                                :id (intern (format nil "E~D" i) :keyword))))
+         (errors '())
+         (errors-lock (bordeaux-threads:make-lock "base-elements-errors"))
+         (threads
+           (loop repeat 8
+                 collect (bordeaux-threads:make-thread
+                          (lambda ()
+                            (dotimes (i 4000)
+                              (let* ((el (nth (mod i (length elements)) elements))
+                                     (p (elmtui.view.base-elements::element-props el)))
+                                (handler-case
+                                    (progn
+                                      (setf (getf p :size) (mod i 7))
+                                      (setf (getf p :layout) (mod i 11))
+                                      (elmtui.view.base-elements::snapshot-props-for-diff el)
+                                      (setf (elmtui.view.base-elements::element-dirty-p el) (oddp i))
+                                      (elmtui.view.base-elements::element-changed-p el))
+                                  (condition (c)
+                                    (bordeaux-threads:with-lock-held (errors-lock)
+                                      (push c errors)))))))))))
+    (dolist (th threads)
+      (bordeaux-threads:join-thread th))
+    (is (null errors)
+        "Concurrent computed-props access should not signal conditions; got: ~S" errors)))
+
 ;;; --- End of file ------------------------------------------------

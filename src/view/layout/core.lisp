@@ -258,7 +258,7 @@
 (defmethod dispatch-layout (display node available-rect parent-styles)
   "Block fallback: honor available-rect for NODE."
   (declare (ignore display parent-styles))
-  (log-info "dispatch-layout BLOCK fallback for ~A available-rect=~S"
+  (log-debug "dispatch-layout BLOCK fallback for ~A available-rect=~S"
             (class-of node)
             (list (x available-rect) (y available-rect) (w available-rect) (h available-rect)))
   ;; keep size/pos from available-rect; do NOT synthesize child rects here
@@ -303,7 +303,7 @@
   (let* ((st (%style-plist-of node))
          (display (getf st :display))
          (parent-rect* parent-rect))
-  (log-info "layout-node ~A display=~S width=~S min-width=~S height=~S min-height=~S parent-rect=~S"
+  (log-debug "layout-node ~A display=~S width=~S min-width=~S height=~S min-height=~S parent-rect=~S"
               (element-id node) display
               (getf st :width) (getf st :min-width) (getf st :height) (getf st :min-height)
               (list (x parent-rect*) (y parent-rect*) (w parent-rect*) (h parent-rect*)))

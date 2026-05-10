@@ -135,6 +135,7 @@
                 ;; ----------------------------------------------------------------
                 (:file "app/api")
                 (:file "runtime/protocol")
+                (:file "runtime/effects")
                 (:file "app/application-extension")
                 (:file "app/tea-core")
                 (:file "app/application")
@@ -172,6 +173,7 @@
                 (:file "pipeline")
                 (:file "platform/driver" :depends-on ("core/system-events" "pipeline"))
                 (:file "tools/packager")
+                (:file "tools/examples-runner")
                 (:file "dev/dev")
                 (:file "elmtui"))
   ;; Build a binary:

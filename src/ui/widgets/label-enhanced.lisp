@@ -241,7 +241,7 @@
 ;;; Contract-Enforced Functions for Direct Use
 ;;;--------------------------------------------------------------
 
-(defupdate-hybrid label-enhanced-update (model message)
+(defupdate-hybrid label-enhanced-update (message model)
     :message-type nil :prefer-typed nil
   "Enhanced label update function for direct use"
   

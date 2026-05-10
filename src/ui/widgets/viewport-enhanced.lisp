@@ -126,7 +126,7 @@
 ;;; Contract-Enforced Update Function
 ;;;--------------------------------------------------------------
 
-(defupdate-hybrid viewport-enhanced-update (model message)
+(defupdate-hybrid viewport-enhanced-update (message model)
                   :message-type nil :prefer-typed nil
                   "Enhanced viewport update function with contract enforcement"
 

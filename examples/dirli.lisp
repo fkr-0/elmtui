@@ -208,7 +208,7 @@
           :terminal-height 24)))
 
 (defapplication dirli-app
-  :root-viewport-id :root
+  :root-viewport-id :dirli-vp
   :initial-state-fn #'%dirli-initial-state
   :root-component-dsl '(:container :id :root)
   :update-fn 'app-update

@@ -58,17 +58,46 @@
   strike
   invisible)
 (defun fuzz-color (in &optional (bg nil))
+  "Convert various color representations to a terminal-color.
+   Supported input formats:
+   - terminal-color: returned as-is
+   - (:rgb r g b): 24-bit RGB color
+   - (:256 n): 256-color palette (n is 0-255)
+   - (r g b): raw RGB list
+   - (n): raw 256-color palette value
+   - integer: 256-color palette value
+   - keyword: simple color (:red, :blue, etc.)
+   - string: hex color (#FF0000)"
   (unless (null in)
-    (etypecase in
+    (typecase in
       (terminal-color in)
-      (list (if (or (and (listp in) (= (length in) 3))
-                    (and (listp in) (= (length in) 1)))
-                (or
-                 (and (= (length in) 3) (make-terminal-color :red (first in) :green (second in) :blue (third in) :bg bg))
-                 (if (integerp (car in))(make-terminal-color :color-256 (first in) :bg bg)
-                     (and (symbolp (first in))(make-terminal-color :simple (first in) :bg bg))))
-
-                ))
+      (list
+       (cond
+         ;; RGB format: (:rgb r g b) or (r g b)
+         ((and (listp in) (= (length in) 3))
+          (if (eq (first in) :rgb)
+              ;; New format: (:rgb r g b)
+              (make-terminal-color :red (second in) :green (third in) :blue (fourth in) :bg bg)
+              ;; Legacy format: (r g b)
+              (make-terminal-color :red (first in) :green (second in) :blue (third in) :bg bg)))
+         ;; 256-color format: (:256 n) or (n)
+         ((and (listp in) (= (length in) 1))
+          (if (eq (first in) :256)
+              ;; New format: (:256 n) - invalid, should be (:256 n) where n is second element
+              ;; Actually looking at my parse output, it's (:256 n) which is a 2-element list
+              nil
+              ;; Legacy format: (n)
+              (if (integerp (car in))
+                  (make-terminal-color :color-256 (first in) :bg bg)
+                  ;; Could be (:sym)
+                  (and (symbolp (car in)) (make-terminal-color :simple (first in) :bg bg)))))
+         ;; Handle (:256 n) - 2-element list
+         ((and (listp in) (= (length in) 2) (eq (first in) :256))
+          (make-terminal-color :color-256 (second in) :bg bg))
+         ;; Keyword list
+         ((and (symbolp (first in)))
+          (make-terminal-color :simple (first in) :bg bg))
+         (t nil)))
       (integer (make-terminal-color :color-256 in :bg bg))
       (keyword (make-terminal-color :simple in :bg bg))
       (string (let ((rgb (hex-str-to-rgb in)))
@@ -100,7 +129,8 @@
           (let ((fg (fuzz-color fg-color-val)))
             (when fg
               (setf (terminal-style-fg-color ts) fg)))))
-      (let ((attrs (getf style-plist :attributes)))
+      (let ((attrs (or (getf style-plist :attributes)
+                       (getf style-plist :attrs))))
         (when (listp attrs)
           (when (member :bold attrs) (setf (terminal-style-bold ts) t))
           (when (member :italic attrs) (setf (terminal-style-italic ts) t))
