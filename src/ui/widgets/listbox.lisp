@@ -257,7 +257,7 @@ Usage:
                                   nil))
          (scroll-offset (when model (listbox-model-scroll-offset model)))
          (effective-empty-text (or empty-text "No items"))
-         (is-focused (widget-focused-p widget-id app-state))
+         (is-focused (widget-focused-p app-state widget-id))
 
          ;; Calculate visible items
          (item-count (length effective-items))
