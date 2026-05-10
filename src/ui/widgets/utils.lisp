@@ -35,7 +35,17 @@
    APP-STATE: The application state.
 
    Returns the ID of the currently focused widget."
-  (state-ref app-state :current-focus-id))
+  (let ((focus-manager (state-ref app-state :focus-manager nil)))
+    (cond
+      ((null focus-manager)
+       (state-ref app-state :current-focus-id nil))
+      ((listp focus-manager)
+       (getf focus-manager :current-focus-id))
+      (t
+       (handler-case
+           (get-current-focus focus-manager)
+         (type-error ()
+           (state-ref app-state :current-focus-id nil)))))))
 
 (defun widget-focused-p (app-state widget-id)
   "Determines if a widget currently has focus.
@@ -43,7 +53,7 @@
    WIDGET-ID: The ID of the widget to check.
 
    Returns t if the widget has focus, nil otherwise."
-  (eql widget-id (get-current-focus app-state)))
+  (eql widget-id (current-focus-id app-state)))
 
 (defmacro with-widget-model ((var app-state widget-id &optional model-path) &body body)
   "Binds VAR to the widget model retrieved from app-state and executes BODY.

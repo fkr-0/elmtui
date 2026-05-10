@@ -6,12 +6,9 @@
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-info #:log-debug #:log-warn)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.app.api #:find-component-by-id) 
-  (:import-from :elmtui.view.dsl #:view #:element) ; Removed unused #:children #:props
-  (:import-from :elmtui.state #:state-ref #:make-update-result #:get-path)
-  (:import-from :elmtui.ui.api #:component-id #:update)
+  (:import-from :elmtui.state #:make-update-result #:get-path)
+  (:import-from :elmtui.ui.api #:update)
   (:import-from :elmtui.ui.widgets.label #:label)
-  (:import-from :elmtui.ui.widgets.layout #:box-layout)
   (:import-from :elmtui.ui.widgets.counter #:counter)
   (:import-from :elmtui.keymaps #:keymap! #:add-keybinding)
   (:export #:main))
@@ -94,13 +91,18 @@
        (log-debug "KEYMAP-APP: Unhandled message: ~S" message)))
     (make-update-result :patches (nreverse patches) :commands commands)))
 
+(defun component-state (app-state component-id)
+  "Return COMPONENT-ID state from this example's alist-backed :components model."
+  (second (assoc component-id (getf app-state :components))))
+
 (defun app-view (app-state)
   "Main application view function using current keyword-headed DSL nodes."
-  (let ((counter-st (get-path (list :components *counter-a-id*) app-state)))
+  (let ((info-st (component-state app-state *info-label-id*))
+        (counter-st (component-state app-state *counter-a-id*)))
     `(:layout :style (:display :flex :flex-direction :row :spacing 1)
       :children
       ((:label :id ,*info-label-id*
-               :text ,(get-path (list :components *info-label-id* :text) app-state))
+               :text ,(getf info-st :text))
        (:counter :id ,*counter-a-id*
                  :value ,(getf counter-st :value))))))
 
