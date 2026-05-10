@@ -270,5 +270,4 @@ If preferred slice has no mutable points, fallback to top-left slice."
   (run-tmux-idle-app
    :platform backend-type
    :platform-options (list :prefill-from-tmux t
-                           :use-alternate-screen t
                            :tmux-prefill-mode mode)))

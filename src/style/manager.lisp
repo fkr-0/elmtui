@@ -12,7 +12,7 @@
   (make-stylesheet :rules nil :variables nil :namespace nil))
 
 (defun %cl-styles-sheet-p (x)
-  (and x (string= (package-name (symbol-package (type-of x))) "CL-STYLES.SHEET")))
+  (typep x 'cl-styles.sheet:stylesheet))
 
 
 

@@ -6,7 +6,11 @@
   #:elmtui.app
   (:use #:cl)
   (:import-from #:log4cl
-    #:log-info)
+    #:log-info
+    #:*root-logger*
+    #:remove-all-appenders
+    #:add-appender
+    #:file-appender)
   (:import-from #:elmtui.core.globals          :*applications*)
   (:import-from #:elmtui.utils                 #:ensure-keyword
     #:coerce-fn)
@@ -210,6 +214,45 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
 (defun generate-child-id (parent-id child-suffix)
   "Generate a unique child ID based on parent ID and suffix."
   (intern (format nil "~A-~A" parent-id child-suffix) :keyword))
+
+;;; ---------------------------------------------------------------------------
+;;; Log4CL management helpers for defapplication-generated run functions
+;;; ---------------------------------------------------------------------------
+
+(defvar *%app-log-buffer-file* nil
+  "Path to temp log file when --log-buffer mode is active.")
+
+(defun %configure-app-logging (log-file log-buffer)
+  "Configure log4cl before running a TUI app.
+Default (no args): silence all logging.
+LOG-FILE string: direct logging to that file.
+LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
+  (ignore-errors (remove-all-appenders *root-logger*))
+  (let ((target (cond
+                  (log-buffer
+                   (let ((path (format nil "/tmp/elmtui-log-~A.tmp"
+                                       (get-universal-time))))
+                     (setf *%app-log-buffer-file* path)
+                     path))
+                  ((and (stringp log-file) (> (length log-file) 0))
+                   log-file)
+                  (t nil))))
+    (when target
+      (ignore-errors
+        (add-appender *root-logger*
+                      (make-instance 'file-appender :file target))))))
+
+(defun %flush-app-log-buffer ()
+  "Print buffered log file to *standard-output*, then delete it."
+  (let ((path *%app-log-buffer-file*))
+    (setf *%app-log-buffer-file* nil)
+    (when (and path (probe-file path))
+      (let ((content (uiop:read-file-string path)))
+        (ignore-errors (uiop:delete-file-if-exists path))
+        (unless (string= content "")
+          (fresh-line)
+          (write-string content *standard-output*)
+          (fresh-line))))))
 
 ;; (defun initialize-components-from-dsl (dsl)
 ;;   "Recursively traverses a component DSL, instantiates components,
@@ -456,10 +499,19 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
                          :message-queue (app-config-message-queue cfg)
                          :cli-args parsed-cli-args
                          :root-viewport-id ,root-vp-id)))
-               (elmtui.app.api:run-application
-                 app-spec-for-driver
-                 :backend-type platform
-                 :platform-options (append effective-platform-options ,other-keys))))
+               (let* ((log-specs
+                         '((:name :log-file :long "--log-file" :type string)
+                           (:name :log-buffer :long "--log-buffer" :type boolean)))
+                       (parsed-log-args (parse-cli-options log-specs argv*)))
+                 (%configure-app-logging
+                   (getf parsed-log-args :log-file)
+                   (getf parsed-log-args :log-buffer nil))
+                 (unwind-protect
+                   (elmtui.app.api:run-application
+                     app-spec-for-driver
+                     :backend-type platform
+                     :platform-options (append effective-platform-options ,other-keys))
+                   (%flush-app-log-buffer)))))
            ',name)))))
 
 ;;; ---------------------------------------------------------------------------

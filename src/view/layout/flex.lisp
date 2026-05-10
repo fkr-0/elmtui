@@ -1,7 +1,7 @@
 (uiop:define-package :elmtui.view.layout.flex
   (:use :cl)
   (:nicknames :et.flex)
-  (:import-from :log4cl #:log-info #:log-warn #:log-error)
+  (:import-from :log4cl #:log-debug #:log-info #:log-warn #:log-error)
   (:import-from :elmtui.view.geo
                 #:rectangle #:pos #:size #:h #:w #:x #:y
                 #:pos-x #:pos-y #:size-w #:size-h
@@ -178,7 +178,7 @@ Returns either a plist, hash-table, or NIL."
 (defun resolve-initial-bases! (items dir avail-main avail-cross)
   (dolist (it items)
     (progn
-      (log-info "it ~A dir ~A mb-main ~A"
+      (log-debug "it ~A dir ~A mb-main ~A"
                 it dir (margin-box-main it dir))
       (let* ((spec (basis-spec-of it))
              (node (node-of it))
@@ -207,7 +207,7 @@ Returns either a plist, hash-table, or NIL."
                            (let ((decl (style-value node :height nil)))
                              (if (numberp decl) decl (or minh 0)))))))
                      (t 0))))
-        (log-info "it ~A dir ~A spec ~A base ~A"
+        (log-debug "it ~A dir ~A spec ~A base ~A"
                   it dir spec base)
         (let ((numeric-base (if (numberp base) base 0)))
           (setf (base-main-of it)
@@ -586,7 +586,7 @@ Returns either a plist, hash-table, or NIL."
   (unless (typep container-node 'base-element)
     (return-from compute-flex-layout nil))
 
-  (log:info "compute-flex-layout ~A type ~A"
+  (log:debug "compute-flex-layout ~A type ~A"
             (element-id container-node) (type-of container-node))
 
   (let* ((styles (or (ignore-errors (elmtui.view.element:el/styles container-node))
@@ -651,7 +651,7 @@ Returns either a plist, hash-table, or NIL."
                                         (make-rectangle :pos (make-pos :x content-x :y content-y)
                                                         :size (make-size :w 0 :h 0))))
                                  (it (make-flex-item n r)))
-                            (log-info "FLEX child ~A styles: display=~S width=~S min-width=~S height=~S min-height=~S"
+                            (log-debug "FLEX child ~A styles: display=~S width=~S min-width=~S height=~S min-height=~S"
                                       (ignore-errors (element-id n))
                                       (style-value n :display nil)
                                       (style-value n :width nil)
@@ -668,7 +668,7 @@ Returns either a plist, hash-table, or NIL."
         (when (eql b :flex-wrap)
           (setf wrap-mode (kw a :nowrap))
           (return))))
-    (log-info "flex wrap-mode=~A main-gap=~A cross-gap=~A" wrap-mode main-gap cross-gap)
+    (log-debug "flex wrap-mode=~A main-gap=~A cross-gap=~A" wrap-mode main-gap cross-gap)
     (resolve-initial-bases! items dir avail-main avail-cross)
     (resolve-initial-cross!  items dir avail-cross)
     (let ((lines (collect-lines items dir avail-main main-gap wrap-mode)))
@@ -697,7 +697,7 @@ Returns either a plist, hash-table, or NIL."
       (let* ((laid-out-children (commit-and-recurse! items styles))
              (new-container (copy-element container-node )))
         (dolist (it items)
-          (log-info "FLEX final item ~A rect=(~A ~A ~A ~A) base-main=~A final-main=~A"
+          (log-debug "FLEX final item ~A rect=(~A ~A ~A ~A) base-main=~A final-main=~A"
                     (ignore-errors (element-id (node-of it)))
                     (x (rect-of it)) (y (rect-of it)) (w (rect-of it)) (h (rect-of it))
                     (base-main-of it) (final-main-of it)))
@@ -710,12 +710,12 @@ Returns either a plist, hash-table, or NIL."
         (dolist (gc laid-out-children)
           (let ((r (el/layout-rect gc)))
             (when r
-              (log-info "flex child ~A rect=(~A ~A ~A ~A)"
+              (log-debug "flex child ~A rect=(~A ~A ~A ~A)"
                         (ignore-errors (element-id gc))
                         (x r) (y r) (w r) (h r)))))
         (setf (elmtui.view.element:el/children new-container) laid-out-children)
         (setf (el/layout-rect new-container) outer-rect)
-        (log-info "flex ~A dir=~A outer=~S content=~S"
+        (log-debug "flex ~A dir=~A outer=~S content=~S"
                   (elmtui.view.base-elements:element-id container-node) dir
                   (list (x outer-rect) (y outer-rect) (w outer-rect) (h outer-rect))
                   (list (x content-rect) (y content-rect) (w content-rect) (h content-rect)))

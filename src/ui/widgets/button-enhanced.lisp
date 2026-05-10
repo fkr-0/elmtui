@@ -472,7 +472,7 @@
 ;;; Contract-Enforced Functions for Direct Use
 ;;;--------------------------------------------------------------
 
-(defupdate-hybrid button-enhanced-update (model message)
+(defupdate-hybrid button-enhanced-update (message model)
     :message-type ButtonMsg :prefer-typed t
   "Enhanced button update function for direct use"
   

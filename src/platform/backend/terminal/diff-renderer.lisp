@@ -84,6 +84,16 @@
 (defparameter *compute-buffer-diff-first-call* t
   "Non-nil to force a full redraw on first compute-buffer-diff call.")
 
+(defun %blank-background-cell-p (cell)
+  "Return true for untouched background cells that should not be emitted.
+This keeps the initial render from blanking the terminal with plain spaces,
+while still allowing intentional styled spaces to be written."
+  (let ((char (buffer-cell-char cell))
+        (style (buffer-cell-style cell)))
+    (and (null style)
+         (or (char= char #\Null)
+             (char= char #\Space)))))
+
 (define-condition buffers-not-compatible-error (error)
   ((front-buffer :initarg :front-buffer :reader buffers-not-compatible-error-front)
     (back-buffer :initarg :back-buffer :reader buffers-not-compatible-error-back)
@@ -172,7 +182,7 @@ Optimizes by batching contiguous character updates with the same style."
   ;; First-time full redraw override
   (when *compute-buffer-diff-first-call*
     (setf *compute-buffer-diff-first-call* nil)
-    (log-info "BUFFER DIFF: Initial full redraw.")
+    (log-debug "BUFFER DIFF: Initial full redraw.")
     (incf (rendering-stats-full-redraws *current-rendering-stats*))
     (let ((diff-ops '())
            (height (buffer-height back-buffer))
@@ -184,18 +194,19 @@ Optimizes by batching contiguous character updates with the same style."
                     (char (buffer-cell-char back-cell))
                     (style (buffer-cell-style back-cell)))
               (incf (rendering-stats-cells-compared *current-rendering-stats*)) ; Count even for full redraw
-              (incf (rendering-stats-cells-changed *current-rendering-stats*))  ; All cells are "changed" in a full redraw
+              (unless (%blank-background-cell-p back-cell)
+                (incf (rendering-stats-cells-changed *current-rendering-stats*)))
               (if current-batch
-                (if (and (char/= char #\Null)
+                (if (and (not (%blank-background-cell-p back-cell))
                          (=? style (getf current-batch :style)))
                   (setf (getf current-batch :chars) (concatenate 'string (getf current-batch :chars) (string char)))
                   (progn
                     (push current-batch diff-ops)
                     (incf (rendering-stats-diff-batches-created *current-rendering-stats*))
-                    (if (char/= char #\Null)
+                    (if (not (%blank-background-cell-p back-cell))
                       (setf current-batch (list :type :write-chars :row r :start-col c :chars (string char) :style style))
                       (setf current-batch nil))))
-                (when (char/= char #\Null)
+                (when (not (%blank-background-cell-p back-cell))
                   (setf current-batch (list :type :write-chars :row r :start-col c :chars (string char) :style style))))))
           (when current-batch
             (push current-batch diff-ops)
@@ -207,7 +218,7 @@ Optimizes by batching contiguous character updates with the same style."
          (equal-count 0)
          (diff-count 0))
 
-    (log-info "BUFFER DIFF: Starting diff computation for buffers of size ~Ax~A" width height)
+    (log-debug "BUFFER DIFF: Starting diff computation for buffers of size ~Ax~A" width height)
 
     (loop for r from 0 below height do
       (let ((current-batch nil)) ; To hold (:type :write-chars :row r :start-col c :chars string :style s)
@@ -245,9 +256,9 @@ Optimizes by batching contiguous character updates with the same style."
             (push current-batch diff-ops)
             (incf (rendering-stats-diff-batches-created *current-rendering-stats*))))))
     ;; (log-info "BUFFER DIFF: Cells compared - Equal: ~A, Different: ~A" equal-count diff-count)
-    (log-info "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
+    (log-debug "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
     ;; (log-info "BUFFER DIFF: Final diff-ops: ~A" diff-ops)
-    (log-info "RENDERING STATS (diff): Compared=~A, Changed=~A, Batches=~A, FullRedraws=~A"
+    (log-debug "RENDERING STATS (diff): Compared=~A, Changed=~A, Batches=~A, FullRedraws=~A"
       (rendering-stats-cells-compared *current-rendering-stats*)
       (rendering-stats-cells-changed *current-rendering-stats*)
       (rendering-stats-diff-batches-created *current-rendering-stats*)

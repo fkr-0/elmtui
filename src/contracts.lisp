@@ -1,8 +1,8 @@
 (uiop:define-package :elmtui.contracts
   (:use :cl)
   (:import-from :elmtui.cl-state.message-normalization
-    #:message-variant-p
-    #:canonicalize-message-variant)
+                #:message-variant-p
+                #:validate-message-instance)
   (:import-from :elmtui.state.msg
     #:*message-schemas*
     #:message-schema)
@@ -258,6 +258,34 @@
 (define-condition view-contract-violation (contract-violation) ())
 (define-condition subscription-contract-violation (contract-violation) ())
 (define-condition message-contract-violation (contract-violation) ())
+
+(defun %symbol-name-contains-p (symbol token)
+  (and (symbolp symbol)
+       (search token (string-downcase (symbol-name symbol)))))
+
+(defun %looks-like-model-symbol-p (symbol)
+  (%symbol-name-contains-p symbol "model"))
+
+(defun %looks-like-message-symbol-p (symbol)
+  (or (%symbol-name-contains-p symbol "message")
+      (%symbol-name-contains-p symbol "msg")))
+
+(defun %validate-update-parameter-order (macro-name message-param model-param)
+  "Guardrail for canonical update signature order: (message model)."
+  (unless (symbolp message-param)
+    (error "~A: first parameter must be a symbol naming MESSAGE, got ~S"
+           macro-name message-param))
+  (unless (symbolp model-param)
+    (error "~A: second parameter must be a symbol naming MODEL, got ~S"
+           macro-name model-param))
+  (when (eq message-param model-param)
+    (error "~A: message and model parameters must be distinct symbols (got ~S)"
+           macro-name message-param))
+  (when (and (%looks-like-model-symbol-p message-param)
+             (%looks-like-message-symbol-p model-param))
+    (error "~A: signature appears swapped; expected (message model), got (~S ~S)"
+           macro-name message-param model-param))
+  t)
 (define-condition pipeline-contract-violation (error)
   ((stage         :initarg :stage :reader violation-stage)
     (expected-type :initarg :expected-type :reader violation-expected)
@@ -313,13 +341,16 @@
       :expected-type "message type specification"
       :actual-value nil
       :context context))
-  (let ((canonical-message (canonicalize-message-variant message-type message)))
+  (multiple-value-bind (canonical-message reason)
+      (validate-message-instance message-type message)
     (unless canonical-message
       (error 'message-contract-violation
         :function-name 'validate-typed-message
-        :expected-type (format nil "valid ~A message variant" message-type)
+        :expected-type (format nil "valid ~A message (variant + args)" message-type)
         :actual-value message
-        :context context))
+        :context (if reason
+                     (format nil "~A (~A)" context reason)
+                     context)))
     canonical-message))
 
 (defun validate-hybrid-message (message message-type &optional (context "hybrid message validation"))
@@ -332,7 +363,7 @@
     ;; If message-type specified but doesn't match, check if it's any valid message type
     (message-type
       (if (some (lambda (schema-name)
-                  (message-variant-p schema-name message))
+                  (nth-value 0 (validate-message-instance schema-name message)))
             (alexandria:hash-table-keys *message-schemas*))
         message  ; Valid message for some schema
         (validate-flexible-message message context)))
@@ -391,24 +422,25 @@
 ;;; Enhanced Update Function Contracts with Message Type Support
 ;;;--------------------------------------------------------------
 
-(defmacro defupdate-ctr (name (model-param message-param) &body body)
+(defmacro defupdate-ctr (name (message-param model-param) &body body)
   "Defines an update function with flexible message validation (backward compatible).
    This is equivalent to defupdate-flexible."
-  `(defupdate-flexible ,name (,model-param ,message-param) ,@body))
+  `(defupdate-flexible ,name (,message-param ,model-param) ,@body))
 
-(defmacro defupdate-flexible (name (model-param message-param) &body body)
+(defmacro defupdate-flexible (name (message-param model-param) &body body)
   "Defines an update function with flexible message validation.
    Accepts any message format - useful for prototyping and migration.
 
-   Contract: update(model, message) => (values new-model commands)
+   Contract: update(message, model) => (values new-model commands)
    - model: Current application state (immutable, property list)
    - message: Any message format (flexible validation)
    - new-model: Updated state or nil (no change)
    - commands: List of side-effects to execute or nil"
 
+  (%validate-update-parameter-order 'defupdate-flexible message-param model-param)
   (let ((doc-string (when (stringp (first body)) (first body)))
          (actual-body (if (stringp (first body)) (rest body) body)))
-    `(defun ,name (,model-param ,message-param)
+    `(defun ,name (,message-param ,model-param)
        ,@(when doc-string (list doc-string))
 
        ;; Input validation
@@ -440,11 +472,11 @@
 
          (values new-model commands)))))
 
-(defmacro defupdate-typed (name (model-param message-param) message-type &body body)
+(defmacro defupdate-typed (name (message-param model-param) message-type &body body)
   "Defines an update function with strict message type validation.
    Only accepts messages that conform to the specified defmsg schema.
 
-   Contract: update(model, typed-message) => (values new-model commands)
+   Contract: update(typed-message, model) => (values new-model commands)
    - model: Current application state (immutable, property list)
    - message: Must be valid variant of message-type (strict validation)
    - message-type: Symbol naming the defmsg schema (e.g., 'AppMsg)
@@ -452,15 +484,16 @@
    - commands: List of side-effects to execute or nil
 
    Example:
-   (defupdate-typed counter-update (model message) AppMsg
+   (defupdate-typed counter-update (message model) AppMsg
      (case (first message)
        (:increment (values (list :count (1+ (getf model :count 0))) nil))
        (:decrement (values (list :count (1- (getf model :count 0))) nil))
        (t (values nil nil))))"
 
+  (%validate-update-parameter-order 'defupdate-typed message-param model-param)
   (let ((doc-string (when (stringp (first body)) (first body)))
          (actual-body (if (stringp (first body)) (rest body) body)))
-    `(defun ,name (,model-param ,message-param)
+    `(defun ,name (,message-param ,model-param)
        ,@(when doc-string (list doc-string))
 
        ;; Input validation
@@ -492,20 +525,21 @@
 
          (values new-model commands)))))
 
-(defmacro defupdate-hybrid (name (model-param message-param) &rest args)
+(defmacro defupdate-hybrid (name (message-param model-param) &rest args)
   "Define an UPDATE function that works with *either* typed or flexible
    messages.
 
    Usage
    -----
-     (defupdate-hybrid <function-name> (model message)
+     (defupdate-hybrid <function-name> (message model)
        [:MESSAGE-TYPE <symbol>]   ;; preferred defmsg schema
        [:PREFER-TYPED  <boolean>] ;; warn on untyped msg when non-NIL
        [doc-string]               ;; optional
        body-forms…)
 
-   Contract: (update model message) -> (values new-model commands)"
+   Contract: (update message model) -> (values new-model commands)"
   ;; ── 1.  Split keyword options from body-forms ─────────────────────────────
+  (%validate-update-parameter-order 'defupdate-hybrid message-param model-param)
   (let ((kw-plist '())
          (body     args))
     ;; pull leading keyword/value pairs into KW-PLIST
@@ -521,7 +555,7 @@
                            (pop body)))
             (actual-body body))
       ;; ── 3.  Generate the real DEFUN ───────────────────────────────────────
-      `(defun ,name (,model-param ,message-param)
+      `(defun ,name (,message-param ,model-param)
          ,@(when doc-string (list doc-string))
 
          ;; Input validation
@@ -561,7 +595,7 @@
 ;;   "Defines an update function with hybrid message validation.
 ;;    Accepts both typed messages (if message-type specified) and flexible messages.
 
-;;    Contract: update(model, message) => (values new-model commands)
+;;    Contract: update(message, model) => (values new-model commands)
 ;;    - model: Current application state (immutable, property list)
 ;;    - message: Typed message (if matches schema) or flexible message
 ;;    - message-type: Optional symbol naming the preferred defmsg schema
@@ -570,7 +604,7 @@
 ;;    - commands: List of side-effects to execute or nil
 
 ;;    Example:
-;;    (defupdate-hybrid counter-update (model message) :message-type AppMsg :prefer-typed t
+;;    (defupdate-hybrid counter-update (message model) :message-type AppMsg :prefer-typed t
 ;;      ;; Can handle both (:increment) and :increment
 ;;      (let ((msg-type (if (listp message) (first message) message)))
 ;;        (case msg-type
@@ -913,7 +947,7 @@
 
     ;; Test update function
     (multiple-value-bind (new-model commands)
-      (funcall update-fn test-model :test-message)
+      (funcall update-fn :test-message test-model)
       (when new-model (validate-model new-model "update function result"))
       (when commands (validate-commands commands "update function commands")))
 

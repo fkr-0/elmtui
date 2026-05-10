@@ -189,5 +189,39 @@
     (finishes
       (upd rv idp state '(:cursorposition :col 1 :row 2)))))
 
+(test default-anchor-below-cursor-and-shutdown-cleanup-contract
+  "Regression contract: default root viewport behavior should anchor below cursor,
+blank only its viewport on exit, and restore the startup cursor without global clears."
+  (let* ((id :rv-default-contract)
+         (id-path `(:components ,id))
+         (rv (make-root-viewport id))
+         (state (elmtui.state:make-application-state)))
+    (multiple-value-bind (_component patches _cmds)
+        (init rv :id-path id-path
+             :dsl '(:root-viewport :id :rv-default-contract
+                    :children ((:text :id :child :content "x"))))
+      (declare (ignore _component _cmds))
+      (elmtui.state:apply-patches state patches))
+    (is (eq :below-cursor (state-ref state (append id-path '(:anchor))))
+        "Default anchor must be :below-cursor when none is provided.")
+    ;; Simulate startup-discovered cursor/viewport runtime state.
+    (setf (state-ref state (append id-path '(:initial-cursor-pos))) '(17 9))
+    (setf (state-ref state (append id-path '(:offset-x))) 4)
+    (setf (state-ref state (append id-path '(:offset-y))) 8)
+    (setf (state-ref state (append id-path '(:width))) 30)
+    (setf (state-ref state (append id-path '(:height))) 10)
+    (setf (state-ref state (append id-path '(:blank-on-exit))) t)
+    (multiple-value-bind (_patches _state cmds)
+        (upd rv id-path state '(:appshutdown))
+      (declare (ignore _patches _state))
+      (is-true (has-render-cmd-p cmds :blank-viewport)
+               "Shutdown should blank only the viewport region.")
+      (is-true (has-render-cmd-p cmds :set-cursor 9)
+               "Shutdown should restore startup cursor row.")
+      (is-false (has-render-cmd-p cmds :clear)
+                "Shutdown must not emit full-screen clear.")
+      (is-false (has-render-cmd-p cmds :clear-below-cursor)
+                "Shutdown must not emit clear-below-cursor."))))
+
 (defun run-root-viewport-anchor-behavior-tests ()
   (run! :elmtui/root-vp/behavior))

@@ -35,16 +35,20 @@
       (aref lines row)
       ""))
 
+(defun %clamp-cursor-to-lines (lines cursor-x cursor-y)
+  (let* ((safe-lines (or lines #()))
+         (max-y (max 0 (1- (length safe-lines))))
+         (new-y (clamp cursor-y 0 max-y))
+         (line (%line-at safe-lines new-y))
+         (max-x (max 0 (1- (length line))))
+         (new-x (clamp cursor-x 0 max-x)))
+    (values new-x new-y)))
+
 (defun %bounded-cursor (state dx dy)
   (let* ((lines (state-ref state :lines #()))
-         (max-y (max 0 (1- (length lines))))
-         (old-y (state-ref state :cursor-y 0))
-         (new-y (clamp (+ old-y dy) 0 max-y))
-         (line (%line-at lines new-y))
-         (max-x (max 0 (1- (length line))))
          (old-x (state-ref state :cursor-x 0))
-         (new-x (clamp (+ old-x dx) 0 max-x)))
-    (values new-x new-y)))
+         (old-y (state-ref state :cursor-y 0)))
+    (%clamp-cursor-to-lines lines (+ old-x dx) (+ old-y dy))))
 
 (defun hover-update (message state)
   (cond
@@ -79,7 +83,15 @@
          (t
           (make-update-result)))))
     ((and (listp message) (eq (first message) :tmux-lines-result))
-     (make-update-result :patches `(((:lines) ,(second message)))))
+     (let ((lines (second message)))
+       (multiple-value-bind (x y)
+           (%clamp-cursor-to-lines lines
+                                   (state-ref state :cursor-x 0)
+                                   (state-ref state :cursor-y 0))
+         (make-update-result
+          :patches `(((:lines) ,lines)
+                     ((:cursor-x) ,x)
+                     ((:cursor-y) ,y))))))
     ((and (listp message) (eq (first message) :app-quit-requested))
      (make-update-result :patches '(((:should-quit) t))))
     (t

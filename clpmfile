@@ -1,10 +1,10 @@
 ;;; -*- Mode: common-lisp; -*-
 (:api-version "0.4")
 
-(:source "quicklisp"
- :url "https://beta.quicklisp.org/dist/quicklisp.txt"
- :type :quicklisp)
-
+;; (:source "quicklisp"
+;;  :url "https://beta.quicklisp.org/dist/quicklisp.txt"
+;;  :type :quicklisp)
+(:source "quicklisp" :type :clpi :url "https://quicklisp.common-lisp-project-index.org/")
 (:asd "/home/user/.roswell/lisp/quicklisp/quicklisp/quicklisp.asd")
 
 

@@ -5,6 +5,10 @@
   (:import-from :elmtui.view.styled #:apply-stylesheet-to-tree)
   (:import-from :elmtui.platform.tree-renderer #:render-laid-out-tree-to-buffer)
   (:import-from :elmtui.view.tree-transforms #:process-tree)
+  (:import-from :elmtui.platform.backend.terminal
+                #:*terminal-debug-phase*
+                #:*terminal-debug-frame-id*
+                #:*terminal-debug-owned-region*)
   (:import-from :elmtui.platform.backend.common.virtual-buffer #:make-virtual-buffer #:copy-virtual-buffer)
   (:import-from :elmtui.contracts #:define-stage)
   (:import-from :elmtui.platform.backend.terminal.diff-renderer #:compute-buffer-diff #:apply-diff-to-backend)
@@ -16,6 +20,7 @@
   (:import-from :elmtui.view.styled #:styled-ui-node)
   (:export
     #:full-view-pipeline
+    #:*preserve-underlay*
     #:render-pipeline-0-to-5
     #:pre-render-terminal-prep
     #:generate-dsl
@@ -38,14 +43,37 @@
 
 (in-package #:elmtui.pipeline)
 
+
+(defvar *display-frame-counter* 0
+  "Monotonic frame counter used to bind terminal debug context during display.")
+
+(defun %display-debug-phase (front-buffer back-buffer)
+  "Infer a coarse terminal debug phase for the current display pass."
+  (cond
+    ((or (zerop *display-frame-counter*) (null front-buffer)) :first-frame)
+    ((or (/= (elmtui.platform.backend.common.virtual-buffer:buffer-width front-buffer)
+             (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer))
+         (/= (elmtui.platform.backend.common.virtual-buffer:buffer-height front-buffer)
+             (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer)))
+     :resize)
+    (t :normal-frame)))
+
+(defun %display-owned-region (origin-x origin-y back-buffer)
+  "Return the terminal region owned by the current display pass."
+  (list :row origin-y
+        :col origin-x
+        :width (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer)
+        :height (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer)))
+(defvar *preserve-underlay* nil
+  "When true, render-to-buffer starts from current front-buffer content and avoids clearing it.")
+
 (defun %root-viewport-offset (ctx)
   "Return (values offset-x offset-y) for the root viewport, defaulting to 0."
   (let* ((state (ctx-state ctx))
           (rv-path (%root-viewport-id-path ctx)))
     (if (and state rv-path)
-      (let* ((st-path (append rv-path '(:state)))
-              (ox (or (get-path (append st-path '(:offset-x)) state 0) 0))
-              (oy (or (get-path (append st-path '(:offset-y)) state 0) 0)))
+      (let* ((ox (or (get-path (append rv-path '(:offset-x)) state 0) 0))
+              (oy (or (get-path (append rv-path '(:offset-y)) state 0) 0)))
         (values ox oy))
       (values 0 0))))
 
@@ -70,9 +98,8 @@
           (state (ctx-state ctx))
           (rv-path (%root-viewport-id-path ctx)))
     (if (and rect state rv-path)
-      (let* ((st-path (append rv-path '(:state)))
-              (desired-w (get-path (append st-path '(:width)) state nil))
-              (desired-h (get-path (append st-path '(:height)) state nil))
+      (let* ((desired-w (get-path (append rv-path '(:width)) state nil))
+              (desired-h (get-path (append rv-path '(:height)) state nil))
               (w* (if (and (numberp desired-w) (> desired-w 0))
                     (min desired-w (w rect))
                     (w rect)))
@@ -159,10 +186,18 @@
         (log:debug "PIPELINE: No laid-out tree; skipping render-to-buffer.")
         ctx)
       (let* ((rect (ctx-viewport-rect ctx))
-              (target-buffer (make-virtual-buffer (w rect) (h rect)))
+              (front (ctx-front-buffer ctx))
+              (target-buffer
+                (if (and *preserve-underlay*
+                      front
+                      (= (elmtui.platform.backend.common.virtual-buffer:buffer-width front) (w rect))
+                      (= (elmtui.platform.backend.common.virtual-buffer:buffer-height front) (h rect)))
+                    (copy-virtual-buffer front)
+                    (make-virtual-buffer (w rect) (h rect))))
               (rendered-buffer (render-laid-out-tree-to-buffer
                                  (list (root laid-out-tree))
-                                 :buffer target-buffer)))
+                                 :buffer target-buffer
+                                 :clear-buffer-p (not *preserve-underlay*))))
         (setf (ctx-back-buffer ctx) rendered-buffer)
         ctx))))
 
@@ -222,20 +257,28 @@
         (%root-viewport-offset ctx)
         (setf origin-x ox
           origin-y oy)
-        (when (or (/= (elmtui.platform.backend.common.virtual-buffer:buffer-width front-buffer)
-                    (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer))
-                (/= (elmtui.platform.backend.common.virtual-buffer:buffer-height front-buffer)
-                  (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer)))
-          (setf front-buffer
-            (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
-              (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer)
-              (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer))))
-        (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
-          (log:debug "PIPELINE: Displaying buffer with diff: ~A" (length diff))
-          (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-y origin-x)
-          (elmtui.platform.api:flush-output backend)
-          (setf (ctx-front-buffer ctx) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))
-          ctx))
+        (let* ((debug-frame-id *display-frame-counter*)
+                (debug-phase (%display-debug-phase front-buffer back-buffer))
+                (debug-owned-region (%display-owned-region origin-x origin-y back-buffer)))
+          (let ((*terminal-debug-frame-id* debug-frame-id)
+                (*terminal-debug-phase* debug-phase)
+                (*terminal-debug-owned-region* debug-owned-region))
+            (when (or (null front-buffer)
+                    (/= (elmtui.platform.backend.common.virtual-buffer:buffer-width front-buffer)
+                      (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer))
+                    (/= (elmtui.platform.backend.common.virtual-buffer:buffer-height front-buffer)
+                      (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer)))
+              (setf front-buffer
+                (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
+                  (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer)
+                  (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer))))
+            (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
+              (log:debug "PIPELINE: Displaying buffer with diff: ~A" (length diff))
+              (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-y origin-x)
+              (elmtui.platform.api:flush-output backend)
+              (setf (ctx-front-buffer ctx) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))
+              (incf *display-frame-counter*)
+              ctx))))
       (progn
         (log:warn "PIPELINE: Display-buffer skipped as backend is not ready for output.")
         ctx))))
@@ -277,6 +320,7 @@
         app-ctx)
       (progn
         (log:debug "PIPELINE: Processing DSL root ~A" (summarize-dsl-root dsl))
+        (setf (ctx-dsl-tree app-ctx) (make-dsl-tree :root dsl))
         (let* ((viewport-rect (%root-viewport-rect app-ctx))
                 (root (elmtui.view.tree-transforms:process-tree
                         dsl
