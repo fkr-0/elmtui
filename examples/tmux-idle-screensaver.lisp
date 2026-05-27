@@ -181,7 +181,7 @@ If preferred slice has no mutable points, fallback to top-left slice."
       (setf (aref out x) (buffer-char buffer row x)))
     out))
 
-(defun idle-update (message state)
+(defun idle-update (message app-state)
   (cond
     ((or (typep message 'key-event)
          (and (listp message)
@@ -192,10 +192,10 @@ If preferred slice has no mutable points, fallback to top-left slice."
      (make-update-result :patches '(((:should-quit) t))))
     ((or (eq message :tick)
          (and (listp message) (eq (first message) :tick)))
-     (let* ((ticks (1+ (state-ref state :ticks 0)))
-            (points (state-ref state :mutable-points #()))
-            (current (state-ref state :current-mutations nil))
-            (exiting (state-ref state :exiting nil))
+     (let* ((ticks (1+ (state-ref app-state :ticks 0)))
+            (points (state-ref app-state :mutable-points #()))
+            (current (state-ref app-state :current-mutations nil))
+            (exiting (state-ref app-state :exiting nil))
             (next (if exiting nil (%next-mutation-indices points ticks))))
        (if exiting
            (make-update-result
@@ -246,10 +246,11 @@ If preferred slice has no mutable points, fallback to top-left slice."
            (:text :content ,(format nil "ticks: ~D" ticks))
            (:text :content ,(format nil "mutable chars: ~D" mutable-count)))))))
 
-(defun idle-subscriptions (_state)
-  (declare (ignore _state))
-  ;; Keep interval short so exit-after-label is responsive.
-  '(:timer (:interval 0.4 :message (:tick))))
+(defun idle-subscriptions (app-state)
+  ;; Returning NIL lets the runtime reconcile and cancel the active timer on quit.
+  (unless (state-ref app-state :should-quit nil)
+    ;; Keep interval short so exit-after-label is responsive.
+    '(:timer (:interval 0.4 :message (:tick)))))
 
 (defapplication tmux-idle-app
   :root-viewport-id :tmux-idle-root

@@ -11,7 +11,7 @@
   (:import-from :elmtui.contracts
                 #:defupdate-hybrid #:defview)
   (:import-from :elmtui.ui.api
-                #:component #:id-from-path #:get-path)
+                #:component #:init #:update #:view #:id-from-path #:get-path #:normalize-update-args)
   (:import-from :elmtui.app.api
                 #:get-component-instance #:destroy-component-state)
   (:export
@@ -258,16 +258,18 @@
       (remf state :id))
     state))
 
-(defmethod update ((component viewport-enhanced) state message &key id-path)
+(defmethod update ((component viewport-enhanced) message app-state &key id-path)
   "Enhanced update method with contract enforcement"
-  (let* ((component-state (get-path id-path state))
+  (multiple-value-bind (message state)
+      (elmtui.ui.api:normalize-update-args message app-state)
+    (let* ((component-state (get-path id-path state))
          (current-state (%viewport-enhanced-state component-state))
          (patches nil)
          (commands nil))
 
     ;; Use the contract-enforced update function
     (multiple-value-bind (new-state new-commands)
-        (viewport-enhanced-update current-state message)
+        (viewport-enhanced-update message current-state)
 
       (when new-state
         (push (list id-path
@@ -279,7 +281,7 @@
       (when new-commands
         (setf commands (append commands new-commands))))
 
-    (values patches commands)))
+    (values patches commands))))
 
 ;; Legacy view method with DSL integration
 (defmethod view ((component viewport-enhanced) state &key id-path)

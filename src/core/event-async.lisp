@@ -18,7 +18,8 @@
                 #:dispatch-event)
   (:import-from :elmtui.core.event-channels
                 #:wait-for-event
-                #:register-event-handler)
+                #:register-event-handler
+                #:unregister-event-handler)
   (:import-from :cl-events.channel
    #:make-channel
    #:make-filtered-channel
@@ -415,33 +416,33 @@
    CHANNEL: The channel to listen for events on (default is *ui-event-channel*)
    Returns a promise that resolves with the event when received, or rejects on timeout."
   (let ((result-promise (make-promise))
-        (timer-id nil))
-
-    ;; Set up timeout if specified
-    (when timeout
-      (setf timer-id
-            (schedule-timer
-             (lambda ()
-               (reject-promise result-promise :timeout))
-             timeout)))
-
-    ;; Create a handler for the event
-    (let ((handler-fn
+        (timer-id nil)
+        (handler-fn nil)
+        (settled nil))
+    (labels ((cleanup ()
+               (when handler-fn
+                 (unregister-event-handler channel handler-fn)
+                 (setf handler-fn nil))
+               (when timer-id
+                 (cancel-timer timer-id)
+                 (setf timer-id nil)))
+             (settle (fn value)
+               (unless settled
+                 (setf settled t)
+                 (cleanup)
+                 (funcall fn result-promise value))))
+      (setf handler-fn
             (lambda (event)
               (when (and (eq (ui-event-type event) event-type)
                          (or (null target) (eq (ui-event-target event) target)))
-                ;; Cancel the timeout timer if it exists
-                (when timer-id
-                  (cancel-timer timer-id))
-
-                ;; Resolve the promise with the event
-                (resolve-promise result-promise event)))))
-
-      ;; Register the handler
-      (register-event-handler channel handler-fn )
-
-
-      ;; Return the promise
+                (settle #'resolve-promise event))))
+      (register-event-handler channel handler-fn)
+      (when timeout
+        (setf timer-id
+              (schedule-timer
+               (lambda ()
+                 (settle #'reject-promise :timeout))
+               timeout)))
       result-promise)))
 
 (defun wait-for-event-async (event-type &key target timeout)

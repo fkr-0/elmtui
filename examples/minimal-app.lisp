@@ -19,8 +19,8 @@
        ((:text :id :label
           :content ,(format nil "Hello ~A" key))))))
 
-(defun minimal-update (msg state)
-  (declare (ignore state))
+(defun minimal-update (msg app-state)
+  (declare (ignore app-state))
   (log-info "minimal:> Received message: ~S" msg)
   (cond
     ((eq (car msg) :keyevent)

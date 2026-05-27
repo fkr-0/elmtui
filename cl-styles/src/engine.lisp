@@ -206,51 +206,24 @@ or if :return :objects:
   (apply #'append (mapcar (lambda (o) (%apply-node o sheet return)) objects)))
 
 (defun apply-stylesheet-to-tree (root sheet &key (return :patches) cache previous-signature)
-  "Apply SHEET to a tree of OBJECTS starting at ROOT, returning either :patches or :objects.
-
-If :patches, return a list of style-patch structs with the path to the object and its computed style.
-If :objects, return a list of the objects themselves with their computed styles set.
-Objects must implement the cl-styles.protocols interface.
-
-Arguments:
- ROOT     The root object of the tree, implementing cl-styles.protocols.
- SHEET    A cl-styles.sheet:stylesheet object.
- RETURN   Either :patches (default) or :objects.
- CACHE    (optional) A cache to optimize repeated calls (not implemented).
- PREVIOUS-SIGNATURE (optional) A signature to detect changes (not implemented).
-Returns:
- A list of style-patch structs or objects with computed styles set.
-Example:
-
- (let ((root (make-object :id :root :type :container
-                         :children (list (make-object :id :btn1 :type :button)
-                                         (make-object :id :lbl1 :type :label)))))
-   ;; set parent links
-   (dolist (c (children root)) (setf (parent c) root))
-   (apply-stylesheet-to-tree root
-                           (make-stylesheet
-                              :rules ((defrule (type> :button) :color :red)))
-                              :return :patches))
-  => (#<STYLE-PATCH path (:BY-ID :ROOT) computed NIL>
-      #<STYLE-PATCH path (:BY-ID :BTN1) computed (:COLOR :RED)>
-      #<STYLE-PATCH path (:BY-ID :LBL1) computed NIL>)
-or if :return :objects:
-  => (#<OBJECT id :ROOT type :CONTAINER computed NIL>
-      #<OBJECT id :BTN1 type :BUTTON computed (:COLOR :RED)>
-      #<OBJECT id :LBL1 type :LABEL computed NIL>
-Notes:
- - The tree is traversed depth-first, applying styles and inheritance.
- - Inheritance is applied from parent to child for inheritable properties.
- - CACHE and PREVIOUS-SIGNATURE are placeholders for future optimizations."
-  (declare (ignore cache previous-signature))
-  (labels ((walk (node inherit-style)
-             ;; compute + set this node with inherited style from parent
-             (let* ((self-patches (%apply-node node sheet return :inherit-from inherit-style))
-                    (children (or (cl-styles.protocols:stylable-children node) nil))
-                    ;; get what we just computed on NODE and hand it to children
-                    (computed-here (cl-styles.protocols:get-computed-style node))
-                    (child-patches (mapcan (lambda (c) (walk c computed-here)) children)))
-               (append self-patches child-patches))))
-    (walk root nil)))
+  "Apply SHEET to ROOT. CACHE may be a hash-table keyed by PREVIOUS-SIGNATURE."
+  (let* ((cache-key (and cache previous-signature
+                         (list root sheet return previous-signature)))
+         (cached (and cache-key (gethash cache-key cache))))
+    (if cached
+        cached
+        (labels ((walk (node inherit-style)
+                   (let* ((self-patches (%apply-node node sheet return
+                                                     :inherit-from inherit-style))
+                          (children (or (cl-styles.protocols:stylable-children node) nil))
+                          (computed-here (cl-styles.protocols:get-computed-style node))
+                          (child-patches (mapcan (lambda (child)
+                                                   (walk child computed-here))
+                                                 children)))
+                     (append self-patches child-patches))))
+          (let ((result (walk root nil)))
+            (when cache-key
+              (setf (gethash cache-key cache) result))
+            result)))))
 
 ;; (cl-styles.rule:defrule (cl-styles.selector:type> :text) :color :red)
