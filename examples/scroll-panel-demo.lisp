@@ -17,8 +17,8 @@
                   :content ,(format nil "Line ~2,'0D: Scroll panel content" i)
                   :style (:padding-left 1))))
 
-(defun scroll-panel-update (message state)
-  (declare (ignore state))
+(defun scroll-panel-update (message app-state)
+  (declare (ignore app-state))
   (labels ((quit ()
              (make-update-result :patches '(((:should-quit) t))))
            (cmd (payload)

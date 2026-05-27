@@ -67,7 +67,7 @@
                                        ((:vel-y) ,next-vy)
                                        ((:score) ,score))))))
 
-(defun pong-update (message state)
+(defun pong-update (message app-state)
   (cond
     ((typep message 'key-event)
      (let ((key (key-event-key message)))
@@ -75,14 +75,14 @@
          ((member key '(#\q #\Q #\Escape) :test #'eql)
           (%quit-result))
          ((member key '(:left #\h #\H) :test #'eql)
-          (%move-paddle state -1))
+          (%move-paddle app-state -1))
          ((member key '(:right #\l #\L) :test #'eql)
-          (%move-paddle state 1))
+          (%move-paddle app-state 1))
          (t
           (make-update-result)))))
     ((or (eql message :tick)
          (and (listp message) (eq (first message) :tick)))
-     (%tick-update state))
+     (%tick-update app-state))
     ((and (listp message) (eq (first message) :app-quit-requested))
      (%quit-result))
     (t

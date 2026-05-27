@@ -66,6 +66,7 @@ Specific implementations will handle the dispatch logic, potentially using elmtu
 (defun subscribe (pattern handler &key (priority :normal))
   "Subscribe to a topic pattern with the given handler.
    Returns a subscription token that can be used for unsubscribing."
+  (check-type handler function)
   (log-debug "Subscribing to pattern: ~A with priority: ~A" pattern priority)
   (let* ((subscription (make-topic-subscription
                         :pattern pattern
@@ -85,6 +86,8 @@ Specific implementations will handle the dispatch logic, potentially using elmtu
   "Subscribe to a topic pattern with handler, but only invoke handler
    if the predicate function returns true when passed the message.
    Returns a subscription token that can be used for unsubscribing."
+  (check-type predicate-fn function)
+  (check-type handler function)
   (log-debug "Subscribing conditionally to pattern: ~A" pattern)
 
   (let ((filtered-handler

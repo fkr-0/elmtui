@@ -24,6 +24,10 @@
    #:application-state-lock
    #:application-state-observers
    #:state-ref
+    #:valid-state-path-p
+    #:assert-valid-state-path
+    #:valid-state-path-p
+    #:assert-valid-state-path
    #:get-state
    #:state-set
    #:make-state

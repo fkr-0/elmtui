@@ -98,9 +98,9 @@
         (selection-changed nil)
         (item-count (length (listbox-model-items model))))
 
-    (etypecase msg
+    (cond
       ;; --- Keyboard Navigation ---
-      ((cons (eql msg-listbox-key-press))
+      ((and (consp msg) (eq (car msg) msg-listbox-key-press))
        (let* ((key-sym (getf (rest msg) :key))
               (current-index (listbox-model-selected-index model)))
          (case key-sym
@@ -143,14 +143,14 @@
               (setf selection-changed t))))))
 
       ;; --- Direct Selection ---
-      ((cons (eql msg-listbox-select-index))
+      ((and (consp msg) (eq (car msg) msg-listbox-select-index))
        (let ((new-idx (clamp-index (getf (rest msg) :index) item-count)))
          (when (and new-idx (not (equal new-idx (listbox-model-selected-index model))))
            (setf (listbox-model-selected-index new-model) new-idx
                  selection-changed t))))
 
       ;; --- Update Items ---
-      ((cons (eql msg-listbox-set-items))
+      ((and (consp msg) (eq (car msg) msg-listbox-set-items))
        (let* ((new-items (getf (rest msg) :items))
               (new-item-count (length new-items))
               (current-index (listbox-model-selected-index model))
@@ -163,7 +163,7 @@
                (listbox-model-scroll-offset new-model) clamped-offset)))
 
       ;; --- Scrolling ---
-      ((cons (eql msg-listbox-scroll-up))
+      ((and (consp msg) (eq (car msg) msg-listbox-scroll-up))
        (let* ((amount (or (getf (rest msg) :amount) 1))
               (current-offset (listbox-model-scroll-offset model))
               (current-height (listbox-model-height model))
@@ -171,13 +171,15 @@
          (setf (listbox-model-scroll-offset new-model)
                (clamp-scroll new-offset current-height item-count))))
 
-      ((cons (eql msg-listbox-scroll-down))
+      ((and (consp msg) (eq (car msg) msg-listbox-scroll-down))
        (let* ((amount (or (getf (rest msg) :amount) 1))
               (current-offset (listbox-model-scroll-offset model))
               (current-height (listbox-model-height model))
               (new-offset (+ current-offset amount)))
          (setf (listbox-model-scroll-offset new-model)
-               (clamp-scroll new-offset current-height item-count)))))
+               (clamp-scroll new-offset current-height item-count))))
+      (t
+       (warn "Unhandled listbox message: ~S" msg)))
 
     ;; --- Update scroll to ensure selected item is visible ---
     (let ((selected-idx (listbox-model-selected-index new-model)))

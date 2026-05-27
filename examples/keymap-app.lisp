@@ -6,7 +6,7 @@
   (:use :cl :alexandria)
   (:import-from :log4cl #:log-info #:log-debug #:log-warn)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.state #:make-update-result #:get-path)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.ui.api #:update)
   (:import-from :elmtui.ui.widgets.label #:label)
   (:import-from :elmtui.ui.widgets.counter #:counter)
@@ -72,11 +72,11 @@
               (component-action (cddr message))
               (component-instance (elmtui.app.api:get-component-instance  target-component-id app-state))
               (component-state-path (list :components target-component-id))
-              (component-state (get-path component-state-path app-state )))
+              (component-state (state-ref app-state component-state-path)))
          (if (and component-instance component-state)
              (multiple-value-bind (comp-patches comp-commands)
                  ;; Pass the action directly, not as a list if it's already the action keyword
-                 (update component-instance component-state (if (consp component-action) (first component-action) component-action) :id-path component-state-path)
+                 (update component-instance (if (consp component-action) (first component-action) component-action) app-state :id-path component-state-path)
                (when comp-patches
                  (push `(,component-state-path ,comp-patches) patches))
                (setf commands (append comp-commands commands)))

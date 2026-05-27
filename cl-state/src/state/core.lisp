@@ -78,15 +78,30 @@ See Also:
       :version (application-state-version app)
       :observers (copy-list (application-state-observers app)))))
 
+
+(defun valid-state-path-p (path)
+  "Return true when PATH is a symbol or a proper list of non-NIL symbols."
+  (or (symbolp path)
+      (and (listp path)
+           (every (lambda (part) (and part (symbolp part))) path))))
+
+(defun assert-valid-state-path (path)
+  (unless (valid-state-path-p path)
+    (error "Invalid state path ~S. Expected a symbol or proper list of non-NIL symbols." path))
+  path)
+
 (defgeneric state-ref (place key &optional default))
 
 (defmethod state-ref ((state application-state) (key t) &optional default)
+  (assert-valid-state-path key)
   (get-path key (application-state-data state) default))
 
 (defmethod state-ref ((state hash-table) (key t) &optional default)
+  (assert-valid-state-path key)
   (get-path key state default))
 
 (defmethod state-ref ((state list) (key t) &optional default)
+  (assert-valid-state-path key)
   (get-path key state default))
 
 (defmethod get-path (path (state application-state) &optional default)
@@ -100,6 +115,7 @@ See Also:
 
 (defmethod (setf state-ref) (value (state application-state) (key t))
   "Atomically store VALUE at KEY inside STATE and log the change."
+  (assert-valid-state-path key)
   (bt:with-lock-held ((application-state-lock state))
     (let* ((data (application-state-data state))
             (old (get-path key data :not-present))
@@ -112,9 +128,11 @@ See Also:
       value)))
 
 (defmethod (setf state-ref) (value (state hash-table) (key t))
+  (assert-valid-state-path key)
   (set-path state key value))
 
 (defmethod (setf state-ref) (value (state list) (key t))
+  (assert-valid-state-path key)
   (set-path state key value))
 
 (defun get-state (state key &optional default)

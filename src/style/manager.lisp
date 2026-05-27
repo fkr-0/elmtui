@@ -8,6 +8,9 @@
 
 (in-package :elmtui.style.manager)
 
+(defvar *computing-active-stylesheet* nil
+  "Dynamically bound while computing the active stylesheet to catch re-entrant style/state cycles.")
+
 (defun default-stylesheet ()
   (make-stylesheet :rules nil :variables nil :namespace nil))
 
