@@ -7,7 +7,8 @@
                 #:init-listbox #:update-listbox #:view-listbox
                 #:listbox-model-height #:listbox-model-items
                 #:listbox-model-selected-index #:listbox-model-on-select
-                #:listbox-model-id)
+                #:listbox-model-id
+                #:msg-listbox-key-press)
   (:export #:run-focus-simple))
 
 (in-package :elmtui.examples.focus-simple)
@@ -78,12 +79,16 @@
                 (t (let ((lb (cdr (assoc *listbox-id* (getf app-state :components)))))
                      (multiple-value-bind (new-lb lb-cmds)
                          (update-listbox (case (car action)
-                                           (:up   (list :listbox-key-press :key :up))
-                                           (:down (list :listbox-key-press :key :down))
-                                           (t     (list :listbox-key-press :key (car action))))
+                                           (:up   (list msg-listbox-key-press :key :up))
+                                           (:down (list msg-listbox-key-press :key :down))
+                                           (t     (list msg-listbox-key-press :key (car action))))
                                          lb)
                        (declare (ignore lb-cmds))
-                       (setf (cdr (assoc *listbox-id* (getf app-state :components))) new-lb)))))))
+                       (let* ((components (copy-alist (getf app-state :components)))
+                              (entry (assoc *listbox-id* components)))
+                         (when entry
+                           (setf (cdr entry) new-lb)
+                           (push `(:components ,components) patches)))))))))
            (:focus-next
             (let* ((fm (copy-list (getf app-state :focus-manager)))
                    (ids (getf fm :focusable-elements))

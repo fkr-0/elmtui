@@ -1,6 +1,5 @@
 (uiop:define-package :elmtui.examples.input-selector
   (:use :cl :alexandria :log4cl)
-  (:import-from :log4cl #:log-info)
   (:import-from :cl-styles.api #:defrule #:defstylesheet #:cls> #:rgb)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.app #:defapplication)
@@ -64,15 +63,26 @@
          (search (string-downcase query) (string-downcase item)))
        items)))
 
+(defun %key-event-parts (message)
+  "Return two values, KEY and CHAR, for supported key-event message shapes."
+  (cond
+    ((and (listp message) (eq (first message) :key-event))
+     (values (second message) (third message)))
+    ((typep message 'elmtui.core.event-types:key-event)
+     (values (elmtui.core.event-types:key-event-key message)
+             (elmtui.core.event-types:key-event-char message)))
+    (t
+     (values nil nil))))
+
 (defun app-update (message app-state)
   (let ((items (state-ref app-state :items))
         (filtered-items (state-ref app-state :filtered-items))
         (selected-index (state-ref app-state :selected-index))
         (query (state-ref app-state :query)))
     (labels ((ret (&key patch) (make-update-result :patches patch)))
-      (cond
-        ((and (listp message) (eq (first message) :key-event))
-         (let ((key (second message)) (ch (third message)))
+      (multiple-value-bind (key ch) (%key-event-parts message)
+        (cond
+          (key
            (cond
              ((eql key :arrow-up)
               (ret :patch `(((:selected-index) ,(max 0 (1- selected-index))))))
@@ -95,34 +105,8 @@
                      (fi (filter-items items q)))
                 (ret :patch `(((:query) ,q) ((:filtered-items) ,fi)
                               ((:selected-index) ,(min selected-index (max 0 (1- (length fi)))))))))
-             (t (ret)))))
-        ((typep message 'elmtui.core.event-types:key-event)
-         (let ((key (elmtui.core.event-types:key-event-key message))
-               (ch (elmtui.core.event-types:key-event-char message)))
-           (cond
-             ((eql key :arrow-up)
-              (ret :patch `(((:selected-index) ,(max 0 (1- selected-index))))))
-             ((eql key :arrow-down)
-              (ret :patch `(((:selected-index)
-                             ,(min (max 0 (1- (length filtered-items))) (1+ selected-index))))))
-             ((eql key :return)
-              (if (plusp (length filtered-items))
-                  (ret :patch `(((:selected-item) ,(nth selected-index filtered-items))
-                                ((:should-quit) t)))
-                  (ret)))
-             ((eql key :escape) (ret :patch '(((:should-quit) t))))
-             ((eql key :backspace)
-              (let* ((q (if (plusp (length query)) (subseq query 0 (1- (length query))) ""))
-                     (fi (filter-items items q)))
-                (ret :patch `(((:query) ,q) ((:filtered-items) ,fi)
-                              ((:selected-index) ,(min selected-index (max 0 (1- (length fi)))))))))
-             ((and ch (graphic-char-p ch))
-              (let* ((q (concatenate 'string query (string ch)))
-                     (fi (filter-items items q)))
-                (ret :patch `(((:query) ,q) ((:filtered-items) ,fi)
-                              ((:selected-index) ,(min selected-index (max 0 (1- (length fi)))))))))
-             (t (ret)))))
-        (t (ret))))))
+             (t (ret))))
+          (t (ret)))))))
 
 (defun input-selector-view (app-state)
   (let* ((filtered-items (state-ref app-state :filtered-items))

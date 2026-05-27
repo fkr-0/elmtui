@@ -103,11 +103,13 @@
                   :commands lb-cmds))))))
       ((eq message :item-selected)
        (let* ((lb-model (state-ref app-state :listbox-model))
-              (selected-idx (listbox-model-selected-index lb-model))
-              (item (when selected-idx
+              (selected-idx (and lb-model (listbox-model-selected-index lb-model)))
+              (item (when (and lb-model selected-idx)
                       (nth selected-idx (listbox-model-items lb-model))))
               (current-path (state-ref app-state :current-path)))
          (cond
+           ((null lb-model)
+            (status-message-result "Listbox is not initialized yet"))
            ((not item)
             (status-message-result "No item selected"))
            (t
@@ -128,16 +130,20 @@
               (term-height (getf msg-data :height))
               (available-height (max 5 (- term-height 5)))
               (lb-model (state-ref app-state :listbox-model))
-              (current-height (listbox-model-height lb-model)))
-         (if (= available-height current-height)
-             (make-update-result)
-             (let ((new-lb-model (regenerate-listbox-model
+              (current-height (and lb-model (listbox-model-height lb-model))))
+         (cond
+           ((null lb-model)
+            (make-update-result))
+           ((= available-height current-height)
+            (make-update-result))
+           (t
+            (let ((new-lb-model (regenerate-listbox-model
                                   lb-model
                                   :height available-height)))
                (make-update-result
                 :patches `(((:listbox-model) ,new-lb-model)
                            (:terminal-width ,(getf msg-data :width))
-                           (:terminal-height ,(getf msg-data :height))))))))
+                           (:terminal-height ,(getf msg-data :height)))))))))
       (t
        (make-update-result)))))
 
@@ -150,8 +156,7 @@
   (let* ((current-path (state-ref app-state :current-path))
          (status-message (state-ref app-state :status-message))
          (terminal-width (state-ref app-state :terminal-width))
-         (terminal-height (state-ref app-state :terminal-height))
-         (lb-model (state-ref app-state :listbox-model)))
+         (terminal-height (state-ref app-state :terminal-height)))
     `(:container
        :id :root
        :style (:width :fill

@@ -8,13 +8,13 @@
         default)))
 
 (defun add-observer (app key fn)
-  "Adds an observer FN for KEY in application-state APP."
+  "Adds observer FN for KEY in application-state APP. Observers run in registration order."
+  (check-type fn function)
   (let* ((observers (application-state-observers app))
          (pair (assoc key observers)))
     (if pair
-        ;; Key exists: add fn to existing observer list
-        (setf (cdr pair) (cons fn (cdr pair)))
-        ;; Key doesn't exist: create new entry
+        ;; Preserve registration order for deterministic notifications.
+        (setf (cdr pair) (append (cdr pair) (list fn)))
         (push (cons key (list fn)) (application-state-observers app)))
     fn))
 
@@ -30,6 +30,7 @@
       t)))
 
 (defun notify-observers (app key old new)
-  "Notify observers for KEY in application-state APP."
-  (dolist (fn (%alist-get key (application-state-observers app)))
-    (funcall fn old new)))
+  "Notify observers for KEY in deterministic registration order."
+  (let ((observers (copy-list (%alist-get key (application-state-observers app)))))
+    (dolist (fn observers)
+      (funcall fn old new))))

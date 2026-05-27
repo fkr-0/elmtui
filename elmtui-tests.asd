@@ -4,7 +4,7 @@
   :description "Test suite for the elmtui system"
   :author "User <user@archlinux>"
   :version "0.2.0"
-  :depends-on (#:elmtui #:fiveam)
+  :depends-on (#:elmtui #:elmtui-widgets-enhanced #:fiveam)
   :license "GPL"
   :serial t
   :components ((:module "tests"
@@ -51,6 +51,7 @@
                                (:file "driver-subscription-tests")
                                (:file "runtime-effects-tests")
                                (:file "runtime-e2e-tests")
+                               (:file "errs-regression-tests")
                                (:file "dev-tests")
                                (:file "tools-tests")
                                (:file "packager-tests")

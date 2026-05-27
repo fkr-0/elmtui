@@ -75,7 +75,11 @@
       (t (%ensure-keyword v)))))
 
 (defun %check-type (prop v)
-  (let* ((def (property-definition prop))
+  (let* ((def (or (property-definition prop)
+                  (error 'style-contract-violation
+                         :expected :known-property
+                         :got prop
+                         :where prop)))
           (type (getf def :type nil))
           (enum (getf def :enum nil))
           (nv (%normalize-value prop v)))
@@ -149,8 +153,12 @@ Raises:
   (loop for (k v) on plist by #'cddr do
     (let* ((kk (%normalize-key k))
             (vv (%normalize-value kk v)))
-      (when (property-definition kk)
-        (%check-type kk vv))))
+      (unless (property-definition kk)
+        (error 'style-contract-violation
+               :expected :known-property
+               :got kk
+               :where kk))
+      (%check-type kk vv)))
   plist)
 
 (defun ensure-declarations (plist)

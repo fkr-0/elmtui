@@ -41,7 +41,7 @@ Returns two values: PATCHES and COMMANDS."
                   (typep (first raw-result) 'update-result))
              (values (ur-patches (first raw-result))
                      (ur-commands (first raw-result))))
-            ((>= (length raw-result) 2)
+            ((= (length raw-result) 2)
              (values (first raw-result) (second raw-result)))
             (t
              (log-warn "Component ~A returned unexpected update result: ~S"
