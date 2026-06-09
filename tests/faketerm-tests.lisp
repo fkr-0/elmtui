@@ -49,3 +49,26 @@
              (is (equal lines '("      " "      ")))))
       (ignore-errors (elmtui.platform.api:shutdown-backend backend))
       (ignore-errors (delete-file path)))))
+
+(test faketerm-enqueues-input-events-after-initialization
+  "Faketerm exposes deterministic post-initialization input injection for harness tests."
+  (let* ((path (merge-pathnames
+                (make-pathname :name (format nil "faketerm-input-~A" (gensym))
+                               :type "log")
+                (uiop:temporary-directory)))
+         (backend (elmtui.platform.api:initialize-backend
+                   :faketerm :filepath path :width 10 :height 2
+                   :initial-input '((:key :initial)))))
+    (unwind-protect
+         (progn
+           (%call-faketerm-symbol "FAKETERM-ENQUEUE-INPUT" backend '(:key :a))
+           (%call-faketerm-symbol "FAKETERM-ENQUEUE-INPUT" backend '(:key :b))
+           (is (equal (elmtui.platform.api:peek-input-event backend) '(:key :initial)))
+           (is (equal (elmtui.platform.api:peek-input-event backend) '(:key :initial)))
+           (is (equal (elmtui.platform.api:poll-input-event backend) '(:key :initial)))
+           (is (equal (elmtui.platform.api:poll-input-event backend) '(:key :a)))
+           (is (equal (elmtui.platform.api:poll-input-event backend) '(:key :b)))
+           (is (null (elmtui.platform.api:poll-input-event backend))))
+      (ignore-errors (elmtui.platform.api:shutdown-backend backend))
+      (ignore-errors (delete-file path)))))
+
