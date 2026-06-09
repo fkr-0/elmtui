@@ -72,3 +72,22 @@
       (ignore-errors (elmtui.platform.api:shutdown-backend backend))
       (ignore-errors (delete-file path)))))
 
+(test faketerm-log-lines-snapshot-api
+  "Faketerm exposes deterministic operation log lines for command-sequence assertions."
+  (let* ((path (merge-pathnames
+                (make-pathname :name (format nil "faketerm-log-lines-~A" (gensym))
+                               :type "log")
+                (uiop:temporary-directory)))
+         (backend (elmtui.platform.api:initialize-backend
+                   :faketerm :filepath path :width 5 :height 2)))
+    (unwind-protect
+         (progn
+           (elmtui.platform.api:draw-text-at backend nil 0 0 "Yo" :style '(:fg :blue))
+           (elmtui.platform.api:flush-output backend)
+           (let ((lines (%call-faketerm-symbol "FAKETERM-LOG-LINES" backend)))
+             (is (some (lambda (line) (search "Faketerm Initialized" line)) lines))
+             (is (some (lambda (line) (search "DRAW_TEXT_AT" line)) lines))
+             (is (every (lambda (line) (not (search "<INFO>" line))) lines))))
+      (ignore-errors (elmtui.platform.api:shutdown-backend backend))
+      (ignore-errors (delete-file path)))))
+

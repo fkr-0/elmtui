@@ -65,12 +65,23 @@ def test_tmux_integration_tests_are_opt_in_by_default():
     assert "*run-tmux-integration-tests*" in text, "missing opt-in switch"
     assert "(not *run-tmux-integration-tests*)" in text, "skip macro must skip before probing live tmux"
 
+
+def test_widgets_enhanced_asdf_definitions_match_file_stem() -> None:
+    path = ROOT / "elmtui-widgets-enhanced.asd"
+    source = path.read_text(encoding="utf-8")
+    assert '"elmtui/widgets-enhanced"' not in source, (
+        "elmtui-widgets-enhanced.asd must not define slash-named system "
+        "elmtui/widgets-enhanced; ASDF warns because systems in this file "
+        "must be elmtui-widgets-enhanced or elmtui-widgets-enhanced/*"
+    )
+
 def main() -> int:
     tests: list[Callable[[], None]] = [
         test_clpm_runner_converts_test_result_to_process_exit_status,
         test_runner_does_not_reference_test_package_at_read_time,
         test_clpm_runner_removes_stdout_log_appenders_before_running_tests,
         test_tmux_integration_tests_are_opt_in_by_default,
+        test_widgets_enhanced_asdf_definitions_match_file_stem,
     ]
     failures = 0
     for test in tests:
