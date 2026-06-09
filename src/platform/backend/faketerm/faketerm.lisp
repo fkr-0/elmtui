@@ -24,7 +24,9 @@
     #:backend-version
     #:get-char-at-faketerm ; Specific name to avoid conflict if generic exists
     #:get-cell-style-faketerm
-    #:faketerm-screen-lines)) ; Specific name
+    #:faketerm-screen-lines
+    #:faketerm-enqueue-input
+    #:faketerm-log-lines)) ; Specific name
 
 (in-package :elmtui.backend.faketerm)
 
@@ -343,6 +345,14 @@
   (finish-output (faketerm-instance-stream instance))
   t)
 
+(defun faketerm-enqueue-input (instance event)
+  "Append EVENT to INSTANCE's deterministic fake input queue."
+  (setf (faketerm-instance-input-queue instance)
+        (append (faketerm-instance-input-queue instance) (list event)))
+  (format (faketerm-instance-stream instance) "; FAKETERM_ENQUEUE_INPUT Event: ~S~%" event)
+  (finish-output (faketerm-instance-stream instance))
+  event)
+
 ;;;---------------------------------------------------------------
 ;;; Capability Querying
 ;;;---------------------------------------------------------------
@@ -393,6 +403,17 @@ against rendered TUI state."
                    (loop for col below width
                          collect (faketerm-cell-char (aref buffer row col)))
                    'string))))
+
+(defun faketerm-log-lines (instance)
+  "Return the current faketerm operation log as deterministic strings."
+  (when (faketerm-instance-stream instance)
+    (finish-output (faketerm-instance-stream instance)))
+  (let ((path (faketerm-instance-filepath instance)))
+    (when (and path (probe-file path))
+      (with-open-file (stream path :direction :input)
+        (loop for line = (read-line stream nil nil)
+              while line
+              collect line)))))
 ;;;---------------------------------------------------------------
 ;;; Raw Access (Escape Hatch)
 ;;;---------------------------------------------------------------

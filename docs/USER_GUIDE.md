@@ -164,7 +164,7 @@ Tips:
 
 ## Enhanced Widgets (Optional)
 
-- Load experimental enhanced widgets: `asdf:load-system :elmtui/widgets-enhanced`
+- Load experimental enhanced widgets: `asdf:load-system :elmtui-widgets-enhanced/experimental`
 - Namespaces: `elmtui.ui.widgets.viewport-enhanced`, `...label-enhanced`, `...button-enhanced`.
 - Core widgets now include a few enhanced features as optional props:
   - `label`: `:aria-label`
