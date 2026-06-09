@@ -34,32 +34,41 @@
 ;;; Helper: Skip tests if tmux not available
 ;;;----------------------------------------------------------------
 
-(defparameter *require-tmux-integration-tests*
-  (member (string-downcase (or (uiop:getenv "ELMTUI_REQUIRE_TMUX") ""))
+(defun %truthy-env-p (name)
+  (member (string-downcase (or (uiop:getenv name) ""))
           '("1" "true" "yes")
-          :test #'string=)
+          :test #'string=))
+
+(defparameter *require-tmux-integration-tests*
+  (%truthy-env-p "ELMTUI_REQUIRE_TMUX")
   "When true, tmux integration tests fail (instead of skip) if tmux is unavailable.")
 
+(defparameter *run-tmux-integration-tests*
+  (or (%truthy-env-p "ELMTUI_RUN_TMUX_INTEGRATION")
+      *require-tmux-integration-tests*)
+  "When true, tests may probe and capture the live tmux pane.")
+
 (defmacro skip-unless-tmux (&body body)
-  "Run BODY when tmux exists. Otherwise skip, or fail when strict mode is enabled."
-  `(let ((tmux-ok (tmux-available-p)))
-     (cond
-       (tmux-ok
-        (progn ,@body))
-       (*require-tmux-integration-tests*
-        (fail "tmux unavailable but ELMTUI_REQUIRE_TMUX requires live tmux integration"))
-       (t
-        (skip "tmux not available in this environment")))))
+  "Run BODY only when live tmux integration is explicitly enabled and tmux exists."
+  `(cond
+     ((not *run-tmux-integration-tests*)
+      (skip "live tmux integration requires ELMTUI_RUN_TMUX_INTEGRATION=1"))
+     ((tmux-available-p)
+      (progn ,@body))
+     (*require-tmux-integration-tests*
+      (fail "tmux unavailable but ELMTUI_REQUIRE_TMUX requires live tmux integration"))
+     (t
+      (skip "tmux not available in this environment"))))
 
 ;;;----------------------------------------------------------------
 ;;; Environment Detection Tests
 ;;;----------------------------------------------------------------
 
 (test tmux-available-detection
-  "tmux-available-p returns boolean indicating tmux availability"
-  (let ((result (tmux-available-p)))
-    (is (or (eq result t) (eq result nil)))
-    (format t "  tmux-available-p returned: ~A~%" result)))
+  "tmux-available-p returns boolean indicating tmux availability when live tmux integration is enabled"
+  (skip-unless-tmux
+    (let ((result (tmux-available-p)))
+      (is (or (eq result t) (eq result nil))))))
 
 ;;;----------------------------------------------------------------
 ;;; Capture Function Tests
