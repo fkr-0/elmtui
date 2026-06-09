@@ -70,6 +70,7 @@
                                ;; (:file "ui-widgets-tests")
                                ;; (:file "state-extended-tests")
                                (:file "platform-tests")
+                               (:file "faketerm-tests")
                (:file "terminal-lifecycle-tests"))))
   ;; (:file "app-tests")
   ;; (:file "ui-widgets-tests")
