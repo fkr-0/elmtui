@@ -1,5 +1,5 @@
 ;; Optional: Enhanced/experimental widgets built on contracts/DSL
-(asdf:defsystem "elmtui/widgets-enhanced"
+(asdf:defsystem "elmtui-widgets-enhanced/experimental"
   :version      "0.1.0"
   :description  "Experimental enhanced widgets with contracts and DSL integration"
   :author       "User <user@archlinux>"
@@ -13,7 +13,7 @@
 
 
 ;; Loadable subset for systems that need only the stable enhanced viewport.
-;; The full experimental slash-named system above also loads label/button files.
+;; The full experimental secondary system above also loads label/button files.
 (asdf:defsystem "elmtui-widgets-enhanced"
   :version      "0.1.0"
   :description  "Stable enhanced widgets used by elmtui tests"
