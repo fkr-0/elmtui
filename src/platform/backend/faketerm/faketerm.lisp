@@ -23,7 +23,8 @@
     #:backend-name
     #:backend-version
     #:get-char-at-faketerm ; Specific name to avoid conflict if generic exists
-    #:get-cell-style-faketerm)) ; Specific name
+    #:get-cell-style-faketerm
+    #:faketerm-screen-lines)) ; Specific name
 
 (in-package :elmtui.backend.faketerm)
 
@@ -114,8 +115,8 @@
 (defmethod clear-screen ((instance faketerm-instance) &optional rect)
   (let ((stream (faketerm-instance-stream instance))
          (buffer (faketerm-instance-screen-buffer instance))
-         (w (or (and rect (w rect))(faketerm-instance-width instance)))
-         (h (or (and rect (h rect))(faketerm-instance-width instance)))
+         (w (or (and rect (w rect)) (faketerm-instance-width instance)))
+         (h (or (and rect (h rect)) (faketerm-instance-height instance)))
          (x (or (and rect (x rect)) 0))
          (y (or (and rect (y rect)) 0))
          (default-style (list :fg (default-foreground-color instance) :bg (default-background-color instance) :attrs nil)))
@@ -377,6 +378,21 @@
   (when (and (>= row 0) (< row (faketerm-instance-height instance))
           (>= col 0) (< col (faketerm-instance-width instance)))
     (faketerm-cell-style (aref (faketerm-instance-screen-buffer instance) row col))))
+
+(defun faketerm-screen-lines (instance)
+  "Return a deterministic row-major snapshot of the fake terminal screen as strings.
+
+Each string has exactly the faketerm width. The returned list has exactly
+faketerm height entries, making it suitable for non-interactive assertions
+against rendered TUI state."
+  (let ((buffer (faketerm-instance-screen-buffer instance))
+        (width (faketerm-instance-width instance))
+        (height (faketerm-instance-height instance)))
+    (loop for row below height
+          collect (coerce
+                   (loop for col below width
+                         collect (faketerm-cell-char (aref buffer row col)))
+                   'string))))
 ;;;---------------------------------------------------------------
 ;;; Raw Access (Escape Hatch)
 ;;;---------------------------------------------------------------

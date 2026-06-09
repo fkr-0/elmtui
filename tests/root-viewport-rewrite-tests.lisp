@@ -44,11 +44,12 @@ PATH is a list of keywords like (:app :rv :width)."
   (labels ((put (cell ks)
              (if (endp ks)
                value
-               (let* ((k (first ks))
+               (let* ((cell* (if (listp cell) cell nil))
+                       (k (first ks))
                        (rest (rest ks))
-                       (sub (getf cell k)))
+                       (sub (getf cell* k)))
                  (setf sub (put (or sub nil) rest))
-                 (let ((out (copy-list cell)))
+                 (let ((out (copy-list cell*)))
                    (setf (getf out k) sub)
                    out)))))
     (put plist path)))
@@ -64,6 +65,23 @@ PATH is a list of keywords like (:app :rv :width)."
   "Create an update context for STATE rooted at BASE-PATH."
   (let ((app (make-state :initial state :backend :plist)))
     (make-update-context app :base-path base-path)))
+
+;;;; --------------------------------------------------------------------------
+;;;; 0) Init normalization
+;;;; --------------------------------------------------------------------------
+
+(test init-normalizes-dotted-initial-cursor-pos
+  (let ((rv (make-root-viewport :rv)))
+    (multiple-value-bind (_component patches)
+      (init rv :id-path '(:app :rv)
+        :initial-terminal-dimensions '(10 5)
+        :initial-cursor-pos '(3 . 4))
+      (declare (ignore _component))
+      (is (some (lambda (patch)
+                  (and (equal (first patch) '(:components :app :rv :initial-cursor-pos))
+                    (equal (second patch) '(3 4))))
+            patches)
+        "Dotted cursor positions are normalized to proper two-element lists."))))
 
 ;;;; --------------------------------------------------------------------------
 ;;;; 1) View gating: return NIL until both size & cursor are known
