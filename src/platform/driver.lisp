@@ -210,8 +210,8 @@
 (defun %resolve-generated-runner (app-name)
   "Resolve DEFAPPLICATION-generated RUN-<APP-NAME> function symbol."
   (let* ((runner-name (format nil "RUN-~A" app-name))
-         (runner-sym (find-symbol runner-name (symbol-package app-name))))
-    (and runner-sym (fboundp runner-sym) runner-sym)))
+         (runner-sym (intern runner-name (symbol-package app-name))))
+    (and (fboundp runner-sym) runner-sym)))
 
 (defmethod elmtui.runtime.protocol:run-application ((app-spec symbol)
                                                      &key (backend-type :tty)
