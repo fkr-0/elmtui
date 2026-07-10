@@ -5,7 +5,8 @@
   (:nicknames :cleve-elm.core.event-channels)
   (:use :cl :log4cl)
   (:import-from :cl-events.channel
-   :make-channel :make-filtered-channel :channel-add-filter :-> :<- :select :no-wait)
+   :make-channel :make-filtered-channel :channel-add-filter :channel-remove-filter
+   :-> :<- :select :no-wait)
   ;; Removed duplicate :nicknames, :use, and :import-from clauses that were here
   (:export
    ;; class names

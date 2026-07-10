@@ -7,6 +7,11 @@
   (:import-from :elmtui.state #:make-state)
   (:import-from :elmtui.ui.api #:update #:view)
   (:import-from :elmtui.state #:state-ref #:get-path)
+  (:import-from :elmtui.utils
+                #:trim-string
+                #:blank-string-p
+                #:string-prefix-p
+                #:split-string-literal)
   ;; (:import-from :elmtui.state  #:get-path)
   (:export #:helpers-tests))
 
@@ -17,6 +22,20 @@
   :description "Tests for helper functions and macros.")
 
 (in-suite helpers-tests)
+
+(test literal-string-helpers
+  "Internal string helpers preserve the small cl-str contract ElmTUI relies on."
+  (is (string= "value"
+               (trim-string (format nil " ~Cvalue~C " #\Tab #\Newline))))
+  (is-true (blank-string-p (format nil " ~C~C" #\Tab #\Newline)))
+  (is-true (string-prefix-p "minmax" "minmax(1, 2)"))
+  (is-true (string-prefix-p "MINMAX" "minmax(1, 2)" :test #'char-equal))
+  (is (equal '("a" "" "b" "")
+             (split-string-literal "," "a,,b,")))
+  (is (equal '("a" "b" "c:d")
+             (split-string-literal ":" "a:b:c:d" :limit 3)))
+  (is (equal '("a" "b")
+             (split-string-literal "," "a,,b," :omit-empty t))))
 
 ;; Test for dsl->ui-node
 (test dsl-ui-node-children-wrapping

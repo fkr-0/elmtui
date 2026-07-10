@@ -2,7 +2,7 @@
 (in-package :asdf)
 (asdf:defsystem "cl-styles"
   :description "CSS-like styling engine for arbitrary object trees (TEA friendly)."
-  :author "elmtui"
+  :author "ElmTUI contributors"
   :license "MIT"
   :version "0.1.0"
   :depends-on (#:alexandria #:uiop)

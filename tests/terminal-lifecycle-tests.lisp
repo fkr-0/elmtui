@@ -11,7 +11,7 @@
   (:import-from :cl-state.core
                 #:make-state
                 #:state-ref)
-  (:import-from :cl-state.tx
+  (:import-from :cl-state.patch
                 #:apply-patches)
   (:import-from :elmtui.ui.api
                 #:init

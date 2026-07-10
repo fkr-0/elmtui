@@ -35,7 +35,7 @@
     ;; Verify all rules applied in correct specificity order
     (let ((computed (cl-styles.protocols:get-computed-style button)))
       (is (eql :white (getf computed :color)))      ; from button rule
-      (is (eql :red (getf computed :background)))   ; from primary rule (higher specificity)
+      (is (eql :red (getf computed :background-color))) ; canonical background property
       (is (eql 8 (getf computed :padding)))         ; from button rule  
       (is (eql :bold (getf computed :font-weight))) ; from primary rule
       (is (eql 2 (getf computed :border)))          ; from id rule (highest specificity)
@@ -102,11 +102,11 @@
            (secondary-style (cl-styles.protocols:get-computed-style secondary-btn)))
       ;; Primary button
       (is (eql :white (getf primary-style :color)))
-      (is (eql :blue (getf primary-style :background)))
+      (is (eql :blue (getf primary-style :background-color)))
       (is (eql 1 (getf primary-style :border)))
       ;; Secondary button (secondary rule overrides primary background)
       (is (eql :white (getf secondary-style :color)))
-      (is (eql :green (getf secondary-style :background))) ; overridden by secondary rule
+      (is (eql :green (getf secondary-style :background-color))) ; overridden by secondary rule
       (is (eql 1 (getf secondary-style :border))))))
 
 (test performance-with-large-stylesheet

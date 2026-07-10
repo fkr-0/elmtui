@@ -9,7 +9,9 @@
 (defun %normalize-patch (p)
   (cond
     ((patch-p p) p)
-    ((and (listp p) (= (length p) 2) (listp (first p)))
+    ((and (listp p)
+          (= (length p) 2)
+          (or (symbolp (first p)) (listp (first p))))
       (make-patch :path (first p) :op :set :value (second p)))
     (t
       (error "Unsupported patch format: ~S" p))))
@@ -53,23 +55,58 @@ Returns the modified STATE (functional API)."
                 (fn value))
           (set-path state path (funcall fn cur)))))))
 
-(defun apply-patch (state p)
-  "Apply P to STATE.
+(defun %remove-from-application-state (state path)
+  "Remove PATH while preserving the application-state log/observer contract."
+  (bt:with-lock-held ((application-state-lock state))
+    (let* ((data (application-state-data state))
+           (old (get-path path data :not-present)))
+      (multiple-value-bind (updated removedp) (remove-path data path)
+        (when removedp
+          (setf (application-state-data state) updated)
+          (push (list path old :elmtui-delete-path)
+                (application-state-log state))
+          (incf (application-state-version state))
+          (unless *transaction-active*
+            (ignore-errors
+              (cl-state.observer:notify-observers
+               state path old :elmtui-delete-path))))
+        (values state removedp)))))
 
-STATE may be either a raw container (hash-table/plist) or an
-APPLICATION-STATE.  Public ElmTUI component tests use the re-exported
-CL-STATE.API:APPLY-PATCHES on application-state values; treating those as
-raw containers caused SET-PATH to reject APPLICATION-STATE objects."
+(defun %apply-patch-to-application-state (state patch)
+  "Apply PATCH through the application-state mutation/logging protocol."
+  (let ((path (patch-path patch))
+        (op (patch-op patch))
+        (value (patch-value patch)))
+    (ecase op
+      (:set
+       (state-set state path value))
+      (:remove
+       (%remove-from-application-state state path))
+      (:merge
+       (state-set state path
+                  (append value (get-path path state nil))))
+      (:update
+       (state-set state path
+                  (funcall value (get-path path state nil)))))
+    state))
+
+(defun apply-patch (state p)
+  "Apply P to a raw container or APPLICATION-STATE."
   (let ((patch (%normalize-patch p)))
     (if (application-state-p state)
-      (progn
-        (setf (application-state-data state)
-          (%apply-patch-to-container (application-state-data state) patch))
-        state)
-      (%apply-patch-to-container state patch))))
+        (%apply-patch-to-application-state state patch)
+        (%apply-patch-to-container state patch))))
 
 (defun apply-patches (state patches)
-  (reduce #'apply-patch patches :initial-value state))
+  "Apply PATCHES in order.
+
+For raw containers this is a direct reduction. For APPLICATION-STATE values,
+the whole batch is one undoable transaction unless already inside one."
+  (if (and (application-state-p state)
+           (not *transaction-active*))
+      (cl-state.tx:with-transaction (state :name :apply-patches)
+        (reduce #'apply-patch patches :initial-value state))
+      (reduce #'apply-patch patches :initial-value state)))
 
 (defun diff-states (old new &key (prefix nil))
   "Return a list of patches representing differences between OLD and NEW states.

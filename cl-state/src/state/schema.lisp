@@ -1,13 +1,3 @@
-(uiop:define-package :cl-state.schema
-  (:use :cl)
-  (:export :register-type-predicate
-    :define-type-predicate
-    :lookup-type-predicate
-    :list-registered-types
-    :validate-type
-    :make-enum-predicate
-    :register-enum-type))
-
 (in-package :cl-state.schema)
 
 ;; Comprehensive type predicate registry
@@ -17,12 +7,18 @@
 (defvar *type-descriptions* (make-hash-table :test #'equal)
   "Registry of type descriptions")
 
+(defun %canonical-type-name (type-name)
+  (etypecase type-name
+    (symbol (intern (symbol-name type-name) :keyword))
+    (string (intern (string-upcase type-name) :keyword))))
+
 (defun register-type-predicate (type-name predicate &optional description)
   "Register a predicate for a type"
-  (setf (gethash type-name *type-predicates*) predicate)
+  (let ((key (%canonical-type-name type-name)))
+    (setf (gethash key *type-predicates*) predicate)
   (when description
-    (setf (gethash type-name *type-descriptions*) description))
-  type-name)
+      (setf (gethash key *type-descriptions*) description))
+    key))
 
 (defmacro define-type-predicate (name args &body body)
   "Define and register a type predicate"
@@ -34,18 +30,20 @@
 
 (defun lookup-type-predicate (type-name)
   "Get a predicate for a type"
-  (or (gethash type-name *type-predicates*)
+  (let ((key (%canonical-type-name type-name)))
+    (or (gethash key *type-predicates*)
     ;; For simple types, try to find CL built-in type predicate
     (let ((possible-predicate
-            (find-symbol (concatenate 'string (string type-name) "P") :cl)))
+            (find-symbol (concatenate 'string (symbol-name key) "P") :cl)))
       (when (and possible-predicate (fboundp possible-predicate))
-        (register-type-predicate type-name (symbol-function possible-predicate))
-        (symbol-function possible-predicate)))))
+          (register-type-predicate key (symbol-function possible-predicate))
+          (symbol-function possible-predicate))))))
 
 (defun list-registered-types ()
   "List all registered type predicates"
   (let ((result nil))
     (maphash (lambda (k v)
+               (declare (ignore v))
                (push (list k (gethash k *type-descriptions* "No description"))
                  result))
       *type-predicates*)
@@ -128,20 +126,30 @@
 (register-type-predicate :float #'floatp "Must be a float")
 
 ;; More specialized predicates
-(define-type-predicate non-empty-string (value)
+(defun non-empty-string-p (value)
   (and (stringp value) (> (length value) 0)))
+(register-type-predicate :non-empty-string #'non-empty-string-p "Must be a non-empty string")
 
-(define-type-predicate positive-integer (value)
+(defun positive-integer-p (value)
   (and (integerp value) (> value 0)))
+(register-type-predicate :positive-integer #'positive-integer-p "Must be a positive integer")
 
-(define-type-predicate non-negative-integer (value)
+(defun non-negative-integer-p (value)
   (and (integerp value) (>= value 0)))
+(register-type-predicate :non-negative-integer #'non-negative-integer-p
+                         "Must be a non-negative integer")
 
-(define-type-predicate finite-number (value)
-  (and (numberp value) (not (float-infinity-p value)) (not (float-nan-p value))))
+(defun finite-number-p (value)
+  (and (numberp value)
+       (or (not (floatp value))
+           #+sbcl (and (not (sb-ext:float-infinity-p value))
+                       (not (sb-ext:float-nan-p value)))
+           #-sbcl (= value value))))
+(register-type-predicate :finite-number #'finite-number-p "Must be a finite number")
 
-(define-type-predicate keyword-symbol (value)
+(defun keyword-symbol-p (value)
   (keywordp value))
+(register-type-predicate :keyword-symbol #'keyword-symbol-p "Must be a keyword symbol")
 
 ;; Create predicate for enum values
 (defun make-enum-predicate (allowed-values)

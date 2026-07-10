@@ -8,8 +8,7 @@
   (:import-from :alexandria #:clamp)
   (:import-from :uiop
     #:run-program
-    #:getenv
-    #:find-program*)
+    #:getenv)
   (:import-from :elmtui.platform.api
     #:term-w #:term-h)
   (:import-from :elmtui.platform.backend.terminal
@@ -51,18 +50,21 @@
 ;;;----------------------------------------------------------------
 ;;; Environment helpers
 ;;;----------------------------------------------------------------
+(defun %find-program-on-path (name)
+  "Return the first existing NAME found in PATH, or NIL."
+  (loop for directory in (uiop:split-string (or (getenv "PATH") "")
+                                             :separator '(#\:))
+        for pathname = (merge-pathnames name
+                                        (uiop:ensure-directory-pathname
+                                         (if (string= directory "")
+                                             "."
+                                             directory)))
+        when (probe-file pathname)
+          return (namestring (truename pathname))))
+
 (defun %tmux-program ()
-  "Locate the tmux binary if available using PATH search."
-  (or (ignore-errors (find-program* "tmux"))
-      (when (probe-file "/usr/bin/tmux") "/usr/bin/tmux")
-      (when (probe-file "/bin/tmux") "/bin/tmux")
-      (ignore-errors
-        ;; Final fallback: try executing tmux directly from PATH.
-        (run-program '("tmux" "-V")
-                     :output :string
-                     :error nil
-                     :ignore-error-status t)
-        "tmux")))
+  "Locate the tmux binary using the current process PATH."
+  (%find-program-on-path "tmux"))
 
 (defun tmux-available-p ()
   "Return true when tmux is available and current process is running inside tmux."

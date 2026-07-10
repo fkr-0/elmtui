@@ -1,5 +1,8 @@
 (uiop:define-package :elmtui.tests.cleanup-regressions
   (:use :cl :fiveam)
+  (:import-from :elmtui.utils
+                #:string-prefix-p
+                #:split-string-literal)
   (:export #:cleanup-regressions-suite))
 
 (in-package :elmtui.tests.cleanup-regressions)
@@ -101,7 +104,7 @@
   (is (null (probe-file (%project-file "src/platform/legacy/")))))
 
 (defun %allowed-runtime-probe-file-p (relative)
-  (or (str:starts-with? "src/dev/" relative)
+  (or (string-prefix-p "src/dev/" relative)
       (string= relative "src/view/base-elements.lisp")))
 
 (test runtime-probes-confined-to-allowed-files
@@ -109,9 +112,9 @@
   (let* ((cmd (list "rg" "-n" "find-package|find-symbol" "src"))
          (out (uiop:run-program cmd :output :string :ignore-error-status t))
          (lines (remove-if (lambda (s) (or (null s) (string= s "")))
-                           (str:split #\Newline out))))
+                           (split-string-literal #\Newline out))))
     (dolist (line lines)
-      (let* ((parts (str:split ":" line :limit 3))
+      (let* ((parts (split-string-literal ":" line :limit 3))
              (file (first parts)))
         (is-true (%allowed-runtime-probe-file-p file)
                  "Disallowed runtime probe occurrence: ~A" line)))))

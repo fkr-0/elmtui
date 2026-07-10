@@ -10,11 +10,17 @@
              )))
 
 (defparameter *property-registry* (make-hash-table :test 'eql))
+(defparameter *property-aliases* (make-hash-table :test 'eql))
 (defparameter *groups* (make-hash-table :test 'eql))
 (defparameter *layout-groups* (make-hash-table :test 'eql))
 
 (defun register-property (name def)
   (setf (gethash name *property-registry*) def))
+
+(defun register-property-alias (alias canonical-name)
+  "Register ALIAS as an alternate spelling for CANONICAL-NAME."
+  (setf (gethash (%ensure-keyword alias) *property-aliases*)
+        (%ensure-keyword canonical-name)))
 
 (defun property-definition (name)
   (gethash name *property-registry*))
@@ -57,7 +63,8 @@
     (t x)))
 
 (defun %normalize-key (k)
-  (%ensure-keyword k))
+  (let ((key (%ensure-keyword k)))
+    (or (gethash key *property-aliases*) key)))
 
 (defun %normalize-value (prop v)
   (let* ((def (property-definition prop))
@@ -124,14 +131,17 @@ Example:
   ;; Returns: (:MARGIN-LEFT 10 :MARGIN-RIGHT 10 :MARGIN-BOTTOM 5 :MARGIN-TOP 5
   ;;           :PADDING-LEFT 10 :PADDING-BOTTOM 10 :PADDING-RIGHT 10 :PADDING-TOP 10
   ;;           :COLOR :BLUE :PADDING 10 :MARGIN (5 10) :FONT-FAMILY \"Arial\")"
-  (let ((normalized-plist (copy-list (or plist nil))))
-    (loop for (key value) on normalized-plist by #'cddr do
-      (let* ((normalized-key (%normalize-key key))
-              (normalized-value (%normalize-value normalized-key value)))
-        ;; Remove the original key and set the normalized key and value
-        (remf normalized-plist key)
-        (setf (getf normalized-plist normalized-key) normalized-value)))
-    normalized-plist))
+  (unless (evenp (length plist))
+    (error 'style-contract-violation
+           :expected :property-value-pairs
+           :got plist
+           :where :declarations))
+  (let ((result nil))
+    (loop for (key value) on plist by #'cddr
+          for normalized-key = (%normalize-key key)
+          for normalized-value = (%normalize-value normalized-key value)
+          do (setf (getf result normalized-key) normalized-value))
+    result))
 
 ;; (getf (property-definition :font-family) :type)
 ;; (normalize-declarations '(:MARGIN-LEFT 10 :MARGIN-RIGHT 10 :MARGIN-BOTTOM 5 :MARGIN-TOP 5 :PADDING-LEFT
@@ -256,7 +266,19 @@ Raises:
 (defproperty :border-left-color :type (lambda (v) (or (keywordp v) (cl-styles.tokens:color-p v))))
 
 ;; text properties
-(defproperty :color :type (lambda (v) (or (keywordp v) (cl-styles.tokens:color-p v) (and (consp v) (eq (car v) 'cl-styles.tokens:var)))))
+(defproperty :color
+  :type (lambda (v)
+          (or (keywordp v)
+              (cl-styles.tokens:color-p v)
+              (cl-styles.tokens:variable-ref-p v))))
+(defproperty :background-color
+  :type (lambda (v)
+          (or (keywordp v)
+              (cl-styles.tokens:color-p v)
+              (cl-styles.tokens:variable-ref-p v))))
+(register-property-alias :background :background-color)
+(defproperty :opacity
+  :type (lambda (v) (and (realp v) (<= 0 v 1))))
 (defproperty :font-family :type :string)
 (defproperty :font-size :type :number)
 (defproperty :font-weight :type :keyword :enum (:normal :bold :bolder :lighter :inherit))

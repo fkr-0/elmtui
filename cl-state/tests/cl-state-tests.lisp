@@ -110,52 +110,33 @@
     (is (= (state-ref state :b) 2))))
 
 (defun run-all-cl-state-tests ()
-  "Run all cl-state test suites and display unified summary."
+  "Run all cl-state test suites and fail ASDF when any check fails."
   (format t "~&╔════════════════════════════════════════════════════════════╗~%")
   (format t "║          CL-STATE TEST SUITE - RUNNING ALL TESTS            ║~%")
   (format t "╚════════════════════════════════════════════════════════════╝~%~%")
-
-  ;; Run all test suites
-  (format t "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Utils Tests...~%")
-  (cl-state-tests.utils:run-utils-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Core Tests...~%")
-  (cl-state-tests.core:run-core-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Patch Tests...~%")
-  (cl-state-tests.patch:run-patch-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Transaction Tests...~%")
-  (cl-state-tests.tx:run-tx-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Observer Tests...~%")
-  (cl-state-tests.observer:run-observer-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Undo (History) Tests...~%")
-  (cl-state-tests.undo:run-undo-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Schema Tests...~%")
-  (cl-state-tests.schema:run-schema-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Validation Tests...~%")
-  (cl-state-tests.validation:run-validation-tests)
-
-  (format t "~%━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
-  (format t "Running Legacy Tests...~%")
-  (run! 'cl-state-suite)
-
-  (format t "~%~%╔════════════════════════════════════════════════════════════╗~%")
-  (format t "║                   ALL TESTS COMPLETED                        ║~%")
-  (format t "╚════════════════════════════════════════════════════════════╝~%")
-  :done)
+  (flet ((run-suite (label suite)
+           (format t "~&━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
+           (format t "Running ~a...~%" label)
+           (let ((results (run suite)))
+             (explain! results)
+             results)))
+    (let ((results
+            (append
+             (run-suite "Utils Tests" 'cl-state-tests.utils:utils-suite)
+             (run-suite "Core Tests" 'cl-state-tests.core:core-suite)
+             (run-suite "Patch Tests" 'cl-state-tests.patch:patch-suite)
+             (run-suite "Transaction Tests" 'cl-state-tests.tx:tx-suite)
+             (run-suite "Observer Tests" 'cl-state-tests.observer:observer-suite)
+             (run-suite "Undo Tests" 'cl-state-tests.undo:undo-suite)
+             (run-suite "Schema Tests" 'cl-state-tests.schema:schema-suite)
+             (run-suite "Validation Tests" 'cl-state-tests.validation:validation-suite)
+             (run-suite "Compatibility Tests" 'cl-state-suite))))
+      (format t "~%╔════════════════════════════════════════════════════════════╗~%")
+      (format t "║                   ALL TESTS COMPLETED                        ║~%")
+      (format t "╚════════════════════════════════════════════════════════════╝~%")
+      (unless (results-status results)
+        (error "The cl-state test suite failed."))
+      results)))
 
 ;; Alias for compatibility
 (setf (symbol-function 'run-cl-state-tests) #'run-all-cl-state-tests)

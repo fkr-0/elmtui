@@ -1,0 +1,63 @@
+version: 1
+name: elmtui-clpm
+
+env:
+  CLPM_HOME: .cache/clpm
+
+default_track: clpm
+
+tracks:
+  clpm:
+    description: Run elmtui through the repository CLPM bundle
+    steps:
+      - name: ensure-bundle
+        run: |
+          mkdir -p .cache/clpm
+          clpm bundle install
+      - name: run-tests
+        run: |
+          clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp
+
+  clpm-dev:
+    description: Run ElmTUI development tools through the optional CLPM bundle
+    steps:
+      - name: ensure-dev-bundle
+        run: |
+          mkdir -p .cache/clpm
+          clpm bundle -f dev/clpmfile install
+
+commands:
+  test:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp
+
+  warning-clean:
+    track: clpm
+    run: |
+      scripts/run-tests-warning-clean.sh
+
+  test-subsystems:
+    track: clpm
+    run: |
+      scripts/test-subsystems.sh
+
+  release-check:
+    track: clpm
+    run: |
+      scripts/release-check.sh
+
+  repl:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --load run_clpm.lisp
+
+  slynk:
+    track: clpm-dev
+    run: |
+      clpm bundle -f dev/clpmfile exec --with-client sbcl -- --noinform --load run_clpm_slynk.lisp
+
+  coverage:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --load coverage.lisp

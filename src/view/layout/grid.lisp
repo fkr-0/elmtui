@@ -13,8 +13,11 @@
                 #:compute-layout
                 #:content-rect-of ;; #:%copy-el
                 #:measure-node-intrinsic-size)
-  (:import-from :elmtui.utils #:ensure-list)
-  (:import-from :str #:split #:trim)
+  (:import-from :elmtui.utils
+                #:ensure-list
+                #:trim-string
+                #:blank-string-p
+                #:split-string-literal)
   (:export
    #:compute-grid-layout))
 
@@ -76,25 +79,68 @@
          (cg (or (el/styles-of styles :column-gap nil) (el/styles-of styles :grid-column-gap nil) gap 0)))
     (values (or rg 0) (or cg 0))))
 
+(defun %decimal-number-string-p (value)
+  (let ((dot (position #\. value)))
+    (and (plusp (length value))
+         (if dot
+             (and (> dot 0)
+                  (< dot (1- (length value)))
+                  (null (position #\. value :start (1+ dot)))
+                  (every #'digit-char-p (subseq value 0 dot))
+                  (every #'digit-char-p (subseq value (1+ dot))))
+             (every #'digit-char-p value)))))
+
+(defun %parse-decimal-number (value)
+  (let ((dot (position #\. value)))
+    (if dot
+        (+ (parse-integer value :end dot)
+           (/ (parse-integer value :start (1+ dot))
+              (expt 10 (- (length value) dot 1))))
+        (parse-integer value))))
+
+(defun %fractional-track-string-p (value)
+  (and (> (length value) 2)
+       (string-equal "fr" value :start2 (- (length value) 2))
+       (%decimal-number-string-p (subseq value 0 (- (length value) 2)))))
+
+(defun %parse-track-token (value)
+  (let ((value (string-downcase (trim-string value))))
+    (cond
+      ((%fractional-track-string-p value)
+       (list :fr
+             (%parse-decimal-number
+              (subseq value 0 (- (length value) 2)))))
+      ((%decimal-number-string-p value)
+       (%parse-decimal-number value))
+      (t
+       (kw value)))))
+
+(defun %parse-minmax-track (value)
+  (let* ((value (trim-string value))
+         (open (position #\( value))
+         (close (position #\) value :from-end t)))
+    (when (and open
+               close
+               (= close (1- (length value)))
+               (string-equal "minmax"
+                             (trim-string (subseq value 0 open))))
+      (let* ((body (subseq value (1+ open) close))
+             (parts (split-string-literal "," body :limit 2)))
+        (when (and (= (length parts) 2)
+                   (= (count #\, body) 1))
+          (list :minmax
+                (%parse-track-token (first parts))
+                (%parse-track-token (second parts))))))))
+
 (defun parse-track-def (def)
   (cond
     ((numberp def) def)
-    ((and (stringp def) (str:blankp (str:trim def))) :auto)
-    ((and (stringp def) (str:starts-with? (str:trim def) "minmax"))
-     (ppcre:register-groups-bind (a b)
-         ("minmax\\s*\\(\\s*([^,]+)\\s*,\\s*([^\\)]+)\\)" (str:trim def))
-       (labels ((tok (s)
-                  (let ((s (string-downcase (str:trim s))))
-                    (cond
-                      ((ppcre:scan "^\\d+(?:\\.\\d+)?fr$" s)
-                       (list :fr (parse-integer (subseq s 0 (- (length s) 2)))))
-                      ((ppcre:scan "^\\d" s) (parse-integer s))
-                      (t (kw s))))))
-         (list :minmax (tok a) (tok b)))))
-    ((and (stringp def) (ppcre:scan "^\\d+(?:\\.\\d+)?fr$" (str:trim def)))
-     (list :fr (parse-integer (subseq (str:trim def) 0 (- (length (str:trim def)) 2)))))
-    ((and (stringp def) (ppcre:scan "^\\d" (str:trim def)))
-     (parse-integer (str:trim def)))
+    ((stringp def)
+     (let ((value (trim-string def)))
+       (cond
+         ((blank-string-p value) :auto)
+         ((%parse-minmax-track value))
+         (t (%parse-track-token value)))))
     (t (kw def))))
 
 (defun parse-track-defs (defs)

@@ -37,6 +37,7 @@
 (defvar *next-subscription-id* 0)
 
 (defun %ensure-function (value role)
+  (declare (ignore role))
   (unless (functionp value)
     (error 'type-error :datum value :expected-type 'function))
   value)

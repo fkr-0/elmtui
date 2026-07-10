@@ -63,11 +63,11 @@
   "Test variable resolution when variable is not defined"
   (let* ((sheet (make-stylesheet 
                   :rules (list (cl-styles.rule:defrule (cl-styles.selector:type> :button) 
-                                 :background :blue)) ; Use a valid property instead
+                                 :background :blue))
                   :variables '(("--other-var" . :blue))))
          (button (make-instance 'node :id :btn :nodetype :button)))
     
     ;; Should not error, and button should get the background color
     (apply-stylesheet sheet (list button))
     (let ((computed (cl-styles.protocols:get-computed-style button)))
-      (is (eql :blue (getf computed :background))))))
+      (is (eql :blue (getf computed :background-color))))))
