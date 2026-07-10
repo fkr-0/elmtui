@@ -319,7 +319,7 @@ Avoids running validation during initialize-instance to keep control over timing
 
 (defun snapshot-props-for-diff (el)
   (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
-    (let* ((p (%props el)))
+    (let ((p (copy-list (%props el))))
       (setf (getf p :prev-size)   (getf p :size))
       (setf (getf p :prev-layout) (getf p :layout))
       p)))
@@ -327,8 +327,9 @@ Avoids running validation during initialize-instance to keep control over timing
 (defun element-changed-p (el)
   (bordeaux-threads:with-recursive-lock-held (*computed-lock*)
     (let* ((p (%props el)))
-      (or (not (equal (getf p :size)   (getf p :prev-size)))
-          (not (equal (getf p :layout) (getf p :prev-layout)))))))
+      (when (or (getf p :prev-size) (getf p :prev-layout))
+        (or (not (equal (getf p :size)   (getf p :prev-size)))
+            (not (equal (getf p :layout) (getf p :prev-layout))))))))
 
 
 ;;;----------------------------------------------------------------

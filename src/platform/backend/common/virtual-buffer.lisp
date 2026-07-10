@@ -13,6 +13,8 @@
                 #:terminal-style-fg-color
                 #:terminal-style-bg-color
                 #:as-plist
+                #:is-term-style
+                #:deep-copy-style
                 #:as-style #:make-termcolor #:copy-term-style #:make-terminal-style) ; Added copy-term-style, make-terminal-style if needed by new fns
   (:export
    #:make-buffer-cell
@@ -81,8 +83,7 @@
 ;;   (when (and style (terminal-style-bg-color style))
 ;;     (terminal-color-simple (terminal-style-bg-color style))))
 
-(defgeneric deep-copy-style (style)
-  (:documentation "Creates a deep copy of a style plist, including any nested lists like RGB values."))
+
 ;;;----------------------------------------------------------------------------------;;;
 ;;; Conditions                                                                       ;;;
 ;;;----------------------------------------------------------------------------------;;;
@@ -199,35 +200,6 @@ that is: at this point already a character with a style."
   ;; Create a deep copy of the style plist
   (setf (buffer-cell-style (aref (virtual-terminal-buffer-cells bfr) row col)) (elmtui.platform.backend.common.ansi-styling:style-to-terminal-style value)))
 ;;;----------------------------------------------------------------------------------;;;
-;;; Style Copying Utilities                                                          ;;;
-;;;----------------------------------------------------------------------------------;;;
-(defmethod deep-copy-style ((style terminal-style))
-  "Creates a deep copy of a style plist, including any nested lists like RGB values.
-   Returns a new plist with the same keys but new list instances for any list values."
-  (let ((ts (copy-term-style style)))
-    (setf
-     (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color ts)
-     (copy-term-color (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color style)))
-    (setf (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color ts)
-          (copy-term-color (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color style)))
-    ts))
-(defmethod deep-copy-style ((style list))
-  "Creates a deep copy of a style plist, including any nested lists like RGB values.
-   Returns a new plist with the same keys but new list instances for any list values."
-  (loop for (key value) on style by #'cddr
-        ;; Copy any nested lists like RGB values
-        if (and (listp value) (every #'numberp value))
-          nconc (list key (copy-list value))
-        else
-          nconc (list key value)))
-
-(defmethod deep-copy-style ((style null))
-  "Returns an empty style plist if STYLE is NIL."
-  nil)
-
-
-
-;;;----------------------------------------------------------------------------------;;;
 ;;; API Functions                                                                    ;;;
 ;;;----------------------------------------------------------------------------------;;;
 
@@ -275,14 +247,6 @@ that is: at this point already a character with a style."
   (check-type buffer virtual-terminal-buffer)
   (virtual-terminal-buffer-lock buffer))
 
-(defgeneric is-term-style (s)
-  (:method (s) nil) ; Default method: not a terminal-style
-  (:documentation "Checks if the given style S is a terminal style."))
-
-(defmethod is-term-style ((s terminal-style))
-  "A terminal-style struct is indeed a terminal style."
-  t)
-
 (defun buffer-cell-equal-p (cell1 cell2)
   "Compares two BUFFER-CELL instances for equality (char and style)."
   (check-type cell1 buffer-cell)
@@ -297,17 +261,9 @@ that is: at this point already a character with a style."
            ((and (is-term-style style1)
                  (is-term-style style2))
             (elmtui.view.geo:=? style1 style2))
-           ;; Fallback for plist comparison if necessary, though ideally styles are always terminal-style structs
-           ((and (listp style1) ;; (listp style2) UNREACHABLE CODE
-                 )
-            ;; UNREACHABLE CODE
-            ;; (and (= (length style1) (length style2))
-            ;;      (loop for (key value) on style1 by #'cddr
-            ;;            always (let ((other-value (getf style2 key :not-found)))
-            ;;                     (if (eq other-value :not-found)
-            ;;                         nil
-            ;;                         (elmtui.view.geo:=? value other-value)))))
-            )
+            ;; Fallback for plist comparison
+            ((and (listp style1) (listp style2))
+             (equal style1 style2))
            (t nil))))) ; Different types or one is not a style representation
 
 (defun %check-bounds (buffer row col)
@@ -459,8 +415,8 @@ Returns the new buffer."
                 do (loop for c from 0 below cols-to-copy
                          do (let ((old-cell (aref old-cells r c))
                                   (new-cell (aref new-cells r c)))
-                              (setf (buffer-cell-char new-cell) (buffer-cell-char old-cell)
-                                    (buffer-cell-style new-cell) (copy-list (buffer-cell-style old-cell)))))))))
+                               (setf (buffer-cell-char new-cell) (buffer-cell-char old-cell)
+                                     (buffer-cell-style new-cell) (deep-copy-style (buffer-cell-style old-cell)))))))))
     new-buffer))
 
 (defun copy-virtual-buffer (buffer)

@@ -130,13 +130,8 @@
   
   :observers
   ((lambda (old-state new-state change-type)
-     ;; Log significant button interactions
-     (when (eq change-type :updated)
-       (when (and (not (getf old-state :pressed)) (getf new-state :pressed))
-         (format t "~&[Button Observer] Button pressed: '~A'~%" (getf new-state :text)))
-       
-       (when (and (not (getf old-state :focused)) (getf new-state :focused))
-         (format t "~&[Button Observer] Button focused: '~A'~%" (getf new-state :text))))))
+     (declare (ignore old-state new-state change-type))
+     nil))
   
   :documentation "Comprehensive button state model with interaction tracking and accessibility"
   :export-accessors t)
@@ -183,13 +178,14 @@
 ;;;--------------------------------------------------------------
 
 (defcomponent button-enhanced ()
-  (:contracts :message-type ButtonMsg :validation-mode :hybrid :validate-dsl t)
+  (:metadata
+   (:documentation "Enhanced button component with typed messages and accessibility metadata."))
   
   (:state
-   (text "Button" :type string :required t)
-   (disabled nil :type boolean)
-   (action nil :type t)
-   (style nil :type list))
+   (text "Button" :type string)
+   (disabled nil :type (or null boolean))
+   (action nil :type (or null t))
+   (style nil :type (or null list)))
   
   (:init (props id-path)
     (let ((initial-state (make-button-state
@@ -285,8 +281,8 @@
       (let ((current-loading (getf state :loading)))
         (values (list* :loading (not current-loading) state) nil))))
   
-  (:view (state app-state id-path)
-    (declare (ignore app-state))
+  (:view (state app-state id-path children)
+    (declare (ignore app-state children))
     (let* ((component-id (id-from-path id-path))
            (text (getf state :text "Button"))
            (disabled (getf state :disabled))
@@ -305,11 +301,11 @@
            (height (getf state :height))
            (full-width (getf state :full-width))
            (visible (getf state :visible t))
-           (focusable (getf state :focusable t)))
+           (focusable (getf state :focusable t))
+           (style-props nil))
       
       ;; Build style properties
-      (let ((style-props nil))
-        (when width
+      (when width
           (setf (getf style-props :width) width))
         (when height
           (setf (getf style-props :height) height))
@@ -333,9 +329,9 @@
           (setf (getf style-props :transform) "scale(0.98)"))
         (when focused
           (setf (getf style-props :outline) "2px solid blue"))
-        (when (or disabled loading)
-          (setf (getf style-props :opacity) 0.6)
-          (setf (getf style-props :cursor) :not-allowed)))
+      (when (or disabled loading)
+        (setf (getf style-props :opacity) 0.6)
+        (setf (getf style-props :cursor) :not-allowed))
       
       ;; Build CSS classes
       (let ((classes (list :ui-button
@@ -401,15 +397,14 @@
   "Returns text color based on variant and style"
   (case style-type
     (:solid
-     (case variant
-       ((:primary :secondary :success :danger :info) "#ffffff")
-       (:warning "#212529")
-       (t "#212529")))
+     (if (member variant '(:primary :secondary :success :danger :info))
+         "#ffffff"
+         "#212529"))
     ((:outline :ghost :link)
      (case variant
        (:primary "#007bff")
        (:secondary "#6c757d")
-       (:success "#28a745") 
+       (:success "#28a745")
        (:warning "#ffc107")
        (:danger "#dc3545")
        (:info "#17a2b8")
@@ -496,6 +491,7 @@
        (let ((disabled (getf msg-data :disabled)))
          (multiple-value-bind (new-state transaction)
              (set-button-state-transaction model disabled (getf model :loading))
+           (declare (ignore transaction))
            (values new-state nil))))
       
       (:set-button-style
@@ -527,11 +523,7 @@
   (let* ((text (getf model :text "Button"))
          (component-id (getf model :id :button))
          (disabled (getf model :disabled))
-         (focused (getf model :focused))
-         (pressed (getf model :pressed))
-         (variant (getf model :variant :default))
-         (size (getf model :size :medium))
-         (style-type (getf model :style :solid)))
+         (pressed (getf model :pressed)))
     
     ;; Generate and validate base DSL
     (let ((button-dsl
@@ -663,23 +655,29 @@
     
     (if issues issues t)))
 
-(defun describe-button-state (button-state)
-  "Provides detailed information about button state"
-  (format t "~&Button State:~%")
-  (format t "  Text: '~A'~%" (getf button-state :text))
-  (format t "  Variant: ~A Size: ~A Style: ~A~%" 
-          (getf button-state :variant)
-          (getf button-state :size)
-          (getf button-state :style))
-  (format t "  States: disabled=~A focused=~A pressed=~A loading=~A~%"
-          (getf button-state :disabled)
-          (getf button-state :focused)
-          (getf button-state :pressed)
-          (getf button-state :loading))
-  (format t "  Action: ~A~%" (getf button-state :action))
-  (format t "  Hotkey: ~A~A~%" 
-          (getf button-state :hotkey)
-          (if (getf button-state :hotkey-modifiers)
-              (format nil " (~{~A~^+~})" (getf button-state :hotkey-modifiers))
-              ""))
-  (format t "  Accessibility: ~A~%" (button-accessibility-check button-state)))
+(defun describe-button-state (button-state &optional stream)
+  "Return detailed information about BUTTON-STATE as a string.
+When STREAM is non-NIL, also write the description to that stream."
+  (let ((description
+          (with-output-to-string (out)
+            (format out "~&Button State:~%")
+            (format out "  Text: '~A'~%" (getf button-state :text))
+            (format out "  Variant: ~A Size: ~A Style: ~A~%"
+                    (getf button-state :variant)
+                    (getf button-state :size)
+                    (getf button-state :style))
+            (format out "  States: disabled=~A focused=~A pressed=~A loading=~A~%"
+                    (getf button-state :disabled)
+                    (getf button-state :focused)
+                    (getf button-state :pressed)
+                    (getf button-state :loading))
+            (format out "  Action: ~A~%" (getf button-state :action))
+            (format out "  Hotkey: ~A~A~%"
+                    (getf button-state :hotkey)
+                    (if (getf button-state :hotkey-modifiers)
+                        (format nil " (~{~A~^+~})" (getf button-state :hotkey-modifiers))
+                        ""))
+            (format out "  Accessibility: ~A~%" (button-accessibility-check button-state)))))
+    (when stream
+      (write-string description stream))
+    description))

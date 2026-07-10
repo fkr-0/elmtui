@@ -7,7 +7,8 @@
   (:import-from :elmtui.view.dsl
                 #:dsl->ui-node)
   (:import-from :elmtui.state.model
-                #:defmodel-contracted #:defpatch #:deftransaction #:make-state-patch)
+                #:defmodel-contracted #:defpatch #:deftransaction
+                #:make-state-patch #:apply-state-patches)
   (:import-from :elmtui.contracts
                 #:defupdate-hybrid #:defview)
   (:import-from :elmtui.ui.api
@@ -140,6 +141,7 @@
                              (y (if (listp message) (getf msg-data :y) 0)))
                          (multiple-value-bind (new-state transaction)
                              (scroll-to-position model x y)
+                           (declare (ignore transaction))
                            (values new-state nil))))
 
                       (:scroll-by
@@ -154,6 +156,7 @@
                              (height (getf msg-data :height (getf model :height))))
                          (multiple-value-bind (new-state transaction)
                              (resize-viewport-transaction model width height)
+                           (declare (ignore transaction))
                            (values new-state nil))))
 
                       ;; Child management
@@ -233,6 +236,7 @@
                                                  initial-offset-x initial-offset-y
                                                  initial-child-spec dsl &allow-other-keys)
   "Enhanced init method with state model integration"
+  (declare (ignore dsl))
   (let ((component-id (id-from-path id-path))
         (viewport-state (make-viewport-state
                          :width (or initial-width 80)
@@ -332,21 +336,27 @@
 ;;; Development and Debugging Support
 ;;;--------------------------------------------------------------
 
-(defun describe-viewport-state (viewport-state)
-  "Provides detailed information about viewport state"
-  (format t "~&Viewport State:~%")
-  (format t "  Dimensions: ~Ax~A~%"
-          (getf viewport-state :width)
-          (getf viewport-state :height))
-  (format t "  Position: (~A, ~A)~%"
-          (getf viewport-state :offset-x)
-          (getf viewport-state :offset-y))
-  (format t "  Scroll: (~A, ~A)~%"
-          (getf viewport-state :scroll-x)
-          (getf viewport-state :scroll-y))
-  (format t "  Child ID: ~A~%" (getf viewport-state :child-id))
-  (format t "  Visible: ~A~%" (getf viewport-state :visible))
-  (format t "  Clipping: ~A~%" (getf viewport-state :clipping)))
+(defun describe-viewport-state (viewport-state &optional stream)
+  "Return detailed information about VIEWPORT-STATE as a string.
+When STREAM is non-NIL, also write the description to that stream."
+  (let ((description
+          (with-output-to-string (out)
+            (format out "~&Viewport State:~%")
+            (format out "  Dimensions: ~Ax~A~%"
+                    (getf viewport-state :width)
+                    (getf viewport-state :height))
+            (format out "  Position: (~A, ~A)~%"
+                    (getf viewport-state :offset-x)
+                    (getf viewport-state :offset-y))
+            (format out "  Scroll: (~A, ~A)~%"
+                    (getf viewport-state :scroll-x)
+                    (getf viewport-state :scroll-y))
+            (format out "  Child ID: ~A~%" (getf viewport-state :child-id))
+            (format out "  Visible: ~A~%" (getf viewport-state :visible))
+            (format out "  Clipping: ~A~%" (getf viewport-state :clipping)))))
+    (when stream
+      (write-string description stream))
+    description))
 
 (defun validate-viewport-hierarchy (viewport-state)
   "Validates the viewport state and its child hierarchy"

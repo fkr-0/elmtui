@@ -446,7 +446,7 @@ Returns either a plist, hash-table, or NIL."
         (current-cross 0.0))
     (labels ((flush-line ()
                (when current-items
-                 (let ((main-used (+ current-main (max 0 (* main-gap (1- (length current-items)))))))
+                 (let ((main-used current-main))
                    (push (list :items (nreverse current-items)
                                :main-used main-used
                                :cross-max current-cross)
