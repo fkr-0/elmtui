@@ -452,7 +452,7 @@
                      (push laid out-children)))
                   (t
                    (let* ((laid (layout-node item grid-area-rect container-styles))
-                          (child-rect (element-layout laid))
+                           (child-rect (el/layout-rect laid))
                           (final (align-item-in-area laid child-rect grid-area-rect align justify)))
                      (setf (elmtui.view.element:el/layout-rect laid) final)
                      (push laid out-children))))))

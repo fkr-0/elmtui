@@ -33,7 +33,6 @@
    #:cmd
    #:defupdate
    #:dispatch-to-topic
-   #:publish-to-topic
    #:handle-async-command))
 
 (in-package :elmtui.state.update)
@@ -181,11 +180,6 @@
            ;; Effect execution is owned by the runtime effect manager.
            ;; DEFUPDATE only produces commands.
            (values patches commands))))))
-
-(defmethod publish-to-topic (topic-name message)
-  (log-warn "Default publish-to-topic: no handler for topic ~S with message ~S."
-            topic-name message)
-  nil)
 
 (defun dispatch-to-topic (topic payload)
   "Create a command that dispatches a payload to a specific topic."

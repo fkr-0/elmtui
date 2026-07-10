@@ -13,7 +13,7 @@
     #:make-terminalresized-systemevent
     #:make-cursorposition-systemevent)
   (:import-from :elmtui.core.event-types
-    #:key-event #:resize-event #:resize-event-width #:resize-event-height)
+    #:key-event)
   (:import-from :elmtui.pipeline #:full-view-pipeline)
   (:import-from :elmtui.core.globals
     #:*app-sender* #:*app-message-processor*)
@@ -345,17 +345,20 @@ This keeps compatibility with older examples that pass app instances."
                       (log-warn "DRIVER: model-driven appshutdown cleanup failed: ~A" e)))
                   (setf elmtui.core.loop:*shutdown-requested* t))
                 ;; Runtime effect manager: command execution + subscription refresh.
-                (ignore-errors
-                  (apply-update-effects
-                   :commands commands
-                   :render-command-fn (lambda (cmd)
-                                        (ignore-errors (execute-render-command cmd *backend*)))
-                   :command-processor-fn cmd-proc-fn
-                   :message-queue message-queue
-                   :model next-model
-                   :app-config app-cfg-for-cmd
-                   :subscriptions-reconciler (lambda (model)
-                                              (%refresh-app-subscriptions app-spec model))))
+                (handler-case
+                    (apply-update-effects
+                     :commands commands
+                     :render-command-fn (lambda (cmd)
+                                          (handler-case (execute-render-command cmd *backend*)
+                                            (error (e) (log-warn "DRIVER: render command failed: ~A" e))))
+                     :command-processor-fn cmd-proc-fn
+                     :message-queue message-queue
+                    :model next-model
+                    :app-config app-cfg-for-cmd
+                    :subscriptions-reconciler (lambda (model)
+                                               (%refresh-app-subscriptions app-spec model)))
+                  (error (e)
+                    (log-warn "DRIVER: apply-update-effects failed: ~A" e)))
 
                 ;; Render the current frame unless we're shutting down.
                 (unless elmtui.core.loop:*shutdown-requested*
@@ -615,8 +618,9 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   (when ctx
     (setf (driver-context-stop-flag ctx) t)
     (let ((thread (driver-context-input-thread ctx)))
-      (when thread
-        (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted.")))
+      (when (and thread (bt:thread-alive-p thread))
+        (ignore-errors
+          (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted."))))
         ;; Do not hard-block on JOIN here: input thread may be in a device read path.
         ;; Shutdown will poll and force-destroy as a bounded fallback.
         ;; Keep the stop flag set so the loop can observe it on the next timeout wakeup.

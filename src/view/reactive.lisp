@@ -99,8 +99,18 @@
          (sleep (/ *view-invalidation-debounce* 1000.0))
          ;; Send update message
          (-> channel :render)
-         ;; Reset debounce timer
-         (setf (view-debounce-timer view) nil))))))
+         ;; Reset debounce timer, then re-check for changes missed during debounce
+         (setf (view-debounce-timer view) nil)
+         (when (view-invalidated-p view)
+           (setf (view-invalidated-p view) nil)
+           (setf (view-debounce-timer view) t)
+           (let ((view-id (view-id view))
+                 (channel (view-update-channel view)))
+             (elmtui.core.async:cmd-async
+              (lambda ()
+                (sleep (/ *view-invalidation-debounce* 1000.0))
+                (-> channel :render)
+                (setf (view-debounce-timer view) nil))))))))))
 ;; (defun invalidate-view (view)
 ;;   "Marks a reactive view as needing to be re-rendered.
 ;;    Schedules a render with debouncing to avoid thrashing."
@@ -304,27 +314,31 @@
 (defun process-animations (delta-time)
   "Processes all active animations, updating their progress.
    Should be called on each frame with the time elapsed since the last frame."
-  (maphash
-   (lambda (id animation)
-     (when (animation-active-p animation)
-       ;; Update progress
-       (let* ((old-progress (animation-progress animation))
-              (new-progress (min 1.0 (+ old-progress (/ delta-time (animation-duration animation)))))
-              (eased-progress (funcall (animation-easing-fn animation) new-progress)))
+  (let ((completed-ids nil))
+    (maphash
+     (lambda (id animation)
+       (when (animation-active-p animation)
+         ;; Update progress
+         (let* ((old-progress (animation-progress animation))
+                (new-progress (min 1.0 (+ old-progress (/ delta-time (animation-duration animation)))))
+                (eased-progress (funcall (animation-easing-fn animation) new-progress)))
 
-         ;; Call update function
-         (funcall (animation-update-fn animation) eased-progress)
+           ;; Call update function
+           (funcall (animation-update-fn animation) eased-progress)
 
-         ;; Update stored progress
-         (setf (animation-progress animation) new-progress)
+           ;; Update stored progress
+           (setf (animation-progress animation) new-progress)
 
-         ;; Check if complete
-         (when (>= new-progress 1.0)
-           (setf (animation-active-p animation) nil)
-           (when (animation-complete-fn animation)
-             (funcall (animation-complete-fn animation)))
-           (remhash id *animations*)))))
-   *animations*))
+           ;; Check if complete
+           (when (>= new-progress 1.0)
+             (setf (animation-active-p animation) nil)
+             (when (animation-complete-fn animation)
+               (funcall (animation-complete-fn animation)))
+             (push id completed-ids)))))
+     *animations*)
+    ;; Remove completed animations after iteration
+    (dolist (id completed-ids)
+      (remhash id *animations*))))
 
 ;;; Easing helpers
 (defun linear-easing (x) x)
