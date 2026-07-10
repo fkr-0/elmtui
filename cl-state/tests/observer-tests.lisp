@@ -162,15 +162,15 @@
   "Observer called for each change in transaction"
   (let ((state (make-state))
          (changes nil))
+    (state-set state :value 0)
     (add-observer state :value
       (lambda (old new)
         (push (list old new) changes)))
-    (state-set state :value 0)
     (with-transaction (state)
       (state-set state :value 1)
       (state-set state :value 2)
       (state-set state :value 3))
-    ;; Observer should be called for each change
+    ;; Observer should be called for each change in the transaction
     (is (= 3 (length changes)))))
 
 (defun run-observer-tests ()

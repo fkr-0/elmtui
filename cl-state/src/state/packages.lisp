@@ -34,10 +34,11 @@
    #:set-application-state-backend
    #:deep-copy-application-state
    #:application-state-plist
-   #:get-component-by-path))
+   #:get-component-by-path
+   #:*transaction-active*))
 
 (uiop:define-package :cl-state.patch
-  (:use :cl :alexandria :cl-state.utils)
+  (:use :cl :alexandria :cl-state.utils :cl-state.core)
   (:export
    #:patch
    #:patch-p
@@ -53,19 +54,19 @@
    #:normalize-patches))
 
 (uiop:define-package :cl-state.tx
-  (:use :cl :alexandria :cl-state.core :cl-state.patch)
+  (:use :cl :alexandria :cl-state.utils :cl-state.core)
   (:export
    #:tx
-   #:make-tx
    #:tx-p
+   #:make-tx
    #:tx-id
    #:tx-name
    #:tx-changes
    #:with-transaction
-   #:apply-patches
    #:state-set
    #:undo
-   #:redo))
+   #:redo
+   #:*transaction-active*))
 
 (uiop:define-package :cl-state.undo
   (:use :cl :alexandria)

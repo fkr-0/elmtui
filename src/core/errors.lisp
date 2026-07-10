@@ -286,7 +286,7 @@ Example usage:
                             :context new-context
                             :module (or ,module (slot-value err 'module))
                             :suggestions (slot-value err 'suggestions))))
-         (signal new-error)))))
+          (error new-error)))))
 
 
 
@@ -393,21 +393,21 @@ Example usage:
     (do-something-that-might-error))
 
 This macro is useful for providing richer diagnostics during development while keeping production error handling clean."
-  (if (development-mode-p)
-    `(handler-bind
-       ((elmtui-error #'(lambda (e)
-                          (format *error-output* "~%=== Enhanced Error Details ===~%")
-                          (format *error-output* "Error Type: ~A~%" (type-of e))
-                          (when (elmtui-error-context e)
-                            (format *error-output* "Context: ~A~%" (elmtui-error-context e)))
-                          (when (elmtui-error-module e)
-                            (format *error-output* "Module: ~A~%" (elmtui-error-module e)))
-                          (format *error-output* "Suggestions:~%~{  - ~A~%~}~%"
-                            (elmtui-error-suggestions e))
-                          (format *error-output* "=== End Error Details ===~%")
-                          (invoke-debugger e))))
-       ,@body)
-    `(progn ,@body)))
+  `(if (development-mode-p)
+     (handler-bind
+        ((elmtui-error #'(lambda (e)
+                           (format *error-output* "~%=== Enhanced Error Details ===~%")
+                           (format *error-output* "Error Type: ~A~%" (type-of e))
+                           (when (elmtui-error-context e)
+                             (format *error-output* "Context: ~A~%" (elmtui-error-context e)))
+                           (when (elmtui-error-module e)
+                             (format *error-output* "Module: ~A~%" (elmtui-error-module e)))
+                           (format *error-output* "Suggestions:~%~{  - ~A~%~}~%"
+                             (elmtui-error-suggestions e))
+                           (format *error-output* "=== End Error Details ===~%")
+                           (invoke-debugger e))))
+        ,@body)
+     (progn ,@body)))
 
 ;;;===================================================================
 ;;; Integration Examples

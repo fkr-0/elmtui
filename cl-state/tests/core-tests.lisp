@@ -34,8 +34,8 @@
 (test make-state-with-hash-table-initial
   "Creating state with hash-table initial data"
   (progn
-    (let ((initial (plist->hash-table '(:x 10 :y 20)))
-          (state (make-state :initial initial)))
+    (let* ((initial (plist->hash-table '(:x 10 :y 20)))
+           (state (make-state :initial initial)))
       (is (application-state-p state))
       (is (= 10 (state-ref state :x)))
       (is (= 20 (state-ref state :y))))))
@@ -50,8 +50,8 @@
 (test make-state-from-existing-state
   "Creating state from existing state"
   (progn
-    (let ((state1 (make-state :initial '(:a 1)))
-          (state2 (make-state :initial state1)))
+    (let* ((state1 (make-state :initial '(:a 1)))
+           (state2 (make-state :initial state1)))
       (is (application-state-p state2))
       (is (= 1 (state-ref state2 :a))))))
 
@@ -147,8 +147,8 @@
 (test deep-copy-application-state
   "Deep copying state creates independent copy"
   (progn
-    (let ((state1 (make-state :initial '(:a 1 :b 2)))
-          (state2 (deep-copy-application-state state1)))
+    (let* ((state1 (make-state :initial '(:a 1 :b 2)))
+           (state2 (deep-copy-application-state state1)))
       (is (application-state-p state2))
       (is (= 1 (state-ref state2 :a)))
       (is (= 2 (state-ref state2 :b)))
@@ -160,8 +160,8 @@
 (test deep-copy-preserves-all-fields
   "Deep copy preserves all state fields"
   (progn
-    (let ((state1 (make-state :initial '(:a 1)))
-          (state2 (deep-copy-application-state state1)))
+    (let* ((state1 (make-state :initial '(:a 1)))
+           (state2 (deep-copy-application-state state1)))
       (is (equal (application-state-backend state1)
                  (application-state-backend state2)))
       (is (equal (application-state-version state1)
@@ -191,10 +191,10 @@
   "Getting existing component by path"
   (progn
     (let ((state (make-state :initial
-                             '(:components (:my-comp (:component-instance :value 42))))))
+                             '(:components (:my-comp (:component-instance (:value 42)))))))
       (let ((comp (get-component-by-path state '(:my-comp))))
         (is (not (null comp)))
-        (is (eq :value (first comp)))))))
+        (is (= 42 (get-path '(:value) comp)))))))
 
 (test get-component-by-path-missing
   "Getting missing component returns nil"

@@ -430,8 +430,7 @@ Handles errors with restarts and async-task-error.
   (with-async-restarts (c)
     (let ((results (mapcar #'interpret-cmd commands)))
       ;; Return the results of the batch execution
-      results))
-  (error 'elmtui.core.conditions:async-task-error :task commands :reason "Batch execution failed"))
+      results)))
 
 (defun cmd-batch-await (commands)
   "Create a CMD that executes a batch of COMMANDS and waits for all to finish.
@@ -439,8 +438,7 @@ Handles errors with restarts and async-task-error.
   (with-async-restarts (c)
     (let ((results (mapcar #'await-cmd commands)))
       ;; Return the results of the batch execution
-      results))
-  (error 'elmtui.core.conditions:async-task-error :task commands :reason "Batch await failed"))
+      results)))
 ;;; USAGE EXAMPLES:
 ;; (let ((cmd (cmd-async #'sleep 1)))
 ;;   (interpret-cmd cmd)

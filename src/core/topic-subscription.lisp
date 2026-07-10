@@ -46,9 +46,19 @@
 ;;; Topic Pattern Compilation
 ;;;-----------------------------------------------------------------------------
 
+(defun split-string-on-char (separator string)
+  "Split STRING on SEPARATOR without requiring an optional dependency."
+  (let ((parts nil)
+        (start 0))
+    (loop for pos = (position separator string :start start)
+          do (push (subseq string start pos) parts)
+          while pos
+          do (setf start (1+ pos)))
+    (nreverse parts)))
+
 (defun tokenize-topic-pattern (pattern)
   "Split a topic pattern into individual tokens based on '/' separator."
-  (split-sequence:split-sequence #\/ (string pattern)))
+  (split-string-on-char #\/ (string pattern)))
 
 (defun topic-pattern-contains-wildcards-p (pattern)
   "Check if a topic pattern contains wildcard characters (* or #)."
