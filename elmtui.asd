@@ -2,11 +2,11 @@
 
 (asdf:defsystem "elmtui"
   :version      "0.2.0"
-  :description  "ElmTUI: A TUI framework inspired by Elm architecture"
-  :author       "User <user@archlinux>"
-  :license      "GNU GPL, version 3"
-  :source-control (:git "https://github.com/user/elmtui.git")
-  :depends-on   (#:alexandria #:str #:sb-posix
+  :description  "Elm-style terminal UI toolkit for Common Lisp"
+  :author       "ElmTUI contributors"
+  :maintainer   "ElmTUI contributors"
+  :license      "GPL-3.0-only"
+  :depends-on   (#:alexandria #:sb-posix
                   #:log4cl  ;; #:slynk
                   #:bordeaux-threads
                   #:cl-inputs

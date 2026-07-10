@@ -204,22 +204,5 @@
     (is (null (application-state-undone state)))
     (is (null (redo state)))))
 
-;;; apply-patches tests (from tx module)
-
-(test apply-patches-creates-transaction
-  "apply-patches creates a transaction"
-  (let ((state (make-state)))
-    (apply-patches state '((:a 1) (:b 2)))
-    (is (= 1 (state-ref state :a)))
-    (is (= 2 (state-ref state :b)))
-    (is (= 1 (length (application-state-history state))))))
-
-(test apply-patches-with-delete
-  "apply-patches handles delete operations"
-  (let ((state (make-state :initial '(:a 1 :b 2))))
-    (apply-patches state '((:b :elmtui-delete-path)))
-    (is (= 1 (state-ref state :a)))
-    (is (null (state-ref state :b nil)))))
-
 (defun run-tx-tests ()
   (run! 'tx-suite))

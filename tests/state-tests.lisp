@@ -12,8 +12,9 @@
     #:state-ref)
   (:import-from :elmtui.state
     #:with-transaction) 
+  (:import-from :cl-state.patch
+    #:apply-patches)
   (:import-from :cl-state.tx
-    #:apply-patches
     #:undo
     #:redo)
   (:import-from :elmtui.state

@@ -45,7 +45,7 @@
   (:use :cl :alexandria)
   (:export
     ;; property registry
-    #:defproperty #:register-property #:property-definition
+    #:defproperty #:register-property #:register-property-alias #:property-definition
     #:normalize-declarations #:validate-declarations #:ensure-declarations
     ;; groups
     #:define-group #:properties-for-group #:groups-for-layout #:properties-for-layout

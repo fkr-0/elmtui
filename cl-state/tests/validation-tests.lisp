@@ -47,14 +47,14 @@
 (test make-validator-basic
   "Creating a validator function"
   (let ((validator (make-validator #'stringp "Must be a string")))
-    (is (validator "hello"))
-    (signals validation-error (validator 123))))
+    (is (funcall validator "hello"))
+    (signals validation-error (funcall validator 123))))
 
 (test make-validator-with-path
   "Validator should include path in error"
   (let ((validator (make-validator #'stringp "Must be a string")))
     (handler-case
-      (validator 123 :path "user.name")
+      (funcall validator 123 :path "user.name")
       (validation-error (c)
         (is (search "user.name" (validation-error-path c)))))))
 
@@ -74,8 +74,7 @@
 
 (test validate-field-symbol-type
   "Validating field with symbol type"
-  (let ((pred (type-predicate 'string)))
-    (is (validate-field "hello" 'string))))
+  (is (validate-field "hello" 'string)))
 
 (test validate-field-or-type
   "Validating field with (or ...) type"
@@ -105,7 +104,7 @@
 (test validate-field-with-path
   "Validating field with path parameter"
   (handler-case
-    (validate-field "wrong" 'integer "user.age")
+    (validate-field "wrong" 'integer :path "user.age")
     (validation-error (c)
       (is (string= "user.age" (validation-error-path c))))))
 
@@ -132,7 +131,7 @@
   "Nested validation should include field paths"
   (let ((obj (make-instance 'test-object
                :name "Alice"
-               :age -5
+               :age "invalid"
                :email "alice@example.com")))
     (handler-case
       (validate-nested obj '((name string) (age integer)) "user")
@@ -147,10 +146,11 @@
     (validate-field "hello" 'string)
     (is (validate-field 123 :integer)))
   ;; Should handle errors gracefully
-  (handler-case
-    (with-validation
-      (validate-field "wrong" 'integer))
-    (validation-error () nil)))
+  (let ((*error-output* (make-broadcast-stream)))
+    (handler-case
+        (with-validation
+          (validate-field "wrong" 'integer))
+      (validation-error () nil))))
 
 (defclass schema-object ()
   ((data :accessor obj-data :initarg :data)

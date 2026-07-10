@@ -241,7 +241,7 @@
     (let ((computed (get-computed-style node)))
       ;; Both rules should apply (same specificity, both win)
       (is (eql :red (getf computed :color)))
-      (is (eql :blue (getf computed :background))))))
+      (is (eql :blue (getf computed :background-color))))))
 
 (test specificity-id-beats-class
   "Test ID selector has higher specificity than class selector"
@@ -384,8 +384,8 @@
     ;; Undefined var should remain as (var "--undefined")
     (let ((computed (get-computed-style node)))
       ;; background accepts keyword or color-p, so var is preserved
-      (is (consp (getf computed :background)))
-      (is (eql :var (first (getf computed :background)))))))
+      (is (consp (getf computed :background-color)))
+      (is (eql :var (first (getf computed :background-color)))))))
 
 (test variable-resolution-in-shorthands
   "Test variables work in shorthand properties"
@@ -440,7 +440,7 @@
                    :border-color ,(hsl 120 50 50)))))
     (is (consp (getf result :color)))
     (is (eql :rgb (first (getf result :color))))
-    (is (eql :rgba (first (getf result :background))))
+    (is (eql :rgba (first (getf result :background-color))))
     (is (eql :hsl (first (getf result :border-color))))))
 
 
@@ -483,12 +483,7 @@
   (let* ((child (make-instance 'tnode :id :child :nodetype :button
                                :state '(:hover)))
          (parent (make-instance 'tnode :id :parent :nodetype :navbar
-                               :children (list child)))
-         (sheet (make-stylesheet
-                 :rules (list (defrule (child> (type> :navbar)
-                                                (sel-and (type> :button)
-                                                         (state> :hover)))
-                               :background :darkblue)))))
+                               :children (list child))))
     (setf (parent child) parent)
     ;; Verify selector matches
     (is (cl-styles.selector:match-selector-p

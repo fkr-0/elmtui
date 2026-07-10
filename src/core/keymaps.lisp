@@ -110,6 +110,9 @@
     #:key-event
     #:key-event-key
     #:key-event-modifiers)
+  (:import-from :elmtui.utils
+    #:split-string-literal
+    #:string-prefix-p)
   (:export
     ;; bootstrap
     #:initialise
@@ -244,7 +247,7 @@ If no special mapping exists, returns SYM unchanged."
 
 (defun parse-single-key-string (s)
   "Handle strings like \"C-x\" or \"Shift-F1\" (no spaces)."
-  (let* ((parts (str:split "-" s))
+  (let* ((parts (split-string-literal "-" s))
           (mods  '())
           (raw   (string-downcase (car (last parts))))
           (sym   (kw raw))
@@ -309,7 +312,7 @@ If no special mapping exists, returns SYM unchanged."
     (setf (gethash key-str (keymap-bindings km)) binding)))
 
 (defun add-keybinding (km key-string &key type target description)
-  (let* ((parts (str:split key-string " "))
+  (let* ((parts (split-string-literal " " key-string))
           (key   (if (> (length parts) 1)
                    (make-key-sequence :keys (mapcar #'parse-key-string parts))
                    (parse-key-string key-string)))
@@ -318,7 +321,7 @@ If no special mapping exists, returns SYM unchanged."
     bind))
 
 (defun remove-keybinding (km key-string)
-  (let* ((parts (str:split key-string " "))
+  (let* ((parts (split-string-literal " " key-string))
           (key-str (if (> (length parts) 1)
                      (mapconcat #'normalized-key->string (mapcar #'parse-key-string parts) " ")
                      (normalized-key->string (parse-key-string key-string)))))
@@ -605,7 +608,7 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
                       (loop for k being the hash-keys of (keymap-bindings km)
                         thereis (and (stringp k)
                                   (> (length k) (length seq-str))
-                                  (str:starts-with? prefix k))))
+                                  (string-prefix-p prefix k))))
                 (mapcar #'resolve-keymap-reference (keymap-context-keymaps (current-context))))
             t
             (progn (%reset-seq) nil)))))))
@@ -654,8 +657,12 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
 ;;; 8.  Introspection
 ;;; ------------------------------------------------------------------------
 (defun mapconcat (fn lst sep)
-  "Like CL:MAPCONCAT but works on lists of strings."
-  (reduce (lambda (a b) (concatenate 'string a sep b)) lst :initial-value "" :key fn))
+  "Map FN over LST and join the resulting strings with SEP."
+  (with-output-to-string (out)
+    (loop for item in lst
+          for firstp = t then nil
+          unless firstp do (princ sep out)
+          do (princ (funcall fn item) out))))
 
 (defun list-active-keybindings ()
   "Return list of plists {:key … :description … :source-keymap …}"

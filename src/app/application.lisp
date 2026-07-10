@@ -43,7 +43,7 @@
     #:ur-patches
     #:ur-commands
     #:make-state)
-  (:import-from #:cl-state.tx
+  (:import-from #:cl-state.patch
     #:apply-patches)
   (:import-from #:elmtui.ui.api                #:init #:view #:initialize-components-from-dsl
     #:instantiate-component-from-dsl)
@@ -194,6 +194,11 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
     (cond
       ((and (consp val) (eq (car val) 'lambda))
         val) ;;
+      ((and (consp val)
+            (eq (car val) 'function)
+            (consp (cadr val))
+            (eq (caadr val) 'lambda))
+        (cadr val))
       ((functionp val)
         val) ;;
       ((symbolp val)

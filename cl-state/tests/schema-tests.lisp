@@ -151,7 +151,7 @@
 
 (test non-empty-string-predicate
   "Testing non-empty-string predicate"
-  (register-type-predicate :non-empty-string #'non-empty-string-p "Must be non-empty string")
+  (is-true (non-empty-string-p "hello"))
   (validate-type "hello" :non-empty-string)
   (signals error (validate-type "" :non-empty-string)))
 
@@ -165,7 +165,10 @@
   "Testing finite-number predicate"
   (validate-type 3.14 :finite-number)
   (validate-type 42 :finite-number)
-  (signals error (validate-type most-positive-long-float :finite-number)))
+  (validate-type most-positive-long-float :finite-number)
+  #+sbcl
+  (signals error
+    (validate-type sb-ext:double-float-positive-infinity :finite-number)))
 
 (defun run-schema-tests ()
   (run! 'schema-suite))

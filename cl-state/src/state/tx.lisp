@@ -57,25 +57,6 @@
           (dolist (chg (nreverse rollback-notifications#))
             (cl-state.observer:notify-observers app# (first chg) (second chg) (third chg)))))))
 
-(defun apply-patches (app patches)
-  "Given patches = ((path value) ...), do (state-set ...) for each."
-  (with-transaction (app :name :apply-patches)
-    (dolist (p patches)
-      (let ((path (first p))
-             (value (second p)))
-        (if (eq value :elmtui-delete-path)
-          (bt:with-lock-held ((application-state-lock app))
-            (let* ((data (application-state-data app))
-                    (old (cl-state.utils:get-path path data :not-present)))
-              (multiple-value-bind (data* _) (cl-state.utils:remove-path data path)
-                (declare (ignore _))
-                (setf (application-state-data app) data*)
-                (push (list path old :elmtui-delete-path) (application-state-log app))
-                (incf (application-state-version app)))))
-          (state-set app path value))))
-    t)
-  t)
-
 (defun undo (app)
   "Undo last tx."
   (let ((tx (pop (application-state-history app))))
@@ -100,6 +81,10 @@
       (dolist (chg (tx-changes tx))
         (bt:with-lock-held ((application-state-lock app))
           (setf (application-state-data app)
-            (cl-state.utils:set-path (application-state-data app)
-              (first chg) (third chg))))))
+                (if (eq (third chg) :elmtui-delete-path)
+                    (cl-state.utils:remove-path
+                     (application-state-data app) (first chg))
+                    (cl-state.utils:set-path
+                     (application-state-data app)
+                     (first chg) (third chg)))))))
     tx))

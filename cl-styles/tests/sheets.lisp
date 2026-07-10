@@ -1,10 +1,12 @@
 (uiop:define-package :stylesheet-tests
   (:use :cl :fiveam)
-  (:import-from :cl-styles.sheet #:stylesheet-rules #:add-rule #:remove-rule #:make-stylesheet))
+  (:import-from :cl-styles.sheet #:stylesheet-rules #:add-rule #:remove-rule #:make-stylesheet)
+  (:export #:stylesheet-suite))
 (in-package :stylesheet-tests)
 
 (def-suite stylesheet-suite
-  :description "Tests for stylesheet rule management.")
+  :description "Tests for stylesheet rule management."
+  :in cl-styles.tests:cl-styles-test)
 
 (in-suite stylesheet-suite)
 

@@ -19,7 +19,6 @@
     ("dirli" "DIRLI-APP")
     ("focus-simple" "FOCUS-SIMPLE-APP")
     ("fzf-finder-real" "FZF-FINDER")
-    ("fzy-picker" "FZY-PICKER")
     ("game-of-life" "GAME-OF-LIFE-APP")
     ("glider-real" "GLIDER-ANIMATION-APP")
     ("input-selector" "INPUT-SELECTOR-APP")

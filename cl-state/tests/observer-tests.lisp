@@ -67,10 +67,9 @@
     (add-observer state :key fn)
     (is (= 1 (length (application-state-observers state))))
     (is (remove-observer state :key fn))
-    ;; After removal, the key should still exist but with no observers
+    ;; Empty observer buckets are removed to keep the registry compact.
     (let ((pair (assoc :key (application-state-observers state))))
-      (is (not (null pair)))
-      (is (null (cdr pair))))))
+      (is (null pair)))))
 
 (test remove-observer-one-of-many
   "Removing one of multiple observers for same key"
@@ -137,7 +136,10 @@
   "Notifying for key with no observers does nothing"
   (let ((state (make-state))
          (called nil))
-    (add-observer state :key1 (lambda (o n) (setf called t)))
+    (add-observer state :key1
+                  (lambda (old-value new-value)
+                    (declare (ignore old-value new-value))
+                    (setf called t)))
     (notify-observers state :key2 1 2)
     (is (not called))))
 

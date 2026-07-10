@@ -104,8 +104,7 @@
          (when (view-invalidated-p view)
            (setf (view-invalidated-p view) nil)
            (setf (view-debounce-timer view) t)
-           (let ((view-id (view-id view))
-                 (channel (view-update-channel view)))
+           (let ((channel (view-update-channel view)))
              (elmtui.core.async:cmd-async
               (lambda ()
                 (sleep (/ *view-invalidation-debounce* 1000.0))

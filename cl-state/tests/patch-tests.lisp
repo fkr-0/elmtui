@@ -36,6 +36,13 @@
     (is (equal '(:a) (patch-path (first patches))))
     (is (eq :set (patch-op (first patches))))))
 
+(test normalize-patches-single-key-shorthand
+  "A symbol path is the supported shorthand for a one-segment path."
+  (let ((patch (first (normalize-patches '((:name "Bob"))))))
+    (is (eq :name (patch-path patch)))
+    (is (eq :set (patch-op patch)))
+    (is (string= "Bob" (patch-value patch)))))
+
 (test normalize-patches-patch-structs
   "Normalizing patch structures returns as-is"
   (let* ((p1 (make-patch :path '(:a) :op :set :value 1))
@@ -120,11 +127,22 @@
 
 
 (test apply-patches-application-state
-  "Applying patches to application-state mutates its data, not the wrapper object."
+  "Applying patches to application-state creates one undoable transaction."
   (let ((state (make-state :initial '(:components ()) :backend :hash-table)))
     (let ((result (apply-patches state '(((:components :panel) :ok)))))
       (is (eq state result))
-      (is (equal :ok (get-path '(:components :panel) state))))))
+      (is (equal :ok (get-path '(:components :panel) state)))
+      (is (= 1 (length (application-state-history state)))))))
+
+(test apply-patches-remove-is-undoable-and-redoable
+  (let ((state (make-state :initial '(:item :present))))
+    (apply-patches state
+                   (list (make-patch :path :item :op :remove)))
+    (is (null (get-path :item state)))
+    (undo state)
+    (is (eq :present (get-path :item state)))
+    (redo state)
+    (is (null (get-path :item state)))))
 
 ;;; diff-states tests
 
