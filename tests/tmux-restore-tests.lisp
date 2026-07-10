@@ -31,8 +31,7 @@
 
 (test save-tmux-capture-basic
   "Saving tmux capture stores buffer for later restore"
-  (let* ((buffer (make-virtual-buffer 40 10))
-         (buffer2 (make-virtual-buffer 40 10)))
+  (let ((buffer (make-virtual-buffer 40 10)))
     ;; Write some content to buffer
     (with-virtual-buffer-lock (buffer)
       (set-buffer-cell-at buffer 0 0 #\H nil)

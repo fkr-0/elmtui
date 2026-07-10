@@ -29,6 +29,16 @@
 
 (in-package :elmtui.contracts.tests)
 
+(defmacro with-muffled-non-typed-message-warnings (&body body)
+  "Suppress expected prefer-typed compatibility warnings in legacy-message tests."
+  `(handler-bind ((warning
+                    (lambda (condition)
+                      (when (search "Non-typed message" (princ-to-string condition))
+                        (let ((restart (find-restart 'muffle-warning condition)))
+                          (when restart
+                            (invoke-restart restart)))))))
+     ,@body))
+
 ;;;--------------------------------------------------------------
 ;;; Test Suite Definition
 ;;;--------------------------------------------------------------
@@ -341,13 +351,15 @@
 
     ;; Flexible message
     (multiple-value-bind (new-model commands)
-        (test-hybrid-update :increment test-model)
+        (with-muffled-non-typed-message-warnings
+          (test-hybrid-update :increment test-model))
       (is (equalp '(:count 11) new-model))
       (is (null commands)))
 
     ;; Unknown message
     (multiple-value-bind (new-model commands)
-        (test-hybrid-update :unknown test-model)
+        (with-muffled-non-typed-message-warnings
+          (test-hybrid-update :unknown test-model))
       (is (equalp new-model test-model))
       (is (null commands)))))
 
@@ -470,7 +482,8 @@
   (test-flexible-update :increment '(:count 1))
   (test-flexible-update :decrement '(:count 2))
   (test-typed-update (make-simple-message-testmsg) '(:value 0))
-  (test-hybrid-update :increment '(:count 3))
+  (with-muffled-non-typed-message-warnings
+   (test-hybrid-update :increment '(:count 3)))
   (test-hybrid-update (make-simple-message-testmsg) '(:count 4))
 
   ;; Analyze usage patterns
@@ -549,7 +562,8 @@
         (declare (ignore _))
 
         (multiple-value-bind (model3 _)
-            (test-hybrid-update :increment model2)
+            (with-muffled-non-typed-message-warnings
+              (test-hybrid-update :increment model2))
           (declare (ignore _))
 
           ;; Final model should reflect all changes
@@ -575,7 +589,7 @@
 
       ;; Should complete reasonably quickly (less than 1 second for 1000 ops)
       (is (< elapsed 1.0))
-      (format t "~&Contract performance: ~A ops in ~A seconds~%" iterations elapsed))))
+      (is (numberp elapsed)))))
 
 ;;;--------------------------------------------------------------
 ;;; Test Runner

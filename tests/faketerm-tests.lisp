@@ -91,3 +91,33 @@
       (ignore-errors (elmtui.platform.api:shutdown-backend backend))
       (ignore-errors (delete-file path)))))
 
+(test faketerm-run-to-quiescence-drains-input-and-stabilizes-screen
+  "Faketerm can drive a deterministic backend scenario until queues are empty and the screen is stable."
+  (let* ((path (merge-pathnames
+                (make-pathname :name (format nil "faketerm-scenario-~A" (gensym))
+                               :type "log")
+                (uiop:temporary-directory)))
+         (backend (elmtui.platform.api:initialize-backend
+                   :faketerm :filepath path :width 4 :height 2
+                   :initial-input '((:text "A" :row 0 :col 0)
+                                    (:text "B" :row 0 :col 1)))))
+    (unwind-protect
+         (let ((result
+                 (%call-faketerm-symbol
+                  "FAKETERM-RUN-TO-QUIESCENCE"
+                  backend
+                  (lambda (instance step)
+                    (declare (ignore step))
+                    (let ((event (elmtui.platform.api:poll-input-event instance)))
+                      (when event
+                        (elmtui.platform.api:draw-text-at
+                         instance nil
+                         (getf event :row)
+                         (getf event :col)
+                         (getf event :text))))))))
+           (is (equal (getf result :reason) :quiescent))
+           (is (= (getf result :steps) 3))
+           (is (equal (getf result :screen-lines) '("AB  " "    "))))
+      (ignore-errors (elmtui.platform.api:shutdown-backend backend))
+      (ignore-errors (delete-file path)))))
+
