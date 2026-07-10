@@ -2,9 +2,9 @@
 (asdf:defsystem "elmtui-examples"
   :version      "0.2.0"
   :description  "ElmTUI maintained example applications"
-  :author       "User <user@archlinux>"
-  :license      "GNU GPL, version 3"
-  :depends-on   (:elmtui :cl-fzy)
+  :author       "ElmTUI contributors"
+  :license      "GPL-3.0-only"
+  :depends-on   (:elmtui)
   :pathname "./examples/"
   :components (
                 (:file "rainbow-app")
@@ -14,7 +14,6 @@
                 (:file "minimal-app")
                 (:file "keymap-app")
                 (:file "cursor-inspector")
-                (:file "fzy-picker")
                 (:file "tmux-hover-demo")
                 (:file "tmux-idle-screensaver")
                 (:file "pong-below-cursor")

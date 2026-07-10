@@ -24,10 +24,8 @@
    #:application-state-lock
    #:application-state-observers
    #:state-ref
-    #:valid-state-path-p
-    #:assert-valid-state-path
-    #:valid-state-path-p
-    #:assert-valid-state-path
+   #:valid-state-path-p
+   #:assert-valid-state-path
    #:get-state
    #:state-set
    #:make-state
@@ -94,10 +92,18 @@
            :list-registered-types
            :validate-type
            :make-enum-predicate
-           :register-enum-type))
+           :register-enum-type
+           :non-empty-string-p
+           :positive-integer-p
+           :non-negative-integer-p
+           :finite-number-p
+           :keyword-symbol-p))
 
 (uiop:define-package :cl-state.validation
   (:use :cl)
+  (:import-from :cl-state.schema
+                :register-type-predicate
+                :lookup-type-predicate)
   (:export :validate-nested
            :validate-field
            :with-validation
@@ -106,7 +112,10 @@
            :validate-model-schema
            :make-validator
            :type-predicate
-           :validation-error))
+           :validation-error
+           :validation-error-message
+           :validation-error-path
+           :validation-error-value))
 
 (uiop:define-package :cl-state.api
   (:use :cl
@@ -148,6 +157,8 @@
    #:application-state-lock
    #:application-state-observers
    #:state-ref
+   #:valid-state-path-p
+   #:assert-valid-state-path
    #:get-state
    #:state-set
    #:make-state
@@ -207,4 +218,7 @@
    #:validate-model-schema
    #:make-validator
    #:type-predicate
-   #:validation-error))
+   #:validation-error
+   #:validation-error-message
+   #:validation-error-path
+   #:validation-error-value))

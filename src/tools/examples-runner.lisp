@@ -207,7 +207,12 @@ Set ELMTUI_VERBOSE_LOGS=1 to keep info/debug output."
 
 (defun %load-example-file (example-file)
   (load-system "elmtui")
-  (ignore-errors (load-system "cl-fzy"))
+  (when (string-equal "fzy-picker" (pathname-name example-file))
+    (handler-case
+        (load-system "cl-fzy")
+      (error (condition)
+        (error "The fzy-picker example requires the optional cl-fzy system: ~A"
+               condition))))
   (load example-file))
 
 (defun %parse-backend-type (value)

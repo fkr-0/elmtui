@@ -23,6 +23,7 @@
   (:import-from :elmtui.keymaps
                 #:lookup
                 #:lookup-binding
+                #:keymap-bindings
                 #:normalized-key-key
                 #:normalized-key-modifiers))
 
@@ -65,6 +66,14 @@
   (let* ((km  (keymap! :test-km)))
     (add-keybinding km "F1" :target '(:dummy))
     (is (not (null (lookup km (parse-key-string "F1")))))))
+
+(test add-multi-key-binding
+  "Space-separated key sequences are split into multiple normalized keys."
+  (let ((km (keymap! :sequence-km)))
+    (add-keybinding km "C-x C-s" :type :message :target '(:save))
+    (is (equal '(:message :target (:save))
+               (let ((binding (gethash "Ctrl-X Ctrl-S" (keymap-bindings km))))
+                 (list (getf binding :type) :target (getf binding :target)))))))
 
 ;;;; -----------------------------------------------------------------------
 ;;;; 4)  Context-stack precedence (later-activated context wins)

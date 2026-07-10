@@ -1,0 +1,17 @@
+;;; -*- Mode: common-lisp; -*-
+(:api-version "0.4")
+
+(:source "quicklisp" :type :clpi :url "https://quicklisp.common-lisp-project-index.org/")
+
+(:asd "../cl-styles/cl-styles.asd")
+(:asd "../cl-inputs/cl-inputs.asd")
+(:asd "../cl-events/cl-events.asd")
+(:asd "../cl-state/cl-state.asd")
+(:asd "../elmtui.asd")
+
+(:github "sly" :path "joaotavora/sly" :branch "master")
+
+(:system "log4cl" :source "quicklisp")
+(:system "bordeaux-threads")
+(:system "slynk")
+(:system "alexandria" :source "quicklisp")

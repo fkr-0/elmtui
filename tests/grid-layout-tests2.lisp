@@ -158,4 +158,10 @@
       (is (> (w ar) 0))
       (is (> (h ar) 0)))))
 
+(test parses-minmax-track-definition
+  "The minmax prefix is matched against the track string, not vice versa."
+  (is (equal '(:minmax 10 (:fr 1))
+             (elmtui.view.layout.grid::parse-track-def
+              "  minmax(10, 1fr)  "))))
+
 (defun run-grid2-tests () (run! :elmtui/grid))

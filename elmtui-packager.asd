@@ -3,8 +3,8 @@
 (asdf:defsystem "elmtui-packager"
   :version      "0.1.0"
   :description  "ElmTUI packager: dump fast-boot executable Lisp images"
-  :author       "User <user@archlinux>"
-  :license      "GNU GPL, version 3"
+  :author       "ElmTUI contributors"
+  :license      "GPL-3.0-only"
   :depends-on   (:elmtui)
   :components ((:module "src/tools"
                  :components ((:file "packager"))))

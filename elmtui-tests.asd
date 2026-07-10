@@ -2,10 +2,10 @@
 
 (asdf:defsystem "elmtui-tests"
   :description "Test suite for the elmtui system"
-  :author "User <user@archlinux>"
+  :author "ElmTUI contributors"
   :version "0.2.0"
   :depends-on (#:elmtui #:elmtui-widgets-enhanced #:fiveam)
-  :license "GPL"
+  :license "GPL-3.0-only"
   :serial t
   :components ((:module "tests"
                  :serial t

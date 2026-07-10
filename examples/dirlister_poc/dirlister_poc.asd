@@ -2,7 +2,7 @@
 
 (asdf:defsystem "dirlister_poc"
   :description "A directory lister TUI application using the elmtui library."
-  :author "Your Name"
+  :author "ElmTUI contributors"
   :license "MIT"
   :depends-on (#:elmtui #:log4cl)
   :components ((:file "dirlister_poc"))

@@ -2,8 +2,8 @@
 (asdf:defsystem "elmtui-widgets-enhanced/experimental"
   :version      "0.1.0"
   :description  "Experimental enhanced widgets with contracts and DSL integration"
-  :author       "User <user@archlinux>"
-  :license      "GNU GPL, version 3"
+  :author       "ElmTUI contributors"
+  :license      "GPL-3.0-only"
   :depends-on   (:elmtui)
   :pathname "./src/ui/widgets/"
   :components (
@@ -17,8 +17,8 @@
 (asdf:defsystem "elmtui-widgets-enhanced"
   :version      "0.1.0"
   :description  "Stable enhanced widgets used by elmtui tests"
-  :author       "User <user@archlinux>"
-  :license      "GNU GPL, version 3"
+  :author       "ElmTUI contributors"
+  :license      "GPL-3.0-only"
   :depends-on   (:elmtui)
   :pathname "./src/ui/widgets/"
   :components ((:file "viewport-enhanced")))

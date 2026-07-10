@@ -1,33 +1,17 @@
-(uiop:define-package :cl-state.validation
-  (:use :cl)
-  (:export :validate-nested
-           :validate-field
-           :with-validation
-           :define-validator
-           :register-type-validator
-           :validate-model-schema
-           :make-validator
-           :type-predicate
-           :validation-error))
-
 (in-package :cl-state.validation)
 
-;; Type predicates registry
-(defvar *type-validators* (make-hash-table :test #'equal)
-  "Registry of type validators")
+;;; Validation is the condition/reporting layer over cl-state.schema's single
+;;; type registry.  Keeping one registry prevents schema and model validation
+;;; from silently disagreeing about built-in or user-defined types.
 
 (defun register-type-validator (type-name predicate &optional description)
-  "Register a validation predicate for a given type"
-  (setf (gethash type-name *type-validators*)
-        (list :predicate predicate :description (or description ""))))
+  "Compatibility name for REGISTER-TYPE-PREDICATE."
+  (register-type-predicate type-name predicate description))
 
 (defun type-predicate (type-name)
-  "Retrieve predicate for a type"
-  (let ((entry (gethash type-name *type-validators*)))
-    (when entry
-      (getf entry :predicate))))
+  "Return the predicate registered for TYPE-NAME."
+  (lookup-type-predicate type-name))
 
-;; Core validation utilities
 (define-condition validation-error (error)
   ((message :initarg :message :reader validation-error-message)
    (path :initarg :path :initform nil :reader validation-error-path)
@@ -37,127 +21,120 @@
                      (or (validation-error-path condition) "root")
                      (validation-error-message condition)))))
 
+(defun %validation-error (value path control &rest arguments)
+  (error 'validation-error
+         :message (apply #'format nil control arguments)
+         :path path
+         :value value))
+
 (defun make-validator (predicate error-message)
-  "Creates a validator function from a predicate"
+  "Create a validator function from PREDICATE and ERROR-MESSAGE."
+  (check-type predicate function)
   (lambda (value &key path)
     (unless (funcall predicate value)
-      (error 'validation-error
-             :message error-message
-             :path path
-             :value value))
+      (%validation-error value path "~a" error-message))
     t))
 
 (defmacro define-validator (name args &body body)
-  "Define a named validator function"
-  `(defun ,name ,args
-     (let ((result (progn ,@body)))
-       (if (eq result t)
-           t
-           (error 'validation-error
-                  :message (or result "Validation failed")
-                  :path ,(cadr args)
-                  :value ,(car args))))))
+  "Define NAME as a validator whose BODY returns T or an error message."
+  (let ((value (first args)))
+    `(defun ,name ,args
+       (let ((result (progn ,@body)))
+         (if (eq result t)
+             t
+             (%validation-error ,value nil "~a" (or result "Validation failed")))))))
 
 (defun validate-field (value type &key path)
-  "Validate a single value against a type specification"
+  "Validate VALUE against TYPE and signal VALIDATION-ERROR on mismatch."
   (cond
-    ;; Handle simple type predicates
     ((symbolp type)
      (let ((predicate (type-predicate type)))
-       (if predicate
-           (funcall predicate value)
-           (error "No validator defined for type ~a" type))))
-
-    ;; Handle compound types like (or ...)
-    ((and (listp type) (eq (first type) 'or))
-     (let ((valid nil))
-       (dolist (sub-type (rest type))
-         (handler-case
-             (progn
-               (validate-field value sub-type :path path)
-               (setf valid t)
-               (return))
-           (validation-error () nil)))
-       (unless valid
-         (error 'validation-error
-                :message (format nil "Value ~S doesn't match any type in ~S" value type)
-                :path path
-                :value value))))
-
-    ;; Handle compound types like (and ...)
-    ((and (listp type) (eq (first type) 'and))
+       (unless predicate
+         (%validation-error value path "No validator defined for type ~a" type))
+       (unless (funcall predicate value)
+         (%validation-error value path "~S is not a valid ~a" value type))))
+    ((and (consp type) (eq (first type) 'or))
+     (unless (some (lambda (sub-type)
+                     (handler-case
+                         (progn (validate-field value sub-type :path path) t)
+                       (validation-error () nil)))
+                   (rest type))
+       (%validation-error value path "Value ~S does not match any type in ~S"
+                          value type)))
+    ((and (consp type) (eq (first type) 'and))
      (dolist (sub-type (rest type))
        (validate-field value sub-type :path path)))
-
-    ;; Handle lists like (list type)
-    ((and (listp type) (eq (first type) 'list))
+    ((and (consp type) (eq (first type) 'list))
      (unless (listp value)
-       (error 'validation-error
-              :message "Expected a list"
-              :path path
-              :value value))
-     (let ((elem-type (second type)))
-       (loop for item in value
-             for i from 0
-             do (validate-field item elem-type
-                               :path (if path
-                                       (format nil "~a[~a]" path i)
-                                       (format nil "[~a]" i))))))
-
-    ;; Handle vectors like (vector type)
-    ((and (listp type) (eq (first type) 'vector))
+       (%validation-error value path "Expected a list"))
+     (loop for item in value
+           for index from 0
+           do (validate-field item (second type)
+                              :path (format nil "~@[~a~][~d]" path index))))
+    ((and (consp type) (eq (first type) 'vector))
      (unless (vectorp value)
-       (error 'validation-error
-              :message "Expected a vector"
-              :path path
-              :value value))
-     (let ((elem-type (second type)))
-       (loop for item across value
-             for i from 0
-             do (validate-field item elem-type
-                               :path (if path
-                                       (format nil "~a[~a]" path i)
-                                       (format nil "[~a]" i))))))
+       (%validation-error value path "Expected a vector"))
+     (loop for item across value
+           for index from 0
+           do (validate-field item (second type)
+                              :path (format nil "~@[~a~][~d]" path index))))
+    (t
+     (%validation-error value path "Unsupported type specification: ~S" type)))
+  t)
 
-    ;; Other compound types
-    (t (error "Unsupported type specification: ~S" type))))
+(defun %field-value (object field-name)
+  (etypecase object
+    (hash-table
+     (multiple-value-bind (value presentp) (gethash field-name object)
+       (if presentp
+           value
+           (gethash (intern (symbol-name field-name) :keyword) object))))
+    (list
+     (or (getf object field-name)
+         (getf object (intern (symbol-name field-name) :keyword))))
+    (standard-object
+     (slot-value object field-name))))
 
 (defun validate-nested (object schema &optional (path ""))
-  "Validate a nested object structure against a schema"
+  "Validate OBJECT fields according to SCHEMA entries (FIELD TYPE)."
   (loop for (field-name field-type) in schema
         for field-path = (if (string= path "")
-                             (string field-name)
-                             (format nil "~a.~a" path field-name))
-        for field-value = (if (symbolp field-name)
-                             (slot-value object field-name)
-                             (error "Field name must be a symbol: ~S" field-name))
-        do (validate-field field-value field-type :path field-path))
+                             (string-downcase (string field-name))
+                             (format nil "~a.~(~a~)" path field-name))
+        do (validate-field (%field-value object field-name) field-type
+                           :path field-path))
   t)
 
 (defmacro with-validation (&body body)
-  "Execute forms with validation error handling"
-  `(handler-bind
-       ((validation-error
-          (lambda (c)
-            (format *error-output* "~&Validation error: ~a~%" c)
-            (invoke-debugger c))))
+  "Run BODY while reporting validation failures before they unwind normally."
+  `(handler-bind ((validation-error
+                    (lambda (condition)
+                      (format *error-output* "~&~a~%" condition))))
      ,@body))
 
-;; Register common type validators
-(register-type-validator 'string #'stringp "Must be a string")
-(register-type-validator 'integer #'integerp "Must be an integer")
-(register-type-validator 'keyword #'keywordp "Must be a keyword")
-(register-type-validator 'boolean #'(lambda (x) (or (eq x t) (eq x nil))) "Must be a boolean")
-(register-type-validator 'function #'functionp "Must be a function")
-(register-type-validator 'symbol #'symbolp "Must be a symbol")
-(register-type-validator 'list #'listp "Must be a list")
-(register-type-validator 'hash-table #'hash-table-p "Must be a hash-table")
+(defun %object-slot-value-if-present (object slot-name)
+  (when (typep object 'standard-object)
+    (let* ((class-name (class-name (class-of object)))
+           (class-package (and (symbolp class-name) (symbol-package class-name)))
+           (local-name (and class-package
+                            (find-symbol (symbol-name slot-name) class-package)))
+           (effective-name (cond
+                             ((slot-exists-p object slot-name) slot-name)
+                             ((and local-name (slot-exists-p object local-name)) local-name))))
+      (when effective-name
+        (slot-value object effective-name)))))
 
-(defun validate-model-schema (model &optional (schema nil))
-  "Validate a model against its schema"
-  (if schema
-      (validate-nested model schema)
-      (if (slot-exists-p model 'schema)
-          (validate-nested model (slot-value model 'schema))
-          (error "No schema provided for validation")))
-  t)
+(defun validate-model-schema (model &optional schema)
+  "Validate MODEL using SCHEMA or an embedded SCHEMA slot.
+
+When MODEL also has a DATA slot, the embedded schema describes that data
+container rather than the wrapper object itself."
+  (let* ((effective-schema (or schema
+                               (%object-slot-value-if-present model 'schema)))
+         (target (if (and (null schema)
+                          (%object-slot-value-if-present model 'data))
+                     (%object-slot-value-if-present model 'data)
+                     model)))
+    (unless effective-schema
+      (error "No schema provided for validation"))
+    (validate-nested target effective-schema)))

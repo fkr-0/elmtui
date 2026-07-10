@@ -26,5 +26,9 @@
 
 ;; Also provide this function for ASDF integration
 (defun run-all-cl-styles-tests ()
-  "Run all cl-styles tests (alias for run-tests)"
-  (fiveam:run-all-tests))
+  "Run all cl-styles tests and fail ASDF when any check fails."
+  (let ((results (fiveam:run 'cl-styles-test)))
+    (fiveam:explain! results)
+    (unless (fiveam:results-status results)
+      (error "The cl-styles test suite failed."))
+    results))

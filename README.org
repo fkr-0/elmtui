@@ -1,438 +1,218 @@
-#+TITLE: ElmTUI - Elm Architecture for Terminal UI in Common Lisp
-#+AUTHOR: ElmTUI Contributors
-#+OPTIONS: toc:3 num:nil
-
-* ElmTUI - Terminal UI with Elm Architecture for Common Lisp
-
-[[./doc/images/elmtui-logo.png]]
-
-ElmTUI is a terminal UI framework for Common Lisp inspired by the Elm Architecture. It provides a pure functional approach to building terminal user interfaces with a clean separation of concerns through Model-View-Update pattern.
-
-See docs/USER_GUIDE.md for the end‑user guide covering app structure, keymaps, focus, running, and packaging.
-
-** Features
-
-- *Pure Functional Architecture*: Clear separation of state, view, and update logic
-- *Declarative UI*: Define your interface using a hierarchical structure
-- *Terminal UI Components*: Buttons, labels, text inputs, forms, listboxes
-- *Flexible Styling*: CSS-like styling system with themes
-- *State Management*: Transactional state with undo/redo support
-- *Input Handling*: Keyboard and mouse event processing
-- *Layout Engine*: Automatic layout calculation with flexbox-like capabilities
-- *Virtual Buffer Rendering*: Efficient screen updates via buffer diffing
-
-** Installation
-
-*** Via Quicklisp
-
-#+BEGIN_SRC lisp
-(ql:quickload :elmtui)
-#+END_SRC
-
-*** Manual Installation
-
-#+BEGIN_SRC shell
-git clone https://github.com/yourusername/elmtui.lisp.git
-cd elmtui.lisp
-#+END_SRC
-
-In your LISP environment:
-
-#+BEGIN_SRC lisp
-(push #p"/path/to/elmtui.lisp/" asdf:*central-registry*)
-(asdf:load-system :elmtui)
-#+END_SRC
-
-** Architecture Overview
-
-ElmTUI follows the Elm Architecture, consisting of three core components:
-
-1. *Model*: Represents your application state
-2. *View*: Pure function that renders the current state as a UI
-3. *Update*: Pure function that takes the current state and a message, producing a new state
-
-[[./doc/images/elm-architecture.png]]
-
-*** Key Components
-
-- *State Management*: `elmtui.state` provides transactional state with undo/redo
-- *UI Components*: Pre-built widgets in `elmtui.ui.widgets`
-- *Layout*: Flexbox-inspired layout with `elmtui.view.layout`
-- *Styling*: CSS-like styling with `elmtui.style-lib`
-- *Events*: Event handling via `elmtui.core.events` and `elmtui.core.loop`
-- *Platform*: Terminal abstraction via `elmtui.platform.api`
-
-** Basic Usage
-
-*** Defining an Elm Application
-
-#+BEGIN_SRC lisp
-(defpackage :my-counter-app
-  (:use :cl :alexandria :elmtui))
-
-(in-package :my-counter-app)
-
-;; 1. Model: Define initial state
-(defun init ()
-  (values
-    ;; Initial state as a plist
-    (list :count 0
-          :button-state (elmtui.ui.widgets.button:init-button :inc-btn :label "Increment"))
-    ;; Initial commands (none in this case)
-    nil))
-
-;; 2. Update: Handle messages and update state
-(elmtui.state.update:defupdate update (app-state message)
-  (case (first message)
-    (:button-click
-     (let ((button-id (getf (rest message) :id)))
-       (when (eq button-id :inc-btn)
-         (elmtui.state.state:set-state app-state :count 
-                                       (1+ (elmtui.state:state-ref app-state :count)))
-         nil)))
-    (otherwise nil)))
-
-;; 3. View: Render the current state as a UI
-(elmtui.view.dsl:define-view view (app-state dispatch-fn)
-  (:div :id :main :direction :column
-        (:label :id :counter-label 
-                :value (format nil "Count: ~D" 
-                             (elmtui.state:state-ref app-state :count)))
-        (:button :id :inc-btn 
-                 :model (elmtui.state:state-ref app-state :button-state)
-                 :on-click (lambda (_) (funcall dispatch-fn '(:button-click :id :inc-btn))))))
-
-;; 4. Define the application
-(elmtui.runtime:def-elm-app counter-app
-  :init #'init
-  :update #'update
-  :view #'view)
-#+END_SRC
-
-*** Running Your Application
-
-#+BEGIN_SRC lisp
-;; Run the defined app
-(elmtui.runtime:run-app)
-
-;; Or run a specific app with options
-(elmtui.runtime:run-app :app-name 'counter-app
-                       :platform :terminal
-                       :platform-options '(:tty-path "/dev/tty"))
-#+END_SRC
-
-** Example Applications
-
-ElmTUI comes with several example applications that demonstrate different aspects of the framework:
-
-*** Counter Example
-
-A simple counter that demonstrates basic state management and button interaction.
-
-#+BEGIN_SRC lisp
-(asdf:load-system :elmtui/examples)
-(elmtui.examples.counter-app:run-counter-app)
-#+END_SRC
-
-*** Form Example
-
-Demonstrates form handling with text inputs, validation and submission.
-
-#+BEGIN_SRC lisp
-(asdf:load-system :elmtui/examples)
-(elmtui.examples.form-app:run-form-app)
-#+END_SRC
-
-*** Keymap Example
-
-Shows keyboard shortcut handling and widget-specific keymaps.
-
-#+BEGIN_SRC lisp
-(asdf:load-system :elmtui/examples)
-(elmtui.examples.keymap-app:run-keymap-app)
-#+END_SRC
-
-*** Rainbow Example
-
-Demonstrates color capabilities and styling.
-
-#+BEGIN_SRC lisp
-(asdf:load-system :elmtui/examples)
-(elmtui.examples.rainbow-app:run-rainbow-example-app)
-#+END_SRC
-
-** Tutorial: Creating Your Own App
-
-Let's build a simple TODO list application:
-
-*** Step 1: Define the Package
-
-#+BEGIN_SRC lisp
-(defpackage :todo-app
-  (:use :cl :alexandria :elmtui)
-  (:export :run-todo-app))
-
-(in-package :todo-app)
-#+END_SRC
-
-*** Step 2: Define the Model
-
-#+BEGIN_SRC lisp
-(defstruct todo-item
-  (id (uuid:make-v4-uuid) :type uuid:uuid)
-  (text "" :type string)
-  (completed nil :type boolean))
-
-(defun init-todo-app ()
-  (values
-   ;; Initial state
-   (list :todos (list (make-todo-item :text "Learn ElmTUI" :completed nil)
-                     (make-todo-item :text "Build a TODO app" :completed nil))
-         :input-text ""
-         :input-model (elmtui.ui.widgets.textinput:init-textinput :new-todo :value "")
-         :current-stylesheet elmtui.style.presets:dark-theme)
-   ;; No initial commands
-   nil))
-#+END_SRC
-
-*** Step 3: Define Messages and Update Function
-
-#+BEGIN_SRC lisp
-;; Message types
-(defparameter +add-todo+ :add-todo)
-(defparameter +toggle-todo+ :toggle-todo)
-(defparameter +update-input+ :update-input)
-
-(elmtui.state.update:defupdate update-todo-app (app-state message)
-  (let ((msg-type (first message)))
-    (case msg-type
-      (:add-todo
-       (when (not (string= "" (elmtui.state:state-ref app-state :input-text)))
-         (let ((new-todo (make-todo-item :text (elmtui.state:state-ref app-state :input-text))))
-           ;; Add the new todo
-           (elmtui.state.state:set-state app-state :todos 
-                                        (cons new-todo (elmtui.state:state-ref app-state :todos)))
-           ;; Clear the input
-           (elmtui.state.state:set-state app-state :input-text "")
-           (elmtui.state.state:set-state app-state :input-model 
-                                         (elmtui.ui.widgets.textinput:init-textinput :new-todo :value ""))
-           nil)))
-      
-      (:toggle-todo
-       (let* ((todo-id (getf (rest message) :id))
-              (todos (elmtui.state:state-ref app-state :todos))
-              (updated-todos (mapcar (lambda (todo)
-                                       (if (uuid:uuid= (todo-item-id todo) todo-id)
-                                           (copy-todo-item todo :completed (not (todo-item-completed todo)))
-                                           todo))
-                                     todos)))
-         (elmtui.state.state:set-state app-state :todos updated-todos)
-         nil))
-      
-      (:update-input
-       (let ((new-text (getf (rest message) :value)))
-         (elmtui.state.state:set-state app-state :input-text new-text)
-         nil))
-      
-      ((:textinput-key-press :textinput-update)
-       (when (eq (getf (rest message) :widget-id) :new-todo)
-         ;; Handle text input updates
-         (let ((new-text (getf (rest message) :value)))
-           (elmtui.state.state:set-state app-state :input-text new-text))
-         nil))
-      
-      (:key-event
-       ;; Handle Enter key to add todo
-       (when (and (eq (key-event-key message) :enter)
-                  (not (string= "" (elmtui.state:state-ref app-state :input-text))))
-         (update-todo-app app-state (list :add-todo))))
-      
-      (otherwise nil))))
-#+END_SRC
-
-*** Step 4: Define the View
-
-#+BEGIN_SRC lisp
-(elmtui.view.dsl:define-view view-todo-app (app-state dispatch-fn)
-  (:div :id :main :direction :column :padding 1
-        ;; Title
-        (:h1 :value "TODO App" :style '(:fg :yellow :bold t))
-        
-        ;; Input area
-        (:div :id :input-container :direction :row :margin-top 1
-              (:textinput :id :new-todo
-                        :model (elmtui.state:state-ref app-state :input-model)
-                        :width 30
-                        :on-change (lambda (e) (funcall dispatch-fn (list :update-input :value (getf e :value)))))
-              (:button :id :add-btn
-                     :label "Add"
-                     :on-click (lambda (_) (funcall dispatch-fn (list :add-todo)))))
-        
-        ;; Todo list
-        (:div :id :todos-container :direction :column :margin-top 1
-              (loop for todo in (elmtui.state:state-ref app-state :todos)
-                    collect (let ((todo-id (todo-item-id todo)))
-                              (:div :direction :row
-                                    :class (if (todo-item-completed todo) "todo-completed" "todo-pending")
-                                    (:checkbox :checked (todo-item-completed todo)
-                                              :on-change (lambda (_) 
-                                                           (funcall dispatch-fn 
-                                                                    (list :toggle-todo :id todo-id))))
-                                    (:label :value (todo-item-text todo)
-                                           :style (when (todo-item-completed todo)
-                                                    '(:fg :gray :strike t)))))))))
-#+END_SRC
-
-*** Step 5: Define and Run the Application
-
-#+BEGIN_SRC lisp
-(elmtui.runtime:def-elm-app todo-app
-  :init #'init-todo-app
-  :update #'update-todo-app
-  :view #'view-todo-app)
-
-(defun run-todo-app ()
-  (elmtui.runtime:run-app :app-name 'todo-app))
-#+END_SRC
-
-** DSL Roadmap - Towards a Simpler UI Description
-
-While ElmTUI already provides a declarative DSL for UI definition, we plan to further simplify and enhance it in upcoming versions:
-
-*** Current DSL Syntax
-
-#+BEGIN_SRC lisp
-(define-view view (app-state dispatch-fn)
-  (:div :id :main :direction :column
-        (:label :id :count-label 
-                :value (format nil "Count: ~D" 
-                              (state-ref app-state :count)))
-        (:button :id :inc-btn 
-                 :model (state-ref app-state :button-state)
-                 :on-click (lambda (_) (funcall dispatch-fn '(:button-click :id :inc-btn))))))
-#+END_SRC
-
-*** Planned Enhancements
-
-**** 1. Simplified Event Handlers
-
-Replace verbose lambda functions with a more concise syntax:
-
-#+BEGIN_SRC lisp
-;; Current approach
-:on-click (lambda (_) (funcall dispatch-fn '(:button-click :id :inc-btn)))
-
-;; Planned enhancement
-:on-click '(:button-click :id :inc-btn)
-#+END_SRC
-
-**** 2. Auto Model-Binding for Widgets
-
-Automatically bind widgets to their corresponding state:
-
-#+BEGIN_SRC lisp
-;; Current approach
-(:button :id :inc-btn :model (state-ref app-state :button-state))
-
-;; Planned enhancement
-(:button :id :inc-btn) ;; Auto-binds to app-state.button-state
-#+END_SRC
-
-**** 3. Property Inheritance and Defaults
-
-Define default properties at parent levels that children inherit:
-
-#+BEGIN_SRC lisp
-(:div :direction :column :text-align :center :fg :white
-      ;; All children inherit text-align and fg properties
-      (:label :value "Title")
-      (:button :label "Click Me"))
-#+END_SRC
-
-**** 4. Simplified Style Definition
-
-More concise style definition syntax:
-
-#+BEGIN_SRC lisp
-;; Current approach
-:style '(:fg :yellow :bg :blue :attrs (:bold t))
-
-;; Planned enhancement
-:fg :yellow :bg :blue :bold t
-#+END_SRC
-
-**** 5. Dynamic Components
-
-Create reusable component templates:
-
-#+BEGIN_SRC lisp
-(define-component labeled-input (label value &key width)
-  (:div :direction :row
-        (:label :value label :width 10)
-        (:textinput :value value :width (or width 20))))
-
-;; Usage in view
-(:labeled-input "Name:" (state-ref app-state :name) :width 30)
-#+END_SRC
-
-**** 6. String Interpolation
-
-Simplified string formatting:
-
-#+BEGIN_SRC lisp
-;; Current approach
-:value (format nil "Count: ~D" (state-ref app-state :count))
-
-;; Planned enhancement
-:value "Count: ${app-state.count}"
-#+END_SRC
-
-**** 7. Layout Shorthands
-
-Simplified layout management:
-
-#+BEGIN_SRC lisp
-;; Current approach
-(:div :direction :column :align-items :center :justify-content :space-between)
-
-;; Planned enhancement
-(:vbox :align :center :justify :space-between)
-#+END_SRC
-
-**** 8. Conditional Rendering
-
-Concise syntax for conditional rendering:
-
-#+BEGIN_SRC lisp
-;; Current approach
-(when condition (:label :value "Conditional content"))
-
-;; Planned enhancement
-(:label :if condition :value "Conditional content")
-#+END_SRC
-
-**** 9. List Iteration
-
-Simplified list iteration:
-
-#+BEGIN_SRC lisp
-;; Planned enhancement
-(:foreach item in (state-ref app-state :items)
-          (:label :value (item-name item)))
-#+END_SRC
-
-*** Implementation Timeline
-
-1. Q1 2023: Property inheritance and simplified style definition
-2. Q2 2023: Simplified event handlers and string interpolation
-3. Q3 2023: Layout shorthands and conditional rendering
-4. Q4 2023: Dynamic components and auto model-binding
-5. Q1 2024: List iteration and finalization of new DSL
-
-** Contributing
-
-ElmTUI welcomes contributions! Please see [[./CONTRIBUTING.md]] for guidelines on how to contribute.
-
-** License
-
-ElmTUI is released under the BSD license. See [[./LICENSE]] for details.
+#+title: ElmTUI
+#+subtitle: Elm-style terminal user interfaces for Common Lisp
+
+* Status
+
+ElmTUI is preparing its first public release as version 0.2.0.
+
+The core runtime, maintained examples, and four reusable support libraries are
+covered by independent ASDF test systems.  The current supported development
+platform is SBCL on a POSIX terminal environment.  Other Common Lisp
+implementations have not yet been qualified because parts of the toolkit use
+SBCL facilities such as SB-POSIX and SB-MOP.
+
+* What ElmTUI provides
+
+- Elm/TEA-style application flow: model, message, update, view, effects.
+- Declarative terminal UI trees and component DSLs.
+- Flex, grid, viewport, focus, keymap, and scrolling behavior.
+- Diffed virtual-buffer rendering with terminal and fake-terminal backends.
+- Typed terminal input decoding and event routing.
+- Transactional state updates with observers and undo/redo.
+- CSS-like selector, cascade, variable, and property handling.
+- Maintained interactive examples and a standalone image packager.
+
+* Repository systems
+
+The repository intentionally separates reusable mechanics from terminal UI
+policy.
+
+| ASDF system | Responsibility | License |
+|-------------+----------------+---------|
+| =cl-events= | Channels, event types, pub/sub, async tasks, generic loop mechanics | MIT |
+| =cl-inputs= | Byte decoding, keymaps, input tokens, device and sink ports | MIT |
+| =cl-state= | Paths, containers, patches, transactions, observers, validation | MIT |
+| =cl-styles= | Selectors, rules, cascade, variables, property normalization | MIT |
+| =elmtui= | Components, UI DSL, runtime policy, rendering, terminal integration | GPL-3.0-only |
+| =elmtui-examples= | Maintained example applications | GPL-3.0-only |
+| =elmtui-packager= | Standalone executable/image packaging | GPL-3.0-only |
+
+The complete ownership rules are documented in
+[[file:docs/architecture/library-boundaries.md][docs/architecture/library-boundaries.md]].
+
+* Requirements
+
+- SBCL.
+- CLPM for the checked-in dependency workflow.
+- A POSIX-like environment for the terminal backend.
+- A terminal with ANSI control-sequence support for interactive applications.
+
+Tmux is optional.  Live tmux integration tests run only when explicitly enabled
+inside a tmux session.
+
+* Setup
+
+Install the repository bundle:
+
+#+begin_src sh
+clpm bundle install
+#+end_src
+
+Load the core system:
+
+#+begin_src sh
+clpm bundle exec --with-client sbcl -- \
+  --noinform --non-interactive \
+  --eval '(require :asdf)' \
+  --eval '(asdf:load-system "elmtui")'
+#+end_src
+
+For development, the repository must be visible to ASDF. Running through the
+CLPM bundle from the repository root already establishes the expected source
+registry. The main =clpmfile= contains only runtime and test dependencies;
+SLY/Slynk is isolated in =dev/clpmfile= and is installed automatically by the
+=bridge.yml= =slynk= command.
+
+* Minimal application shape
+
+ElmTUI applications define an initial state, an update function, a view
+function, and a root viewport.  This reduced example follows the API used by
+=examples/minimal-app.lisp=:
+
+#+begin_src lisp
+(uiop:define-package :example.hello
+  (:use :cl)
+  (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:export #:run-hello))
+
+(in-package :example.hello)
+
+(defun initial-state ()
+  (list :last-key "-"))
+
+(defun update (message state)
+  (declare (ignore state))
+  (if (and (consp message) (eq (first message) :keyevent))
+      (make-update-result
+       :patches `(((:last-key) ,(getf (rest message) :key "-"))))
+      (make-update-result)))
+
+(defun view (state)
+  `(:container
+    :id :root
+    :style (:display :block :width 30 :height 3 :padding 1)
+    :children
+    ((:text :id :label
+      :content ,(format nil "Last key: ~A"
+                        (state-ref state :last-key "-"))))))
+
+(defapplication hello
+  :root-component-dsl
+  '(:root-viewport
+    :id :hello-root
+    :anchor :below-cursor
+    :child-dsl-spec (:view nil))
+  :root-viewport-id :hello-root
+  :initial-state-fn #'initial-state
+  :update-fn #'update
+  :view-fn #'view)
+#+end_src
+
+=DEFAPPLICATION= generates the application runner, here =RUN-HELLO=.
+
+* Running examples
+
+Load the maintained examples and start one by calling its exported runner:
+
+#+begin_src sh
+clpm bundle exec --with-client sbcl -- \
+  --noinform \
+  --eval '(require :asdf)' \
+  --eval '(asdf:load-system "elmtui-examples")' \
+  --eval '(elmtui.examples.minimal:run-minimal)'
+#+end_src
+
+See [[file:examples/README.md][examples/README.md]] for the curated example map and
+entry points.
+
+* Testing
+
+Run the root integration suite:
+
+#+begin_src sh
+clpm bundle exec --with-client sbcl -- \
+  --noinform --load run-tests-clpm.lisp
+#+end_src
+
+Run every reusable subsystem independently:
+
+#+begin_src sh
+scripts/test-subsystems.sh
+#+end_src
+
+Run the complete release gate:
+
+#+begin_src sh
+scripts/release-check.sh
+#+end_src
+
+The release gate checks repository topology, the tracked release manifest,
+staged and unstaged patch whitespace, all four independent support-library
+suites, and the warning-clean full ElmTUI suite.
+
+Live tmux checks are intentionally skipped by default.  To include them, run
+from a tmux session with:
+
+#+begin_src sh
+ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
+#+end_src
+
+* Source layout
+
+#+begin_example
+elmtui.lisp/
+├── cl-events/          reusable event/runtime mechanics
+├── cl-inputs/          reusable terminal input subsystem
+├── cl-state/           reusable state subsystem
+├── cl-styles/          reusable style subsystem
+├── src/
+│   ├── app/            application definition and TEA runtime policy
+│   ├── core/           ElmTUI event adapters, contracts, errors, globals
+│   ├── platform/       input integration, rendering backends, tmux helpers
+│   ├── state/          ElmTUI state/update adapters
+│   ├── style/          renderer-facing style adapters and presets
+│   ├── ui/             components, widgets, focus, layout, DSL
+│   └── view/           view tree, reactivity, layout and rendering stages
+├── examples/           maintained applications
+├── tests/              root unit, integration, regression, and smoke tests
+├── docs/               architecture and release documentation
+└── scripts/            reproducible verification commands
+#+end_example
+
+The four =cl-*= libraries are tracked directly in this repository rather than
+as Git submodules, so a source archive is complete without additional fetches.
+
+* Design constraints
+
+- Reusable =cl-= systems must not depend on =elmtui= packages.
+- ElmTUI may adapt or re-export a support-library API, but must not carry a
+  second implementation of the same generic mechanism.
+- Terminal/UI policy remains in =src/=, even when it delegates transport,
+  state, event, or style mechanics to a support library.
+- Compatibility adapters must be thin and covered by integration tests.
+- Each support library must remain loadable and testable through its own ASDF
+  system.
+
+* Release information
+
+- [[file:CHANGELOG.md][CHANGELOG.md]] records release-visible changes.
+- [[file:docs/release-checklist.md][docs/release-checklist.md]] defines the first-release gate.
+- The repository currently has no configured Git remote.  Distribution URLs and
+  release signing details must be supplied by the maintainer before publishing.
+
+* License
+
+ElmTUI itself is licensed under GPL-3.0-only; see =LICENSE=.  The reusable
+=cl-events=, =cl-inputs=, =cl-state=, and =cl-styles= directories are licensed
+under MIT and each carries its own =LICENSE= file.

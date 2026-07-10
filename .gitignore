@@ -6,6 +6,34 @@
 */coverage/
 /coverage/
 /.worktrees/
+/.cache/
+/.ws-bridge/
+/test-output/
+/.env
+*.out
+*.backup
+*.zip
+*.7z
+
+# Locally built executables and maintained example images
+/elmtui
+/elmtui-packager
+/cursor-inspector
+/dirli
+/focus-simple
+/fzf-finder-real
+/fzy-picker
+/game-of-life
+/glider-real
+/input-selector
+/key-tester
+/keymap-app
+/mini-rainbow
+/minimal-app
+/pong-below-cursor
+/rainbow-app
+/root-viewport-test-app
+/scroll-panel-demo
 
 ### Emacs ###
 # -*- mode: gitignore; -*-

@@ -149,9 +149,8 @@
     (push-snapshot hist :s2)
     (push-snapshot hist :s3)
     (history-undo hist)
-    (let ((undone (history-past hist)))
-      (history-redo hist)
-      (is (equal (list :s3 :s2 :s1) (history-past hist))))))
+    (history-redo hist)
+    (is (equal (list :s3 :s2 :s1) (history-past hist)))))
 
 (test undo-redo-alternating
   "Alternating undo and redo"
