@@ -21,6 +21,7 @@
    #:terminal-style-strike
    #:terminal-style-invisible
    #:deep-copy-style
+   #:is-term-style
    #:copy-term-color
 
    #:terminal-color-simple
@@ -44,6 +45,13 @@
 
 (defgeneric as-plist (style)
   (:documentation "Convert STYLE to plist representation for terminal rendering."))
+
+(defgeneric deep-copy-style (style)
+  (:documentation "Creates a deep copy of a style plist, including any nested lists like RGB values."))
+
+(defgeneric is-term-style (s)
+  (:method (s) nil)
+  (:documentation "Checks if the given style S is a terminal style."))
 
 (defstruct terminal-color red green blue simple bg color-256)
 (defstruct terminal-style
@@ -77,7 +85,7 @@
          ((and (listp in) (= (length in) 3))
           (if (eq (first in) :rgb)
               ;; New format: (:rgb r g b)
-              (make-terminal-color :red (second in) :green (third in) :blue (fourth in) :bg bg)
+               (make-terminal-color :red (second in) :green (third in) :blue (third in) :bg bg)
               ;; Legacy format: (r g b)
               (make-terminal-color :red (first in) :green (second in) :blue (third in) :bg bg)))
          ;; 256-color format: (:256 n) or (n)
@@ -166,9 +174,6 @@
 ;;   "Get the simple color value from a terminal style's background color."
 ;;   (when (and style (terminal-style-bg-color style))
 ;;     (termcolor-simple (terminal-style-bg-color style))))
-(defmethod deep-copy-style ((style elmtui.platform.backend.common.ansi-styling:terminal-style))
-  "Creates a deep copy of a terminal-style instance."
-  (copy-term-style style))
 ;; (defgeneric from-styles (styles)
 ;;   "Derives a Terminal-Style from regular styles object")
 
@@ -360,7 +365,7 @@ If multiple attributes are requested, return a list of values in order."
    - ATTRS: The attributes to convert.
    Returns:
    - A list of ANSI escape sequences."
-  (log-info "ansi-seqs: ~A attrs: ~A" s attrs)
+  (log-debug "ansi-seqs: ~A attrs: ~A" s attrs)
   (mapcar
    (lambda
        (kv)
@@ -643,6 +648,29 @@ the escape sequence as byte stream."
   "Check if STYLE1 is a terminal-style object and matches STYLE-VAL.
    Returns a list of attributes that differ, or NIL if they match."
   t)
+
+(defmethod deep-copy-style ((style terminal-style))
+  "Creates a deep copy of a terminal-style struct, including nested color objects."
+  (let ((ts (copy-term-style style)))
+    (setf
+     (terminal-style-fg-color ts)
+     (copy-term-color (terminal-style-fg-color style)))
+    (setf (terminal-style-bg-color ts)
+          (copy-term-color (terminal-style-bg-color style)))
+    ts))
+
+(defmethod deep-copy-style ((style list))
+  "Creates a deep copy of a style plist, including any nested lists like RGB values.
+   Returns a new plist with the same keys but new list instances for any list values."
+  (loop for (key value) on style by #'cddr
+        if (and (listp value) (every #'numberp value))
+          nconc (list key (copy-list value))
+        else
+          nconc (list key value)))
+
+(defmethod deep-copy-style ((style null))
+  "Returns an empty style plist if STYLE is NIL."
+  nil)
 
 (defun termcolor-simple (color)
   "Returns the simple color keyword from a terminal-color instance."

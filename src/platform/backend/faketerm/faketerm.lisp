@@ -26,7 +26,8 @@
     #:get-cell-style-faketerm
     #:faketerm-screen-lines
     #:faketerm-enqueue-input
-    #:faketerm-log-lines)) ; Specific name
+    #:faketerm-log-lines
+    #:faketerm-run-to-quiescence)) ; Specific name
 
 (in-package :elmtui.backend.faketerm)
 
@@ -414,6 +415,39 @@ against rendered TUI state."
         (loop for line = (read-line stream nil nil)
               while line
               collect line)))))
+
+(defun %faketerm-scenario-result (instance reason steps)
+  (list :reason reason
+        :steps steps
+        :screen-lines (faketerm-screen-lines instance)
+        :log-lines (faketerm-log-lines instance)
+        :input-queue (copy-list (faketerm-instance-input-queue instance))))
+
+(defun faketerm-run-to-quiescence (instance step-fn &key (max-steps 100) until)
+  "Drive INSTANCE with STEP-FN until deterministic quiescence.
+
+STEP-FN is called as (STEP-FN INSTANCE STEP), with STEP starting at 1.
+The runner never sleeps: it stops when INSTANCE has no queued input and the
+screen snapshot is unchanged across a step, or when UNTIL returns true.  If no
+condition is reached within MAX-STEPS, signal an error with the latest screen
+and queue state in the message."
+  (check-type instance faketerm-instance)
+  (check-type step-fn function)
+  (loop for step from 1 to max-steps
+        for before = (faketerm-screen-lines instance)
+        do (funcall step-fn instance step)
+           (flush-output instance)
+           (let ((after (faketerm-screen-lines instance)))
+             (when (and until (funcall until instance step before after))
+               (return (%faketerm-scenario-result instance :until step)))
+             (when (and (null (faketerm-instance-input-queue instance))
+                        (equal before after))
+               (return (%faketerm-scenario-result instance :quiescent step))))
+        finally
+           (error "Faketerm scenario did not quiesce within ~D steps. Queue=~S Screen=~S"
+                  max-steps
+                  (faketerm-instance-input-queue instance)
+                  (faketerm-screen-lines instance))))
 ;;;---------------------------------------------------------------
 ;;; Raw Access (Escape Hatch)
 ;;;---------------------------------------------------------------

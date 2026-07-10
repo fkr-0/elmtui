@@ -130,10 +130,20 @@ Returns an element-position struct or nil if position is not available."))
 (defmethod element-position ((element null))
   nil)
 
+(defun %element-props (element)
+  "Return plist properties from either a plist node or Hiccup-style element node."
+  (cond
+    ((and (listp element) (keywordp (first element))
+          (listp (second element)) (keywordp (first (second element))))
+     (second element))
+    ((and (listp element) (keywordp (first element)))
+     element)
+    (t nil)))
+
 (defmethod element-position ((element t))
   "Default implementation for getting element position from properties.
 Override this for specific element types as needed."
-  (let ((props (when (listp element) (second element))))
+  (let ((props (%element-props element)))
     (when (and (listp props)
                (getf props :x)
                (getf props :y)
@@ -159,7 +169,7 @@ Returns an element-grid-coordinates struct or nil if grid position is not availa
 (defmethod element-grid-coordinates ((element t))
   "Default implementation for getting element grid coordinates from properties.
 Override this for specific element types as needed."
-  (let ((props (when (listp element) (second element))))
+  (let ((props (%element-props element)))
     (when (and (listp props)
                (or (getf props :grid-row)
                    (getf props :grid-col)

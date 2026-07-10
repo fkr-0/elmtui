@@ -559,12 +559,15 @@ Set the length component (:w or :h) of a rectangle's dimension."))
   val)
 
 (defmethod resize-dimension! ((r rectangle) &key (side :right) (amount 1))
-  "Resize the rectangle by adjusting one side (mutating)."
+  "Resize the rectangle by adjusting one side (mutating).
+   Positive AMOUNT grows the rectangle; negative AMOUNT shrinks it.
+   For :left/:top, positive amount moves the edge outward (grows),
+   negative amount moves it inward (shrinks)."
   (case side
-    (:left   (let ((delta amount)) (setf (w r) (neg-err (- (w r) delta) :w)) (incf (x r) delta)))
-    (:right  (let ((delta amount)) (setf (w r) (neg-err (+ (w r) delta) :w))))
-    (:top    (let ((delta amount)) (setf (h r) (neg-err (- (h r) delta) :h)) (incf (y r) delta)))
-    (:bottom (let ((delta amount)) (setf (h r) (neg-err (+ (h r) delta) :h))))
+    (:left   (setf (w r) (neg-err (- (w r) amount) :w)) (incf (x r) amount))
+    (:right  (setf (w r) (neg-err (+ (w r) amount) :w)))
+    (:top    (setf (h r) (neg-err (- (h r) amount) :h)) (incf (y r) amount))
+    (:bottom (setf (h r) (neg-err (+ (h r) amount) :h)))
     (otherwise (error "Invalid side for resize-dimension!: ~A" side)))
   r)
 

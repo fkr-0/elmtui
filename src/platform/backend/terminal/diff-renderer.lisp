@@ -18,7 +18,8 @@
     #:terminal-instance-current-style
     #:terminal-instance-cl-device
     #:send-sequence
-    #:apply-style-diff)
+    #:apply-style-diff
+    #:write-output)
 
   (:import-from :elmtui.platform.backend.common.ansi-styling
     #:terminal-style)
@@ -304,38 +305,6 @@ Optimizes by batching contiguous character updates with the same style."
     (error (e)
       (log-error "SAFE-EQUALP: Error comparing ~S and ~S: ~A" a b e)
       nil)))
-(defmacro as-utf-8-bytes (char writer)
-  "Given the character CHAR, call the WRITER for every byte in the
-  UTF-8 encoded form of that character. WRITER may a function or a
-  macro."
-  (let ((char-code (gensym)))
-    `(let ((,char-code (char-code ,char)))
-       (declare (type fixnum ,char-code))
-       (cond ((< ,char-code 128) (,writer ,char-code))
-         ;; ((< ,char-code 2048)
-         ;;  (,writer (logior #b11000000 (ldb (byte 5 6) ,char-code)))
-         ;;  (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))
-         ((< ,char-code 2048)
-           (,writer (logior #b11000000 (ldb (byte 5 6) ,char-code)))
-           (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))
-         ((< ,char-code 65536)
-           (,writer (logior #b11100000 (ldb (byte 4 12) ,char-code)))
-           (,writer (logior #b10000000 (ldb (byte 6 6) ,char-code)))
-           (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))
-         (t
-           (,writer (logior #b11110000 (ldb (byte 3 18) ,char-code)))
-           (,writer (logior #b10000000 (ldb (byte 6 12) ,char-code)))
-           (,writer (logior #b10000000 (ldb (byte 6 6) ,char-code)))
-           (,writer (logior #b10000000 (ldb (byte 6 0) ,char-code))))))))
-(defun write-output (output stream )
-  "Write output to the terminal
-This method should be implemented by subclasses of low-level-terminal."
-  ;; (declare (ignore style))
-  ;; ;; (with-lock (term)
-  ;; (exec-sequence term :cursor-set-position y x)
-  (dotimes (i (length output))
-    (as-utf-8-bytes (char output i) (lambda (x) (write-byte x stream)))))
-
 ;; == elmtui/renderer/apply-diff.lisp ==
 (defun %write-string (device stream string)
   (cond

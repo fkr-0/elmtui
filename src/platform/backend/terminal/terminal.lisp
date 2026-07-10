@@ -100,9 +100,19 @@
     #:restore-terminal-state
     ;; New generic method implementations are implicitly exported by their generic definitions
     #:make-terminal-instance-for-device
+    #:*terminal-debug-phase*
+    #:*terminal-debug-frame-id*
+    #:*terminal-debug-owned-region*
     ))
 
 (in-package :elmtui.platform.backend.terminal)
+
+(defvar *terminal-debug-phase* nil
+  "Current rendering phase, bound dynamically during pipeline display.")
+(defvar *terminal-debug-frame-id* nil
+  "Current frame ID, bound dynamically during pipeline display.")
+(defvar *terminal-debug-owned-region* nil
+  "Current owned region, bound dynamically during pipeline display.")
 
 (defparameter *log-terminal-clear-calls* nil
   "When true, log clear/erase calls with a backtrace for debugging.")
@@ -235,7 +245,7 @@
       (let ((front-buffer (terminal-instance-front-buffer instance)))
         (when front-buffer
           (with-virtual-buffer-lock (front-buffer)
-            (clear-buffer front-buffer :char #\Nul))))
+            (clear-buffer front-buffer :char #\Space))))
       (let ((back-buffer (terminal-instance-back-buffer instance)))
         (when back-buffer
           (with-virtual-buffer-lock (back-buffer)
@@ -341,12 +351,12 @@
       (setf (terminal-instance-front-buffer instance) nil
         (terminal-instance-back-buffer instance) nil))
     (error (e)
-      (log-info "TERMINAL: Shutdown Error: " e )
+      (log-info "TERMINAL: Shutdown Error: ~A" e)
       (log:error "TERMINAL: Error during primary shutdown: ~A" e)))
 
   (handler-case (sb-ext:run-program "/bin/stty" '("sane") :search t :input nil :output nil :error nil)
     (error (e)
-      (log-info "TERMINAL: stty sane Error: " e )
+      (log-info "TERMINAL: stty sane Error: ~A" e)
       (log:error "TERMINAL: stty sane failed: ~A" e)))
   (log-info "TERMINAL: Backend shutdown complete.")
   t)
@@ -583,7 +593,7 @@
   (when (and (> width 1) (> height 1))
     (let* ((effective-style (if border-color (list :fg border-color) (getf style :attrs)))
             (chars (case border-style
-                     (:single '(#\┌ #\┐ #\└ #\╝ #\─ #\│))
+                      (:single '(#\┌ #\┐ #\└ #\┘ #\─ #\│))
                      (:double '(#\╔ #\╗ #\╚ #\╝ #\═ #\║))
                      (otherwise '(#\+ #\+ #\+ #\+ #\- #\|))))
             (tl (first chars)) (tr (second chars)) (bl (third chars)) (br (fourth chars))
@@ -630,7 +640,7 @@
 ;;; Color and Style Management (existing methods)
 ;;;---------------------------------------------------------------
 (defun style-to-terminal-style (style-plist)
-  (log-info "Converting style plist to terminal style: ~S" style-plist)
+  (log-debug "Converting style plist to terminal style: ~S" style-plist)
   (let ((normalized (when style-plist
                       (normalize-tui-style-plist style-plist))))
     (when normalized
@@ -680,7 +690,7 @@
         (when (member :italic attrs) (setf (terminal-style-italic ts) t))
         (when (member :underline attrs) (setf (terminal-style-underline ts) t))
         (when (member :inverse attrs) (setf (terminal-style-inverse ts) t)))
-      (log:debug "APPLY-STYLE-DIFF CALLED. Current: conveeeert tadaaaaa  ~A" ts)
+      (log:debug "APPLY-STYLE-DIFF CALLED. Current: ~A" ts)
       ts))))
 
 (defun write-style-to-stream (stream style)

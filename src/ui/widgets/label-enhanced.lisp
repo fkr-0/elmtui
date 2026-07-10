@@ -85,11 +85,8 @@
   
   :observers
   ((lambda (old-state new-state change-type)
-     ;; Log text changes for debugging
-     (when (and (eq change-type :updated)
-               (not (equal (getf old-state :text) (getf new-state :text))))
-       (format t "~&[Label Observer] Text changed: '~A' -> '~A'~%" 
-               (getf old-state :text) (getf new-state :text)))))
+     (declare (ignore old-state new-state change-type))
+     nil))
   
   :documentation "Enhanced label state model with comprehensive styling and accessibility"
   :export-accessors t)
@@ -133,13 +130,14 @@
 ;;;--------------------------------------------------------------
 
 (defcomponent label-enhanced ()
-  (:contracts :message-type nil :validation-mode :hybrid :validate-dsl t)
+  (:metadata
+   (:documentation "Enhanced label component with styling and accessibility metadata."))
   
   (:state
-   (text "Label" :type string :required t)
+   (text "Label" :type string)
    (for nil :type (or null keyword string))
-   (style nil :type list)
-   (accessibility nil :type list))
+   (style nil :type (or null list))
+   (accessibility nil :type (or null list)))
   
   (:init (props id-path)
     (let ((initial-state (make-label-state 
@@ -179,8 +177,8 @@
     (:blur ()
       (values state (list (list :blur-element :id (id-from-path id-path))))))
   
-  (:view (state app-state id-path)
-    (declare (ignore app-state))
+  (:view (state app-state id-path children)
+    (declare (ignore app-state children))
     (let* ((component-id (id-from-path id-path))
            (text (getf state :text "Label"))
            (for-target (getf state :for))
@@ -393,9 +391,19 @@
       ;; Default: clip text
       (t (subseq text 0 (min (length text) max-width))))))
 
+(defun split-label-words (text)
+  "Split TEXT on spaces without requiring the optional SPLIT-SEQUENCE system."
+  (let ((words nil)
+        (start 0))
+    (loop for pos = (position #\Space text :start start)
+          do (push (subseq text start pos) words)
+          while pos
+          do (setf start (1+ pos)))
+    (nreverse words)))
+
 (defun split-text-for-wrapping (text max-width)
   "Splits text into lines for wrapping"
-  (let ((words (split-sequence:split-sequence #\Space text))
+  (let ((words (split-label-words text))
         (lines nil)
         (current-line ""))
     
@@ -432,18 +440,24 @@
 ;;; Development and Debugging Support
 ;;;--------------------------------------------------------------
 
-(defun describe-label-state (label-state)
-  "Provides detailed information about label state"
-  (format t "~&Label State:~%")
-  (format t "  Text: '~A'~%" (getf label-state :text))
-  (format t "  For: ~A~%" (getf label-state :for))
-  (format t "  Style: ~A~%" (build-label-style-props label-state))
-  (format t "  Classes: ~A~%" (build-label-classes label-state))
-  (format t "  Visible: ~A~%" (getf label-state :visible))
-  (format t "  Focusable: ~A~%" (getf label-state :focusable))
-  (format t "  Accessibility: role=~A, hint='~A'~%" 
-          (getf label-state :aria-role)
-          (getf label-state :accessibility-hint)))
+(defun describe-label-state (label-state &optional stream)
+  "Return detailed information about LABEL-STATE as a string.
+When STREAM is non-NIL, also write the description to that stream."
+  (let ((description
+          (with-output-to-string (out)
+            (format out "~&Label State:~%")
+            (format out "  Text: '~A'~%" (getf label-state :text))
+            (format out "  For: ~A~%" (getf label-state :for))
+            (format out "  Style: ~A~%" (build-label-style-props label-state))
+            (format out "  Classes: ~A~%" (build-label-classes label-state))
+            (format out "  Visible: ~A~%" (getf label-state :visible))
+            (format out "  Focusable: ~A~%" (getf label-state :focusable))
+            (format out "  Accessibility: role=~A, hint='~A'~%"
+                    (getf label-state :aria-role)
+                    (getf label-state :accessibility-hint)))))
+    (when stream
+      (write-string description stream))
+    description))
 
 (defun validate-label-accessibility (label-state)
   "Validates label accessibility properties"
