@@ -926,16 +926,25 @@
           :subscription-count (length subscriptions))
     *subscriptions-log*))
 
-(defun trace-contracts (&key update view subscriptions messages)
-  "Enable tracing for specific contract types"
-  (when update
-    (format t "~&Tracing UPDATE contracts...~%"))
-  (when view
-    (format t "~&Tracing VIEW contracts...~%"))
-  (when subscriptions
-    (format t "~&Tracing SUBSCRIPTION contracts...~%"))
-  (when messages
-    (format t "~&Tracing MESSAGE validation...~%")))
+(defun trace-contracts (&key update view subscriptions messages stream)
+  "Return tracing status text for selected contract types.
+
+When STREAM is supplied, also write the generated text there. This keeps
+non-interactive callers silent by default while preserving an explicit
+interactive diagnostic path."
+  (let ((text
+          (with-output-to-string (out)
+            (when update
+              (format out "~&Tracing UPDATE contracts...~%"))
+            (when view
+              (format out "~&Tracing VIEW contracts...~%"))
+            (when subscriptions
+              (format out "~&Tracing SUBSCRIPTION contracts...~%"))
+            (when messages
+              (format out "~&Tracing MESSAGE validation...~%")))))
+    (when stream
+      (write-string text stream))
+    text))
 
 ;;;--------------------------------------------------------------
 ;;; Contract Validation Utilities (enhanced)
@@ -1013,15 +1022,16 @@
           (union (gethash msg-type message-patterns)
             (list msg-args) :test 'equal))))
 
-    (format t "~&Suggested defmsg schema for ~A:~%" update-function-name)
-    (format t "(defmsg ~AMsg (:docstring \"Messages for ~A\")~%"
-      (string-capitalize update-function-name) update-function-name)
-    (maphash (lambda (msg-type patterns)
-               (if (every #'null patterns)
-                 (format t "  ~A~%" msg-type)
-                 (format t "  (~A ~{~A~^ ~})~%" msg-type (first patterns))))
-      message-patterns)
-    (format t ")~%")))
+    (with-output-to-string (out)
+      (format out "~&Suggested defmsg schema for ~A:~%" update-function-name)
+      (format out "(defmsg ~AMsg (:docstring \"Messages for ~A\")~%"
+        (string-capitalize update-function-name) update-function-name)
+      (maphash (lambda (msg-type patterns)
+                 (if (every #'null patterns)
+                   (format out "  ~A~%" msg-type)
+                   (format out "  (~A ~{~A~^ ~})~%" msg-type (first patterns))))
+        message-patterns)
+      (format out ")~%"))))
 ;; == elmtui/pipeline/contracts.lisp ==
 
 (defmacro define-stage (name (in-type out-type) arglist &body body)

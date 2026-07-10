@@ -2,10 +2,13 @@
 ;;; File: src/core/events.lisp
 ;;; Advanced Event & Message Layer (using cl-events)
 (uiop:define-package :elmtui.core.events
-  (:use :cl :alexandria) ; Added alexandria for once-only
+  (:use :cl :alexandria)
   (:import-from :elmtui.core.conditions :log-condition :with-recovery)
   (:import-from :cl-events.types
    :message :make-message :message-type :message-data)
+  (:import-from :cl-events.protocols
+   #:broadcast-p #:capture-p #:bubble-p
+   #:stop-propagation #:message-state #:message-priority)
   (:import-from :elmtui.core.conditions
    :message-validation-error
                 :command-execution-error)
@@ -127,12 +130,8 @@
     (setf (getf out key) value)
     out))
 
-(defun message-state (msg)
-  "Return the message state if present, otherwise NIL."
-  (typecase msg
-    (message (getf (message-data msg) :state))
-    (cons (getf msg :state))
-    (t nil)))
+(defmethod message-state ((msg cons))
+  (getf msg :state))
 
 (defun (setf message-state) (new-state msg)
   (typecase msg
@@ -145,37 +144,21 @@
      new-state)
     (t new-state)))
 
-(defun broadcast-p (msg &rest _args)
-  (declare (ignore _args))
-  (typecase msg
-    (message
-     (let ((data (message-data msg)))
-       (or (eq (getf data :target) :broadcast)
-           (null (getf data :target)))))
-    (cons
-     (or (eq (getf msg :target) :broadcast)
-         (null (getf msg :target))))
-    (t nil)))
+(defmethod broadcast-p ((msg cons))
+  (or (eq (getf msg :target) :broadcast)
+      (null (getf msg :target))))
 
-(defun capture-p (msg &rest _args)
-  (declare (ignore _args))
-  (typecase msg
-    (message (getf (message-data msg) :capture))
-    (cons (getf msg :capture))
-    (t nil)))
+(defmethod capture-p ((msg cons))
+  (getf msg :capture))
 
-(defun bubble-p (msg &rest _args)
-  (declare (ignore _args))
-  (typecase msg
-    (message (getf (message-data msg) :bubble))
-    (cons (getf msg :bubble))
-    (t nil)))
+(defmethod bubble-p ((msg cons))
+  (getf msg :bubble))
 
 (defun propagation-stopped-p (msg &rest _args)
   (declare (ignore _args))
   (eq (message-state msg) :stopped))
 
-(defun stop-propagation (msg)
+(defmethod stop-propagation ((msg cons))
   (setf (message-state msg) :stopped)
   msg)
 

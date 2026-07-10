@@ -118,6 +118,14 @@
         (is (= 3 (gethash :c result)))
         (is (= 6 (gethash :count result)))))))
 
+
+(test apply-patches-application-state
+  "Applying patches to application-state mutates its data, not the wrapper object."
+  (let ((state (make-state :initial '(:components ()) :backend :hash-table)))
+    (let ((result (apply-patches state '(((:components :panel) :ok)))))
+      (is (eq state result))
+      (is (equal :ok (get-path '(:components :panel) state))))))
+
 ;;; diff-states tests
 
 (test diff-states-no-changes

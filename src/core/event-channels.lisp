@@ -118,9 +118,7 @@
 (defun remove-event-filter (chan fn)
   (setf (filters chan) (remove fn (filters chan)))
   (setf (channel-of chan)
-        (if (filters chan)
-            (make-filtered-channel :filters (filters chan))
-            (make-channel)))
+        (channel-remove-filter (channel-of chan) fn))
   chan)
 
 ;;; ------------------------------------------------------------------
