@@ -54,6 +54,7 @@
                      t))
              (setf (symbol-function 'elmtui.platform.driver::make-context-from-spec)
                    (lambda (_app-spec state backend)
+                     (declare (ignore _app-spec))
                      (elmtui.contracts:make-app-context
                        :state state
                        :backend backend
@@ -132,6 +133,7 @@
                      t))
              (setf (symbol-function 'elmtui.platform.driver::make-context-from-spec)
                    (lambda (_app-spec state backend)
+                     (declare (ignore _app-spec))
                      (elmtui.contracts:make-app-context
                        :state state
                        :backend backend
@@ -142,12 +144,14 @@
                      ctx))
              (setf (symbol-function 'elmtui.core.async:cancel-cmd)
                    (lambda (_cmd)
+                     (declare (ignore _cmd))
                      (incf cancel-calls)
                      t))
              (elmtui.platform.driver::initialize-app-model
               (list :name 'runtime-shutdown-e2e-app
                     :init-fn (lambda () (values '(:count 0) nil))
                     :update-fn (lambda (_msg _model)
+                                 (declare (ignore _model))
                                  (push _msg seen-msgs)
                                  (values '(:should-quit t) nil))
                     :view-fn (lambda (_model) (declare (ignore _model)) nil)
@@ -199,6 +203,7 @@
                      t))
              (setf (symbol-function 'elmtui.platform.driver::make-context-from-spec)
                    (lambda (_app-spec state backend)
+                     (declare (ignore _app-spec))
                      (elmtui.contracts:make-app-context
                       :state state
                       :backend backend

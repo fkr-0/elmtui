@@ -229,8 +229,8 @@
 
   :observers
   ((lambda (old-state new-state change-type)
-     (when (eq change-type :updated)
-       (format t "User state changed~%"))))
+     (declare (ignore old-state new-state change-type))
+     nil))
 
   :export-accessors t)
 
@@ -470,8 +470,7 @@
            (elapsed (/ (- end-time start-time) internal-time-units-per-second)))
 
       ;; Should complete reasonably quickly
-      (is (< elapsed 1.0))
-      (format t "~&DSL Performance: ~A validations in ~A seconds~%" iterations elapsed)))
+      (is (< elapsed 1.0))))
 
   ;; Test many state operations
   (let ((start-time (get-internal-real-time))
@@ -488,8 +487,7 @@
            (elapsed (/ (- end-time start-time) internal-time-units-per-second)))
 
       ;; Should complete reasonably quickly
-      (is (< elapsed 1.0))
-      (format t "~&State Performance: ~A patches in ~A seconds~%" iterations elapsed))))
+      (is (< elapsed 1.0)))))
 
 ;;;--------------------------------------------------------------
 ;;; Error Handling Tests

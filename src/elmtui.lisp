@@ -27,4 +27,8 @@
 
 (in-package :elmtui)
 (defun dev-main ()
-  (format t "huhu"))
+  "Minimal development entrypoint placeholder.
+
+Keep this silent so loading or smoke-running the top-level system does not leak
+accidental debug text into automated test output."
+  nil)

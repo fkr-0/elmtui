@@ -74,8 +74,8 @@
    expansion is now handled by cl-styles engine; avoid legacy macros here."
   (declare (ignore ctx))
   (let* ((raw (%get-style el))
-          (canon (nreverse (%canon-style-plist raw)))
-          (expanded (nreverse canon)))
+          (canon (%canon-style-plist raw))
+          (expanded canon))
     (unless (equal raw expanded)
       (%set-style! el expanded))
     el))

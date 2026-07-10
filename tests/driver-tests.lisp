@@ -74,7 +74,7 @@
                :backend nil
                :device nil
                :input-source :fake-source
-               :publish-fn (lambda (_evt) nil)))
+               :publish-fn (lambda (_evt) (declare (ignore _evt)) nil)))
          (published nil)
          (poll-calls 0)
          (orig-next (symbol-function 'cl-inputs.loop:next-token)))
