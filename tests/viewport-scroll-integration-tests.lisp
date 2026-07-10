@@ -195,7 +195,7 @@
         :initial-terminal-dimensions '(80 24)
         :initial-cursor-pos '(0 12)
         :anchor :below-cursor)
-      (declare (ignore comp))
+      (declare (ignore comp cmds))
       ;; Apply patches to state
       (elmtui.state:apply-patches state patches))
     ;; Provide known viewport size for cleanup
@@ -440,6 +440,7 @@
         :initial-terminal-dimensions '(80 24)
         :initial-cursor-pos '(0 18)
         :anchor :below-cursor)
+      (declare (ignore comp cmds))
       (elmtui.state:apply-patches state patches))
 
     ;; Simulate scroll events

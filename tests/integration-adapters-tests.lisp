@@ -210,7 +210,7 @@
             (symbol-function 'elmtui.core.event-channels:standard-event-channels) orig-standard))))
 
 (test core-loop-consumer-error-policy-stop-sets-shutdown
-  (let ((elmtui.core.loop::*shutdown-requested-cell* (list nil))
+  (let ((elmtui.core.loop::*shutdown-requested-flag* (elmtui.core.loop::make-shutdown-flag))
         (elmtui.core.loop::*consumer-error-policy* :stop))
     (is (eq :stop
             (elmtui.core.loop::%handle-consumer-poll-error
@@ -220,7 +220,7 @@
     (is-true elmtui.core.loop::*shutdown-requested*)))
 
 (test core-loop-consumer-error-policy-restart-does-not-force-shutdown
-  (let ((elmtui.core.loop::*shutdown-requested-cell* (list nil))
+  (let ((elmtui.core.loop::*shutdown-requested-flag* (elmtui.core.loop::make-shutdown-flag))
         (elmtui.core.loop::*consumer-error-policy* :restart))
     (is (eq :restart
             (elmtui.core.loop::%handle-consumer-poll-error
@@ -233,7 +233,7 @@
   (let ((called nil)
         (callbacks-shape nil)
         (orig-shell (symbol-function 'cl-events.loop:run-consumer-loop-shell))
-        (elmtui.core.loop::*shutdown-requested-cell* (list nil))
+        (elmtui.core.loop::*shutdown-requested-flag* (elmtui.core.loop::make-shutdown-flag))
         (elmtui.core.loop::*active-event-channels* nil))
     (unwind-protect
          (progn

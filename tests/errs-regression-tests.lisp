@@ -32,14 +32,18 @@
 (defun %patch-value-for (patches path)
   (second (find path patches :key #'first :test #'equal)))
 
+(test top-level-dev-main-is-silent
+  "The exported development entrypoint must not leak placeholder debug text."
+  (let ((output (with-output-to-string (*standard-output*)
+                  (elmtui:dev-main))))
+    (is (string= "" output))))
+
 (test drawable-content-update-accepts-standard-update-argument-order
   (let* ((component (make-drawable-content :id :content))
-         (state nil)
-         (_init-patches nil))
+         (state nil))
     (multiple-value-bind (_ initialized-patches _commands)
         (init component :id-path '(:components :content) :initial-content "old")
       (declare (ignore _ _commands))
-      (setf _init-patches initialized-patches)
       (setf state initialized-patches))
     (let ((result (update component
                           (cons msg-set-drawable-content "new")
@@ -120,6 +124,16 @@
                     'update-result))
     (is-true (typep (funcall update-fn '(:terminal-resized :width 80 :height 24)
                              '(:terminal-width 80 :terminal-height 24))
+                    'update-result))))
+
+(test minimal-update-handles-non-cons-messages
+  (%load-example "minimal-app")
+  (let ((update-fn (%pkg-fn "ELMTUI.EXAMPLES.MINIMAL" "MINIMAL-UPDATE")))
+    (is-true (typep (funcall update-fn
+                             (elmtui.core.event-types:make-key-event :key :enter)
+                             '(:last-key "before"))
+                    'update-result))
+    (is-true (typep (funcall update-fn :unknown-message '(:last-key "before"))
                     'update-result))))
 
 (test focus-simple-listbox-dispatch-returns-patch-without-mutating-state
@@ -307,3 +321,60 @@
       (funcall input-stream :unsupported))
     (signals error
       (funcall set-modes :unsupported '(:mouse :sgr)))))
+
+(test directional-grid-focus-uses-row-and-column-coordinates
+  "Grid-first directional focus should use grid row/column metadata, not plist/stylable fallbacks."
+  (let* ((tree '(:id :root :children
+                 ((:id :a :focusable t :grid-row 0 :grid-col 0 :x 0 :y 0 :width 1 :height 1)
+                  (:id :b :focusable t :grid-row 0 :grid-col 1 :x 10 :y 0 :width 1 :height 1)
+                  (:id :c :focusable t :grid-row 1 :grid-col 0 :x 0 :y 10 :width 1 :height 1)
+                  (:id :d :focusable t :grid-row 1 :grid-col 1 :x 10 :y 10 :width 1 :height 1))))
+         (fm (elmtui.core.focus:make-focus-manager :initial-focus :a)))
+    (setf (elmtui.core.focus:focus-manager-focusable-elements fm)
+          (elmtui.core.focus:collect-focusable-ids tree))
+    (is (equal '(:a :b :c :d)
+               (elmtui.core.focus:focus-manager-focusable-elements fm)))
+
+    (is-true (elmtui.core.focus:navigate-right fm :ui-tree tree))
+    (is (eq :b (elmtui.core.focus:get-current-focus fm)))
+
+    (is-true (elmtui.core.focus:navigate-down fm :ui-tree tree))
+    (is (eq :d (elmtui.core.focus:get-current-focus fm)))
+
+    (is-true (elmtui.core.focus:navigate-left fm :ui-tree tree))
+    (is (eq :c (elmtui.core.focus:get-current-focus fm)))
+
+    (is-true (elmtui.core.focus:navigate-up fm :ui-tree tree))
+    (is (eq :a (elmtui.core.focus:get-current-focus fm)))))
+
+(test directional-grid-focus-honors-row-and-column-spans
+  "Grid-first directional focus should compare occupied cell extents, not only top-left cells."
+  (let* ((tree '(:id :root :children
+                 ((:id :wide :focusable t
+                   :grid-row 0 :grid-col 0 :grid-col-span 2
+                   :x 0 :y 0 :width 20 :height 1)
+                  (:id :overlap-right :focusable t
+                   :grid-row 0 :grid-col 1
+                   :x 10 :y 0 :width 10 :height 1)
+                  (:id :right :focusable t
+                   :grid-row 0 :grid-col 2
+                   :x 20 :y 0 :width 10 :height 1)
+                  (:id :tall :focusable t
+                   :grid-row 1 :grid-col 0 :grid-row-span 2
+                   :x 0 :y 10 :width 10 :height 20)
+                  (:id :overlap-down :focusable t
+                   :grid-row 2 :grid-col 1
+                   :x 10 :y 20 :width 10 :height 10)
+                  (:id :down :focusable t
+                   :grid-row 3 :grid-col 0
+                   :x 0 :y 30 :width 10 :height 10))))
+         (fm (elmtui.core.focus:make-focus-manager :initial-focus :wide)))
+    (setf (elmtui.core.focus:focus-manager-focusable-elements fm)
+          (elmtui.core.focus:collect-focusable-ids tree))
+
+    (is-true (elmtui.core.focus:navigate-right fm :ui-tree tree))
+    (is (eq :right (elmtui.core.focus:get-current-focus fm)))
+
+    (elmtui.core.focus:set-focus fm :tall)
+    (is-true (elmtui.core.focus:navigate-down fm :ui-tree tree))
+    (is (eq :down (elmtui.core.focus:get-current-focus fm)))))

@@ -164,7 +164,7 @@ PATH is a list of keywords like (:app :rv :width)."
   ;; Cursor at col=19; desired width 20 should clamp to x=0 so full rect is visible.
   (multiple-value-bind (oy ox ap growth eff)
     (compute-anchor-solution :above-cursor 20 3 20 20 10 19)
-    (declare (ignore ap growth))
+    (declare (ignore oy ap growth))
     (is (= ox 0) "When desired width hits right edge, the rectangle shifts left to fit.")
     (is (= (car eff) 20))
     (is (= (cdr eff) 3))))

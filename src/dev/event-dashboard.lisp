@@ -32,6 +32,16 @@
 
 (in-package :elmtui.dev.event-dashboard)
 
+(defun split-string-on-char (separator string)
+  "Split STRING on SEPARATOR without requiring an optional dependency."
+  (let ((parts nil)
+        (start 0))
+    (loop for pos = (position separator string :start start)
+          do (push (subseq string start pos) parts)
+          while pos
+          do (setf start (1+ pos)))
+    (nreverse parts)))
+
 ;;;-----------------------------------------------------------------------------
 ;;; Dashboard Configuration
 ;;;-----------------------------------------------------------------------------

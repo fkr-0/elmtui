@@ -302,10 +302,9 @@
     (let* ((result (update panel state '(:scroll-to-top) :id-path id-path))
             (patches (ur-patches result)))
       (apply-patches state patches))
-    (let ((local-state (state-ref state id-path)))
-      (is (= (get-prop state :test-panel9 :scroll-y) 0)
-        (format nil "Scroll-y: ~A should be 0 after scroll-to-top"
-          (get-prop state :test-panel9 :scroll-y))))))
+    (is (= (get-prop state :test-panel9 :scroll-y) 0)
+      (format nil "Scroll-y: ~A should be 0 after scroll-to-top"
+        (get-prop state :test-panel9 :scroll-y)))))
 
 (test scroll-to-bottom
   "Test scroll-to-bottom command."
@@ -378,7 +377,7 @@
             (box-attrs (cdr box))
             (box-children (getf box-attrs :children))
             (scrollbar (find-scrollbar-node dsl)))
-      (declare (ignore panel-state))
+      (declare (ignore panel-state scrollbar))
       ;; Should have content container + scrollbar
       (is (>= (length box-children) 2) "Should have content and scrollbar")
       (is (search "-SCROLLBAR" dsl-str) "Should include scrollbar"))))
@@ -393,7 +392,7 @@
       (init panel :id-path id-path
         :width 40 :height 20 :content-height 100
         :show-scrollbar nil)
-      
+      (declare (ignore comp cmds))
       (apply-patches state patches)
       (setf (state-ref state (append id-path '(:show-scrollbar))) nil))
 
@@ -404,7 +403,7 @@
             (box-attrs (cdr box))
             (box-children (getf box-attrs :children))
             (scrollbar (find-scrollbar-node dsl)))
-      (declare (ignore panel-state))
+      (declare (ignore panel-state box-children))
       ;; Should only have content container
       (is (null scrollbar) "Should only have content container, no scrollbar"))))
 

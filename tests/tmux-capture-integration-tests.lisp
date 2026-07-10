@@ -79,17 +79,16 @@
   (skip-unless-tmux
     (let ((result (capture-pane-string)))
       (is (stringp result))
-      (format t "  Captured ~A characters~%" (length result))
       (is (plusp (length result))))))
 
 (test capture-pane-string-contains-ansi
   "Captured content may contain ANSI escape sequences"
   (skip-unless-tmux
     (let ((result (capture-pane-string)))
-      ;; Just check we got something - actual ANSI content depends on terminal state
+      ;; Just check we got something - actual ANSI content depends on terminal state.
+      ;; Keep the live capture silent so CI and bridge logs remain parseable.
       (is (stringp result))
-      (format t "  Sample content (first 50 chars): ~A~%"
-        (subseq result 0 (min 50 (length result)))))))
+      (is (not (null result))))))
 
 ;;;----------------------------------------------------------------
 ;;; ANSI Parsing Tests
@@ -213,9 +212,7 @@
       (when buffer
         (is (virtual-terminal-buffer-p buffer))
         (is (= (buffer-width buffer) 40))
-        (is (= (buffer-height buffer) 10))
-        (format t "  Created buffer from tmux: ~Ax~A~%"
-          (buffer-width buffer) (buffer-height buffer))))))
+        (is (= (buffer-height buffer) 10))))))
 
 (test end-to-end-capture-and-parse
   "Full end-to-end test: capture tmux, parse ANSI, create buffer"
@@ -231,8 +228,7 @@
       (is (virtual-terminal-buffer-p buffer))
       ;; Step 4: Fill buffer
       (prefill-buffer-from-styled-content buffer runs 40 10)
-      (format t "  End-to-end test passed: ~A runs, ~Ax~A buffer~%"
-        (length runs) (buffer-width buffer) (buffer-height buffer)))))
+      (is (>= (length runs) 0)))))
 
 (test end-to-end-capture-parse-save-restore-visible
   "Integration smoke: capture visible pane, parse, save snapshot, then restore into another buffer"
