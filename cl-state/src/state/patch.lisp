@@ -32,11 +32,11 @@ Returns the modified STATE (functional API)."
 Returns the modified STATE (functional API)."
   (reduce #'merge-patch patches :initial-value state))
 
-(defun apply-patch (state p)
-  (let* ((patch (%normalize-patch p))
-          (path (patch-path patch))
-          (op (patch-op patch))
-          (value (patch-value patch)))
+(defun %apply-patch-to-container (state patch)
+  "Apply normalized PATCH to a raw hash-table/plist container."
+  (let ((path (patch-path patch))
+         (op (patch-op patch))
+         (value (patch-value patch)))
     (ecase op
       (:set
         (set-path state path value))
@@ -51,8 +51,22 @@ Returns the modified STATE (functional API)."
       (:update
         (let* ((cur (get-path path state nil))
                 (fn value))
-          (set-path state path (funcall fn cur))))))
-  state)
+          (set-path state path (funcall fn cur)))))))
+
+(defun apply-patch (state p)
+  "Apply P to STATE.
+
+STATE may be either a raw container (hash-table/plist) or an
+APPLICATION-STATE.  Public ElmTUI component tests use the re-exported
+CL-STATE.API:APPLY-PATCHES on application-state values; treating those as
+raw containers caused SET-PATH to reject APPLICATION-STATE objects."
+  (let ((patch (%normalize-patch p)))
+    (if (application-state-p state)
+      (progn
+        (setf (application-state-data state)
+          (%apply-patch-to-container (application-state-data state) patch))
+        state)
+      (%apply-patch-to-container state patch))))
 
 (defun apply-patches (state patches)
   (reduce #'apply-patch patches :initial-value state))
@@ -74,10 +88,10 @@ Returns:
   of keys and value is the new value.
 
 Note: This is a shallow comparison that doesn't handle:
-- Removed keys (only detects changes and additions)
 - Non-hash-table nested structures
 - Order differences in list values"
   (let ((patches '()))
+    ;; Detect changes and additions
     (maphash (lambda (key new-val)
                (let* ((path (append prefix (list key)))
                       (old-val (gethash key old)))
@@ -93,4 +107,12 @@ Note: This is a shallow comparison that doesn't handle:
                     (unless (equal old-val new-val)
                       (push (list path new-val) patches))))))
              new)
+    ;; Detect removed keys
+    (when old
+      (maphash (lambda (key old-val)
+                 (declare (ignore old-val))
+                 (let ((path (append prefix (list key))))
+                   (unless (gethash key new)
+                     (push (list path :removed) patches))))
+               old))
     (nreverse patches)))

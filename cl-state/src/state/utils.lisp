@@ -42,14 +42,15 @@ Accepts even-length lists with symbol/keyword keys in odd positions."
     ((hash-table-p container)
       (setf (gethash key container) value)
       container)
+    ((null container)
+      ;; nil container treated as empty plist
+      (list key value))
     ((listp container)
       (if (%alist-p container)
         (let ((pair (assoc key container)))
           (if pair
             (setf (cdr pair) value)
-            (if container
-              (nconc container (list (cons key value)))
-              (setq container (list (cons key value)))))
+            (nconc container (list (cons key value))))
           container)
         (progn
           (setf (getf container key) value)

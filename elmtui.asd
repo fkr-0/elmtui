@@ -62,18 +62,16 @@
                   :serial t
                   :components (
                                 (:file "threads")
-                                (:file "event-channels")
-                                (:file "message-bus")
-                                (:file "event-pipeline")
                                 (:file "topics")
-                                (:file "topic-registry")
+                                (:file "topic-registry" :depends-on ("topics"))
+                                (:file "event-channels")
                                 (:file "event-types")
+                                (:file "event-async" :depends-on ("event-channels" "event-types"))
+                                (:file "event-pipeline")
                                 (:file "keymaps")
                                 (:file "events")
-                                (:file "event-propagation")
-                                (:file "event-async")
-                                (:file "focus")
-                                (:file "loop")))
+                                (:file "loop")
+                                (:file "focus")))
 
                 ;; ----------------------------------------------------------------
                 ;; 4) UI/App contract and API layer

@@ -70,8 +70,8 @@
                 :keymap-context-parent
 
                 )
-  (:import-from :elmtui.core.event-async
-   :dispatch-event-async) ; Added for handle-key-binding
+  (:import-from :elmtui.core.loop
+   :publish)
 
   (:export
    ;; Focus manager struct
@@ -232,6 +232,12 @@
     (log-debug "Component ~A lost focus" component-id)
     nil))
 
+(defgeneric handle-key-binding (binding &key app-state)
+  (:documentation "Execute the action associated with a key binding."))
+
+(defgeneric handle-key-event (focus-manager key-event &key app-state ui-tree)
+  (:documentation "Handle a key event with focus awareness."))
+
 (defun set-focus (focus-manager element-id &key app-state)
   "Set focus to ELEMENT-ID. Notifies the focused component and keymap system.
    Also updates the last-focus for the active context."
@@ -384,33 +390,107 @@
         most-positive-fixnum ; Propagate if direction was invalid
         (+ (* primary-dist 2) secondary-dist)))) ; Example heuristic
 
-(defun find-grid-adjacent (source-grid-coords direction ui-tree)
-  "Placeholder for finding an adjacent element in a grid layout.
-  SOURCE-GRID-COORDS: An element-grid-coordinates struct.
-  DIRECTION: One of :UP, :DOWN, :LEFT, :RIGHT.
-  UI-TREE: The current UI tree.
-  Returns an element node or NIL."
-  (let* ( ;; TODO this cant be right?
-         (next-in-ui-tree
-           (find-nearest-in-direction
-            ui-tree
-            (element-grid-coordinates-col source-grid-coords)
-            direction)))
-    (when next-in-ui-tree
-      (let ((next-coords (element-grid-coordinates next-in-ui-tree)))
-        ;; Check if the next element is actually adjacent in the grid
-        (when (and next-coords
-                   (case direction
-                     (:up (= (element-grid-coordinates-row next-coords)
-                             (1- (element-grid-coordinates-row source-grid-coords))))
-                     (:down (= (element-grid-coordinates-row next-coords)
-                               (1+ (element-grid-coordinates-row source-grid-coords))))
-                     (:left (= (element-grid-coordinates-col next-coords)
-                               (1- (element-grid-coordinates-col source-grid-coords))))
-                     (:right (= (element-grid-coordinates-col next-coords)
-                                (1+ (element-grid-coordinates-col source-grid-coords))))))
-          next-in-ui-tree)))))
+(defun %focus-node-props (node)
+  "Return plist properties from either a plist node or Hiccup-style element node."
+  (cond
+    ((and (listp node) (keywordp (first node))
+          (listp (second node)) (keywordp (first (second node))))
+     (second node))
+    ((and (listp node) (keywordp (first node)))
+     node)
+    (t nil)))
 
+(defun %focus-node-children (node)
+  "Return children from either a plist node or Hiccup-style element node."
+  (cond
+    ((and (listp node) (keywordp (first node))
+          (listp (second node)) (keywordp (first (second node))))
+     (cddr node))
+    ((listp node)
+     (getf node :children))))
+
+(defun %focus-node-id (node)
+  "Return NODE id without requiring a stylable protocol method on plist nodes."
+  (or (ignore-errors (stylable-id node))
+      (let ((props (%focus-node-props node)))
+        (when props (getf props :id)))))
+
+(defun %grid-primary-gap (a-start a-end b-start b-end)
+  "Return distance between half-open ranges on the navigation axis.
+Touching ranges are adjacent, so their primary distance is zero."
+  (cond
+    ((<= a-end b-start) (- b-start a-end))
+    ((<= b-end a-start) (- a-start b-end))
+    (t 0)))
+
+(defun %grid-cross-gap (a-start a-end b-start b-end)
+  "Return cross-axis separation for half-open ranges.
+Only real overlap scores zero; merely touching ranges score one cell apart so
+same-row/same-column candidates win over edge-adjacent candidates."
+  (cond
+    ((< a-end b-start) (- b-start a-end))
+    ((< b-end a-start) (- a-start b-end))
+    ((or (= a-end b-start) (= b-end a-start)) 1)
+    (t 0)))
+
+(defun %grid-distance (source target direction)
+  "Return a deterministic distance for TARGET in DIRECTION from SOURCE, or NIL.
+
+Grid coordinates describe occupied cells, not just a top-left point.  Treat row
+and column spans as half-open ranges so navigation ignores candidates that still
+overlap the source extent on the primary axis."
+  (let* ((sr (element-grid-coordinates-row source))
+         (sc (element-grid-coordinates-col source))
+         (sr-end (+ sr (max 1 (element-grid-coordinates-row-span source))))
+         (sc-end (+ sc (max 1 (element-grid-coordinates-col-span source))))
+         (tr (element-grid-coordinates-row target))
+         (tc (element-grid-coordinates-col target))
+         (tr-end (+ tr (max 1 (element-grid-coordinates-row-span target))))
+         (tc-end (+ tc (max 1 (element-grid-coordinates-col-span target))))
+         (primary-row-gap (%grid-primary-gap sr sr-end tr tr-end))
+         (primary-col-gap (%grid-primary-gap sc sc-end tc tc-end))
+         (cross-row-gap (%grid-cross-gap sr sr-end tr tr-end))
+         (cross-col-gap (%grid-cross-gap sc sc-end tc tc-end)))
+    (case direction
+      (:up (when (<= tr-end sr) (+ (* 1000 primary-row-gap) cross-col-gap)))
+      (:down (when (>= tr sr-end) (+ (* 1000 primary-row-gap) cross-col-gap)))
+      (:left (when (<= tc-end sc) (+ (* 1000 primary-col-gap) cross-row-gap)))
+      (:right (when (>= tc sc-end) (+ (* 1000 primary-col-gap) cross-row-gap))))))
+
+(defun find-grid-adjacent (source-grid-coords direction ui-tree)
+  "Find the nearest focusable grid element in DIRECTION from SOURCE-GRID-COORDS.
+Grid navigation uses row/column coordinates directly and leaves spatial
+position navigation as the fallback when no grid candidate exists."
+  (let ((best-node nil)
+        (best-score nil))
+    (dolist (node (collect-focusable-elements ui-tree) best-node)
+      (let ((coords (element-grid-coordinates node)))
+        (when coords
+          (let ((score (%grid-distance source-grid-coords coords direction)))
+            (when (and score (or (null best-score) (< score best-score)))
+              (setf best-node node
+                    best-score score))))))))
+
+
+(defun %position-x (pos)
+  (if (typep pos 'elmtui.view.position:element-position)
+      (element-position-x pos)
+      (getf pos :x 0)))
+
+(defun %position-y (pos)
+  (if (typep pos 'elmtui.view.position:element-position)
+      (element-position-y pos)
+      (getf pos :y 0)))
+
+(defun %position-width (pos)
+  (if (typep pos 'elmtui.view.position:element-position)
+      (element-position-width pos)
+      (getf pos :width 1)))
+
+(defun %position-height (pos)
+  (if (typep pos 'elmtui.view.position:element-position)
+      (element-position-height pos)
+      (getf pos :height 1)))
 
 (defun find-closest-in-direction (focus-manager source-id direction ui-tree)
   "Finds the closest element to source-id in the specified direction.
@@ -418,7 +498,7 @@
   ;; Early return if we have no source
   (unless source-id (return-from find-closest-in-direction nil))
 
-  (let* ((source-element (find source-id (collect-focusable-elements ui-tree) :key #'stylable-id :test #'equal))
+  (let* ((source-element (find source-id (collect-focusable-elements ui-tree) :key #'%focus-node-id :test #'equal))
          (source-pos (when source-element (element-position source-element)))
          (source-grid-coords (when source-element (element-grid-coordinates source-element))))
 
@@ -428,10 +508,10 @@
       (return-from find-closest-in-direction nil))
 
     ;; Extract source position details for easier access
-    (let* ((source-x (getf source-pos :x 0))
-           (source-y (getf source-pos :y 0))
-           (source-width (getf source-pos :width 1))
-           (source-height (getf source-pos :height 1))
+    (let* ((source-x (%position-x source-pos))
+           (source-y (%position-y source-pos))
+           (source-width (%position-width source-pos))
+           (source-height (%position-height source-pos))
            (source-center-x (+ source-x (/ source-width 2)))
            (source-center-y (+ source-y (/ source-height 2)))
            (candidates '()))
@@ -442,7 +522,7 @@
         (let ((adj (find-grid-adjacent source-grid-coords direction ui-tree)))
           (when adj
             (log-debug "Found grid adjacent element: ~A" (stylable-id adj))
-            (return-from find-closest-in-direction (stylable-id adj)))))
+            (return-from find-closest-in-direction (%focus-node-id adj)))))
 
       ;; If grid navigation failed or wasn't applicable, try spatial navigation
       (log-debug "Performing spatial navigation from ~A in direction ~A" source-id direction)
@@ -450,13 +530,13 @@
       ;; Collect all potential candidates in the specified direction
       (dolist (el (focus-manager-focusable-elements focus-manager))
         (unless (equal el source-id) ; Don't consider the source itself
-          (let* ((target-element (find el (collect-focusable-elements ui-tree) :key #'stylable-id :test #'equal))
+          (let* ((target-element (find el (collect-focusable-elements ui-tree) :key #'%focus-node-id :test #'equal))
                  (pos (when target-element (element-position target-element))))
             (when pos ; Only consider elements with position data
-              (let* ((target-x (getf pos :x 0))
-                     (target-y (getf pos :y 0))
-                     (target-width (getf pos :width 1))
-                     (target-height (getf pos :height 1))
+              (let* ((target-x (%position-x pos))
+                     (target-y (%position-y pos))
+                     (target-width (%position-width pos))
+                     (target-height (%position-height pos))
                      (target-center-x (+ target-x (/ target-width 2)))
                      (target-center-y (+ target-y (/ target-height 2))))
 
@@ -737,9 +817,9 @@
        (when (fboundp target)
          (funcall target app-state)
          t))
-      (:message
-       (dispatch-event-async target) ; Assuming dispatch-event-async is available
-       t)
+       (:message
+        (publish target)
+        t)
       (t
        (log-warn "Unknown binding type: ~A" type)
        nil))))
@@ -880,25 +960,29 @@
 
 (defun collect-focusable-elements (ui-tree)
   "Traverses the UI tree and collects all elements that are focusable.
-   Returns a list of element objects that can receive focus."
-  ;; This implementation will depend on the structure of your UI tree
-  ;; Here's a simplified version that assumes a nested structure with :focusable property
+   Supports legacy plist nodes and Hiccup-style (type props . children) nodes."
   (labels ((collect-recursive (node result)
              (if (null node)
                  result
-                 (let ((new-result
-                         (if (and (getf node :focusable) (getf node :id))
-                             (cons node result)
-                             result)))
-                   (if (listp (getf node :children))
-                       (reduce #'collect-recursive (getf node :children) :initial-value new-result)
+                 (let* ((props (%focus-node-props node))
+                        (new-result
+                          (if (and props (getf props :focusable) (getf props :id)
+                                   (not (getf props :disabled)))
+                              (cons node result)
+                              result))
+                        (children (%focus-node-children node)))
+                   (if (listp children)
+                       (reduce (lambda (acc child)
+                                 (collect-recursive child acc))
+                               children
+                               :initial-value new-result)
                        new-result)))))
-    (collect-recursive ui-tree nil)))
+    (nreverse (collect-recursive ui-tree nil))))
 
 (defun collect-focusable-ids (ui-tree)
   "Traverses the UI tree and collects IDs of all elements that are focusable.
    Returns a list of element IDs that can receive focus."
-  (mapcar #'stylable-id (collect-focusable-elements ui-tree)))
+  (mapcar #'%focus-node-id (collect-focusable-elements ui-tree)))
 
 (defun recalculate-focusable-elements (focus-manager ui-tree &key app-state preserve-focus)
   "Recalculates the list of focusable elements based on the current UI tree.

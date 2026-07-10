@@ -53,9 +53,32 @@
 - consumer is the dequeuing events/messages and running the update function
 as well as the view function for the application.")
 
-(defvar *shutdown-requested-cell* (list nil)
-  "Shared cell storing the shutdown-requested flag across threads.")
-(define-symbol-macro *shutdown-requested* (car *shutdown-requested-cell*))
+(defstruct (shutdown-flag (:constructor %make-shutdown-flag))
+  "Thread-safe boolean flag for shutdown signaling."
+  (lock (bt:make-lock "shutdown-flag-lock"))
+  (value nil :type boolean))
+
+(defun make-shutdown-flag ()
+  (%make-shutdown-flag))
+
+(defvar *shutdown-requested-flag* (make-shutdown-flag)
+  "Thread-safe shared cell storing the shutdown-requested flag.")
+
+(defun shutdown-requested-value ()
+  (bt:with-lock-held ((shutdown-flag-lock *shutdown-requested-flag*))
+    (shutdown-flag-value *shutdown-requested-flag*)))
+
+(defun (setf shutdown-requested-value) (new-val)
+  (bt:with-lock-held ((shutdown-flag-lock *shutdown-requested-flag*))
+    (setf (shutdown-flag-value *shutdown-requested-flag*) new-val)))
+
+(define-symbol-macro *shutdown-requested* (shutdown-requested-value))
+(define-setf-expander *shutdown-requested* (&environment env)
+  (declare (ignore env))
+  (let ((val (gensym "VAL")))
+    (values nil nil (list val)
+      `(setf (shutdown-requested-value) ,val)
+      `(shutdown-requested-value))))
 
 
 (defvar *event-loop-metrics* (make-hash-table :test 'eq)

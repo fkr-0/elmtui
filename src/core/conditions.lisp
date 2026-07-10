@@ -100,23 +100,26 @@
 ;;; == elmtui/src/core/conditions.lisp ==
 (defmacro with-recovery ((condition-type &key (on-error '*log-condition*) (restarts '(:retry :skip :abort))) &body body)
   "Wrap BODY with recovery for CONDITION-TYPE, supporting restarts and logging."
-  `(handler-bind
-       ((,condition-type
-          (lambda (c)
-            (funcall ,on-error c)
-            (restart-case
-                ;; Re-evaluate body in each restart; no compiled-function returned
-                (progn ,@body)
-              ,@(when (member :retry restarts)
-                  `((retry () :report "Retry the operation."
-                     (progn ,@body))))
-              ,@(when (member :skip restarts)
-                  '((skip () :report "Skip the operation."
-                     nil)))
-              ,@(when (member :abort restarts)
-                  '((abort () :report "Abort and propagate the error."
-                     (signal c))))))))
-     ,@body))
+  (let ((restart-forms
+          (append
+           (when (member :retry restarts)
+             `((retry () :report "Retry the operation."
+                 (return-from with-recovery (progn ,@body)))))
+           (when (member :skip restarts)
+             '((skip () :report "Skip the operation."
+                 (return-from with-recovery nil))))
+           (when (member :abort restarts)
+             '((abort () :report "Abort and propagate the error."
+                 (error c)))))))
+    `(block with-recovery
+       (handler-bind
+           ((,condition-type
+              (lambda (c)
+                (funcall ,on-error c)
+                (restart-case
+                    (signal c)
+                  ,@restart-forms))))
+         ,@body))))
 ;;; == end/conditions.lisp ==
 
 
@@ -212,14 +215,7 @@
                      (validation-error-path condition)
                      (constraint-validation-error-constraint condition)))))
 
-;; Base error for validation errors
-(define-condition elmtui-validation-error (error)
-  ((path :initarg :path :reader validation-error-path :initform nil)
-   (value :initarg :value :reader validation-error-value))
-  (:report (lambda (condition stream)
-             (format stream "Validation error at ~A: ~S"
-                     (or (validation-error-path condition) "root")
-                     (validation-error-value condition)))))
+;; Duplicate removed — the canonical elmtui-validation-error is defined above at line 183
 
 ;; Event validation error
 (define-condition event-validation-error (elmtui-validation-error)

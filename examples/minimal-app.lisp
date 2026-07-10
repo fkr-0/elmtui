@@ -23,7 +23,7 @@
   (declare (ignore app-state))
   (log-info "minimal:> Received message: ~S" msg)
   (cond
-    ((eq (car msg) :keyevent)
+    ((and (consp msg) (eq (car msg) :keyevent))
       (let ((ch (getf (cdr msg) :key "whoops")))
         (log-info "minimal:> car-msg-Key event received: ~S" ch)
         

@@ -66,13 +66,32 @@ See Also:
       (application-state-backend state) backend*)
     state))
 
+(defvar *transaction-active* nil
+  "Bound to T inside with-transaction to suppress observer notifications.")
+
+(defun deep-copy-data (data)
+  "Recursively deep copy data. Handles hash-tables and lists."
+  (cond
+    ((hash-table-p data)
+     (let ((copy (make-hash-table :test (hash-table-test data)
+                                   :size (hash-table-size data))))
+       (maphash (lambda (k v)
+                  (setf (gethash (deep-copy-data k) copy)
+                    (deep-copy-data v)))
+         data)
+       copy))
+    ((consp data)
+     (cons (deep-copy-data (car data))
+       (deep-copy-data (cdr data))))
+    (t data)))
+
 (defun deep-copy-application-state (app)
   (let ((data (application-state-data app)))
     (make-application-state
-      :data (if (hash-table-p data) (copy-hash-table data) (copy-list data))
+      :data (deep-copy-data data)
       :backend (application-state-backend app)
       :lock (bt:make-lock "cl-state.lock")
-      :log (copy-list (application-state-log app))
+      :log (deep-copy-data (application-state-log app))
       :history (copy-list (application-state-history app))
       :undone (copy-list (application-state-undone app))
       :version (application-state-version app)
@@ -123,8 +142,9 @@ See Also:
       (setf (application-state-data state) data*)
       (push (list key old value) (application-state-log state))
       (incf (application-state-version state))
-      (ignore-errors
-        (cl-state.observer:notify-observers state key old value))
+      (unless *transaction-active*
+        (ignore-errors
+          (cl-state.observer:notify-observers state key old value)))
       value)))
 
 (defmethod (setf state-ref) (value (state hash-table) (key t))
