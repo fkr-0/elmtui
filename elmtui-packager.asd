@@ -1,13 +1,13 @@
 
 ;; Standalone packager executable for dumping fast-boot images
 (asdf:defsystem "elmtui-packager"
-  :version      "0.1.0"
-  :description  "ElmTUI packager: dump fast-boot executable Lisp images"
-  :author       "ElmTUI contributors"
-  :license      "GPL-3.0-only"
-  :depends-on   (:elmtui)
+  :version "0.2.0"
+  :description "ElmTUI packager: dump fast-boot executable Lisp images"
+  :author "ElmTUI contributors"
+  :license "GPL-3.0-only"
+  :depends-on (:elmtui)
   :components ((:module "src/tools"
-                 :components ((:file "packager"))))
+                :components ((:file "packager"))))
   :build-operation "program-op"
   :build-pathname "elmtui-packager"
   :entry-point "elmtui.packager:main")

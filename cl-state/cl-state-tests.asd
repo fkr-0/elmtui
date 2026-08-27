@@ -14,13 +14,14 @@
                  ((:file "utils-tests")
                   (:file "core-tests" :depends-on ("utils-tests"))
                   (:file "patch-tests" :depends-on ("utils-tests"))
+                  (:file "persistent-tests" :depends-on ("patch-tests" "core-tests"))
                   (:file "tx-tests" :depends-on ("core-tests"))
                   (:file "observer-tests" :depends-on ("core-tests" "tx-tests"))
                   (:file "undo-tests")
                   (:file "schema-tests")
                   (:file "validation-tests")
                   (:file "cl-state-tests" :depends-on ("utils-tests" "core-tests"
-                                                       "patch-tests" "tx-tests"
+                                                       "patch-tests" "persistent-tests" "tx-tests"
                                                        "observer-tests" "undo-tests"
                                                        "schema-tests" "validation-tests")))))
   :perform (test-op (o c)

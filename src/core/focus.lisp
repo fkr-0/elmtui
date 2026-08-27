@@ -410,8 +410,9 @@
      (getf node :children))))
 
 (defun %focus-node-id (node)
-  "Return NODE id without requiring a stylable protocol method on plist nodes."
-  (or (ignore-errors (stylable-id node))
+  "Return NODE id without probing unsupported stylable protocol methods."
+  (if (typep node 'elmtui.view.base-elements:base-element)
+      (stylable-id node)
       (let ((props (%focus-node-props node)))
         (when props (getf props :id)))))
 

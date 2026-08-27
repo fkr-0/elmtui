@@ -10,11 +10,13 @@
   (:import-from :cl-state.core :application-state)
   (:export #:defapplication
            #:run-application
+           #:make-runtime-app-spec
            #:get-component-instance
            #:process-command-default #:render-view-default #:read-event-default
            #:app-config #:app-config-message-queue #:app-config-command-processor-fn #:app-config-renderer-fn
            #:app-config-name #:app-config-root-component-dsl #:app-config-initial-state-plist
            #:app-config-update-fn-sym #:app-config-view-fn-sym #:app-config-subscriptions-fn-form
+           #:app-config-state-semantics
            #:app-config-binary-options #:app-config-cli-options #:app-config-configure-fn
            #:validate-platform-options
            #:get-cli-arg))
@@ -34,12 +36,60 @@
   (view-fn-sym nil :type (or symbol function list )
                    :read-only t)
   (subscriptions-fn-form nil :type (or symbol list) :read-only t)
+  (state-semantics :transactional
+                   :type (member :transactional :strict-elm)
+                   :read-only t)
   (command-processor-fn nil :type (or symbol function) :read-only t)
   (message-queue (error "Message queue must be provided.") :type event-channel :read-only t)
   (renderer-fn nil :type (or symbol function) :read-only t)
   (binary-options nil :type (or null list) :read-only t)
   (cli-options nil :type list :read-only t)
   (configure-fn nil :type (or null symbol function) :read-only t))
+
+(setf (documentation 'app-config-state-semantics 'function)
+      "Return the application's state commit semantics, either :TRANSACTIONAL or :STRICT-ELM.")
+
+(defun make-runtime-app-spec (&key name init transition view subscriptions
+                               command-processor message-queue root-viewport-id
+                               (state-semantics :strict-elm) cli-args)
+  "Build the canonical runtime application specification.
+
+The normative runtime vocabulary is INIT and TRANSITION:
+
+  INIT :: () -> (values MODEL COMMANDS)
+  TRANSITION :: (MESSAGE MODEL) -> (values NEXT-MODEL COMMANDS)
+  VIEW :: MODEL -> DSL
+  SUBSCRIPTIONS :: MODEL -> SUBSCRIPTIONS
+
+DEFAPPLICATION, the normative full application constructor for the next stable
+major version, adapts its context/patch update callback into TRANSITION.
+DEFTEA-APP remains the supported minimal direct-transition adapter for small and
+pedagogical applications. Both lower through this function. The returned plist
+retains the legacy internal :UPDATE-FN key because the platform driver consumes
+that key, but new framework code should construct specs through this function
+and speak in terms of transitions.
+
+STATE-SEMANTICS must be :TRANSACTIONAL or :STRICT-ELM. A NIL SUBSCRIPTIONS value
+is normalized to an empty subscription function."
+  (unless (member state-semantics '(:transactional :strict-elm))
+    (error "Invalid runtime state semantics ~S." state-semantics))
+  (dolist (required `((:init ,init) (:transition ,transition) (:view ,view)))
+    (unless (second required)
+      (error "MAKE-RUNTIME-APP-SPEC requires ~S." (first required))))
+  (let ((subscriptions* (or subscriptions
+                            (lambda (model)
+                              (declare (ignore model))
+                              nil))))
+    (list :name name
+          :init-fn init
+          :update-fn transition
+          :view-fn view
+          :subscriptions-fn subscriptions*
+          :state-semantics state-semantics
+          :command-processor-fn command-processor
+          :message-queue message-queue
+          :cli-args cli-args
+          :root-viewport-id root-viewport-id)))
 
 ;; Generic function signatures with improved type declarations
 ;;(declaim (ftype (function (list t) t) get-component-instance))

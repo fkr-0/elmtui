@@ -6,8 +6,7 @@
     #:ur-patches
     #:ur-commands
     #:update-result
-    #:get-path
-    #:application-state-data)
+    #:get-path)
   (:import-from :elmtui.ui.api
     #:view
     #:component      ;; Base class for components
@@ -639,9 +638,15 @@ SYNTAX:
                        (let ((,message-var message*))
                          (declare (ignorable ,message-var))
                          (multiple-value-bind (default-patches default-commands)
-                           (if (fboundp 'call-next-method)
-                             (call-next-method)
-                             (values nil nil))
+                           (let ((default-result
+                                   (if (next-method-p)
+                                     (call-next-method)
+                                     (make-update-result))))
+                             (unless (typep default-result 'update-result)
+                               (error "Component UPDATE next method returned ~S instead of UPDATE-RESULT."
+                                 default-result))
+                             (values (ur-patches default-result)
+                               (ur-commands default-result)))
                            (declare (ignorable default-patches default-commands))
                            (let* ((returned-values
                                     (multiple-value-list
@@ -723,7 +728,7 @@ SYNTAX:
              collect `(defmethod ,(intern (symbol-name accessor-name)) (app-state component &key (id-path (list :components (elmtui.ui.api:component-id component))))
                         (declare (ignore id-path))
                         (let* ((full-path (append '(:components) (list (component-id component))))
-                                (comp-state (get-path full-path (application-state-data app-state))))
+                                (comp-state (get-path full-path app-state)))
                           (cond ((hash-table-p comp-state)
                                   (gethash ,slot-keyword comp-state ,slot-initial-value))
                             ((listp comp-state)

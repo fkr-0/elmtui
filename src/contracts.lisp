@@ -104,6 +104,34 @@
   front-buffer
   back-buffer
   backend)
+
+(setf (documentation 'make-app-context 'function)
+      "Construct an APP-CONTEXT from the supplied pipeline state, tree stages, buffers, viewport, stylesheet, view function, and backend. The constructor only packages references; it does not render or mutate application state."
+      (documentation 'ctx-state 'function)
+      "Return the application model stored in APP-CONTEXT."
+      (documentation 'ctx-viewport-rect 'function)
+      "Return the viewport rectangle associated with APP-CONTEXT."
+      (documentation 'ctx-dsl-tree 'function)
+      "Return the DSL-TREE stage currently stored in APP-CONTEXT."
+      (documentation 'ctx-raw-tree 'function)
+      "Return the RAW-TREE stage currently stored in APP-CONTEXT."
+      (documentation 'ctx-styled-tree 'function)
+      "Return the STYLED-TREE stage currently stored in APP-CONTEXT."
+      (documentation 'ctx-view-fn 'function)
+      "Return the view function stored in APP-CONTEXT."
+      (documentation 'ctx-stylesheet 'function)
+      "Return the stylesheet used by the styling stage of APP-CONTEXT."
+      (documentation 'ctx-atomic-tree 'function)
+      "Return the ATOMIC-TREE stage with visibility and overflow decisions resolved."
+      (documentation 'ctx-laid-out-tree 'function)
+      "Return the LAID-OUT-TREE stage containing resolved geometry."
+      (documentation 'ctx-front-buffer 'function)
+      "Return the front buffer representing the previously presented frame."
+      (documentation 'ctx-back-buffer 'function)
+      "Return the back buffer used to assemble the next frame."
+      (documentation 'ctx-backend 'function)
+      "Return the rendering backend associated with APP-CONTEXT.")
+
 ;; (:NAME
 ;;   ELMTUI.EXAMPLES.RAINBOW-APP::RAINBOW-EXAMPLE-APP
 ;;   :INIT-FN
@@ -242,7 +270,7 @@
 ;;; Contract Violation Conditions
 ;;;--------------------------------------------------------------
 
-(define-condition contract-violation (error)
+(define-condition contract-violation (elmtui.core.errors:elmtui-error)
   ((function-name :initarg :function-name :reader cv-function-name)
     (expected-type :initarg :expected-type :reader cv-expected-type)
     (actual-value :initarg :actual-value :reader cv-actual-value)
@@ -286,7 +314,7 @@
     (error "~A: signature appears swapped; expected (message model), got (~S ~S)"
            macro-name message-param model-param))
   t)
-(define-condition pipeline-contract-violation (error)
+(define-condition pipeline-contract-violation (elmtui.core.errors:elmtui-error)
   ((stage         :initarg :stage :reader violation-stage)
     (expected-type :initarg :expected-type :reader violation-expected)
     (got-object    :initarg :got-object :reader violation-got)

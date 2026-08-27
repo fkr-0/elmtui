@@ -128,3 +128,13 @@
                     ((mouse-event-p event) (mouse-event-modifiers event))
                     (t nil))))
     (member modifier-keyword mods)))
+
+;;; Public documentation for DEFSTRUCT-generated API bindings.
+(setf (documentation 'make-event 'function) "Construct an EVENT from TYPE, DATA, and WHEN fields.")
+(setf (documentation 'event-type 'function) "Return the event type stored in EVENT.")
+(setf (documentation 'event-data 'function) "Return the payload data stored in EVENT.")
+(setf (documentation 'event-when 'function) "Return the timestamp stored in EVENT.")
+(setf (documentation 'make-message 'function) "Construct a MESSAGE carrying TYPE, DATA, STATE, and PRIORITY metadata.")
+(setf (documentation 'message-type 'function) "Return the message type stored in MESSAGE.")
+(setf (documentation 'message-data 'function) "Return the payload data stored in MESSAGE.")
+(setf (documentation 'make-command 'function) "Construct a COMMAND from TYPE and ARGS.")

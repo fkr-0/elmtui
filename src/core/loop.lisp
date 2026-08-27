@@ -18,6 +18,7 @@
   (:import-from :cl-events.loop
                 #:+default-poll-timeout-seconds+
                 #:poll-runtime-event
+                #:poll-until
                 #:runtime-consume-once
                 #:run-consumer-loop-shell
                 #:select-primary-channel
@@ -362,31 +363,41 @@ Can be a keyword (:stop/:restart) or a function receiving the signaled error.")
         (when ch-obj
           (let ((raw-ch (elmtui.core.event-channels:channel-of ch-obj)))
             (when raw-ch
-              (ignore-errors (-> raw-ch :shutdown-loop)))))))
+              (handler-case
+                  (-> raw-ch :shutdown-loop)
+                (error (condition)
+                  (log-warn "LOOP: failed to wake consumer during shutdown: ~A" condition))))))))
 
     ;; 2. Wait for the consumer thread to exit cleanly.
     (when (and *consumer-thread* (bt:thread-alive-p *consumer-thread*))
       (log:info "LOOP: Waiting for consumer thread to terminate...")
-      (let ((deadline (make-join-deadline +consumer-join-timeout-seconds+)))
-        (loop while (and *consumer-thread*
-                         (bt:thread-alive-p *consumer-thread*)
-                         (not (deadline-expired-p deadline)))
-              do (sleep 0.01))
-        (if (and *consumer-thread* (bt:thread-alive-p *consumer-thread*))
+      (let ((stopped-p
+              (poll-until
+               (lambda ()
+                 (not (and *consumer-thread*
+                           (bt:thread-alive-p *consumer-thread*))))
+               :timeout +consumer-join-timeout-seconds+
+               :interval 0.01)))
+        (if (not stopped-p)
             (progn
               (log:warn "LOOP: Consumer thread failed to terminate in ~,2F seconds. Forcing termination."
                         +consumer-join-timeout-seconds+)
               (bt:destroy-thread *consumer-thread*))
             (progn
-              (ignore-errors
-                (bt:join-thread *consumer-thread*))
+              (handler-case
+                  (bt:join-thread *consumer-thread*)
+                (error (condition)
+                  (log-warn "LOOP: consumer join failed during shutdown: ~A" condition)))
               (log:info "LOOP: Consumer thread terminated gracefully."))))
       (setf *consumer-thread* nil))
 
     ;; 3. Now that the consumer is stopped, it's safe to clean up channels.
     (log-info "LOOP: Closing event channels.")
     (dolist (ch-obj *active-event-channels*)
-      (ignore-errors (chan-close (elmtui.core.event-channels:channel-of ch-obj))))
+      (handler-case
+          (chan-close (elmtui.core.event-channels:channel-of ch-obj))
+        (error (condition)
+          (log-warn "LOOP: channel close failed during shutdown: ~A" condition))))
     (setf *active-event-channels* nil
           *default-event-channel* nil)
     (log-info "LOOP: *active-event-channels* set to NIL.")

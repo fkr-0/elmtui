@@ -624,3 +624,31 @@
 ;; Auto-run tests when file is loaded in test mode
 #+test-mode
 (run-contract-tests :verbose t)
+
+(test message-priority-is-owned-by-cl-events
+  (let ((message (cl-events.types:make-message
+                  :type :priority-owner-test
+                  :data '(:value :ok)
+                  :priority 7)))
+    (is (= 7 (cl-events.protocols:message-priority message)))
+    (is (= 7 (elmtui.core.events:message-priority message)))))
+
+(test message-contract-registration-keeps-validation-and-deprecates-type-priority
+  (let ((elmtui.core.events:*message-contracts* (make-hash-table :test 'equal)))
+    (elmtui.core.events:register-message-contract
+     :legacy-priority-test
+     (lambda (message)
+       (eq :ok (getf (cl-events.types:message-data message) :value)))
+     999)
+    (let ((valid (cl-events.types:make-message
+                  :type :legacy-priority-test
+                  :data '(:value :ok)
+                  :priority 3))
+          (invalid (cl-events.types:make-message
+                    :type :legacy-priority-test
+                    :data '(:value :bad)
+                    :priority 4)))
+      (is-true (elmtui.core.events:validate-message valid))
+      (is (= 3 (elmtui.core.events:message-priority valid)))
+      (signals elmtui.core.conditions:message-validation-error
+        (elmtui.core.events:validate-message invalid)))))

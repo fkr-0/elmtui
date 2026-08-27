@@ -89,4 +89,52 @@
     ))
 
 ;;; Run all the tests in this suite
-(run! 'pipeline-restart-suite)
+(progn
+  (test elmtui-condition-recovery-preserves-original-condition
+    (let* ((original
+             (make-condition 'elmtui.core.errors:state-error
+                             :message "Counter state is invalid"
+                             :operation :update
+                             :path '(:counter :value)
+                             :state-type :plist
+                             :context '((:component-id . :counter))))
+           (seen nil)
+           (result
+             (handler-bind
+                 ((elmtui.core.errors:state-error
+                    (lambda (condition)
+                      (setf seen condition)
+                      (invoke-restart 'use-value :recovered))))
+               (elmtui.core.conditions:with-recovery
+                   (elmtui.core.errors:state-error
+                    :restarts '(:use-value :abort))
+                 (elmtui.core.errors:with-error-context
+                     (:module :runtime-e2e :operation :update)
+                   (error original))))))
+      (is (eq :recovered result))
+      (is (eq original seen)
+          "Recovery must preserve the original inspectable condition object.")
+      (is (eq :runtime-e2e
+              (elmtui.core.errors:elmtui-error-module original)))
+      (is (assoc :operation
+                 (elmtui.core.errors:elmtui-error-context original)))))
+
+  (test async-restart-provides-result-with-original-condition-active
+    (let* ((original
+             (make-condition 'elmtui.core.conditions:async-task-error
+                             :task '(:lookup-wikipedia "Common Lisp")
+                             :reason "simulated transport failure"))
+           (seen nil)
+           (result
+             (handler-bind
+                 ((elmtui.core.conditions:async-task-error
+                    (lambda (condition)
+                      (setf seen condition)
+                      (invoke-restart 'use-value :cached))))
+               (elmtui.core.async:with-async-restarts (_condition)
+                 (error original)))))
+      (is (eq :cached result))
+      (is (eq original seen)
+          "Async recovery must retain the original condition object.")))
+
+  (run! 'pipeline-restart-suite))

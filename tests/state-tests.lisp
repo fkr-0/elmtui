@@ -38,6 +38,22 @@
     (is (null (elmtui.state.api:application-state-history state)))
     (is (null (elmtui.state.api:application-state-undone state)))))
 
+(test public-state-data-facades-are-owned-read-only-snapshots
+  (let* ((state (make-state :initial '(:nested (:value 1))))
+         (snapshot (elmtui.state:application-state-data state))
+         (snapshot-nested (gethash :nested snapshot))
+         (cl-state-api-symbol (find-symbol "APPLICATION-STATE-DATA" :cl-state.api))
+         (elmtui-api-symbol (find-symbol "APPLICATION-STATE-DATA" :elmtui.state.api))
+         (elmtui-facade-symbol (find-symbol "APPLICATION-STATE-DATA" :elmtui.state))
+         (raw-core-symbol (find-symbol "APPLICATION-STATE-DATA" :cl-state.core)))
+    (is (eq cl-state-api-symbol elmtui-api-symbol))
+    (is (eq cl-state-api-symbol elmtui-facade-symbol))
+    (is-false (eq cl-state-api-symbol raw-core-symbol))
+    (setf (gethash :value snapshot-nested) 9)
+    (is (= 1 (state-ref state '(:nested :value))))
+    (signals error
+      (setf (elmtui.state:application-state-data state) snapshot))))
+
 (test state-initial-state-creation
   (let ((state (make-state :initial (alexandria:plist-hash-table '(:a 1 :b 2)))))
     (is (= (get-state state :a) 1))

@@ -386,3 +386,34 @@
       (dsl-type :test-auto-widget '(:extra "data"))
     (is (eq class 'test-auto-widget))
     (is (equal (getf props :extra) "data"))))
+
+;;; Focused inheritance fixtures for UPDATE next-method semantics.
+(defcomponent test-update-parent ()
+  (:state (parent-value 0 :type integer :documentation "Parent update value"))
+  (:update (msg local-state app-state id-path)
+    (:tick (value) (values `(:parent-value ,value) nil))))
+
+(defcomponent test-update-child (test-update-parent)
+  (:state (child-value 0 :type integer :documentation "Child update value"))
+  (:update (msg local-state app-state id-path)
+    (:tick (value) (values `(:child-value ,value) nil))))
+
+(test defcomponent-update-inheritance-composes-next-method
+  "A child custom update preserves patches produced by its applicable parent update."
+  (let* ((instance (make-instance 'test-update-child))
+         (id-path '(:components :inherited))
+         (state (make-state :initial
+                  (alexandria:plist-hash-table
+                    '(:components (:inherited (:parent-value 0 :child-value 0))))))
+         (result (update instance state '(:tick 7) :id-path id-path))
+         (patches (ur-patches result))
+         (parent-patch (find '(:components :inherited :parent-value)
+                         patches :key #'first :test #'equal))
+         (child-patch (find '(:components :inherited :child-value)
+                        patches :key #'first :test #'equal)))
+    (is (not (null parent-patch)))
+    (is (not (null child-patch)))
+    (when parent-patch
+      (is (= 7 (second parent-patch))))
+    (when child-patch
+      (is (= 7 (second child-patch))))))
