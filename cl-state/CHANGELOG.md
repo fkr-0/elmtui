@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Candidate version: **0.2.0**. This remains an in-tree candidate and is not a
+registry publication or separate-repository release.
+
 ### Added
 - Structurally shared persistent patch application plus an eager persistent correctness oracle.
 - Frozen strict-state snapshots and explicit value-ownership helpers for Elm-style state semantics.
