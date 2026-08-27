@@ -4,6 +4,17 @@ All notable release-facing changes are recorded here.
 
 The project follows semantic versioning from the first published release.
 
+## Unreleased
+
+### Changed
+
+- Quarantined local debug, review, generated-release, editor, and agent artifacts
+  from the release surface without deleting preserved workspace material.
+- Archived superseded root-level implementation and design notes under
+  `docs/archive/legacy-root-notes/`.
+- Clarified that `actiwat` is an independent consumer/application repository,
+  not a reusable ElmTUI release member.
+
 ## [0.2.0] - 2026-07-10
 
 First public-release candidate.
