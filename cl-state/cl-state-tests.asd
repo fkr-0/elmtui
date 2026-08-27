@@ -4,7 +4,7 @@
 (asdf:defsystem "cl-state-tests"
   :description "Test suite for the cl-state system"
   :author "ElmTUI contributors"
-  :version "0.1.0"
+  :version "0.2.0"
   :depends-on (#:cl-state #:fiveam)
   :license "MIT"
   :serial t

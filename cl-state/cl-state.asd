@@ -2,7 +2,7 @@
 (asdf:defsystem "cl-state"
   :description "State container, patches, transactions, undo/redo, observers, schema, validation."
   :license "MIT"
-  :version "0.1.0"
+  :version "0.2.0"
   :author "ElmTUI contributors"
   :maintainer "ElmTUI contributors"
   :depends-on (#:alexandria #:uiop #:bordeaux-threads)

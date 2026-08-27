@@ -2,6 +2,18 @@
 
 A state management library for Common Lisp inspired by Elm Architecture and Redux patterns. Provides state containers, patches, transactions, undo/redo, and observers.
 
+## Release status
+
+The current in-tree candidate version is **0.2.0** for both `cl-state` and
+`cl-state-tests`. This is release-candidate metadata only: the library has not
+been published to Quicklisp, Ultralisp, CLPM, or a separate source repository.
+
+The qualified implementation boundary is SBCL on the repository's POSIX/Linux
+CLPM environment. Other Common Lisp implementations and non-POSIX platforms
+have not yet been qualified. The primary public convenience package is
+`cl-state.api`; focused packages such as `cl-state.core`, `cl-state.patch`, and
+`cl-state.tx` expose lower-level contracts.
+
 ## Features
 
 - **State Container**: Thread-safe application state with hash-table or plist backends
@@ -24,7 +36,10 @@ clpm bundle exec --with-client sbcl -- \
   --eval '(asdf:load-system "cl-state")'
 ```
 
-### Using Quicklisp
+### Using a Quicklisp local-project checkout
+
+This describes local ASDF discovery only; it does not imply registry
+publication.
 
 Add `cl-state` to your Quicklisp local-projects directory:
 
@@ -268,13 +283,16 @@ MIT License - See LICENSE file for details
 
 ## Contributing
 
-Contributions are welcome! Please:
+`cl-state` is maintained in-tree with ElmTUI; it is not currently a separate
+published repository. Contributions to this library should preserve that
+one-way ownership boundary.
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+When preparing changes:
+
+1. Add tests for new functionality.
+2. Ensure `asdf:test-system "cl-state"` passes from the library CLPM bundle.
+3. Run the ElmTUI integration release gate before treating the change as a
+   release candidate.
 
 ## Changelog
 
