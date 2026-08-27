@@ -251,3 +251,38 @@
            (is-true called)
            (is (equal '(t t t t t) callbacks-shape)))
       (setf (symbol-function 'cl-events.loop:run-consumer-loop-shell) orig-shell))))
+
+(test reactive-view-dependency-delivers-debounced-render
+  "A state observer must enqueue a real render, not an uninterpreted async command."
+  (let* ((state (make-state :initial '(:count 0) :backend :plist))
+         (result-channel (cl-events.channel:make-channel))
+         (view (create-reactive-view
+                :integration-view-delivery
+                state
+                (lambda (current-state _dispatch)
+                  (declare (ignore _dispatch))
+                  (list :count (state-ref current-state :count)))))
+         (elmtui.view.reactive::*view-invalidation-debounce* 5))
+    (unwind-protect
+         (progn
+           (register-view-dependency view :count)
+           (setf (view-invalidated-p view) nil)
+           (elmtui.view.reactive::start-reactive-rendering
+            view
+            (lambda (message)
+              (cl-events.channel:-> result-channel message)))
+           (setf (state-ref state :count) 3)
+           (is-true
+            (cl-events.loop:poll-until
+             (lambda ()
+               (plusp (cl-events.channel:channel-length result-channel)))
+             :timeout 0.5
+             :interval 0.005))
+           (let ((message (cl-events.channel:<- result-channel)))
+             (is (eq :view-updated (first message)))
+             (is (eq :integration-view-delivery (second message)))
+             (is (equal '(:count 3) (third message))))
+           (is-false (view-invalidated-p view)))
+      ;; CLEANUP-REACTIVE-VIEW sends :SHUTDOWN to the managed worker; callers
+      ;; intentionally receive a worker ID rather than a Bordeaux thread object.
+      (cleanup-reactive-view view))))
