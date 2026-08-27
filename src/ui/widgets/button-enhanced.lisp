@@ -78,7 +78,10 @@
                   :validator (lambda (v) (member v '(:left :right :top :bottom))))
    (hotkey nil :type (or null keyword))
    (hotkey-modifiers nil :type list)
-   (action nil :type t :documentation "Action to execute when clicked")
+   (action nil :type t
+        :validator (lambda (value) (or value (null value)))
+        :documentation "Action to execute when clicked; any Common Lisp object is accepted")
+
    (loading nil :type boolean :documentation "Whether button is in loading state")
    (tooltip nil :type (or null string))
    (aria-label nil :type (or null string))

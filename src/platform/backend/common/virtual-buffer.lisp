@@ -88,7 +88,7 @@
 ;;; Conditions                                                                       ;;;
 ;;;----------------------------------------------------------------------------------;;;
 
-(define-condition buffer-error (error) ())
+(define-condition buffer-error (elmtui.core.errors:elmtui-error) ())
 
 (define-condition invalid-buffer-coordinates-error (buffer-error)
   ((buffer :initarg :buffer :reader invalid-buffer-coordinates-error-buffer)
@@ -330,8 +330,15 @@ Returns the modified BUFFER."
           :report "Ignore the set operation or provide new char/style to use (or use defaults)."
           :interactive (lambda ()
                          (format *query-io* "~&Set operation for invalid coordinates (~A, ~A).~%" row col)
-                         (list (ignore-errors (read-char *query-io*))
-                               (ignore-errors (read *query-io* :prompt "Enter style list (or NIL to skip style): "))))
+                         (list (handler-case
+                                   (read-char *query-io*)
+                                 (end-of-file () nil)
+                                 (stream-error () nil))
+                               (handler-case
+                                   (read *query-io* :prompt "Enter style list (or NIL to skip style): ")
+                                 (end-of-file () nil)
+                                 (reader-error () nil)
+                                 (stream-error () nil))))
           (when new-char (setf char new-char))
           (when new-style (setf processed-style new-style))
           buffer) ; Return buffer, operation might have been skipped or values changed for a valid coord.

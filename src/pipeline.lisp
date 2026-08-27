@@ -234,14 +234,11 @@
 
 ;;; STAGE 6: Display the back buffer, handling diffing.
 (defun %backend-ready-for-display-p (backend)
-  "Return true when BACKEND appears writable for display."
-  (when backend
-    (let ((stream (ignore-errors (elmtui.platform.api:term-stream backend))))
-      (cond
-        ((and stream (ignore-errors (open-stream-p stream))) t)
-        ((typep backend 'elmtui.platform.backend.terminal:terminal-instance)
-          (and (elmtui.platform.backend.terminal:terminal-instance-cl-device backend) t))
-        (t nil)))))
+  "Return true when BACKEND is a maintained terminal backend with writable output."
+  (when (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
+    (let ((stream (elmtui.platform.api:term-stream backend)))
+      (or (and (streamp stream) (open-stream-p stream))
+          (and (elmtui.platform.backend.terminal:terminal-instance-cl-device backend) t)))))
 
 (define-stage display-buffer
   (app-context app-context)

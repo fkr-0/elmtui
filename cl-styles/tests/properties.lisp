@@ -39,6 +39,24 @@
   (signals cl-styles.properties:style-contract-violation
     (cl-styles.properties:ensure-declarations '(:display :weird))))
 
+(test terminal-geometry-declarations-are-valid
+  "Maintained viewport/container geometry hints belong to the shared style contract."
+  (let ((ens (cl-styles.properties:ensure-declarations
+               '(:offset-x 2 :offset-y 3 :scroll-x 4 :scroll-y 5))))
+    (is (= 2 (getf ens :offset-x)))
+    (is (= 3 (getf ens :offset-y)))
+    (is (= 4 (getf ens :scroll-x)))
+    (is (= 5 (getf ens :scroll-y)))))
+
+(test tui-color-aliases-normalize-to-canonical-properties
+  "ElmTUI color spellings normalize without weakening the style contract."
+  (let ((ens (cl-styles.properties:ensure-declarations
+               '(:fg-color :white :bg-color :black))))
+    (is (eq :white (getf ens :color)))
+    (is (eq :black (getf ens :background-color)))
+    (is (null (getf ens :fg-color)))
+    (is (null (getf ens :bg-color)))))
+
 (test shorthands-flex-and-gap
   (let* ((decl '(:flex (2 3 4) :gap (1 2)))
          (exp  (cl-styles.rule:expand-shorthands decl)))

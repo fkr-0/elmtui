@@ -297,7 +297,7 @@ Returns NIL for non-component/base-element DSL types."
                (when (and (consp node) (keywordp (car node)))
                  (destructuring-bind (component-type &rest component-props) node
                    ;; Check if this is a component (has dsl-type method) or just an element
-                   (let ((is-component-p (ignore-errors (nth-value 0 (elmtui.ui.dsl-resolution:resolve-dsl-type component-type))))
+                   (let ((is-component-p (nth-value 0 (elmtui.ui.dsl-resolution:resolve-dsl-type component-type)))
                          (component-id (getf component-props :id)))
                      ;; Only instantiate if it's a component AND has an :id
                      (when (and is-component-p component-id)

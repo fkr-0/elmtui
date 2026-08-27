@@ -19,6 +19,10 @@ The project follows semantic versioning from the first published release.
   snapshots with an eager persistent correctness oracle.
 - Added a runtime context object and deterministic runtime/state/async E2E
   coverage, including retained-snapshot and differential state-engine traces.
+- Added explicit renderer overflow semantics: descendants remain visible by
+  default, while `:overflow :hidden` clips to nested content-box intersections.
+- Added terminal image fallback rendering using `:alt` text or `[image]` and
+  regression coverage for source-order sibling painting.
 
 ### Changed
 
@@ -28,6 +32,8 @@ The project follows semantic versioning from the first published release.
   explicit live representation access remains confined to `cl-state.core`.
 - Removed large commented legacy implementations from `cl-inputs` input decoding
   and loop code after executable behavior was covered independently.
+- Normalized ElmTUI terminal geometry and color aliases through `cl-styles`, while
+  retaining inline-style priority and the existing flex/grid layout model.
 
 ### Fixed
 
@@ -35,6 +41,14 @@ The project follows semantic versioning from the first published release.
   so failures remain inspectable without silently corrupting transaction state.
 - Fixed inherited component update composition, keymap/runtime polling edge cases,
   and async completion/error recovery contracts exposed by the expanded E2E suite.
+- Fixed the real blank-TUI regression by making primitive `:text`, `:label`, and
+  `:button` tags win at render time and preserving NIL as the pre-layout rectangle
+  sentinel instead of synthesizing a zero-sized box.
+- Replaced broad renderer/layout/terminal exception probes with maintained-type
+  checks or narrow, logged teardown handlers; buffer/diff conditions now join the
+  structured ElmTUI error hierarchy.
+- Fixed enhanced label style construction and preserved arbitrary button action
+  payloads through the widget contract.
 
 - Quarantined local debug, review, generated-release, editor, and agent artifacts
   from the release surface without deleting preserved workspace material.
