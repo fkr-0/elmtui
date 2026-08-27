@@ -110,10 +110,11 @@
 (defmethod (setf el/content) (txt (el text-element))
   (setf (elmtui.view.base-elements:text-content el) txt))
 (defmethod el/layout-rect ((el base-element))
-  (or (elmtui.view.base-elements:element-layout-rect el)
-      (elmtui.view.geo:make-rectangle
-       :pos (elmtui.view.geo:make-pos :x 0 :y 0)
-       :size (make-size :w 0 :h 0))))
+  "Return EL's assigned layout rectangle, or NIL before layout.
+
+NIL is semantically distinct from a real zero-sized rectangle: layout passes
+use it to decide whether a parent must seed the child's available rectangle."
+  (elmtui.view.base-elements:element-layout-rect el))
 
 (defmethod (setf el/layout-rect) ((rect rectangle) (el base-element))
   (setf (elmtui.view.base-elements:element-layout-rect el) rect))

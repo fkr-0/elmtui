@@ -163,7 +163,7 @@ If NIL, summaries are not truncated.")
                ;; potential DSL node: only if head is a known DSL tag
                ((and (listp spec)
                   (keywordp (first spec))
-                  (or (ignore-errors (nth-value 0 (resolve-dsl-type (first spec))))
+                  (or (nth-value 0 (resolve-dsl-type (first spec)))
                     (element-class (first spec)))) ;; (element-class :root-viewport)
                  (destructuring-bind (type &rest tail) spec
                    ;; shorthand (:TEXT "hello")
@@ -177,7 +177,13 @@ If NIL, summaries are not truncated.")
                            (format nil "Circular dependency for ID ~S detected in path ~S" id path)
                            "Use unique IDs within the component hierarchy"
                            "Check that no parent and child share the same ID"))
-                       (if (ignore-errors (nth-value 0 (resolve-dsl-type type)))
+                       ;; Primitive element tags own the render-time DSL namespace.
+                       ;; A stateful component is resolved only when no primitive base
+                       ;; element is registered for the same tag. This prevents IDs on
+                       ;; ordinary :text/:label/:button nodes from rerouting them through
+                       ;; component state that was never initialized by the app tree.
+                       (if (and (null (element-class type))
+                                (nth-value 0 (resolve-dsl-type type)))
                          ;; component → resolve view, attach as a PROP
                          (if id
                              ;; Has :id, so instantiate as a component

@@ -27,11 +27,9 @@
 
 (in-package :elmtui.view.layout.flex)
 (defun %get-styles (node)
-  "Fetch styles for NODE, supporting both element API and base-element slot.
-Returns either a plist, hash-table, or NIL."
-  (or (ignore-errors (elmtui.view.element:el/styles node))
-      (ignore-errors (elmtui.view.base-elements:element-style node))
-      nil))
+  "Fetch styles for maintained BASE-ELEMENT nodes without exception probing."
+  (and (typep node 'base-element)
+       (element-style node)))
 
 (defun style-value (node key &optional default)
   (let ((st (%get-styles node)))
@@ -589,8 +587,7 @@ Returns either a plist, hash-table, or NIL."
   (log:debug "compute-flex-layout ~A type ~A"
             (element-id container-node) (type-of container-node))
 
-  (let* ((styles (or (ignore-errors (elmtui.view.element:el/styles container-node))
-                     (ignore-errors (element-style container-node))))
+  (let* ((styles (element-style container-node))
          (dir (kw (style-value container-node :flex-direction :row) :row))
          (wrap-mode (kw (style-value container-node :flex-wrap :nowrap) :nowrap))
          ;; Start with the rect provided by parent or existing layout
@@ -614,7 +611,9 @@ Returns either a plist, hash-table, or NIL."
                    ((and (stringp sw)
                          (> (length sw) 1)
                          (char= #\% (char sw (1- (length sw)))))
-                    (let ((pct (ignore-errors (parse-integer sw :end (1- (length sw))))))
+                    (let ((pct (handler-case
+                                   (parse-integer sw :end (1- (length sw)))
+                                 (parse-error () nil))))
                       (if (numberp pct)
                           (* (/ pct 100.0d0) (max 0 (w outer-rect)))
                           base-w)))
@@ -625,7 +624,9 @@ Returns either a plist, hash-table, or NIL."
                    ((and (stringp sh)
                          (> (length sh) 1)
                          (char= #\% (char sh (1- (length sh)))))
-                    (let ((pct (ignore-errors (parse-integer sh :end (1- (length sh))))))
+                    (let ((pct (handler-case
+                                   (parse-integer sh :end (1- (length sh)))
+                                 (parse-error () nil))))
                       (if (numberp pct)
                           (* (/ pct 100.0d0) (max 0 (h outer-rect)))
                           base-h)))
@@ -652,7 +653,7 @@ Returns either a plist, hash-table, or NIL."
                                                         :size (make-size :w 0 :h 0))))
                                  (it (make-flex-item n r)))
                             (log-debug "FLEX child ~A styles: display=~S width=~S min-width=~S height=~S min-height=~S"
-                                      (ignore-errors (element-id n))
+                                      (and (typep n 'base-element) (element-id n))
                                       (style-value n :display nil)
                                       (style-value n :width nil)
                                       (style-value n :min-width nil)
@@ -698,20 +699,22 @@ Returns either a plist, hash-table, or NIL."
              (new-container (copy-element container-node )))
         (dolist (it items)
           (log-debug "FLEX final item ~A rect=(~A ~A ~A ~A) base-main=~A final-main=~A"
-                    (ignore-errors (element-id (node-of it)))
+                    (and (typep (node-of it) 'base-element)
+                         (element-id (node-of it)))
                     (x (rect-of it)) (y (rect-of it)) (w (rect-of it)) (h (rect-of it))
                     (base-main-of it) (final-main-of it)))
         (dolist (it items)
           (when (or (zerop (elmtui.view.geo:w (rect-of it)))
                     (zerop (elmtui.view.geo:h (rect-of it))))
             (log:warn "flex item ~S ended with zero size: ~A"
-                      (ignore-errors (elmtui.view.base-elements:element-id (node-of it)))
+                      (and (typep (node-of it) 'base-element)
+                           (element-id (node-of it)))
                       (rect-of it))))
         (dolist (gc laid-out-children)
           (let ((r (el/layout-rect gc)))
             (when r
               (log-debug "flex child ~A rect=(~A ~A ~A ~A)"
-                        (ignore-errors (element-id gc))
+                        (and (typep gc 'base-element) (element-id gc))
                         (x r) (y r) (w r) (h r)))))
         (setf (elmtui.view.element:el/children new-container) laid-out-children)
         (setf (el/layout-rect new-container) outer-rect)

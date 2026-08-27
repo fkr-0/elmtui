@@ -178,62 +178,31 @@
       (values state (list (list :blur-element :id (id-from-path id-path))))))
   
   (:view (state app-state id-path children)
-    (declare (ignore app-state children))
-    (let* ((component-id (id-from-path id-path))
-           (text (getf state :text "Label"))
-           (for-target (getf state :for))
-           (text-color (getf state :text-color))
-           (background-color (getf state :background-color))
-           (font-weight (getf state :font-weight :normal))
-           (font-style (getf state :font-style :normal))
-           (text-decoration (getf state :text-decoration))
-           (alignment (getf state :alignment :left))
-           (wrap (getf state :wrap t))
-           (truncate-mode (getf state :truncate))
-           (visible (getf state :visible t))
-           (focusable (getf state :focusable nil))
-           (aria-role (getf state :aria-role :label))
-           (accessibility-hint (getf state :accessibility-hint)))
-      
-      ;; Build style properties
-      (let ((style-props nil))
-        (when text-color
-          (setf (getf style-props :color) text-color))
-        (when background-color
-          (setf (getf style-props :background-color) background-color))
-        (when (not (eq font-weight :normal))
-          (setf (getf style-props :font-weight) font-weight))
-        (when (not (eq font-style :normal))
-          (setf (getf style-props :font-style) font-style))
-        (when text-decoration
-          (setf (getf style-props :text-decoration) text-decoration))
-        (when (not (eq alignment :left))
-          (setf (getf style-props :text-align) alignment))
-        (when (not wrap)
-          (setf (getf style-props :white-space) :nowrap))
-        (when truncate-mode
-          (setf (getf style-props :text-overflow) truncate-mode))
-        (when (not visible)
-          (setf (getf style-props :display) :none)))
-      
-      ;; Generate base DSL
-      (let ((label-dsl
-             `(:label
-               :id ,component-id
-               :text ,text
-               :class (:ui-label 
-                      ,@(when for-target '(:has-target))
-                      ,@(when focusable '(:focusable))
-                      ,@(when (not visible) '(:hidden)))
-               :style ,style-props
-               :focusable ,focusable
-               :aria-role ,aria-role
-               ,@(when for-target `(:for ,for-target))
-               ,@(when accessibility-hint `(:aria-label ,accessibility-hint)))))
-        
-        ;; Validate and expand the DSL
-        (validate-base-dsl label-dsl)
-        (expand-base-dsl label-dsl)))))
+  (declare (ignore app-state children))
+  (let* ((component-id (id-from-path id-path))
+         (text (getf state :text "Label"))
+         (for-target (getf state :for))
+         (visible (getf state :visible t))
+         (focusable (getf state :focusable nil))
+         (aria-role (getf state :aria-role :label))
+         (accessibility-hint (getf state :accessibility-hint))
+         (style-props (build-label-style-props state))
+         (label-dsl
+           `(:label
+             :id ,component-id
+             :text ,text
+             :class (:ui-label
+                     ,@(when for-target '(:has-target))
+                     ,@(when focusable '(:focusable))
+                     ,@(when (not visible) '(:hidden)))
+             :style ,style-props
+             :focusable ,focusable
+             :aria-role ,aria-role
+             ,@(when for-target `(:for ,for-target))
+             ,@(when accessibility-hint `(:aria-label ,accessibility-hint)))))
+    (validate-base-dsl label-dsl)
+    (expand-base-dsl label-dsl)))
+)
 
 ;;;--------------------------------------------------------------
 ;;; Contract-Enforced Functions for Direct Use

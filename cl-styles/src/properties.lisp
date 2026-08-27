@@ -207,6 +207,14 @@ Raises:
 (defproperty :max-width  :type :number)
 (defproperty :min-height :type :number)
 (defproperty :max-height :type :number)
+;; Terminal-oriented geometry hints used by maintained viewport/container DSL.
+;; OFFSET-* affects placement at the owning renderer/layout boundary; SCROLL-*
+;; records the logical content translation.  Registering them here makes the
+;; shared style contract agree with the declarations emitted by ElmTUI widgets.
+(defproperty :offset-x :type :number)
+(defproperty :offset-y :type :number)
+(defproperty :scroll-x :type :number)
+(defproperty :scroll-y :type :number)
 
 ;; flex props
 (defproperty :flex-direction :type :keyword :enum (:row :row-reverse :column :column-reverse))
@@ -276,6 +284,13 @@ Raises:
           (or (keywordp v)
               (cl-styles.tokens:color-p v)
               (cl-styles.tokens:variable-ref-p v))))
+;; TUI-facing aliases remain accepted at the reusable style boundary while
+;; canonical declaration storage stays CSS-like.
+(register-property-alias :fg-color :color)
+(register-property-alias :fg :color)
+(register-property-alias :foreground-color :color)
+(register-property-alias :bg-color :background-color)
+(register-property-alias :bg :background-color)
 (register-property-alias :background :background-color)
 (defproperty :opacity
   :type (lambda (v) (and (realp v) (<= 0 v 1))))

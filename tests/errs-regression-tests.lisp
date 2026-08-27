@@ -378,3 +378,80 @@
     (elmtui.core.focus:set-focus fm :tall)
     (is-true (elmtui.core.focus:navigate-down fm :ui-tree tree))
     (is (eq :down (elmtui.core.focus:get-current-focus fm)))))
+
+(test minimal-defapplication-wrapped-view-renders-through-buffer-diff
+  "The real minimal DEFAPPLICATION lowering must reach layout, virtual buffer, and diff output."
+  (%load-example "minimal-app")
+  (let* ((package-name "ELMTUI.EXAMPLES.MINIMAL")
+         (init-fn (%pkg-fn package-name "INITIALIZE-APP-STATE-MINIMAL"))
+         (process-fn (%pkg-fn package-name "PROCESS-MESSAGE-MINIMAL"))
+         (view-fn (%pkg-fn package-name "WRAPPED-VIEW-MINIMAL"))
+         (state nil))
+    (multiple-value-bind (initial-state commands)
+        (funcall init-fn)
+      (declare (ignore commands))
+      (setf state initial-state))
+    (multiple-value-bind (next-state commands)
+        (funcall process-fn '(:terminalresized :width 80 :height 24) state)
+      (declare (ignore commands))
+      (setf state next-state))
+    (multiple-value-bind (next-state commands)
+        (funcall process-fn '(:cursorposition :col 1 :row 1) state)
+      (declare (ignore commands))
+      (setf state next-state))
+    (let* ((viewport
+             (elmtui.view.geo:make-rectangle
+              :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+              :size (elmtui.view.geo:make-size :w 80 :h 24)))
+           (front
+             (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 80 24))
+           (ctx
+             (elmtui.contracts:make-app-context
+              :state state
+              :viewport-rect viewport
+              :front-buffer front
+              :view-fn view-fn))
+           (result (elmtui.pipeline:render-pipeline-0-to-5 ctx))
+           (laid (elmtui.contracts:ctx-laid-out-tree result))
+           (back (elmtui.contracts:ctx-back-buffer result))
+           (row-zero
+             (coerce
+              (loop for col below 80
+                    collect
+                    (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                     (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                      back 0 col)))
+              'string))
+           (diff
+             (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
+               (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff
+                front back)))
+           (diff-text
+             (with-output-to-string (stream)
+               (dolist (operation diff)
+                 (when (eq :write-chars (getf operation :type))
+                   (write-string (getf operation :chars "") stream))))))
+      (is-true laid "The wrapped minimal view must produce a laid-out tree.")
+      (is-true (elmtui.contracts:root laid)
+               "The laid-out tree must retain the resolved root element.")
+      (is (search "Hello slurp" row-zero)
+          "The expected text must reach the virtual back buffer.")
+      (is (search "Hello slurp" diff-text)
+          "The expected text must survive into the terminal diff output."))))
+
+(test primitive-component-collisions-prefer-primitives-at-render-time
+  "Primitive tags stay declarative even when compatibility component aliases share their names."
+  (dolist (tag '(:text :label :button))
+    (is-true (elmtui.view.base-elements:element-class tag)
+             "Each collision tag must retain a registered primitive class.")
+    (multiple-value-bind (component-class props)
+        (elmtui.ui.dsl-resolution:resolve-dsl-type tag)
+      (declare (ignore props))
+      (is-true component-class
+               "The compatibility component resolution remains observable."))
+    (let ((resolved
+            (elmtui.view.dsl:render-dsl-to-resolved-tree
+             (list tag :id :collision-proof :content "visible")
+             nil)))
+      (is (eq tag (first resolved))
+          "Render-time resolution must preserve the primitive tag."))))

@@ -28,9 +28,65 @@
     (:double  '(:h #\═ :v #\║ :tl #\╔ :tr #\╗ :bl #\╚ :br #\╝))
     (t (get-border-characters :solid))))
 
+(defvar *render-clip* nil
+  "Absolute rectangle limiting renderer writes for the current node.
+NIL preserves the historical buffer-only clipping behavior.")
+
 (defun inside-buffer-p (buffer r c)
   (and (>= r 0) (< r (buffer-height buffer))
-       (>= c 0) (< c (buffer-width  buffer))))
+       (>= c 0) (< c (buffer-width buffer))
+       (or (null *render-clip*)
+           (and (>= r (y *render-clip*))
+                (< r (+ (y *render-clip*) (h *render-clip*)))
+                (>= c (x *render-clip*))
+                (< c (+ (x *render-clip*) (w *render-clip*)))))))
+
+
+
+(defun %content-geometry (node abs-x abs-y width height)
+  "Return NODE's absolute content box as X, Y, WIDTH, HEIGHT values."
+  (let* ((smap (elmtui.view.element:el/styles node))
+         (btw (getf smap :border-top-width 0))
+         (brw (getf smap :border-right-width 0))
+         (bbw (getf smap :border-bottom-width 0))
+         (blw (getf smap :border-left-width 0))
+         (pad-t (getf smap :padding-top 0))
+         (pad-r (getf smap :padding-right 0))
+         (pad-b (getf smap :padding-bottom 0))
+         (pad-l (getf smap :padding-left 0)))
+    (values (+ abs-x blw pad-l)
+            (+ abs-y btw pad-t)
+            (max 0 (- width blw brw pad-l pad-r))
+            (max 0 (- height btw bbw pad-t pad-b)))))
+
+(defun %rectangle-intersection (a b)
+  "Return the absolute intersection of rectangles A and B.
+A NIL rectangle means no inherited clipping; disjoint rectangles produce a
+zero-sized rectangle so an empty intersection is not confused with no clip."
+  (cond
+    ((null a) b)
+    ((null b) a)
+    (t
+     (let* ((left (max (x a) (x b)))
+            (top (max (y a) (y b)))
+            (right (min (+ (x a) (w a)) (+ (x b) (w b))))
+            (bottom (min (+ (y a) (h a)) (+ (y b) (h b)))))
+       (elmtui.view.geo:make-rectangle
+        :pos (elmtui.view.geo:make-pos :x left :y top)
+        :size (elmtui.view.geo:make-size
+               :w (max 0 (- right left))
+               :h (max 0 (- bottom top))))))))
+
+(defun %child-render-clip (node inherited-clip content-rect)
+  "Return the clipping rectangle inherited by NODE's descendants.
+The maintained terminal renderer keeps descendant overflow visible by default,
+which preserves historical source behavior.  Setting :OVERFLOW to :HIDDEN clips
+descendants to NODE's content rectangle.  Nested hidden-overflow ancestors
+compose by rectangle intersection; other overflow values retain visible
+behavior for compatibility."
+  (if (eq (style-value node :overflow :visible) :hidden)
+      (%rectangle-intersection inherited-clip content-rect)
+      inherited-clip))
 
 (defun fill-rect (buffer x y w h char style)
   (loop for row below h
@@ -99,76 +155,92 @@
             (draw-border-char
              buffer (+ y height -1) (+ x width -1) br border-style)))))))
 
+(defun %render-string-content (content buffer x y w h style white-space)
+  "Render CONTENT into the current content rectangle using terminal text rules."
+  (cond
+    ((eq white-space :nowrap)
+     (loop for i from 0 below (min (length content) w)
+           for ch = (aref content i)
+           do (let ((rr y) (cc (+ x i)))
+                (when (inside-buffer-p buffer rr cc)
+                  (let* ((existing-style
+                           (buffer-cell-style (buffer-cell-at buffer rr cc)))
+                         (new-style (copy-term-style style)))
+                    (unless (terminal-style-bg-color new-style)
+                      (setf (terminal-style-bg-color new-style)
+                            (when existing-style
+                              (terminal-style-bg-color existing-style))))
+                    (set-buffer-cell-at buffer rr cc ch new-style))))))
+    (t
+     (loop with cur-x = 0 and cur-y = 0
+           for ch across content
+           do (when (>= cur-y h) (return))
+              (let ((rr (+ y cur-y)) (cc (+ x cur-x)))
+                (when (inside-buffer-p buffer rr cc)
+                  (let* ((existing-style
+                           (buffer-cell-style (buffer-cell-at buffer rr cc)))
+                         (new-style (copy-term-style style)))
+                    (unless (terminal-style-bg-color new-style)
+                      (setf (terminal-style-bg-color new-style)
+                            (when existing-style
+                              (terminal-style-bg-color existing-style))))
+                    (set-buffer-cell-at buffer rr cc ch new-style))))
+              (incf cur-x)
+              (when (>= cur-x w)
+                (setq cur-x 0)
+                (incf cur-y))))))
+
 (defun render-content (node buffer x y w h style)
   (when (and style (> w 0) (> h 0))
-    (case (element-type node)
-      (:text
-       (let* ((smap (elmtui.view.element:el/styles node))
-              (white-space (getf smap :white-space :normal)))
-         (cond
-           ;; Truncate: draw a single line clipped to width
-           ((eq white-space :nowrap)
-            (loop for i from 0 below (min (length (text-content node)) w)
-                  for ch = (aref (text-content node) i)
-                  do (let ((rr y) (cc (+ x i)))
-                       (when (inside-buffer-p buffer rr cc)
-                         (let* ((existing-style (buffer-cell-style (buffer-cell-at buffer rr cc)))
-                                (new-style (copy-term-style style)))
-                           (unless (terminal-style-bg-color new-style)
-                             (setf (terminal-style-bg-color new-style)
-                                   (when existing-style (terminal-style-bg-color existing-style))))
-                           (set-buffer-cell-at buffer rr cc ch new-style))))))
-           ;; Wrap by width into multiple rows up to h rows
-           (t
-            (loop with cur-x = 0 and cur-y = 0
-                  for ch across (text-content node)
-                  do (when (>= cur-y h) (return))
-                     (let ((rr (+ y cur-y)) (cc (+ x cur-x)))
-                       (when (inside-buffer-p buffer rr cc)
-                         (let* ((existing-style (buffer-cell-style (buffer-cell-at buffer rr cc)))
-                                (new-style (copy-term-style style)))
-                           (unless (terminal-style-bg-color new-style)
-                             (setf (terminal-style-bg-color new-style)
-                                   (when existing-style (terminal-style-bg-color existing-style))))
-                           (set-buffer-cell-at buffer rr cc ch new-style))))
-                     (incf cur-x)
-                     (when (>= cur-x w)
-                       (setq cur-x 0)
-                       (incf cur-y))))))))))
+    (let* ((smap (elmtui.view.element:el/styles node))
+           (white-space (getf smap :white-space :normal)))
+      (case (element-type node)
+        (:text
+         (%render-string-content
+          (text-content node) buffer x y w h style white-space))
+        (:image
+         (let* ((alt (getf (elmtui.view.element:el/props node) :alt ""))
+                (fallback (if (and (stringp alt) (plusp (length alt)))
+                              alt
+                              "[image]")))
+           (%render-string-content
+            fallback buffer x y w h style white-space)))))))
 
-(defun render-node (node buffer parent-x parent-y)
+(defun render-node (node buffer parent-x parent-y &optional inherited-clip)
   (log-debug "Rendering node ~A of type ~A, typep ~A"
-            node
-            (type-of node)
-            (typep node 'base-element))
+             node
+             (type-of node)
+             (typep node 'base-element))
   (if (listp node)
       (dolist (n node)
-        (render-node n buffer parent-x parent-y))
+        (render-node n buffer parent-x parent-y inherited-clip))
       (if (typep node 'base-element)
           (let ((rect (elmtui.view.element:el/layout-rect node)))
             (log-debug "Rendering node ~A at parent pos (~A, ~A) with rect ~A"
-                      node parent-x parent-y rect)
+                       node parent-x parent-y rect)
             (when rect
               (let* ((abs-x (+ parent-x (x rect)))
                      (abs-y (+ parent-y (y rect)))
-                    (bw (w rect))
-                    (bh (h rect)))
+                     (bw (w rect))
+                     (bh (h rect)))
                 (when (visible-node-p node bw bh)
-                  (let ((ts (style-to-terminal-style (elmtui.view.element:el/styles node))))
-                    (when ts
-                      (render-background buffer abs-x abs-y bw bh ts)
-                      (draw-border node buffer abs-x abs-y bw bh ts)
-                      (let* ((smap (elmtui.view.element:el/styles node))
-                             (btw (getf smap :border-top-width 0)) (brw (getf smap :border-right-width 0))
-                             (bbw (getf smap :border-bottom-width 0)) (blw (getf smap :border-left-width 0))
-                             (pad-t (getf smap :padding-top 0)) (pad-r (getf smap :padding-right 0))
-                             (pad-b (getf smap :padding-bottom 0)) (pad-l (getf smap :padding-left 0))
-                             (cx (+ abs-x blw pad-l)) (cy (+ abs-y btw pad-t))
-                             (cw (max 0 (- bw blw brw pad-l pad-r)))
-                             (ch (max 0 (- bh btw bbw pad-t pad-b))))
-                        (render-content node buffer cx cy cw ch ts))))
-                  (dolist (child (elmtui.view.element:el/children node))
-                    (render-node child buffer abs-x abs-y))))))
+                  (multiple-value-bind (cx cy cw ch)
+                      (%content-geometry node abs-x abs-y bw bh)
+                    (let ((*render-clip* inherited-clip)
+                          (ts (style-to-terminal-style
+                               (elmtui.view.element:el/styles node))))
+                      (when ts
+                        (render-background buffer abs-x abs-y bw bh ts)
+                        (draw-border node buffer abs-x abs-y bw bh ts)
+                        (render-content node buffer cx cy cw ch ts)))
+                    (let* ((content-rect
+                             (elmtui.view.geo:make-rectangle
+                              :pos (elmtui.view.geo:make-pos :x cx :y cy)
+                              :size (elmtui.view.geo:make-size :w cw :h ch)))
+                           (child-clip
+                             (%child-render-clip node inherited-clip content-rect)))
+                      (dolist (child (elmtui.view.element:el/children node))
+                        (render-node child buffer abs-x abs-y child-clip))))))))
           (log-debug "Skipping non-element node ~A of type ~A" node (type-of node)))))
 
 (defun render-laid-out-tree-to-buffer (laid-out-tree &key buffer (origin-x 0) (origin-y 0) (clear-buffer-p t))
