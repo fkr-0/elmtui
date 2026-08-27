@@ -3,7 +3,7 @@
   :description "Event bus, channels, async tasks, and TEA app loop."
   :author "ElmTUI contributors"
   :license "MIT"
-  :version "0.1.0"
+  :version "0.2.0"
   :depends-on (#:alexandria #:bordeaux-threads #:uiop)
   :components
   ((:file "src/events/packages")

@@ -2,6 +2,16 @@
 
 `cl-events` is ElmTUI's reusable event/concurrency library. It has no dependency on ElmTUI and can be loaded and tested as an ordinary Common Lisp system.
 
+## Release status
+
+The current in-tree candidate version is **0.2.0** for both `cl-events` and
+`cl-events-tests`. This is release-candidate metadata only: the library has not
+been published to Quicklisp, Ultralisp, CLPM, or a separate source repository.
+
+The qualified implementation boundary is SBCL on the repository's POSIX/Linux
+CLPM environment. Other Common Lisp implementations and non-POSIX platforms
+have not yet been qualified.
+
 ## What it provides
 
 - bounded channels, mailboxes, filtered channels, and select-style receive helpers;
