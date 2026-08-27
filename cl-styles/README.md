@@ -11,7 +11,7 @@ A CSS-like styling engine for Common Lisp, designed for TUI (Terminal User Inter
 - **Specificity-based rule resolution**: Proper CSS specificity rules
 - **Flexible object protocol**: Works with any object implementing the styling protocol
 - **Performance optimized**: Direct processing without compilation overhead
-- **Comprehensive test suite**: 87 test assertions with 100% pass rate
+- **Comprehensive test suite**: 164 current assertions covering selectors, properties, cascade, inheritance, variables, flex/grid declarations, and edge cases
 
 ## Installation
 
@@ -20,10 +20,13 @@ Add cl-styles to your project dependencies. The library requires:
 - alexandria
 - uiop
 
-Using CLPM:
+Using the local CLPM bundle from this directory:
 ```bash
-# Add to clpmfile
-cl-styles :git "https://path/to/cl-styles.git"
+clpm bundle install
+clpm bundle exec --with-client sbcl -- \
+  --noinform --non-interactive \
+  --eval '(require :asdf)' \
+  --eval '(asdf:load-system "cl-styles")'
 ```
 
 Using Quicklisp:
@@ -472,12 +475,10 @@ cl-styles provides specific error types for validation:
 Run the test suite:
 
 ```bash
-# Run all tests
-./rt-styles.sh
-
-# Run specific test suites
 clpm bundle exec --with-client sbcl -- \
-  --eval "(asdf:test-system :cl-styles)"
+  --noinform --non-interactive \
+  --eval '(require :asdf)' \
+  --eval '(asdf:test-system "cl-styles")'
 ```
 
 The test suite includes:
