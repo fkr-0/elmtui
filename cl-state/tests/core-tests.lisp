@@ -55,6 +55,15 @@
       (is (application-state-p state2))
       (is (= 1 (state-ref state2 :a))))))
 
+(test make-state-from-existing-state-isolates-mutable-data
+  (let* ((state1 (make-state :initial '(:nested (:value 1))))
+         (state2 (make-state :initial state1)))
+    (state-set state2 '(:nested :value) 9)
+    (is (= 1 (state-ref state1 '(:nested :value))))
+    (is (= 9 (state-ref state2 '(:nested :value))))
+    (is-false (eq (state-ref state1 :nested)
+                  (state-ref state2 :nested)))))
+
 ;;; state-ref tests
 
 (test state-ref-nested-path
@@ -167,6 +176,32 @@
       (is (equal (application-state-version state1)
                  (application-state-version state2))))))
 
+(test deep-copy-data-isolates-supported-nested-containers
+  "Nested conses, hash tables, and vectors in a copied state do not alias source containers."
+  (let* ((vector (vector (list :value 1)))
+         (source (list :nested (list :value 2)
+                       :vector vector))
+         (copy (deep-copy-data source)))
+    (setf (getf (getf copy :nested) :value) 20)
+    (setf (getf (aref (getf copy :vector) 0) :value) 10)
+    (is (= 2 (getf (getf source :nested) :value)))
+    (is (= 1 (getf (aref (getf source :vector) 0) :value)))
+    (is (= 20 (getf (getf copy :nested) :value)))
+    (is (= 10 (getf (aref (getf copy :vector) 0) :value)))))
+
+(test state-mutation-policy-rejects-supported-write-with-inspectable-condition
+  (let ((state (make-state :initial '(:count 1))))
+    (let ((*state-mutation-policy* :forbid))
+      (handler-case
+          (progn
+            (state-set state :count 2)
+            (fail "STATE-SET should be rejected under :FORBID."))
+        (state-mutation-forbidden (condition)
+          (is (eq state (state-mutation-forbidden-state condition)))
+          (is (eq :count (state-mutation-forbidden-path condition)))
+          (is (eq :set (state-mutation-forbidden-operation condition))))))
+    (is (= 1 (state-ref state :count)))))
+
 ;;; set-application-state-backend tests
 
 (test set-backend-hash-to-plist
@@ -210,3 +245,17 @@
 
 (defun run-core-tests ()
   (run! 'core-suite))
+
+(test public-application-state-data-is-an-owned-snapshot
+  (let* ((state (make-state :initial '(:nested (:value 1))))
+         (borrowed (state-ref state :nested))
+         (owned (state-value state :nested))
+         (snapshot (application-state-data state))
+         (snapshot-nested (gethash :nested snapshot)))
+    (is (eq borrowed
+            (gethash :nested (cl-state.core:application-state-data state))))
+    (is-false (eq borrowed owned))
+    (is-false (eq borrowed snapshot-nested))
+    (setf (gethash :value owned) 9)
+    (setf (gethash :value snapshot-nested) 8)
+    (is (= 1 (state-ref state '(:nested :value))))))

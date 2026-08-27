@@ -125,6 +125,7 @@
              (run-suite "Utils Tests" 'cl-state-tests.utils:utils-suite)
              (run-suite "Core Tests" 'cl-state-tests.core:core-suite)
              (run-suite "Patch Tests" 'cl-state-tests.patch:patch-suite)
+             (run-suite "Persistent State Tests" 'cl-state-tests.persistent:persistent-suite)
              (run-suite "Transaction Tests" 'cl-state-tests.tx:tx-suite)
              (run-suite "Observer Tests" 'cl-state-tests.observer:observer-suite)
              (run-suite "Undo Tests" 'cl-state-tests.undo:undo-suite)

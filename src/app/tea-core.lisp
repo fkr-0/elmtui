@@ -5,7 +5,8 @@
   (:import-from :elmtui.core.event-channels
     #:make-message-channel)
   (:import-from :elmtui.app.api
-    #:run-application)
+    #:run-application
+    #:make-runtime-app-spec)
   (:export
     #:deftea-app))
 
@@ -27,20 +28,29 @@ Signals an error for all other types."
 
 (defmacro deftea-app (name
                        &key
-                       init          ; (-> (values model commands))
-                       update        ; (msg model) -> (values model commands)
-                       view          ; model -> dsl-tree
-                       subscriptions ; (optional) model -> list-of-subscriptions
-                       command-processor ; (optional) (cmd queue model app-config) -> ...
+                       init
+                       transition
+                       update
+                       view
+                       subscriptions
+                       command-processor
                        (root-viewport-id :root-viewport))
-  "Define a minimal TEA-style application and a corresponding RUN-NAME entry point.
+  "Define a supported minimal direct-transition TEA application and RUN-NAME.
+
+DEFTEA-APP is intentionally the small/pedagogical constructor, not the normative
+full application constructor for the next stable major version. Use
+ELMTUI.APP:DEFAPPLICATION for production application composition, component and
+root-viewport initialization, CL-STATE patch/context updates, CLI/binary
+configuration, keymaps, and selectable transaction semantics. DEFTEA-APP remains
+compatible for direct model-replacement programs and lowers through the same
+MAKE-RUNTIME-APP-SPEC INIT/TRANSITION/VIEW/SUBSCRIPTIONS vocabulary.
 
 Syntax:
 
   (deftea-app NAME
-    :init  INIT-FN
-    :update UPDATE-FN
-    :view   VIEW-FN
+    :init       INIT-FN
+    :transition TRANSITION-FN
+    :view       VIEW-FN
     &key
       :subscriptions      SUBS-FN
       :command-processor  CMD-FN
@@ -65,16 +75,19 @@ Required arguments:
       A list of \"commands\" understood by the command processor,
       or NIL if there are no startup side-effects.
 
-  :UPDATE
-    A function designator called by the driver for each message:
+  :TRANSITION
+    The canonical direct transition function designator called for each message:
 
-      UPDATE-FN :: (MSG MODEL) -> (values NEXT-MODEL COMMANDS)
+      TRANSITION-FN :: (MSG MODEL) -> (values NEXT-MODEL COMMANDS)
+
+    :UPDATE is retained as a legacy compatibility alias for :TRANSITION. Do not
+    specify both; new code should use :TRANSITION.
 
     MSG
       An arbitrary message object (often a keyword or small list).
     MODEL / NEXT-MODEL
       The current / next model. NEXT-MODEL must be suitable for
-      subsequent calls to UPDATE and VIEW.
+      subsequent calls to TRANSITION and VIEW.
     COMMANDS
       A list of commands to execute after the update, or NIL.
 
@@ -110,7 +123,7 @@ Optional keywords:
       CMD-FN :: (CMD QUEUE MODEL APP-CONFIG) -> *
 
     or NIL.  If non-NIL, the driver calls it for each command
-    produced by UPDATE, passing:
+    produced by TRANSITION, passing:
 
       CMD        — the command object
       QUEUE      — the app's message queue (for enqueuing new MSGs)
@@ -139,7 +152,7 @@ Expansion / side effects:
 
         :name                NAME
         :init-fn             INIT-FN
-        :update-fn           UPDATE-FN
+        :update-fn           TRANSITION-FN  ; legacy internal runtime key
         :view-fn             VIEW-FN
         :subscriptions-fn    SUBS-FN-OR-DEFAULT
         :command-processor-fn COMMAND-PROCESSOR
@@ -157,8 +170,8 @@ Expansion / side effects:
 Contracts / validation:
 
   * NAME must be a non-keyword symbol.
-  * :INIT, :UPDATE and :VIEW must be non-NIL and suitable as FUNCALL
-    argument (symbol or lambda).
+  * :INIT, :VIEW, and one of canonical :TRANSITION or legacy :UPDATE must be
+    non-NIL and suitable as FUNCALL arguments (symbol or lambda).
   * :ROOT-VIEWPORT-ID must resolve to a keyword; an error is signaled
     at macro-expansion time for unsupported types.
 
@@ -175,8 +188,11 @@ Contracts / validation:
 
   (when (null init)
     (error "DEFTEA-APP ~S: :INIT is required." name))
-  (when (null update)
-    (error "DEFTEA-APP ~S: :UPDATE is required." name))
+  (when (and transition update)
+    (error "DEFTEA-APP ~S: specify :TRANSITION or legacy :UPDATE, not both." name))
+  (when (and (null transition) (null update))
+    (error "DEFTEA-APP ~S: :TRANSITION is required (legacy :UPDATE is accepted)." name))
+  (setf update (or transition update))
   (when (null view)
     (error "DEFTEA-APP ~S: :VIEW is required." name))
 
@@ -195,12 +211,14 @@ Contracts / validation:
        ;; 1. Define the application specification plist
        ;; --------------------------------------------------------------
        (defparameter ,app-spec-var
-         (list :name ',name
-           :init-fn ,init
-           :update-fn ,update
-           :view-fn ,view
-           :subscriptions-fn ,subs-expr
-           :command-processor-fn ,command-processor
+         (make-runtime-app-spec
+           :name ',name
+           :init ,init
+           :transition ,update
+           :view ,view
+           :subscriptions ,subs-expr
+           :state-semantics :strict-elm
+           :command-processor ,command-processor
            :message-queue (make-message-channel :capacity 20)
            :root-viewport-id ',root-key)
          ,(format nil

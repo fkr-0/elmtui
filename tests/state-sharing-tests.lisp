@@ -1,0 +1,9 @@
+(uiop:define-package :elmtui.tests.state-sharing (:use :cl :fiveam) (:export #:state-sharing-tests))
+
+(in-package :elmtui.tests.state-sharing)
+
+(def-suite state-sharing-tests :in elmtui.tests:elmtui-test :description "Application-level structural-sharing and retained-snapshot checks.")
+
+(in-suite state-sharing-tests)
+
+(test long-application-trace-preserves-retained-strict-snapshots (multiple-value-bind (fast-state _fast-init) (elmtui.tests.state-semantics::initialize-app-state-semantics-fast-app) (declare (ignore _fast-init)) (multiple-value-bind (strict-state _strict-init) (elmtui.tests.state-semantics::initialize-app-state-semantics-strict-app) (declare (ignore _strict-init)) (let ((expected 0) (snapshots nil)) (dotimes (step 128) (push (cons strict-state expected) snapshots) (let* ((message (case (mod step 4) (0 :increment) (1 :increment) (2 :decrement) (otherwise :unknown))) (next-expected (case message (:increment (1+ expected)) (:decrement (1- expected)) (otherwise expected))) (old-nested (elmtui.state.api:state-ref strict-state :nested))) (multiple-value-bind (next-fast fast-commands) (elmtui.tests.state-semantics::process-message-semantics-fast-app message fast-state) (multiple-value-bind (next-strict strict-commands) (elmtui.tests.state-semantics::process-message-semantics-strict-app message strict-state) (is (= next-expected (elmtui.state.api:state-ref next-fast :count))) (is (= next-expected (elmtui.state.api:state-ref next-strict :count))) (is (equal fast-commands strict-commands)) (is (eq old-nested (elmtui.state.api:state-ref next-strict :nested))) (is-true (cl-state.core::application-state-frozen-p next-strict)) (setf expected next-expected fast-state next-fast strict-state next-strict))))) (dolist (snapshot snapshots) (is (= (cdr snapshot) (elmtui.state.api:state-ref (car snapshot) :count))))))))

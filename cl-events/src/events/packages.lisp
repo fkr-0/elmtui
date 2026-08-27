@@ -104,6 +104,8 @@
         :cl-events.types :cl-events.channel :cl-events.async)
   (:export
    #:+default-poll-timeout-seconds+
+   #:+default-poll-interval-seconds+
+   #:poll-until
    #:poll-runtime-event
    #:runtime-consume-once
    #:run-consumer-loop-shell

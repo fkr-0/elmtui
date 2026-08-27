@@ -65,6 +65,52 @@
       (is (eq :event ev))
       (is (eq :channel ch)))))
 
+(progn
+  (test poll-until-centralizes-probing-and-preserves-values
+    (let ((probes 0)
+          (sleeps 0))
+      (multiple-value-bind (event source)
+          (cl-events.loop:poll-until
+           (lambda ()
+             (incf probes)
+             (if (= probes 3)
+                 (values :ready :source)
+                 (values nil nil)))
+           :timeout 1
+           :interval 0.01
+           :sleep-fn (lambda (_seconds)
+                       (declare (ignore _seconds))
+                       (incf sleeps)))
+        (is (eq :ready event))
+        (is (eq :source source))
+        (is (= 3 probes))
+        (is (= 2 sleeps)))))
+
+  (test poll-until-zero-timeout-probes-once-without-sleeping
+    (let ((probes 0)
+          (sleeps 0))
+      (is (null
+           (cl-events.loop:poll-until
+            (lambda ()
+              (incf probes)
+              nil)
+            :timeout 0
+            :sleep-fn (lambda (_seconds)
+                        (declare (ignore _seconds))
+                        (incf sleeps)))))
+      (is (= 1 probes))
+      (is (zerop sleeps))))
+
+  (test poll-until-stop-p-cancels-before-probe
+    (let ((probes 0))
+      (is (null
+           (cl-events.loop:poll-until
+            (lambda ()
+              (incf probes)
+              :unexpected)
+            :stop-p (lambda () t))))
+      (is (zerop probes)))))
+
 (test join-deadline-helpers
   (let* ((deadline (cl-events.loop:make-join-deadline 2.0 (lambda () 100))))
     (is (= deadline (+ 100 (round (* 2.0 internal-time-units-per-second)))))

@@ -55,6 +55,22 @@
     (is (equal '(:nested 2) (sref ctx nil)))
     (is (= 2 (sref ctx :nested)))))
 
+(test update-context-draft-does-not-alias-plist-state
+  "Draft mutation must not leak into the previous model before patches are committed."
+  (let* ((state (plist-to-application-state
+                 (list :nested (list :value 1)
+                       :vector (vector (list :value 2)))
+                 :backend :plist))
+         (ctx (make-update-context state)))
+    (setf (sref ctx '(:nested :value)) 10)
+    ;; Deliberately mutate a nested draft value without using SREF; even this
+    ;; must remain isolated from the previous application model.
+    (setf (getf (aref (sref ctx :vector) 0) :value) 20)
+    (is (= 1 (elmtui.state.api:state-ref state '(:nested :value))))
+    (is (= 2 (getf (aref (elmtui.state.api:state-ref state :vector) 0) :value)))
+    (is (= 10 (sref ctx '(:nested :value))))
+    (is (= 20 (getf (aref (sref ctx :vector) 0) :value)))))
+
 ;;;=============================================================================
 ;;; Sref Tests
 ;;;=============================================================================

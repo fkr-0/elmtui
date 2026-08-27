@@ -156,8 +156,8 @@
         (is (string= "Default Text" (gethash :text state)))
         (is (= 0 (gethash :count state)))))
 
-    ;; Test with provided initargs
-    (setf (elmtui.state:application-state-data app-state) (make-hash-table :test 'equal)) ; Reset state
+    ;; Test with provided initargs against a fresh supported state value.
+    (setf app-state (make-state))
     (multiple-value-bind (instance patches commands)
       (elmtui.ui.api:init comp-instance :id-path id-path :initial-text "Hello" :initial-count 42)
       (declare (ignore commands)) ; No commands expected

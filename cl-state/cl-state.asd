@@ -9,9 +9,11 @@
   :components
   ((:file "src/state/packages")
    (:file "src/state/utils")
+   (:file "src/state/value-protocol")
    (:file "src/state/core")
    (:file "src/state/tx")
    (:file "src/state/patch")
+   (:file "src/state/persistent")
    (:file "src/state/undo")
    (:file "src/state/observer")
    (:file "src/state/schema")

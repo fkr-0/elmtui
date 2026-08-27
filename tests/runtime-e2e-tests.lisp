@@ -21,6 +21,35 @@
 
 (in-suite runtime-e2e-tests)
 
+(defun %form-contains-symbol-p (form symbol)
+  (cond
+    ((eq form symbol) t)
+    ((consp form)
+     (or (%form-contains-symbol-p (car form) symbol)
+         (%form-contains-symbol-p (cdr form) symbol)))
+    (t nil)))
+
+(test application-constructors-share-canonical-runtime-spec-lowering
+  (let ((tea-expansion
+          (macroexpand-1
+           '(elmtui.app.tea-core:deftea-app phase6-minimal-app
+              :init #'phase6-minimal-init
+              :transition #'phase6-minimal-transition
+              :view #'phase6-minimal-view)))
+        (full-expansion
+          (macroexpand-1
+           '(elmtui.app:defapplication phase6-full-app
+              :root-viewport-id :root
+              :root-component-dsl '(:root-viewport :id :root :children ())
+              :initial-state-plist '(:count 0)
+              :update-fn phase6-full-update
+              :view-fn phase6-full-view
+              :subscriptions-fn phase6-full-subscriptions))))
+    (is (%form-contains-symbol-p
+         tea-expansion 'elmtui.app.api:make-runtime-app-spec))
+    (is (%form-contains-symbol-p
+         full-expansion 'elmtui.app.api:make-runtime-app-spec))))
+
 (test runtime-e2e-token-route-update-effects-render
   (let ((orig-next (symbol-function 'cl-inputs.loop:next-token))
         (orig-render (symbol-function 'elmtui.platform.driver::execute-render-command))
@@ -67,7 +96,7 @@
               (list :name 'runtime-e2e-app
                     :init-fn (lambda () (values '(:count 0) nil))
                     :update-fn (lambda (msg model)
-                                 (setf update-msg msg)
+                                 (setf update-msg (list msg model))
                                  (incf update-calls)
                                  (values
                                   (list :count (1+ (getf model :count 0)))
@@ -95,11 +124,20 @@
                (elmtui.platform.driver::driver-context-input-loop ctx))
              (is (= 1 update-calls))
              (is (consp update-msg))
-             (is (eq :KEYEVENT (car update-msg)))
+             (is (eq :KEYEVENT (caar update-msg)))
              (is (= 1 pipeline-calls))
              (is (equal '(:render :set-cursor 2 3) (first render-cmds)))
              (is (equal '(:dispatch (:worker-done)) (first non-render-cmds)))
-             (is (= 1 (getf elmtui.platform.driver::*current-app-model* :count))))
+             (progn
+               (is (= 0 (getf (second update-msg) :count))
+                   "The prior model received by UPDATE must remain unchanged.")
+               (is-false
+                (eq (second update-msg)
+                    elmtui.platform.driver::*current-app-model*)
+                "The runtime must install UPDATE's replacement model rather than mutate the prior one.")
+               (is (= 1
+                      (getf elmtui.platform.driver::*current-app-model*
+                            :count)))))
         (setf (symbol-function 'cl-inputs.loop:next-token) orig-next
               (symbol-function 'elmtui.platform.driver::execute-render-command) orig-render
               (symbol-function 'elmtui.platform.driver::make-context-from-spec) orig-make-ctx

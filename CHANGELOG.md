@@ -6,7 +6,35 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Added
+
+- Added a centralized cooperative polling primitive in `cl-events` and migrated
+  ElmTUI readiness/shutdown waits to it, with deterministic timeout and
+  cancellation coverage.
+- Added structured condition/restart recovery with preserved condition identity,
+  debugger-visible context, and `retry`, `skip`, `ignore-task`, `use-value`, and
+  `abort` recovery paths.
+- Added transactional and `:strict-elm` application state semantics sharing one
+  update/patch contract; strict mode uses frozen, structurally shared persistent
+  snapshots with an eager persistent correctness oracle.
+- Added a runtime context object and deterministic runtime/state/async E2E
+  coverage, including retained-snapshot and differential state-engine traces.
+
 ### Changed
+
+- `DEFAPPLICATION` is the recommended full application constructor while
+  `DEFTEA-APP` remains the supported minimal direct-transition adapter.
+- Public `APPLICATION-STATE-DATA` compatibility reads now return owned snapshots;
+  explicit live representation access remains confined to `cl-state.core`.
+- Removed large commented legacy implementations from `cl-inputs` input decoding
+  and loop code after executable behavior was covered independently.
+
+### Fixed
+
+- Fixed observer failure reporting and transaction rollback/notification ordering
+  so failures remain inspectable without silently corrupting transaction state.
+- Fixed inherited component update composition, keymap/runtime polling edge cases,
+  and async completion/error recovery contracts exposed by the expanded E2E suite.
 
 - Quarantined local debug, review, generated-release, editor, and agent artifacts
   from the release surface without deleting preserved workspace material.

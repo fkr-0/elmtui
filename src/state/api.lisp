@@ -61,15 +61,17 @@
   (setf (state-ref state path) value))
 
 (defun store-component-at-path (app-state component-id-path value)
-  "Store VALUE at COMPONENT-ID-PATH inside APP-STATE."
+  "Store VALUE at COMPONENT-ID-PATH through the normal state transaction protocol."
   (let ((path (append '(:components) component-id-path '(:component-instance))))
-    (set-path (application-state-data app-state) path value))
+    (apply-patches app-state
+                   (list (make-patch :path path :op :set :value value))))
   value)
 
 (defun remove-component-at-path (app-state component-id-path)
-  "Remove the component at COMPONENT-ID-PATH inside APP-STATE."
+  "Remove COMPONENT-ID-PATH through the normal state transaction protocol."
   (let ((path (append '(:components) component-id-path '(:component-instance))))
-    (remove-path (application-state-data app-state) path)
+    (apply-patches app-state
+                   (list (make-patch :path path :op :remove)))
     nil))
 
 (defun pprinc-application-state (state)

@@ -173,7 +173,7 @@
 (defvar *dispatch-fn* nil "Dynamically bound function for dispatching messages from keybindings.")
 (declaim (special *dispatch-fn*))
 
-(define-condition keymap-error (simple-error) ())
+(define-condition keymap-error (simple-error elmtui.core.errors:elmtui-error) ())
 
 (defun kw (thing) (alexandria:make-keyword thing))
 
@@ -508,28 +508,27 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps."
 ;;; ------------------------------------------------------------------------
 
 (defun %dispatch-msg (msg app)
-  "Dispatches a message using the dynamically bound *dispatch-fn*."
+  "Dispatch MSG through the dynamically bound *DISPATCH-FN*.
+If no dispatcher is configured, log and drop MSG; the matched key remains consumed."
   (declare (ignore app))
   (if *dispatch-fn*
-    (funcall *dispatch-fn* msg)
-    (log-warn "Keymap dispatch function not configured. Dropping message: ~S" msg)))
+      (funcall *dispatch-fn* msg)
+      (log-warn "Keymap dispatch function not configured. Dropping message: ~S" msg)))
 
-(defun action-cancel  (app) (declare (ignore app)) (log-info "cancel"))
-(defun action-confirm (app) (declare (ignore app)) (log-info "confirm"))
-(defun action-help    (app) (declare (ignore app)) (log-info "help"))
-(defun action-menu    (app) (declare (ignore app)) (log-info "menu"))
 
 (define-keymap *global-navigation-keymap*
-  ("F1"    :type :action  :target 'action-help   :description "Show Help")
-  ("F10"   :type :action  :target 'action-menu   :description "Show Menu")
-  ("Escape":type :action  :target 'action-cancel :description "Cancel / Back")
-  ("C-q"   :type :message :target '(:quit)       :description "Quit"))
+  ("F1"     :type :message :target '(:show-help) :description "Show Help")
+  ("F10"    :type :message :target '(:show-menu) :description "Show Menu")
+  ("Escape" :type :message :target '(:cancel) :description "Cancel / Back")
+  ("C-q"    :type :message :target '(:quit) :description "Quit"))
+
 
 (define-keymap *dialog-keymap*
-  ("Enter" :type :action  :target 'action-confirm :description "Confirm")
-  ("Escape":type :action  :target 'action-cancel  :description "Cancel")
-  ("Tab"   :type :message :target '(:focus-next)  :description "Next Field")
-  ("S-Tab" :type :message :target '(:focus-prev)  :description "Prev Field"))
+  ("Enter"  :type :message :target '(:confirm) :description "Confirm")
+  ("Escape" :type :message :target '(:cancel) :description "Cancel")
+  ("Tab"    :type :message :target '(:focus-next) :description "Next Field")
+  ("S-Tab"  :type :message :target '(:focus-prev) :description "Prev Field"))
+
 
 (define-keymap *form-keymap*
   ("Enter" :type :message :target '(:form-submit)   :description "Submit")

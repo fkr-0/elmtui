@@ -109,10 +109,11 @@
 ;;;; -----------------------------------------------------------------------
 
 (test initialise-defaults
-  (initialise)                               ; sets up global context
-  (let* ((nk (parse-key-string "F1"))
-         (binding (lookup-binding nk)))
-    (is (string= (symbol-name 'action-help) (symbol-name (getf binding :target))))))
+  (initialise)
+  (let ((binding (lookup-binding (parse-key-string "F1"))))
+    (is (eq :message (getf binding :type)))
+    (is (equal '(:show-help) (getf binding :target)))))
+
 
 ;;;; -----------------------------------------------------------------------
 ;;;; Helper: Run the suite when file is loaded from the REPL
@@ -121,3 +122,31 @@
 ;; (eval-when (:execute)
 ;;   (run! 'keymaps-suite))
 ;;; == end/keymaps-tests.lisp ==
+
+(test default-message-bindings-dispatch-canonical-messages
+  (initialise)
+  (let ((seen nil))
+    (flet ((dispatch (message) (setf seen message)))
+      (dolist (case '((:f1 (:show-help))
+                      (:f10 (:show-menu))
+                      (:escape (:cancel))))
+        (setf seen nil)
+        (is-true (process-key-event (list :key (first case) :modifiers nil)
+                                    nil
+                                    :dispatch-fn #'dispatch))
+        (is (equal (second case) seen)))
+      (let ((dialog (define-keymap-context :post002-dialog
+                                           :parent :global-context
+                                           :keymaps '(:dialog))))
+        (activate-context dialog)
+        (setf seen nil)
+        (is-true (process-key-event '(:key :enter :modifiers nil)
+                                    nil
+                                    :dispatch-fn #'dispatch))
+        (is (equal '(:confirm) seen))))))
+
+(test default-message-binding-without-dispatch-is-consumed
+  (initialise)
+  (is-true (process-key-event '(:key :f1 :modifiers nil)
+                              nil
+                              :dispatch-fn nil)))

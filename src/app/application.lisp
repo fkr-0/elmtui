@@ -28,7 +28,9 @@
     #:app-config-update-fn-sym
     #:app-config-view-fn-sym
     #:app-config-renderer-fn
-    #:app-config-subscriptions-fn-form     ; <— newly imported
+    #:app-config-subscriptions-fn-form
+    #:app-config-state-semantics
+    #:make-runtime-app-spec
     #:get-component-instance)
   (:import-from #:elmtui.app.extension
     #:validate-cli-option-specs
@@ -45,6 +47,8 @@
     #:make-state)
   (:import-from #:cl-state.patch
     #:apply-patches)
+  (:import-from #:cl-state.core
+    #:*state-mutation-policy*)
   (:import-from #:elmtui.ui.api                #:init #:view #:initialize-components-from-dsl
     #:instantiate-component-from-dsl)
   (:import-from #:elmtui.runtime.protocol
@@ -220,6 +224,19 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
   "Generate a unique child ID based on parent ID and suffix."
   (intern (format nil "~A-~A" parent-id child-suffix) :keyword))
 
+(defun %commit-state-patches (state patches semantics)
+  "Commit PATCHES according to application state SEMANTICS.
+
+:TRANSACTIONAL applies patches to STATE in place for the low-allocation default
+runtime. :STRICT-ELM path-copies changed state containers, structurally shares
+unchanged branches, and returns a frozen replacement snapshot."
+  (ecase semantics
+    (:transactional
+     (apply-patches state patches))
+    (:strict-elm
+     (cl-state.patch::apply-patches-shared
+      state patches :name :strict-elm-commit))))
+
 ;;; ---------------------------------------------------------------------------
 ;;; Log4CL management helpers for defapplication-generated run functions
 ;;; ---------------------------------------------------------------------------
@@ -232,7 +249,11 @@ For a symbol/quoted symbol, returns the symbol for later resolution."
 Default (no args): silence all logging.
 LOG-FILE string: direct logging to that file.
 LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
-  (ignore-errors (remove-all-appenders *root-logger*))
+  (handler-case
+      (remove-all-appenders *root-logger*)
+    (error (condition)
+      (format *error-output* "~&ElmTUI logging reset failed; continuing without reset: ~A~%"
+              condition)))
   (let ((target (cond
                   (log-buffer
                    (let ((path (format nil "/tmp/elmtui-log-~A.tmp"
@@ -243,9 +264,12 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
                    log-file)
                   (t nil))))
     (when target
-      (ignore-errors
-        (add-appender *root-logger*
-                      (make-instance 'file-appender :file target))))))
+      (handler-case
+          (add-appender *root-logger*
+                        (make-instance 'file-appender :file target))
+        (error (condition)
+          (format *error-output* "~&ElmTUI log appender setup failed for ~A: ~A~%"
+                  target condition))))))
 
 (defun %flush-app-log-buffer ()
   "Print buffered log file to *standard-output*, then delete it."
@@ -253,7 +277,11 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
     (setf *%app-log-buffer-file* nil)
     (when (and path (probe-file path))
       (let ((content (uiop:read-file-string path)))
-        (ignore-errors (uiop:delete-file-if-exists path))
+        (handler-case
+            (uiop:delete-file-if-exists path)
+          (file-error (condition)
+            (format *error-output* "~&ElmTUI buffered log cleanup failed for ~A: ~A~%"
+                    path condition)))
         (unless (string= content "")
           (fresh-line)
           (write-string content *standard-output*)
@@ -289,10 +317,53 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
 
 
 (defmacro defapplication (name &rest args)
-  "Define an ElmTUI application called NAME."
+  "Define the normative full-featured ElmTUI application called NAME.
+
+DEFAPPLICATION is the application constructor selected for the next stable major
+version. It owns the production application surface: CL-STATE initialization,
+component/root-viewport wiring, context/patch updates, subscriptions, CLI and
+binary configuration, keymaps, generated runners, and selectable
+:TRANSACTIONAL/:STRICT-ELM commit semantics. ELMTUI.APP.TEA-CORE:DEFTEA-APP
+remains a supported minimal direct-transition adapter for small or pedagogical
+TEA programs; both constructors lower to MAKE-RUNTIME-APP-SPEC and therefore
+share the same INIT/TRANSITION/VIEW/SUBSCRIPTIONS runtime vocabulary.
+
+Arguments:
+  NAME is a non-keyword application symbol. ARGS is the DEFAPPLICATION keyword
+  plist. :ROOT-VIEWPORT-ID and :ROOT-COMPONENT-DSL are required. Optional keys
+  include :INITIAL-STATE-PLIST/:INITIAL-STATE-FN, :UPDATE-FN, :VIEW-FN,
+  :SUBSCRIPTIONS-FN, :COMMAND-PROCESSOR-FN, :STATE-SEMANTICS, CLI/binary
+  configuration, and platform options.
+
+Returns:
+  Macro expansion defining application helpers, configuration, and RUN-NAME;
+  the expansion itself yields NAME.
+
+Mutation:
+  Macro expansion registers application configuration and generated functions.
+  Runtime mutation follows :STATE-SEMANTICS: :TRANSACTIONAL commits through the
+  state transaction machinery; :STRICT-ELM installs frozen replacement
+  snapshots with structural sharing.
+
+Conditions:
+  Macro expansion signals an error for missing required keys, unsupported state
+  semantics, or invalid function/configuration designators. Runtime conditions
+  from generated update/view/subscription code remain inspectable through their
+  owning framework boundaries.
+
+Example:
+  (defapplication counter
+    :root-viewport-id :root
+    :root-component-dsl '(:root-viewport :id :root :children ())
+    :initial-state-plist '(:count 0)
+    :update-fn #'counter-update
+    :view-fn #'counter-view
+    :subscriptions-fn #'counter-subscriptions
+    :state-semantics :strict-elm)"
   (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
                   :update-fn :view-fn :command-processor-fn
                   :subscriptions-fn :root-viewport-id :platform-options
+                  :state-semantics
                   :binary :cli-options :args :configure-fn)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
@@ -319,6 +390,12 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
               (all-cli-options (merge-cli-option-specs cli-options simple-args))
               (binary-options (normalize-binary-options (getf kw-plist :binary) name))
               (configure-fn (getf kw-plist :configure-fn nil))
+              (state-semantics
+                (let ((value (getf kw-plist :state-semantics :transactional)))
+                  (unless (member value '(:transactional :strict-elm))
+                    (error "DEFAPPLICATION ~S: :STATE-SEMANTICS must be :TRANSACTIONAL or :STRICT-ELM, got ~S"
+                           name value))
+                  value))
               ;; Normalise FN designators to symbols
               (state (if initial-state-fn
                        `(funcall ,initial-state-fn)
@@ -354,9 +431,11 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
            ;; Generated WRAPPED VIEW function
            ;; --------------------------------------------------------------
            (defun ,wrapped-view-fn-sym (model)
-             (maybe-wrap-with-root-viewport
-               (funcall ',view-fn* model)
-               :root-id ',root-vp-id))
+             (let ((*state-mutation-policy*
+                     ,(if (eq state-semantics :strict-elm) :forbid :allow)))
+               (maybe-wrap-with-root-viewport
+                 (funcall ',view-fn* model)
+                 :root-id ',root-vp-id)))
 
            ;; --------------------------------------------------------------
            ;; Register config object
@@ -370,6 +449,7 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
                :view-fn-sym   ',wrapped-view-fn-sym
                :command-processor-fn ,cmd-proc-fn
                :subscriptions-fn-form ,subs-fn-form
+               :state-semantics ,state-semantics
                :message-queue (make-message-channel :capacity 20) ; Create proper event-channel
                :binary-options ',binary-options
                :cli-options ',all-cli-options
@@ -398,8 +478,9 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
                  ;; :term-size initial-terminal-dimensions
                  ;; :cursor-pos initial-cursor-position))
                  ;; (format t "~A ~A~%" app-state patches)
-                 (apply-patches app-state patches)
-                   (values app-state commands)))))
+                 (let ((initialized-state
+                         (%commit-state-patches app-state patches ,state-semantics)))
+                   (values initialized-state commands))))))
 
 
            ;; --------------------------------------------------------------
@@ -425,7 +506,8 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
            ;;     (elmtui.state.transactions:apply-patches state (ur-patches update-result))
            ;;     (values state (ur-commands update-result))))
            (defun ,proc-fn-sym (msg state)
-             (let ((cfg (gethash ',name *applications*)))
+             (let* ((cfg (gethash ',name *applications*))
+                    (state-semantics (app-config-state-semantics cfg)))
                (cond
                  ;; -------------------------------------------------------------
                  ;; Handle raw key events by dispatching to the keymap system
@@ -434,26 +516,40 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
                    (flet ((dispatch (new-msg)
                             (elmtui.core.event-channels:send-event
                               (app-config-message-queue cfg) new-msg)))
-                     (let ((handled (process-key-event msg
-                                      nil ; focus-manager placeholder
-                                      :app-state state
-                                      :dispatch-fn #'dispatch)))
+                     (let ((handled
+                             (let ((*state-mutation-policy*
+                                     (if (eq state-semantics :strict-elm)
+                                         :forbid
+                                         :allow)))
+                               (process-key-event msg
+                                 nil ; focus-manager placeholder
+                                 :app-state state
+                                 :dispatch-fn #'dispatch))))
                        (if handled
                          (values state nil) ; Event consumed by keymap system
                          ;; If not handled, fall through to the component tree
                          (multiple-value-bind (comp-patches comp-cmds)
-                           (dispatch-root-message msg state ',root-vp-id)
-                           (apply-patches state comp-patches)
-                           (values state comp-cmds))))))
+                           (let ((*state-mutation-policy*
+                                   (if (eq state-semantics :strict-elm)
+                                       :forbid
+                                       :allow)))
+                             (dispatch-root-message msg state ',root-vp-id))
+                           (values (%commit-state-patches
+                                    state comp-patches state-semantics)
+                                   comp-cmds))))))
 
                  ;; -------------------------------------------------------------
                  ;; Handle all other messages via the app's update function
                  ;; -------------------------------------------------------------
                  (t
-                   (let* ((ur (elmtui.state.api:invoke-update
-                                (%normalize-fn ',update-fn* nil nil)
-                                msg
-                                state)))
+                   (let* ((ur (let ((*state-mutation-policy*
+                                      (if (eq state-semantics :strict-elm)
+                                          :forbid
+                                          :allow)))
+                                (elmtui.state.api:invoke-update
+                                  (%normalize-fn ',update-fn* nil nil)
+                                  msg
+                                  state))))
                      (unless (typep ur 'update-result)
                        (error "~A update function (~S) must return UPDATE-RESULT, got: ~S"
                          ',name ',update-fn* ur))
@@ -461,12 +557,18 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
                      (multiple-value-bind (comp-patches comp-cmds)
                        (if (ur-handled ur)
                          (values nil nil)
-                         (dispatch-root-message msg state ',root-vp-id))
+                         (let ((*state-mutation-policy*
+                                 (if (eq state-semantics :strict-elm)
+                                     :forbid
+                                     :allow)))
+                           (dispatch-root-message msg state ',root-vp-id)))
 
                        (let* ((all-patches (nconc (ur-patches ur) comp-patches))
-                               (all-cmds    (nconc (ur-commands ur) comp-cmds)))
-                        (apply-patches state all-patches)
-                         (values state all-cmds))))))))
+                              (all-cmds (nconc (ur-commands ur) comp-cmds))
+                              (next-state
+                                (%commit-state-patches
+                                 state all-patches state-semantics)))
+                         (values next-state all-cmds))))))))
            ;; --------------------------------------------------------------
            ;; RUN-<app>
            ;; --------------------------------------------------------------
@@ -495,12 +597,14 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
                            (funcall configure-fn* cli-platform-options merged-platform-options)
                            merged-platform-options))
                      (app-spec-for-driver
-                       (list :name ',name
-                         :init-fn #',init-fn-sym
-                         :update-fn #',proc-fn-sym
-                         :view-fn (symbol-function (app-config-view-fn-sym cfg))
-                         :subscriptions-fn (app-config-subscriptions-fn-form cfg)
-                         :command-processor-fn (app-config-command-processor-fn cfg)
+                       (make-runtime-app-spec
+                         :name ',name
+                         :init #',init-fn-sym
+                         :transition #',proc-fn-sym
+                         :view (symbol-function (app-config-view-fn-sym cfg))
+                         :subscriptions (app-config-subscriptions-fn-form cfg)
+                         :state-semantics (app-config-state-semantics cfg)
+                         :command-processor (app-config-command-processor-fn cfg)
                          :message-queue (app-config-message-queue cfg)
                          :cli-args parsed-cli-args
                          :root-viewport-id ,root-vp-id)))
@@ -575,6 +679,7 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
 (defmacro defapplication-contracted (name &key root-dsl initial-state
                                       update view subscriptions
                                       message-schema validation-mode
+                                      (state-semantics :transactional)
                                       modules platform-options)
   "Enhanced defapplication with contract enforcement and modular architecture."
   (let ((app-msg-type (or message-schema
@@ -635,6 +740,7 @@ LOG-BUFFER T: buffer to a temp file; call %flush-app-log-buffer after exit."
          :view-fn ',view-fn-name
          :subscriptions-fn ',subs-fn-name
          :root-viewport-id ,(intern (format nil "~A-ROOT" name) :keyword)
+         :state-semantics ,state-semantics
          ,@platform-options)
 
        ;; Module integration

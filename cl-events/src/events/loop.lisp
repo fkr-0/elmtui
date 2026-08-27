@@ -23,9 +23,54 @@ POLICY can be a keyword action or a function of ERROR."
         action
         *default-runtime-error-action*)))
 
+(defparameter +default-poll-interval-seconds+ 0.001
+  "Default cooperative pause between unsuccessful polling probes.")
+
+(defun poll-until (probe-fn
+                   &key timeout stop-p
+                     (interval +default-poll-interval-seconds+)
+                     (sleep-fn #'sleep)
+                     (now-fn #'get-internal-real-time))
+  "Run PROBE-FN until it succeeds, STOP-P requests cancellation, or TIMEOUT expires.
+
+PROBE-FN may return multiple values.  Its first value is the success value; when
+that value is non-NIL all values are returned unchanged.  A NIL first value
+means that no result is ready yet.
+
+TIMEOUT is measured in seconds.  NIL means wait indefinitely, zero means perform
+exactly one probe, and a positive value bounds the total wait.  STOP-P, when
+non-NIL, is called before every probe and can end an otherwise unbounded wait.
+INTERVAL is the cooperative sleep between unsuccessful probes and must be a
+non-negative real.
+
+The optional SLEEP-FN and NOW-FN hooks make timing deterministic in tests.
+Polling itself performs no mutation other than whatever PROBE-FN, STOP-P, or the
+injected timing functions perform.  Conditions signaled by those functions are
+not swallowed; callers can inspect them or establish handlers/restarts."
+  (check-type probe-fn function)
+  (check-type timeout (or null (real 0 *)))
+  (check-type interval (real 0 *))
+  (let ((deadline (when timeout
+                    (make-join-deadline timeout now-fn))))
+    (loop
+      (when (and stop-p (funcall stop-p))
+        (return nil))
+      (let ((values (multiple-value-list (funcall probe-fn))))
+        (when (first values)
+          (return (values-list values))))
+      (when (and deadline (deadline-expired-p deadline now-fn))
+        (return nil))
+      (when (plusp interval)
+        (funcall sleep-fn interval)))))
+
 (defun poll-runtime-event (channels wait-fn &key (timeout +default-poll-timeout-seconds+))
-  "Delegate runtime event polling to WAIT-FN with a standard timeout contract.
-Returns the same multiple values produced by WAIT-FN."
+  "Poll CHANNELS through WAIT-FN using the shared runtime timeout contract.
+
+WAIT-FN is called as (WAIT-FN CHANNELS :TIMEOUT TIMEOUT) and its multiple values
+are returned unchanged.  Implementations that need repeated non-blocking probes
+should use POLL-UNTIL rather than introducing an independent sleep/deadline
+loop.  This function performs no mutation itself and propagates conditions from
+WAIT-FN unchanged."
   (funcall wait-fn channels :timeout timeout))
 
 (defun runtime-consume-once (&key stop-p poll-fn on-event on-empty on-error)

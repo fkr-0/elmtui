@@ -11,6 +11,9 @@
 (:asd "elmtui-widgets-enhanced.asd")
 (:asd "elmtui-tests.asd")
 (:asd "elmtui-examples.asd")
+(:asd "elmtui-packager.asd")
+(:asd "elmtui-examples-cli.asd")
+(:asd "elmtui-docs.asd")
 
 (:github "fiveam"
  :path "lispci/fiveam"
@@ -19,3 +22,5 @@
 (:system "log4cl" :source "quicklisp")
 (:system "bordeaux-threads")
 (:system "alexandria" :source "quicklisp")
+;; API documentation is generated from ANSI CL DOCUMENTATION metadata by
+;; ELMTUI-DOCS; no documentation dependency enters the runtime bundle.
