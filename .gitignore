@@ -8,8 +8,27 @@
 /.worktrees/
 /.cache/
 /.ws-bridge/
+/.wsbridge/
 /test-output/
+/.pytest_cache/
+**/__pycache__/
 /.env
+
+# Local agent/editor state
+/.roo/
+/.roomodes
+/.serena/
+/.skill/
+/.vscode/
+/.tmp-*
+
+# Preserved local quarantine and generated release artifacts
+/scratch/
+/trunk/
+/dist/
+
+# actiwat is an independent consumer/application repository, not an ElmTUI release member
+/actiwat/
 *.out
 *.backup
 *.zip
