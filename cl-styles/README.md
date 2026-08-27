@@ -2,6 +2,18 @@
 
 A CSS-like styling engine for Common Lisp, designed for TUI (Terminal User Interface) applications and other hierarchical object structures. cl-styles provides a flexible, declarative way to style objects using familiar CSS concepts like selectors, rules, inheritance, and variables.
 
+## Release status
+
+The current in-tree candidate version is **0.2.0** for both `cl-styles` and
+`cl-styles/tests`. This is release-candidate metadata only: the library has not
+been published to Quicklisp, Ultralisp, CLPM, or a separate source repository.
+
+The qualified implementation boundary is SBCL on the repository's POSIX/Linux
+CLPM environment. Other Common Lisp implementations and non-POSIX platforms
+have not yet been qualified. `cl-styles.api` is the public convenience package;
+the focused `cl-styles.*` packages expose selector, rule, sheet, engine,
+property, token, and protocol contracts.
+
 ## Features
 
 - **CSS-like selectors**: Type, ID, class, attribute, and pseudo-class selectors
@@ -29,7 +41,7 @@ clpm bundle exec --with-client sbcl -- \
   --eval '(asdf:load-system "cl-styles")'
 ```
 
-Using Quicklisp:
+Using an ASDF/Quicklisp local project (not registry publication):
 ```lisp
 ;; Add to your system dependencies
 :depends-on (#:cl-styles #:other-deps)
