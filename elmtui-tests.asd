@@ -4,8 +4,8 @@
   :description "Test suite for the elmtui system"
   :author "ElmTUI contributors"
   :version "0.2.0"
-  :depends-on (#:elmtui #:elmtui-widgets-enhanced #:fiveam)
-  :license "GPL-3.0-only"
+  :depends-on (#:elmtui #:elmtui-widgets-enhanced #:elmtui-packager #:elmtui-examples-cli #:fiveam)
+:license "GPL-3.0-only"
   :serial t
   :components ((:module "tests"
                  :serial t
@@ -31,7 +31,10 @@
                                (:file "state-tests")
                                (:file "state-api-tests")
                                (:file "state-update-tests")
+                               (:file "state-semantics-tests")
+                               (:file "state-sharing-tests")
                                (:file "contract-restart-tests")
+                               (:file "condition-system-tests")
                                (:file "base-dsl-tests")
                                (:file "base-elements-tests")
                                (:file "element-protocol-tests")
@@ -50,6 +53,7 @@
                                (:file "driver-tests")
                                (:file "driver-subscription-tests")
                                (:file "runtime-effects-tests")
+                               (:file "runtime-context-tests")
                                (:file "runtime-e2e-tests")
                                (:file "errs-regression-tests")
                                (:file "dev-tests")

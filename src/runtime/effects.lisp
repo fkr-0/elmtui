@@ -14,6 +14,9 @@
                 #:cancel-cmd)
   (:import-from :elmtui.contracts
                 #:subscription)
+  (:import-from :cl-state.core
+                #:*state-mutation-policy*
+                #:state-mutation-forbidden)
   (:export
    #:split-render-commands
    #:run-commands-with-policy
@@ -71,8 +74,11 @@
   "Cancel installed HANDLE using COMMAND-CANCELLER."
   (let ((cmd (getf handle :cmd)))
     (when cmd
-      (ignore-errors
-        (funcall command-canceller cmd)))))
+      (handler-case
+          (funcall command-canceller cmd)
+        (error (condition)
+          (log-warn "RUNTIME-EFFECTS: subscription cancellation failed for ~S: ~A"
+                    cmd condition))))))
 
 (defun %install-subscription (sub command-interpreter)
   "Install one subscription descriptor. Returns handle plist or NIL."
@@ -115,7 +121,7 @@
                                         (command-interpreter #'interpret-cmd)
                                         (command-canceller #'cancel-cmd))
   "Reconcile ACTIVE-SUBSCRIPTIONS against SUBSCRIPTIONS-FN evaluated on MODEL."
-  (let* ((desired-raw (ignore-errors (funcall subscriptions-fn model)))
+  (let* ((desired-raw (funcall subscriptions-fn model))
          (desired (normalize-subscriptions desired-raw))
          (desired-keys (make-hash-table :test 'equal))
          (to-remove nil))
@@ -153,6 +159,7 @@
       message-queue
       model
       app-config
+      (state-mutation-policy :allow)
       (fallback-command-interpreter #'interpret-cmd))
   "Execute COMMANDS using runtime policy callbacks.
 
@@ -166,8 +173,9 @@ FALLBACK-COMMAND-INTERPRETER."
       (when render-command-fn
         (funcall render-command-fn cmd)))
     (if command-processor-fn
-        (dolist (cmd other-cmds)
-          (funcall command-processor-fn cmd message-queue model app-config))
+        (let ((*state-mutation-policy* state-mutation-policy))
+          (dolist (cmd other-cmds)
+            (funcall command-processor-fn cmd message-queue model app-config)))
         (dolist (cmd other-cmds)
           (funcall fallback-command-interpreter cmd)))))
 
@@ -179,6 +187,7 @@ FALLBACK-COMMAND-INTERPRETER."
      message-queue
      model
      app-config
+     (state-mutation-policy :allow)
      fallback-command-interpreter
      subscriptions-reconciler)
   "Apply command execution and subscription reconciliation for one update.
@@ -191,6 +200,7 @@ This function is the runtime effect-manager boundary used by the driver."
    :message-queue message-queue
    :model model
    :app-config app-config
+   :state-mutation-policy state-mutation-policy
    :fallback-command-interpreter (or fallback-command-interpreter #'interpret-cmd))
   (when subscriptions-reconciler
     (funcall subscriptions-reconciler model))

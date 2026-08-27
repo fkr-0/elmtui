@@ -5,17 +5,14 @@
 (uiop:define-package :elmtui.view.geo
   (:use #:cl)
   (:nicknames :et.geo)
-
   (:import-from :log4cl
-                #:log-info #:log-warn)
-  (:import-from :sb-pcl
-                #:make-instance)
+                #:log-info
+                #:log-warn)
   (:export #:=? #:area #:area< #:contains-p #:normalize!
            #:rectangle-union #:border #:bounding-box #:circle
            #:corner #:dim #:dim-length #:dim-pos #:flip #:grow-view!
            #:h #:line #:make-pos #:make-rectangle #:make-size
            #:move! #:overlap #:polygon #:pos #:rect-diff #:rectangle
-           #:make-instance
            #:pos-x #:pos-y #:rectangle-size #:rectangle-pos
            #:clamp
            #:rectangle-union-list

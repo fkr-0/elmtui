@@ -144,6 +144,41 @@
     (redo state)
     (is (null (get-path :item state)))))
 
+(test apply-patches-persistent-preserves-source-state
+  "Persistent patch commit returns a replacement while leaving the prior state untouched."
+  (let* ((source (make-state :initial '(:counter 1 :nested (:value 2))))
+         (source-version (application-state-version source))
+         (source-history-count (length (application-state-history source)))
+         (next (apply-patches-persistent
+                source
+                '(((:counter) 2) ((:nested :value) 9))
+                :name :strict-elm-test)))
+    (is-false (eq source next))
+    (is (= 1 (state-ref source :counter)))
+    (is (= 2 (state-ref source '(:nested :value))))
+    (is (= source-version (application-state-version source)))
+    (is (= source-history-count (length (application-state-history source))))
+    (is (= 2 (state-ref next :counter)))
+    (is (= 9 (state-ref next '(:nested :value))))
+    (is (> (application-state-version next) source-version))
+    (is (= (1+ source-history-count)
+           (length (application-state-history next))))))
+
+(test persistent-and-transactional-commits-have-equivalent-logical-state
+  "The strict and fast commit engines implement the same patch transition."
+  (let* ((fast (make-state :initial '(:counter 3 :nested (:value 4))))
+         (strict-source (deep-copy-application-state fast))
+         (patches (list (make-patch :path :counter :op :update :value #'1+)
+                        (make-patch :path '(:nested :value) :op :set :value 11)
+                        (make-patch :path :new :op :set :value :present))))
+    (apply-patches fast patches)
+    (let ((strict (apply-patches-persistent strict-source patches)))
+      (dolist (path '(:counter (:nested :value) :new))
+        (is (equal (get-path path fast)
+                   (get-path path strict))))
+      (is (= 3 (state-ref strict-source :counter)))
+      (is (= 4 (state-ref strict-source '(:nested :value)))))))
+
 ;;; diff-states tests
 
 (test diff-states-no-changes

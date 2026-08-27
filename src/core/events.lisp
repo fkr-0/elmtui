@@ -8,7 +8,8 @@
    :message :make-message :message-type :message-data)
   (:import-from :cl-events.protocols
    #:broadcast-p #:capture-p #:bubble-p
-   #:stop-propagation #:message-state #:message-priority)
+   #:stop-propagation #:message-state #:message-priority
+)
   (:import-from :elmtui.core.conditions
    :message-validation-error
                 :command-execution-error)
@@ -83,11 +84,12 @@
   (:export :message
    :make-message
            :message-p
-   :*message-priorities*
+
            :message-type
    :message-data
            :message-state
    :broadcast-p
+   :message-priority
            :capture-p
    :bubble-p
            :propagation-stopped-p
@@ -165,9 +167,6 @@
 (defvar *message-contracts* (make-hash-table :test 'equal)
   "Registry of message contracts for validation and documentation.")
 
-(defvar *message-priorities* (make-hash-table :test 'equal)
-  "Stub: Registry for message priorities. Extend for advanced priority handling.")
-
 (defvar *before-send-message-hooks* nil
   "A list of functions to be called before a message is sent via SEND-MESSAGE.
 Each hook function should accept the target and the message as arguments.")
@@ -192,12 +191,13 @@ Each hook function should accept the target and the message as arguments.")
   "Removes HOOK-FN from the list of hooks executed after sending a message."
   (setf *after-send-message-hooks* (remove hook-fN *after-send-message-hooks* :test #'eq)))
 
-(defmacro register-message-contract (type contract-fn &optional (priority 0))
-  "Register a message contract and optional priority for TYPE.
-Stub for richer contract registration and enforcement."
-  `(progn
-     (setf (gethash ,type *message-contracts*) ,contract-fn)
-     (setf (gethash ,type *message-priorities*) ,priority)))
+(defmacro register-message-contract (type contract-fn &optional priority)
+  "Register CONTRACT-FN as the explicit validation contract for TYPE.
+PRIORITY is deprecated and ignored for source compatibility. Message priority is
+owned exclusively by CL-EVENTS.PROTOCOLS:MESSAGE-PRIORITY on message values."
+  (declare (ignore priority))
+  `(setf (gethash ,type *message-contracts*) ,contract-fn))
+
 
 
 (defun validate-message-via-schema (msg message-type-name schema)

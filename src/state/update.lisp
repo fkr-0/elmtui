@@ -7,6 +7,7 @@
   (:import-from :cl-state.core
                 #:state-set
                 #:state-ref
+                #:deep-copy-data
                 #:application-state-plist)
   (:import-from :cl-state.utils
                 #:get-path
@@ -51,8 +52,14 @@
   commands)
 
 (defun make-update-context (state &key base-path)
-  "Create an update context with an isolated draft for mutations."
-  (let ((draft (application-state-plist state)))
+  "Create an update context with a mutation-isolated draft.
+
+The draft is a deep copy of CL-STATE's supported container graph, not merely a
+plist view. UPDATE code may therefore use SREF/SAPPLY/SDELETE destructively on
+its draft without changing the model supplied by the runtime. Custom mutable
+leaf objects remain application-owned atoms and must be treated as immutable or
+copied by the application when strict value semantics are required."
+  (let ((draft (deep-copy-data (application-state-plist state))))
     (%make-update-context
      :state state
      :base-path base-path
@@ -123,7 +130,7 @@
 (defmethod cl-state.utils:get-path (path (ctx update-context) &optional default)
   (sref ctx path default))
 
-(define-condition malformed-update-result-error (error)
+(define-condition malformed-update-result-error (elmtui.core.errors:elmtui-error)
   ((update-fn-name :initarg :update-fn-name :reader malformed-update-result-fn-name :type symbol)
    (reason :initarg :reason :reader malformed-update-result-reason :type string)
    (returned-values :initarg :returned-values :reader malformed-update-result-values :type list))

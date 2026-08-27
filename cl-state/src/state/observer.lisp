@@ -7,8 +7,30 @@
         (cdr pair)
         default)))
 
+(define-condition observer-notification-error (error)
+  ((state :initarg :state :reader observer-notification-error-state)
+   (key :initarg :key :reader observer-notification-error-key)
+   (observer :initarg :observer :reader observer-notification-error-observer)
+   (old-value :initarg :old-value :reader observer-notification-error-old-value)
+   (new-value :initarg :new-value :reader observer-notification-error-new-value)
+   (phase :initarg :phase :reader observer-notification-error-phase)
+   (cause :initarg :cause :reader observer-notification-error-cause))
+  (:documentation "Inspect an observer callback failure without hiding the original cause.")
+  (:report
+   (lambda (condition stream)
+     (format stream "Observer ~S failed for ~S during ~S: ~A"
+             (observer-notification-error-observer condition)
+             (observer-notification-error-key condition)
+             (observer-notification-error-phase condition)
+             (observer-notification-error-cause condition)))))
+
 (defun add-observer (app key fn)
-  "Adds observer FN for KEY in application-state APP. Observers run in registration order."
+  "Register runtime observer FN for KEY in APP.
+
+Observer registration is runtime metadata, not logical model mutation. It is
+therefore allowed on frozen snapshots, does not increment model VERSION or alter
+transaction history, and is copied into a descendant strict snapshot only when
+that descendant is committed."
   (check-type fn function)
   (let* ((observers (application-state-observers app))
          (pair (assoc key observers)))
@@ -19,7 +41,11 @@
     fn))
 
 (defun remove-observer (app key fn)
-  "Removes observer FN for KEY in application-state APP. Returns T if FN was found and removed, NIL otherwise."
+  "Remove runtime observer FN for KEY from APP.
+
+This metadata operation is allowed on frozen snapshots and does not change the
+logical model/version/history. Returns true only when FN was registered and
+removed."
   (let* ((observers (application-state-observers app))
          (pair (assoc key observers)))
     (when (and pair (member fn (cdr pair)))
@@ -29,8 +55,25 @@
               (remove pair (application-state-observers app) :test #'eq)))
       t)))
 
-(defun notify-observers (app key old new)
-  "Notify observers for KEY in deterministic registration order."
+(defun notify-observers (app key old new &key (phase :manual))
+  "Notify APP observers for KEY in registration order.
+
+Observers run fail-fast. An arbitrary callback error is wrapped in
+OBSERVER-NOTIFICATION-ERROR with the callback, values, phase, and original
+cause. Notification is post-mutation metadata: this function never rolls back
+logical state."
   (let ((observers (copy-list (%alist-get key (application-state-observers app)))))
     (dolist (fn observers)
-      (funcall fn old new))))
+      (handler-case
+          (funcall fn old new)
+        (observer-notification-error (condition)
+          (error condition))
+        (error (cause)
+          (error 'observer-notification-error
+                 :state app
+                 :key key
+                 :observer fn
+                 :old-value old
+                 :new-value new
+                 :phase phase
+                 :cause cause))))))

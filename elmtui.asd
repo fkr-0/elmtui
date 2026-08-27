@@ -28,6 +28,7 @@
                 (:file "core/logging")
                 (:file "core/defaults")
                 (:file "core/conditions")
+                (:file "core/condition-docs" :depends-on ("core/conditions" "core/errors"))
                 (:file "core/globals")
                 (:file "core/system-events")
                 (:file "api")
@@ -59,6 +60,7 @@
                 ;; ----------------------------------------------------------------
                 (:module "core"
                   :pathname "./core/"
+                  :depends-on ("utils")
                   :serial t
                   :components (
                                 (:file "threads")
@@ -132,6 +134,7 @@
                 ;; 7) Application runtime subsystem
                 ;; ----------------------------------------------------------------
                 (:file "app/api")
+                (:file "runtime/context")
                 (:file "runtime/protocol")
                 (:file "runtime/effects")
                 (:file "app/application-extension")
@@ -170,8 +173,8 @@
                 ;; ----------------------------------------------------------------
                 (:file "pipeline")
                 (:file "platform/driver" :depends-on ("core/system-events" "pipeline"))
-                (:file "tools/packager")
-                (:file "tools/examples-runner")
+
+
                 (:file "dev/dev")
                 (:file "elmtui"))
   ;; Build a binary:

@@ -7,6 +7,8 @@
   (:import-from :cl-events.channel
    :make-channel :make-filtered-channel :channel-add-filter :channel-remove-filter
    :-> :<- :select :no-wait)
+  (:import-from :cl-events.loop
+   #:poll-until)
   ;; Removed duplicate :nicknames, :use, and :import-from clauses that were here
   (:export
    ;; class names
@@ -133,32 +135,18 @@
 
 
 (defun try-receive-event (chan &optional timeout)
-  "Attempt to pull a message from CHAN.
-Returns the message, or NIL on timeout / no data."
-  (let* ((raw       (channel-of chan))
-         (deadline  (when (and timeout (plusp timeout)) ; Ensure timeout is positive
-                      (+ (get-internal-real-time)
-                         (* timeout internal-time-units-per-second)))))
-    (loop
-      ;; non-blocking receive; NO-WAIT consumes one message when present.
-      (let ((msg (no-wait raw :send nil)))
-        (when msg
-          (return msg)))
-      ;; timed-out?
-      (when (and deadline ; Only check deadline if it was calculated
-                 (> (get-internal-real-time) deadline))
-        (return nil))
-      ;; If no timeout, and no data, this loop would be infinite without a break.
-      ;; However, try-receive-event is typically called when a timeout is expected
-      ;; or in a context where blocking indefinitely is not desired.
-      ;; For a non-timeout scenario, one might expect receive-event.
-      ;; If timeout is nil or not positive, and no data, this will busy-wait with sleep.
-      ;; This behavior might need further review based on intended use cases of try-receive-event without a valid timeout.
-      (unless deadline ; If no valid timeout, and no data, don't loop indefinitely if not intended.
-        (return nil)) ; Or, if it should block, this part needs rethinking. Assuming non-blocking intent if no valid timeout.
+  "Try to receive one event from CHAN, optionally waiting up to TIMEOUT seconds.
 
-      ;; back-off a touch to avoid a busy loop
-      (sleep 0.001))))
+With NIL or zero TIMEOUT this performs exactly one non-blocking probe.  A
+positive TIMEOUT repeatedly probes through CL-EVENTS.LOOP:POLL-UNTIL and returns
+NIL when the deadline expires.  The event is consumed when returned.
+
+Mutation: consumes at most one item from CHAN's underlying queue.
+Conditions: channel/probe conditions are propagated unchanged; none are
+silently converted to NIL."
+  (let ((raw (channel-of chan)))
+    (poll-until (lambda () (no-wait raw :send nil))
+                :timeout (or timeout 0))))
 
 (defun set-channel-priority (chan new) (setf (priority chan) new))
 (defun channel-priority      (chan)    (priority chan))
@@ -196,31 +184,26 @@ Returns the message, or NIL on timeout / no data."
 ;;         (return nil))
 ;;       ;; 3) short pause – avoids pegging a core --------------------
 ;;       (sleep 0.001))))
-(defun wait-for-event (event-channels &key timeout) ; Argument is now list of event-channel wrapper objects
-  "Block until the **first ready event** arrives on one of EVENT-CHANNELS.
-   Channels are probed in priority order.
-   Returns two values: *EVENT* and the originating *EVENT-CHANNEL* object,
-   or NIL if TIMEOUT (seconds) expires.
+(defun wait-for-event (event-channels &key timeout)
+  "Wait for the first ready event from EVENT-CHANNELS.
 
-   Use timeout to limit the wait duration in case you want to realize some
-   responsiveness in your application. If TIMEOUT is NIL or not positive,
-    the function will block indefinitely until an event is received."
-  (let* ((deadline  (when (and timeout (plusp timeout)) ; Ensure timeout is positive
-                      (+ (get-internal-real-time)
-                         (* timeout internal-time-units-per-second)))))
-    (loop named event-poll-loop
-          ;; 1) scan in priority order ---------------------------------
-          do (dolist (ec event-channels) ; caller should pass channels in priority order
-               (let ((raw-channel (channel-of ec)))
-                 ;; NO-WAIT performs the receive itself when data is available.
-                 (let ((event (no-wait raw-channel :send nil)))
-                   (when event
-                     (return-from event-poll-loop (values event ec))))))
-             ;; 2) maybe timeout? -----------------------------------------
-          when (and deadline ; Only check deadline if it was calculated
-                    (> (get-internal-real-time) deadline))
-            do (progn
-                 (return-from event-poll-loop nil))
-               ;; 3) short pause – avoids pegging a core --------------------
-          do (progn
-               (sleep 0.001)))))
+Channels are stably ordered by PRIORITY before each wait: :HIGH, :NORMAL, then
+:LOW.  Returns two values, EVENT and its EVENT-CHANNEL.  TIMEOUT is in seconds;
+NIL waits indefinitely and zero performs one scan.
+
+All repeated probing, deadline handling, and cooperative sleeping are delegated
+to CL-EVENTS.LOOP:POLL-UNTIL so the runtime has one polling implementation.
+
+Mutation: consumes exactly one queued event on success.
+Conditions: channel/probe conditions propagate to the caller unchanged."
+  (let ((ordered (stable-sort (copy-list event-channels)
+                              #'<
+                              :key (lambda (channel)
+                                     (%priority-weight (priority channel))))))
+    (poll-until
+     (lambda ()
+       (dolist (event-channel ordered (values nil nil))
+         (let ((event (no-wait (channel-of event-channel) :send nil)))
+           (when event
+             (return (values event event-channel))))))
+     :timeout timeout)))

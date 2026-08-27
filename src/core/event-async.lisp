@@ -8,6 +8,7 @@
                 #:register-event-handler
                 #:unregister-event-handler)
   (:import-from :elmtui.core.event-types
+                #:ui-event-p
                 #:ui-event-type
                 #:ui-event-target)
   (:export #:event-promise))
@@ -21,11 +22,13 @@
   reason)
 
 (defun %event-type-of (event)
-  (or (ignore-errors (ui-event-type event))
+  (if (ui-event-p event)
+      (ui-event-type event)
       (and (consp event) (getf event :type))))
 
 (defun %event-target-of (event)
-  (or (ignore-errors (ui-event-target event))
+  (if (ui-event-p event)
+      (ui-event-target event)
       (and (consp event) (getf event :target))))
 
 (defun event-promise (event-type &key target timeout channel)

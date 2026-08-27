@@ -15,17 +15,39 @@
 (uiop:define-package :elmtui.core.errors
   (:use :cl)
   (:import-from :alexandria #:when-let)
-  (:export #:elmtui-error
-    #:state-error
-    #:component-error
-    #:defcomponent-error
-    #:dsl-error
-    #:backend-error
-    #:make-elmtui-error
-    #:error-with-context
-    #:suggest-fixes
-    #:development-mode-p
-    #:with-error-context))
+  (:export
+   #:elmtui-condition
+   #:elmtui-information
+   #:elmtui-warning
+   #:+diagnostic-context-keys+
+   #:diagnostic-context-key-p
+   #:elmtui-error
+   #:elmtui-error-message
+   #:elmtui-error-context
+   #:elmtui-error-suggestions
+   #:elmtui-error-module
+   #:state-error
+   #:state-error-operation
+   #:state-error-path
+   #:state-error-type
+   #:component-error
+   #:component-error-type
+   #:component-error-id
+   #:component-error-operation
+   #:defcomponent-error
+   #:defcomponent-error-arg
+   #:defcomponent-error-validation-type
+   #:dsl-error
+   #:dsl-error-form
+   #:dsl-error-position
+   #:backend-error
+   #:backend-error-type
+   #:backend-error-operation
+   #:make-elmtui-error
+   #:error-with-context
+   #:suggest-fixes
+   #:development-mode-p
+   #:with-error-context))
 
 (in-package :elmtui.core.errors)
 
@@ -45,34 +67,84 @@
 ;;; Base Error Classes
 ;;;===================================================================
 
-(define-condition elmtui-error (error)
-  ((context :initarg :context
-     :initform nil
-     :reader elmtui-error-context
-     :documentation "Additional context information (path, component-id, etc.)")
-    (suggestions :initarg :suggestions
-      :initform nil
-      :reader elmtui-error-suggestions
-      :documentation "List of suggested fixes")
-    (module :initarg :module
-      :initform nil
-      :reader elmtui-error-module
-      :documentation "Module where error occurred"))
-  (:report (lambda (condition stream)
-             (format stream "~A~@[~&Context: ~A~]~%~@[[~A]~]~%~@{~&   Suggestion: ~A~^~%~}"
-               (type-of condition)
-               (elmtui-error-context condition)
-               (elmtui-error-module condition)
-               (elmtui-error-suggestions condition)))))
+(define-condition elmtui-condition (condition) ()
+  (:documentation
+   "Inspectable root for maintained ElmTUI framework conditions.
+
+ELMTUI-INFORMATION, ELMTUI-WARNING, and ELMTUI-ERROR form the public severity
+families. Subsystem conditions remain inspectable through their concrete type
+while a handler on ELMTUI-CONDITION can observe the whole framework family."))
+
+(define-condition elmtui-information (elmtui-condition) ()
+  (:documentation "Base class for non-warning informational ElmTUI conditions."))
+
+(define-condition elmtui-warning (warning elmtui-condition) ()
+  (:documentation "Base class for ElmTUI warnings."))
+
+(defparameter +diagnostic-context-keys+
+  '(:operation :component-id :component-path :state-path :backend
+    :message :event :offending-value :expected-type :underlying-condition)
+  "Canonical keys for structured ElmTUI diagnostic context.
+
+The vocabulary is deliberately small and orthogonal: operation identifies the
+action, component/state/backend keys identify ownership and location,
+message/event identifies runtime input, offending-value and expected-type
+explain validation failures, and underlying-condition preserves causal errors.")
+
+(defun diagnostic-context-key-p (key)
+  "Return true when KEY belongs to the canonical diagnostic context vocabulary."
+  (and (keywordp key) (member key +diagnostic-context-keys+ :test #'eq)))
+
+(define-condition elmtui-error (error elmtui-condition)
+  ((message
+    :initarg :message
+    :initform nil
+    :reader elmtui-error-message
+    :documentation "Optional human-readable summary of the failure.")
+   (context
+    :initarg :context
+    :initform nil
+    :reader elmtui-error-context
+    :documentation "Inspectable structured context, conventionally an association list.")
+   (suggestions
+    :initarg :suggestions
+    :initform nil
+    :reader elmtui-error-suggestions
+    :documentation "Ordered list of actionable recovery suggestions.")
+   (module
+    :initarg :module
+    :initform nil
+    :reader elmtui-error-module
+    :documentation "Logical module or subsystem where the condition originated."))
+  (:documentation
+   "Base error condition for ElmTUI failures.
+
+Instances are intended to remain inspectable in the debugger: MESSAGE summarizes
+the failure, CONTEXT carries machine-readable details, MODULE identifies the
+subsystem, and SUGGESTIONS provides human-oriented remediation.  Signaling this
+condition does not mutate application state; callers may establish handlers and
+invoke restarts supplied around the signaling operation.")
+  (:report
+   (lambda (condition stream)
+     (format stream "~A~@[: ~A~]~@[~&Context: ~A~]~%~@[[~A]~]~%~@{~&   Suggestion: ~A~^~%~}"
+             (type-of condition)
+             (elmtui-error-message condition)
+             (elmtui-error-context condition)
+             (elmtui-error-module condition)
+             (elmtui-error-suggestions condition)))))
 
 (defmethod print-object ((obj elmtui-error) stream)
-  (print-unreadable-object (obj stream :type t)
-    (when-let ((context (elmtui-error-context obj)))
-      (format stream " context: ~A" context))
-    (when-let ((module (elmtui-error-module obj)))
-      (format stream " module: ~A" module))
-    (when-let ((suggestions (elmtui-error-suggestions obj)))
-      (format stream " suggestions: ~A" suggestions))))
+  ;; Preserve the historical exact-ELMTUI-ERROR debugger representation while
+  ;; allowing newly migrated subclasses to keep DEFINE-CONDITION :REPORT output.
+  (if (eq (class-of obj) (find-class 'elmtui-error))
+      (print-unreadable-object (obj stream :type t)
+        (when-let ((context (elmtui-error-context obj)))
+          (format stream " context: ~A" context))
+        (when-let ((module (elmtui-error-module obj)))
+          (format stream " module: ~A" module))
+        (when-let ((suggestions (elmtui-error-suggestions obj)))
+          (format stream " suggestions: ~A" suggestions)))
+      (call-next-method)))
 
 (define-condition state-error (elmtui-error)
   ((operation :initarg :operation
@@ -205,39 +277,43 @@
 ;;; Error Construction Helpers
 ;;;===================================================================
 
-(defun make-elmtui-error (type &rest args &key message context suggestions module &allow-other-keys)
-  "
-Create an Elmtui error condition with enhanced context and suggestions.
+(defun make-elmtui-error (type &rest args
+                         &key message context suggestions module
+                         &allow-other-keys)
+  "Construct and return an inspectable ElmTUI condition of TYPE.
 
-This function constructs and returns a condition of the specified ~type~ (typically a subclass of ~elmtui-error~), allowing you to supply additional metadata for improved diagnostics.
+Arguments:
+  TYPE is ELMTUI-ERROR or one of its subclasses. MESSAGE is an optional concise
+  summary. CONTEXT is preserved as the caller supplied it, so structured
+  plists/alists remain debugger-inspectable. SUGGESTIONS is normalized to a
+  list. MODULE identifies the logical subsystem. Remaining keyword arguments
+  are passed to MAKE-CONDITION for subclass-specific slots.
 
-+ ~type~: The condition type to create (e.g., ~'elmtui-error~ or a subclass).
-+ ~args~: Additional keyword arguments for the condition constructor.
-+ ~message~: A human-readable error message (string).
-+ ~context~: Additional context information (string or object, coerced to string).
-+ ~suggestions~: A list (or single value) of suggestions for resolving the error.
-+ ~module~: The module or subsystem where the error originated.
+Returns:
+  A condition object. The condition is not signaled by this function.
 
-All other keyword arguments in ~args~ are passed through to the condition constructor, except for ~:message~, ~:context~, ~:suggestions~, and ~:module~, which are handled explicitly.
+Mutation:
+  None. Caller-owned CONTEXT and SUGGESTIONS are referenced, not modified.
 
-*Example usage:*
-(make-elmtui-error 'elmtui-error
-  :message \"Invalid widget state\"
-  :context '(:widget-id 42)
-  :suggestions '(\"Check widget initialization\" \"Ensure state is not nil\")
-  :module \"ui/widgets/button.lisp\")
-This function is useful for creating rich, informative error conditions throughout the Elmtui system.
-"
-  (let ((base-args (remove-from-plist args :message :context :suggestions :module)))
+Conditions:
+  MAKE-CONDITION may signal an error when TYPE is unknown or required
+  subclass initargs are missing. Those conditions propagate unchanged.
+
+Example:
+  (make-elmtui-error 'state-error
+    :message \"Counter state is invalid\"
+    :operation :update
+    :path '(:counter :value)
+    :state-type :plist
+    :context '((:component-id . :counter)))"
+  (let ((base-args
+          (remove-from-plist args :message :context :suggestions :module)))
     (apply #'make-condition type
-      :message message
-      :context (when context
-                 (if (stringp context)
-                   context
-                   (format nil "~A" context)))
-      :suggestions (ensure-list suggestions)
-      :module module
-      base-args)))
+           :message message
+           :context context
+           :suggestions (ensure-list suggestions)
+           :module module
+           base-args)))
 
 (defun error-with-context (error-type &rest args)
   "Signal an error with rich context information."
@@ -257,36 +333,60 @@ This function is useful for creating rich, informative error conditions througho
 ;;;===================================================================
 
 (defmacro with-error-context ((&key context module operation component-id macro-arg) &body body)
-  "Execute BODY with enhanced error context for any elmtui-error signaled.
+  "Annotate ElmTUI errors signaled by BODY without replacing the condition object.
 
-This macro allows you to provide additional contextual information (such as :operation, :component-id, :macro-arg, :module, and :context) that will be appended to the error context if an elmtui-error is signaled during the execution of BODY.
+CONTEXT, MODULE, OPERATION, COMPONENT-ID, and MACRO-ARG are evaluated once.  If
+BODY signals ELMTUI-ERROR, the same condition object is enriched in place and
+continues through the active condition machinery.  Preserving object identity
+also preserves every subclass slot, debugger state, and restart association.
 
-If an elmtui-error is caught, a new condition of the same type is constructed with:
-+ The original context, plus any extra context provided via keyword arguments.
-+ The :module slot set to the supplied value or the original error's module.
-+ The :suggestions slot preserved from the original error.
-+ All other slots from the original error, except those explicitly overridden.
+Existing structured context is retained.  Non-list context is wrapped as a
+:CONTEXT entry before new entries are appended.  MODULE, when non-NIL, also
+updates the condition's module slot.
 
-This is useful for debugging and tracing errors in complex systems, as it allows you to annotate errors with precise, dynamic context at the point where they occur.
+Mutation: mutates only diagnostic slots of a signaled ELMTUI-ERROR; application
+state is untouched.
+Conditions: does not catch or suppress ELMTUI-ERROR.  The original condition
+continues outward and remains available to HANDLER-BIND, the debugger, and
+active restarts.
 
-Example usage:
-  (with-error-context (:operation \"update\" :component-id 42)
-    (do-something-that-might-error))"
-  `(handler-case
-     (progn ,@body)
-     (elmtui-error (err)
-       (let* ((new-context (append (slot-value err 'context)
-                             (remove nil (list
-                                           ,@(when context      `((cons :context ,context)))
-                                           ,@(when module       `((cons :module ,module)))
-                                           ,@(when operation    `((cons :operation ,operation)))
-                                           ,@(when component-id `((cons :component-id ,component-id)))
-                                           ,@(when macro-arg    `((cons :macro-arg ,macro-arg)))))))
-               (new-error (make-condition (type-of err)
-                            :context new-context
-                            :module (or ,module (slot-value err 'module))
-                            :suggestions (slot-value err 'suggestions))))
-          (error new-error)))))
+Example:
+  (with-error-context (:module :renderer :operation :draw :component-id id)
+    (render-component component))"
+  (let ((context-var (gensym "CONTEXT"))
+        (module-var (gensym "MODULE"))
+        (operation-var (gensym "OPERATION"))
+        (component-id-var (gensym "COMPONENT-ID"))
+        (macro-arg-var (gensym "MACRO-ARG")))
+    `(let ((,context-var ,context)
+           (,module-var ,module)
+           (,operation-var ,operation)
+           (,component-id-var ,component-id)
+           (,macro-arg-var ,macro-arg))
+       (handler-bind
+           ((elmtui-error
+              (lambda (condition)
+                (let* ((old-context (elmtui-error-context condition))
+                       (normalized
+                         (cond
+                           ((null old-context) nil)
+                           ((listp old-context) old-context)
+                           (t (list (cons :context old-context)))))
+                       (extra
+                         (remove nil
+                                 (list
+                                  (when ,context-var (cons :context ,context-var))
+                                  (when ,module-var (cons :module ,module-var))
+                                  (when ,operation-var (cons :operation ,operation-var))
+                                  (when ,component-id-var
+                                    (cons :component-id ,component-id-var))
+                                  (when ,macro-arg-var (cons :macro-arg ,macro-arg-var))))))
+                  (setf (slot-value condition 'elmtui.core.errors::context)
+                        (append normalized extra))
+                  (when ,module-var
+                    (setf (slot-value condition 'elmtui.core.errors::module)
+                          ,module-var))))))
+         ,@body))))
 
 
 

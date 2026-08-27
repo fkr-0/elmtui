@@ -9,6 +9,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :sources
+(:implicit-file :type :file-system :system-files ("elmtui-docs.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui-examples.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui-tests.asd"))
 (:implicit-file :type :file-system :system-files
@@ -33,6 +34,7 @@
 (:system :name "log4cl" :source "quicklisp")
 (:project :name "fiveam" :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379"
  :source :implicit-vcs)
+(:asd-file :name "elmtui-docs.asd")
 (:asd-file :name "elmtui-examples.asd")
 (:asd-file :name "elmtui-tests.asd")
 (:asd-file :name "elmtui-widgets-enhanced.asd")
@@ -61,6 +63,8 @@
  ("cl-state"))
 ("cl-styles/cl-styles.asd" :version :newest :source :implicit-file :systems
  ("cl-styles" "cl-styles/tests"))
+("elmtui-docs.asd" :version :newest :source :implicit-file :systems
+ ("elmtui-docs"))
 ("elmtui-examples.asd" :version :newest :source :implicit-file :systems
  ("elmtui-examples"))
 ("elmtui-tests.asd" :version :newest :source :implicit-file :systems
@@ -118,6 +122,8 @@
  ((:system :name "cl-styles/tests") (:system :name "cl-styles"))
  (t (:asd-file :name "cl-styles/cl-styles.asd")))
 
+("elmtui-docs.asd" (t (:asd-file :name "elmtui-docs.asd")))
+
 ("elmtui-examples.asd" (t (:asd-file :name "elmtui-examples.asd")))
 
 ("elmtui-tests.asd" (t (:asd-file :name "elmtui-tests.asd")))
@@ -132,6 +138,7 @@
  ((:system :name "elmtui-widgets-enhanced") (:system :name "elmtui"))
  ((:system :name "elmtui-tests") (:system :name "elmtui"))
  ((:system :name "elmtui-examples") (:system :name "elmtui"))
+ ((:system :name "elmtui-docs") (:system :name "elmtui"))
  (t (:asd-file :name "elmtui.asd")))
 
 ("fiveam" ((:system :name "fiveam/test") (:system :name "fiveam"))

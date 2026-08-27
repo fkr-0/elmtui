@@ -78,3 +78,13 @@
                                      :command-interpreter #'interpreter)
       (is (= 1 installed))
       (is (= 1 (hash-table-count table))))))
+
+(test reconcile-subscriptions-propagates-unexpected-subscription-errors
+  (let ((table (make-hash-table :test 'equal)))
+    (signals error
+      (reconcile-model-subscriptions
+       (lambda (_model)
+         (declare (ignore _model))
+         (error "subscription boom"))
+       nil table))
+    (is (= 0 (hash-table-count table)))))

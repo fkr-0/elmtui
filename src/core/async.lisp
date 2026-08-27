@@ -31,7 +31,7 @@
 (defvar *async-tasks* (make-hash-table :test 'equal) "Active async tasks.") ;; Still not used for cancellation
 (defvar *async-errors* (make-hash-table :test 'equal) "Async task errors.")
 
-(define-condition promise-cancelled-condition (error)
+(define-condition promise-cancelled-condition (elmtui.core.errors:elmtui-error)
   ((message :initarg :message :reader promise-cancelled-message))
   (:report (lambda (c s)
              (format s "~A" (promise-cancelled-message c)))))
@@ -57,18 +57,42 @@
 ;;;-----------------------------------------------------------------------------
 
 (defun cmd-async (function &key args on-complete on-error timeout cancellation-fn)
-  "Construct a CMD that will run FUNCTION with ARGS asynchronously.
-   Parameters:
-   - FUNCTION: The function to execute asynchronously
-   - ARGS: Arguments to pass to the function
-   - ON-COMPLETE: Optional function to call when task completes successfully
-   - ON-ERROR: Optional function to call when task fails
-   - TIMEOUT: Optional timeout in seconds after which the task is cancelled
-   - CANCELLATION-FN: Optional function to call when the task is cancelled
+  "Construct an asynchronous ElmTUI command around FUNCTION.
 
-   The function should accept a progress-callback as its first argument,
-   followed by the specified ARGS.
-   The progress-callback can be called with arbitrary data to report progress."
+Arguments:
+  FUNCTION receives a progress callback followed by ARGS. ON-COMPLETE maps a
+  successful result to an application message; ON-ERROR maps a failure to an
+  application message. TIMEOUT schedules promise cancellation after the given
+  seconds. CANCELLATION-FN is optional best-effort cancellation cleanup.
+
+Returns:
+  A command plist beginning with :ASYNC and containing the task, generated task
+  id, promise, and completion/error callbacks. Execution does not begin until
+  INTERPRET-CMD processes the command.
+
+Mutation:
+  Allocates task/promise objects. Once interpreted, the worker resolves/rejects
+  the promise and sends progress/completion/error messages through *APP-SENDER*.
+  A timeout may invoke CANCELLATION-FN and cancel the promise.
+
+Conditions:
+  Construction errors are exposed through ASYNC-TASK-ERROR recovery. Worker
+  errors reject the promise, optionally emit ON-ERROR output, and remain
+  available when the task is awaited. CANCELLATION-FN failures are currently
+  deliberately suppressed during timeout cleanup.
+
+Restarts:
+  Construction is wrapped by WITH-RECOVERY with IGNORE-TASK and RETRY. Retrying
+  construction may allocate a new task/promise pair.
+
+Example:
+  (cmd-async (lambda (progress value)
+               (funcall progress '(:phase :working))
+               (1+ value))
+             :args '(41)
+             :on-complete
+             (lambda (result)
+               `(:lookup-succeeded :result ,result)))"
   (elmtui.core.conditions:with-recovery (elmtui.core.conditions:async-task-error :restarts '(:ignore-task :retry))
     (let* ((task-id (gensym "TASK-"))
            (promise (make-promise))
@@ -114,7 +138,10 @@
          timeout
          (lambda ()
            (when cancellation-fn
-             (ignore-errors (funcall cancellation-fn)))
+             (handler-case
+                 (funcall cancellation-fn)
+               (error (condition)
+                 (log4cl:log-warn "ASYNC: cancellation cleanup failed: ~A" condition))))
            (promise-cancel promise))))
       ;; Store task ID along with the task object in the command
       ;; The command structure is now (:async :task <task-obj> :id <task-id> :promise <promise>)
@@ -164,34 +191,66 @@
 
 
 
-(defmacro with-async-restarts ((condition-var) &body forms) ; Renamed body to forms
-  "Handle async task failures with DRY restarts: ignore, rollback, replace, provide result."
-  `(block with-async-restarts
-     (handler-bind
-         ((elmtui.core.conditions:async-task-error
-            (lambda (,condition-var)
-              (elmtui.core.conditions:log-condition ,condition-var)
-              (restart-case
-                  (signal ,condition-var)
-                (ignore-task ()
-                  :report "Ignore/discard this async task."
-                  (return-from with-async-restarts nil))
-                ;; (rollback-state ()
-                ;;   :report "Rollback state to previous checkpoint."
-                ;;   ;; Call the imported rollback-state function
-                ;;   (rollback-state)
-                ;;   (return-from with-async-restarts nil))
-                (replace-task (new-task)
-                  :report "Replace the async task interactively or programmatically."
-                  ;; Return the new task value, don't funcall body
-                  (return-from with-async-restarts new-task))
-                (provide-result (result)
-                  :report "Provide a custom result for this task."
-                  (return-from with-async-restarts result))
-                (retry ()
-                  :report "Retry the async task."
-                  (return-from with-async-restarts (progn ,@forms))))))) ; Use forms
-       ,@forms)))
+(defmacro with-async-restarts ((condition-var) &body forms)
+  "Execute FORMS with async-task recovery restarts around the operation.
+
+Arguments:
+  CONDITION-VAR names an ELMTUI.CORE.CONDITIONS:ASYNC-TASK-ERROR while its
+  handler is active. FORMS are the operation to execute.
+
+Returns:
+  The values of FORMS on success. IGNORE-TASK returns NIL, REPLACE-TASK returns
+  the supplied replacement task, PROVIDE-RESULT returns the supplied result,
+  and RETRY re-executes FORMS.
+
+Mutation:
+  The macro itself only logs signaled async-task conditions. FORMS controls
+  application mutation. RETRY can repeat effects, so use it only around work
+  whose retry semantics are safe, idempotent, or otherwise explicitly handled.
+
+Conditions:
+  ASYNC-TASK-ERROR is observed with HANDLER-BIND but is not reconstructed or
+  re-signaled. If no handler/debugger invokes a restart, the original condition
+  propagates normally with its identity and debugger context intact.
+
+Restarts:
+  IGNORE-TASK, REPLACE-TASK, PROVIDE-RESULT, the standard Common Lisp
+  USE-VALUE, and RETRY are active while FORMS executes. USE-VALUE is the
+  preferred programmatic value-substitution restart across package boundaries.
+
+Example:
+  (handler-bind
+      ((elmtui.core.conditions:async-task-error
+         (lambda (condition)
+           (declare (ignore condition))
+           (invoke-restart 'use-value :cached))))
+    (with-async-restarts (_condition)
+      (run-async-operation)))"
+  (let ((attempt (gensym "ATTEMPT")))
+    `(labels ((,attempt ()
+                (restart-case
+                    (handler-bind
+                        ((elmtui.core.conditions:async-task-error
+                           (lambda (,condition-var)
+                             (elmtui.core.conditions:log-condition
+                              ,condition-var))))
+                      ,@forms)
+                  (ignore-task ()
+                    :report "Ignore/discard this async task."
+                    nil)
+                  (replace-task (new-task)
+                    :report "Replace the async task interactively or programmatically."
+                    new-task)
+                  (provide-result (result)
+                    :report "Provide a custom result for this task."
+                    result)
+                  (use-value (result)
+                    :report "Supply a replacement result using the standard Common Lisp restart."
+                    result)
+                  (retry ()
+                    :report "Retry the async task."
+                    (,attempt)))))
+       (,attempt))))
 
 (defun cmd-recurring (interval-seconds function &key args on-message stop-condition max-iterations)
   "Create a recurring command that runs periodically.
@@ -237,36 +296,40 @@
 ;;;-----------------------------------------------------------------------------
 
 (defun interpret-cmd (cmd)
-  "Execute CMD: spawn async-task(s) or sequence.
-Handles errors with restarts and async-task-error.
+  "Interpret and execute one ElmTUI command.
 
-   Parameters:
-   - CMD: Command structure to interpret, can be of type :async, :batch, :dispatch, or :recurring-task.
+Arguments:
+  CMD begins with one of :ASYNC, :BATCH, :DISPATCH, or :RECURRING-TASK.
+  *APP-SENDER* must name a callable application-message sink.
 
-   Returns:
-   - For :async: Returns the task object and promise.
-   - For :batch: Returns a list of results from each command in the batch.
-   - For :dispatch: Returns nil (no task).
-   - For :recurring-task: Returns the task ID.
+Returns:
+  :ASYNC returns two values, its task and promise. :BATCH returns a list of
+  recursively interpreted results. :DISPATCH sends its payload and returns NIL.
+  :RECURRING-TASK starts its worker and returns its task id. Unknown command
+  kinds return (:UNKNOWN KIND) after a warning.
 
-   Errors are handled with restarts, allowing for recovery or cancellation.
-   If an error occurs during execution, it will signal an async-task-error condition
-   which can be handled with the provided restarts:
-   - ignore-task: Ignore the error and continue.
-   - rollback-state: Rollback the application state to the last checkpoint.
-   - replace-task: Replace the task with a new one.
-   - provide-result: Provide a custom result for the task.
-   - retry: Retry the async task.
-   This function is the main entry point for executing commands in the application.
+Mutation:
+  :ASYNC stores the task in *ASYNC-TASKS* and starts it. :DISPATCH sends a
+  message. :RECURRING-TASK creates/stores a worker thread whose function may
+  perform its documented effects and emit messages. The application model is
+  changed only later through messages/update, not directly by this interpreter.
 
-  Example usage:
-    (interpret-cmd (cmd-async #'my-function :args '(1 2 3)
-                    :on-complete #'my-on-complete
-                    :on-error #'my-on-error)
-    => Returns a promise that can be awaited.
- (interpret-cmd (cmd-batch '((:async :task #'task1 :id 'task1-id)
-                                 (:async :task #'task2 :id 'task2-id))
-"
+Conditions:
+  Missing *APP-SENDER* is an error. Command execution failures are translated
+  to ASYNC-TASK-ERROR with CMD in the task slot and the original condition in
+  the reason slot.
+
+Restarts:
+  WITH-ASYNC-RESTARTS keeps the original ASYNC-TASK-ERROR inspectable while
+  offering IGNORE-TASK, REPLACE-TASK, PROVIDE-RESULT, standard USE-VALUE, and
+  RETRY. RETRY can repeat command side effects and is safe only when the command
+  operation is idempotent or otherwise transactionally protected.
+
+Example:
+  (multiple-value-bind (task promise)
+      (interpret-cmd
+       (cmd-async (lambda (_progress) :ready)))
+    (values task promise))"
 
   ;;Ensure we have a valid *app-sender* to send messages
   (unless *app-sender*
@@ -348,7 +411,37 @@ Handles errors with restarts and async-task-error.
         (error 'elmtui.core.conditions:async-task-error :task cmd :reason e)))))
 
 (defun await-cmd (cmd)
-  "Wait for CMD (async-task) to finish and return result. Handles async-task-error."
+  "Wait for CMD and return its completed result.
+
+Arguments:
+  CMD is an ElmTUI command structure. :ASYNC commands are awaited directly;
+  :BATCH commands are awaited recursively; :DISPATCH returns NIL.
+
+Returns:
+  The async task result, a list of batch results, or NIL for non-awaitable
+  command kinds.
+
+Mutation:
+  Waiting does not mutate application state, but the worker being awaited may
+  already have performed its documented effects and promise transitions.
+
+Conditions:
+  Worker failures are translated to ASYNC-TASK-ERROR while preserving the
+  original failure as the condition reason. Unknown command kinds are warned
+  about and return NIL.
+
+Restarts:
+  WITH-ASYNC-RESTARTS establishes IGNORE-TASK, REPLACE-TASK, PROVIDE-RESULT,
+  standard USE-VALUE, and RETRY while the await operation is active. RETRY may
+  repeat an await and must not be confused with rerunning an arbitrary effect.
+
+Example:
+  (handler-bind
+      ((elmtui.core.conditions:async-task-error
+         (lambda (condition)
+           (declare (ignore condition))
+           (invoke-restart 'use-value :cached))))
+    (await-cmd command))"
   (with-async-restarts (c)
     (let ((cmd-type (car cmd)))
       (case cmd-type
@@ -362,7 +455,31 @@ Handles errors with restarts and async-task-error.
         (otherwise (log:warn "Cannot await unknown command type: ~A" cmd-type) nil)))))
 
 (defun cancel-cmd (cmd)
-  "Cancel CMD (async-task). Handles async-task-error."
+  "Cancel CMD according to its command kind.
+
+Arguments:
+  CMD is an ElmTUI command structure. For :ASYNC commands the associated task
+  and promise are cancelled; batches are traversed recursively where supported.
+
+Returns:
+  The command-kind-specific cancellation result, conventionally true/NIL.
+
+Mutation:
+  Mutates task/promise lifecycle state and the async task registry as required
+  by the command implementation. It does not directly mutate the application
+  model.
+
+Conditions:
+  Cancellation failures are exposed as ASYNC-TASK-ERROR. Unknown/non-cancellable
+  commands may warn and return NIL.
+
+Restarts:
+  The standard async recovery restarts are active while cancellation runs.
+  Retrying cancellation is intended to be safe only for cancellation backends
+  whose operation is idempotent.
+
+Example:
+  (cancel-cmd command)"
   (with-async-restarts (c)
     (let ((cmd-type (car cmd)))
       (case cmd-type
