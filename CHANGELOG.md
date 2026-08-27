@@ -49,6 +49,9 @@ The project follows semantic versioning from the first published release.
   structured ElmTUI error hierarchy.
 - Fixed enhanced label style construction and preserved arbitrary button action
   payloads through the widget contract.
+- Fixed reactive state dependencies so observer invalidations schedule an actual
+  debounced render instead of returning an uninterpreted async command; cleanup
+  now cancels pending debounce work before shutting the view down.
 
 - Quarantined local debug, review, generated-release, editor, and agent artifacts
   from the release surface without deleting preserved workspace material.

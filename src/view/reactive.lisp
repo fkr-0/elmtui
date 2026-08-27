@@ -79,37 +79,31 @@
     ;; Return the view
     view))
 (defun invalidate-view (view)
-  "Marks a reactive view as needing to be re-rendered.
-   Returns a command to schedule a render with debouncing."
+  "Mark VIEW invalid and enqueue one debounced render request.
+
+Observer callbacks call this function directly, outside the Elm command
+interpreter.  The debounce therefore uses CL-EVENTS.ASYNC:SCHEDULE-AFTER rather
+than constructing a CMD-ASYNC value that nobody would execute.
+
+Returns the active debounce thread when one is pending, otherwise NIL."
   (check-type view reactive-view)
-
-  ;; Mark as invalidated
   (setf (view-invalidated-p view) t)
-
-  ;; Only return a command if not already debouncing
   (unless (view-debounce-timer view)
-    (setf (view-debounce-timer view) t)
-    ;; Return a command to handle the debounce and send the update
-    (let ((view-id (view-id view))
-          (channel (view-update-channel view)))
+    (let ((channel (view-update-channel view))
+          (view-id (view-id view)))
       (log:debug "Invalidating reactive view: ~A" view-id)
-      (elmtui.core.async:cmd-async
-       (lambda ()
-         ;; Wait for debounce period
-         (sleep (/ *view-invalidation-debounce* 1000.0))
-         ;; Send update message
-         (-> channel :render)
-         ;; Reset debounce timer, then re-check for changes missed during debounce
-         (setf (view-debounce-timer view) nil)
-         (when (view-invalidated-p view)
-           (setf (view-invalidated-p view) nil)
-           (setf (view-debounce-timer view) t)
-           (let ((channel (view-update-channel view)))
-             (elmtui.core.async:cmd-async
-              (lambda ()
-                (sleep (/ *view-invalidation-debounce* 1000.0))
-                (-> channel :render)
-                (setf (view-debounce-timer view) nil))))))))))
+      ;; Use a sentinel before spawning so an extremely short debounce cannot
+      ;; race the thread handle assignment and leave a stale non-NIL timer.
+      (setf (view-debounce-timer view) :pending)
+      (let ((thread
+              (cl-events.async:schedule-after
+               (/ *view-invalidation-debounce* 1000.0)
+               (lambda ()
+                 (setf (view-debounce-timer view) nil)
+                 (-> channel :render)))))
+        (when (eq (view-debounce-timer view) :pending)
+          (setf (view-debounce-timer view) thread)))))
+  (view-debounce-timer view))
 ;; (defun invalidate-view (view)
 ;;   "Marks a reactive view as needing to be re-rendered.
 ;;    Schedules a render with debouncing to avoid thrashing."
@@ -200,21 +194,21 @@
                        (view-id view) msg))))))))
 
 (defun cleanup-reactive-view (view)
-  "Cleans up a reactive view, removing observers and channels."
+  "Clean up VIEW, cancel pending debounce work, and remove observers/channels."
   (check-type view reactive-view)
-
   (let ((view-id (view-id view))
-        (app-state (view-app-state view)))
-
-    ;; Remove from global registry
+        (app-state (view-app-state view))
+        (timer (view-debounce-timer view)))
+    ;; Prevent a delayed render from arriving after teardown.  :PENDING is the
+    ;; tiny pre-handle sentinel used by INVALIDATE-VIEW and is not cancellable.
+    (when (and timer (not (eq timer :pending)))
+      (cl-events.async:cancel timer))
+    (setf (view-debounce-timer view) nil)
     (remhash view-id *active-view-channels*)
     (remhash view-id *view-dependencies*)
-
-    ;; Remove all observers
     (dolist (binding (view-observers view))
       (remove-observer app-state (car binding) (cdr binding)))
-
-    ;; Send shutdown message to the view's channel
+    (setf (view-observers view) nil)
     (-> (view-update-channel view) :shutdown)))
 
 ;;;-----------------------------------------------------------------------------
