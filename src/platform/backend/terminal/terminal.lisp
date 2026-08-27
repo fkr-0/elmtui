@@ -338,15 +338,24 @@
       (flush-output instance)
       (let ((source (terminal-instance-input-source instance)))
         (when source
-          (ignore-errors (cl-inputs.loop:close-input-source source)) ;; cl-inputs cleans raw/close
+          (handler-case
+              (cl-inputs.loop:close-input-source source)
+            (error (condition)
+              (log-warn "TERMINAL: input-source cleanup failed: ~A" condition)))
           (setf (terminal-instance-input-source instance) nil)))
       (let ((device (terminal-instance-cl-device instance)))
         (when device
           ;; cl-inputs close-input-source handles restoration; device kept for stream
-          (ignore-errors (cl-inputs.device.api:close-device device))
+          (handler-case
+              (cl-inputs.device.api:close-device device)
+            (error (condition)
+              (log-warn "TERMINAL: device cleanup failed: ~A" condition)))
           (setf (terminal-instance-cl-device instance) nil)))
       (when (terminal-instance-stream instance)
-        (ignore-errors (close (terminal-instance-stream instance)))
+        (handler-case
+            (close (terminal-instance-stream instance))
+          (error (condition)
+            (log-warn "TERMINAL: stream cleanup failed: ~A" condition)))
         (setf (terminal-instance-stream instance) nil))
       (setf (terminal-instance-front-buffer instance) nil
         (terminal-instance-back-buffer instance) nil))

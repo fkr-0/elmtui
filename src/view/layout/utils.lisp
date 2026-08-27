@@ -22,10 +22,9 @@
 ;;;; ---------- style access ----------
 
 (defun %style-plist (node)
-  "Return raw style storage (plist or hash-table) from either slot."
-  (or (ignore-errors (elmtui.view.element:el/styles node))
-    (ignore-errors (elmtui.view.base-elements:element-style node))
-    nil))
+  "Return raw style storage for maintained BASE-ELEMENT nodes."
+  (and (typep node 'elmtui.view.base-elements:base-element)
+       (elmtui.view.base-elements:element-style node)))
 
 (defun style-value (node key &optional default)
   "Read KEY from style regardless of backing store shape."
@@ -46,7 +45,9 @@
 (defun percent-of (s total)
   "Return S% of TOTAL. If TOTAL is not a number, treat as 0."
   (when (percentp s)
-    (let* ((n (ignore-errors (parse-integer s :end (1- (length s))))))
+    (let ((n (handler-case
+                 (parse-integer s :end (1- (length s)))
+               (parse-error () nil))))
       (when (numberp n)
         (let ((tot (if (numberp total) (max 0 total) 0)))
           (* (/ n 100.0d0) tot))))))
@@ -60,7 +61,8 @@
 
 (defun infer-parent-content-size (el)
   "Try to infer a usable parent content size for EL."
-  (let* ((existing (ignore-errors (elmtui.view.element:el/layout-rect el)))
+  (let* ((existing (and (typep el 'elmtui.view.base-elements:base-element)
+                        (elmtui.view.element:el/layout-rect el)))
           (sw (num+ (style-value el :width nil)))
           (sh (num+ (style-value el :height nil))))
     (cond
@@ -79,14 +81,10 @@
   (length (or s "")))
 
 (defun %text-wrap (node)
-  (or (ignore-errors (elmtui.view.base-elements:text-wrap node))
-    (ignore-errors (slot-value node 'wrap))
-    t))
+  (elmtui.view.base-elements:text-wrap node))
 
 (defun %text-content (node)
-  (or (ignore-errors (elmtui.view.base-elements:text-content node))
-    (ignore-errors (slot-value node 'content))
-    ""))
+  (or (elmtui.view.base-elements:text-content node) ""))
 
 (defun measure-node-intrinsic-size (node container-w container-h)
   "Return 4 values: (minw maxw minh maxh). Never NIL.
@@ -119,15 +117,15 @@
                 (max mh (min 1    Mxh)) Mxh)))))
 
       (elmtui.view.base-elements:separator-element
-        (let ((orientation (ignore-errors (elmtui.view.base-elements:separator-orientation node)))
-               (thickness  (or (ignore-errors (elmtui.view.base-elements:separator-thickness node)) 1)))
+        (let ((orientation (elmtui.view.base-elements:separator-orientation node))
+               (thickness  (or (elmtui.view.base-elements:separator-thickness node) 1)))
           (if (eq orientation :horizontal)
             (values 0 most-positive-fixnum thickness thickness)
             (values thickness thickness 0 most-positive-fixnum))))
 
       (elmtui.view.base-elements:spacer-element
-        (let ((width  (or (ignore-errors (elmtui.view.base-elements:spacer-width node))  0))
-               (height (or (ignore-errors (elmtui.view.base-elements:spacer-height node)) 0)))
+        (let ((width  (or (elmtui.view.base-elements:spacer-width node) 0))
+               (height (or (elmtui.view.base-elements:spacer-height node) 0)))
           (values width width height height)))
 
       (t

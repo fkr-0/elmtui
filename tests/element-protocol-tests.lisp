@@ -241,8 +241,12 @@
 ;;; el/layout-rect Tests
 ;;;=============================================================================
 
-(test el/layout-rect-returns-rectangle
-  "Test el/layout-rect returns the layout rectangle"
+(test el/layout-rect-distinguishes-unlaid-from-zero-sized
+  "An element has no layout rectangle until a layout pass assigns one."
   (let ((e (normalize-base-dsl '(:label :id :test :content "Test"))))
-    (let ((rect (el/layout-rect e)))
-      (is-true (typep rect 'elmtui.view.geo::rectangle)))))
+    (is (null (el/layout-rect e)))
+    (setf (el/layout-rect e)
+          (elmtui.view.geo:make-rectangle
+           :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+           :size (elmtui.view.geo:make-size :w 0 :h 0)))
+    (is-true (typep (el/layout-rect e) 'elmtui.view.geo::rectangle))))

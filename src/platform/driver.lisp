@@ -60,6 +60,10 @@
   (:import-from :elmtui.platform.input #:cl-inputs-token->event)
   (:import-from :bordeaux-threads #:mailbox)
   (:import-from :cl-events.channel #:->)
+  (:import-from :cl-events.loop #:poll-until)
+  (:import-from :cl-state.core
+    #:*state-mutation-policy*
+    #:state-mutation-forbidden)
   (:import-from :elmtui.core.event-channels #:channel-of)
   (:export #:run-app-platform
     #:driver-context #:make-driver-context
@@ -311,7 +315,11 @@ This keeps compatibility with older examples that pass app instances."
                     (run-commands-with-policy
                      commands
                      :render-command-fn (lambda (cmd)
-                                          (ignore-errors (execute-render-command cmd *backend*)))))
+                                          (handler-case
+                                              (execute-render-command cmd *backend*)
+                                            (error (condition)
+                                              (log-warn "DRIVER: shutdown render cleanup failed: ~A"
+                                                        condition))))))
                   (error (e)
                     (log-warn "DRIVER: appshutdown cleanup failed: ~A" e))))
               (log:info "DRIVER: Setting *shutdown-requested* flag.")
@@ -340,7 +348,11 @@ This keeps compatibility with older examples that pass app instances."
                         (run-commands-with-policy
                          shutdown-commands
                          :render-command-fn (lambda (cmd)
-                                              (ignore-errors (execute-render-command cmd *backend*)))))
+                                              (handler-case
+                                                  (execute-render-command cmd *backend*)
+                                                (error (condition)
+                                                  (log-warn "DRIVER: model shutdown render cleanup failed: ~A"
+                                                            condition))))))
                     (error (e)
                       (log-warn "DRIVER: model-driven appshutdown cleanup failed: ~A" e)))
                   (setf elmtui.core.loop:*shutdown-requested* t))
@@ -353,10 +365,16 @@ This keeps compatibility with older examples that pass app instances."
                                             (error (e) (log-warn "DRIVER: render command failed: ~A" e))))
                      :command-processor-fn cmd-proc-fn
                      :message-queue message-queue
-                    :model next-model
-                    :app-config app-cfg-for-cmd
-                    :subscriptions-reconciler (lambda (model)
+                     :model next-model
+                     :app-config app-cfg-for-cmd
+                     :state-mutation-policy
+                     (if (eq (getf app-spec :state-semantics) :strict-elm)
+                         :forbid
+                         :allow)
+                     :subscriptions-reconciler (lambda (model)
                                                (%refresh-app-subscriptions app-spec model)))
+                  (state-mutation-forbidden (condition)
+                    (error condition))
                   (error (e)
                     (log-warn "DRIVER: apply-update-effects failed: ~A" e)))
 
@@ -372,6 +390,8 @@ This keeps compatibility with older examples that pass app instances."
                       (elmtui.contracts:pipeline-contract-violation (e)
                         (log:error "DRIVER: Pipeline contract violation ~A; keeping previous ctx." e)
                         (setf *last-ctx* (or *last-ctx* ctx)))
+                      (state-mutation-forbidden (condition)
+                        (error condition))
                       (error (e)
                         (log:error "DRIVER: Pipeline error ~A; keeping previous ctx." e)
                         (setf *last-ctx* (or *last-ctx* ctx))))))))))))
@@ -435,7 +455,7 @@ This keeps compatibility with older examples that pass app instances."
             (log-warn "clear-below-cursor not implemented for backend ~S" backend)))
         (:clear-above-cursor
           ;; Clear above cursor by moving to top and clearing down to cursor
-          (let ((current-pos (ignore-errors (elmtui.platform.api:get-cursor-position backend))))
+          (let ((current-pos (elmtui.platform.api:get-cursor-position backend)))
             (when current-pos
               (elmtui.platform.api:set-cursor-position backend 0 0)
               (if (fboundp 'elmtui.platform.api:clear-below-cursor)
@@ -470,13 +490,14 @@ This keeps compatibility with older examples that pass app instances."
   "Emit one startup :terminalresized message through PROC. Always emits."
   (let ((width 80)
          (height 24))
-    ;; Prefer cached backend dimensions first to avoid blocking probes in weak TTYs.
-    (let ((cached-w (ignore-errors (term-w backend)))
-          (cached-h (ignore-errors (term-h backend))))
-      (when (and (numberp cached-w) (numberp cached-h)
-                 (> cached-w 0) (> cached-h 0))
-        (setf width cached-w
-              height cached-h)))
+    ;; Prefer cached terminal dimensions first; other backends use the explicit probe below.
+    (when (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
+      (let ((cached-w (term-w backend))
+            (cached-h (term-h backend)))
+        (when (and (numberp cached-w) (numberp cached-h)
+                   (> cached-w 0) (> cached-h 0))
+          (setf width cached-w
+                height cached-h))))
     (when (or (<= width 0) (<= height 0))
       (handler-case
           (multiple-value-bind (w h) (get-screen-dimensions backend)
@@ -494,10 +515,10 @@ This keeps compatibility with older examples that pass app instances."
          (col 0))
     ;; Reuse cached cursor from terminal backend when available.
     (when (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
-      (let ((cached-row (ignore-errors
-                          (elmtui.platform.backend.terminal:terminal-instance-cursor-row backend)))
-            (cached-col (ignore-errors
-                          (elmtui.platform.backend.terminal:terminal-instance-cursor-col backend))))
+      (let ((cached-row
+              (elmtui.platform.backend.terminal:terminal-instance-cursor-row backend))
+            (cached-col
+              (elmtui.platform.backend.terminal:terminal-instance-cursor-col backend)))
         (when (and (numberp cached-row) (>= cached-row 0))
           (setf row cached-row))
         (when (and (numberp cached-col) (>= cached-col 0))
@@ -566,7 +587,11 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
 
 (defun %refresh-app-subscriptions (app-spec model)
   "Refresh active app subscriptions according to APP-SPEC and MODEL."
-  (let ((subs-fn (%resolve-subscriptions-fn app-spec)))
+  (let ((subs-fn (%resolve-subscriptions-fn app-spec))
+        (*state-mutation-policy*
+          (if (eq (getf app-spec :state-semantics) :strict-elm)
+              :forbid
+              :allow)))
     (reconcile-model-subscriptions subs-fn model *active-app-subscriptions*)))
 ;;; ---------------------------------------------------------------------------
 ;;; == Context Construction ==
@@ -619,8 +644,10 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
     (setf (driver-context-stop-flag ctx) t)
     (let ((thread (driver-context-input-thread ctx)))
       (when (and thread (bt:thread-alive-p thread))
-        (ignore-errors
-          (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted."))))
+        (handler-case
+            (bt:interrupt-thread thread (lambda () (log:info "Driver input thread interrupted.")))
+          (error (condition)
+            (log-warn "DRIVER: input-thread interrupt failed during teardown: ~A" condition)))
         ;; Do not hard-block on JOIN here: input thread may be in a device read path.
         ;; Shutdown will poll and force-destroy as a bounded fallback.
         ;; Keep the stop flag set so the loop can observe it on the next timeout wakeup.
@@ -661,30 +688,39 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
       (when (and before front)
         (elmtui.platform.tmux:restore-to-tmux-capture front)
         (let ((diff (compute-buffer-diff before front)))
-          (ignore-errors (apply-diff-to-backend diff backend 0 0)))
+          (handler-case
+              (apply-diff-to-backend diff backend 0 0)
+            (error (condition)
+              (log-warn "DRIVER: tmux capture restore presentation failed: ~A" condition))))
         (setf (terminal-instance-back-buffer backend) (copy-virtual-buffer front))))
     t))
 
 (defun %set-alternate-screen-mode (backend enabled-p)
-  "Enter or leave terminal alternate screen mode for BACKEND."
-  (when backend
+  "Enter or leave terminal alternate screen mode for a maintained terminal backend.
+Failures are logged and returned as NIL so shutdown can remain best-effort."
+  (when (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
     (let* ((seq (if enabled-p
                     (format nil "~C[?1049h~C[H" #\Escape #\Escape)
                     (format nil "~C[?1049l~C[1G" #\Escape #\Escape)))
-           (dev (ignore-errors (backend-input-device backend)))
-           (stream (ignore-errors (term-stream backend))))
-      (cond
-        ((and dev (fboundp 'cl-inputs.device.api:device-write-bytes))
-         (let ((bytes (make-array (length seq) :element-type '(unsigned-byte 8))))
-           (loop for i from 0 below (length seq)
-                 do (setf (aref bytes i) (char-code (char seq i))))
-           (ignore-errors
-             (cl-inputs.device.api:device-write-bytes dev bytes 0 (length bytes))
-             (flush-output backend))))
-        ((and stream (output-stream-p stream))
-         (ignore-errors
-           (write-string seq stream)
-           (finish-output stream)))))))
+           (dev (backend-input-device backend))
+           (stream (term-stream backend)))
+      (handler-case
+          (cond
+            ((and dev (fboundp 'cl-inputs.device.api:device-write-bytes))
+             (let ((bytes (make-array (length seq) :element-type '(unsigned-byte 8))))
+               (loop for i from 0 below (length seq)
+                     do (setf (aref bytes i) (char-code (char seq i))))
+               (cl-inputs.device.api:device-write-bytes dev bytes 0 (length bytes))
+               (flush-output backend)
+               t))
+            ((and (streamp stream) (output-stream-p stream))
+             (write-string seq stream)
+             (finish-output stream)
+             t)
+            (t nil))
+        (error (condition)
+          (log-warn "DRIVER: alternate-screen transition failed: ~A" condition)
+          nil)))))
 
 (defun shutdown-platform ()
   (log:info "DRIVER: Shutting down platform...")
@@ -701,16 +737,24 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   ;; Wait for the input thread to terminate, forcibly destroy if needed
   (when (and *input-thread* (bt:thread-alive-p *input-thread*))
     (log:info "DRIVER: Waiting for input thread to terminate...")
-    ;; Bordeaux threads does not provide a portable join timeout.
-    ;; Poll liveness with a bounded wait, then force-destroy if still alive.
-    (loop repeat 20
-          while (bt:thread-alive-p *input-thread*)
-          do (sleep 0.01))
-    (if (bt:thread-alive-p *input-thread*)
-        (progn
-          (log:warn "DRIVER: Input thread did not terminate within 200ms. Forcing termination.")
-          (ignore-errors (bt:destroy-thread *input-thread*)))
-        (log:info "DRIVER: Input thread terminated gracefully."))
+    ;; Bordeaux threads does not provide a portable join timeout. Delegate the
+    ;; bounded liveness probe to the shared runtime poller.
+    (let ((stopped-p
+            (poll-until
+             (lambda ()
+               (not (and *input-thread*
+                         (bt:thread-alive-p *input-thread*))))
+             :timeout 0.2
+             :interval 0.01)))
+      (if stopped-p
+          (log:info "DRIVER: Input thread terminated gracefully.")
+          (progn
+            (log:warn "DRIVER: Input thread did not terminate within 200ms. Forcing termination.")
+            (when *input-thread*
+              (handler-case
+                  (bt:destroy-thread *input-thread*)
+                (error (condition)
+                  (log-warn "DRIVER: forced input-thread teardown failed: ~A" condition)))))))
     (setf *input-thread* nil))
 
   ;; Attempt to clean up the root viewport instance if present
@@ -721,8 +765,10 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
         (let ((saved-row (car *last-cursor-pos*))
               (saved-col (cdr *last-cursor-pos*)))
           (when (and (integerp saved-row) (integerp saved-col))
-            (ignore-errors
-              (set-cursor-position *backend* saved-row saved-col)))))))
+            (handler-case
+                (set-cursor-position *backend* saved-row saved-col)
+              (error (condition)
+                (log-warn "DRIVER: cursor restore failed during teardown: ~A" condition))))))))
 
   ;; Shutdown the backend and clear the backend global
   (when *backend*
@@ -897,8 +943,7 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
                 (when (> replayed 0)
                   (log-info "DRIVER: Replayed ~D startup message(s)." replayed)))))
           (log-info "Application model and message processor are initialized.")
-          (ignore-errors
-            (%refresh-app-subscriptions app-spec *current-app-model*))
+          (%refresh-app-subscriptions app-spec *current-app-model*)
 
           ;; Ensure startup terminal signals flow through the canonical app update path.
           (%set-runtime-phase :awaiting-terminal-info :reason "model initialized")
@@ -928,7 +973,11 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
                      :publish-fn event-handler)))
           (setf *driver-context* ctx
                 *stop-input-fn* (lambda ()
-                                  (ignore-errors (stop-driver-input-loop ctx))
+                                  (handler-case
+                                      (stop-driver-input-loop ctx)
+                                    (error (condition)
+                                      (log-warn "DRIVER: input-loop stop failed during teardown: ~A"
+                                                condition)))
                                   (setf *input-thread* nil)
                                   t)
                 *input-thread* (start-driver-input-loop ctx))
@@ -940,8 +989,9 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
         (when initial-commands
           (process-initial-commands initial-commands app-spec))
         (log:info "Initial commands processed. Starting main wait loop.")
-        ;; 7. Wait for shutdown signal.
-        (loop until elmtui.core.loop:*shutdown-requested* do (sleep 0.1))
+        ;; 7. Wait for shutdown signal through the shared runtime poller.
+        (poll-until (lambda () elmtui.core.loop:*shutdown-requested*)
+                    :interval 0.1)
         (log:info "DRIVER: Shutdown signal received, exiting loop."))
       ;; Cleanup: always executes even if an unhandled condition escapes the main loop.
       (shutdown-platform)

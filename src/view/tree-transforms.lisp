@@ -59,15 +59,13 @@
       out)))
 
 (defun %get-style (el)
-  "Fetch style from protocol view first, fallback to base-element slot."
-  (or (ignore-errors (elmtui.view.element:el/styles el))
-    (ignore-errors (elmtui.view.base-elements:element-style el))
-    nil))
+  "Fetch style for maintained BASE-ELEMENT values without exception probing."
+  (and (base-element-p el)
+       (elmtui.view.element:el/styles el)))
 
 (defun %set-style! (el new-style)
-  "Write style back consistently to both views."
-  (setf (elmtui.view.element:el/styles el) new-style)
-  (ignore-errors (setf (elmtui.view.base-elements:element-style el) new-style)))
+  "Write style through the maintained element protocol."
+  (setf (elmtui.view.element:el/styles el) new-style))
 
 (defun expand-element-style (el &key ctx)
   "Normalize style keys/values to keywords and store them back. Style-group
@@ -114,15 +112,15 @@
   "Return a short description of EL for logging."
   (cond
     ((null el) "nil")
-    ((ignore-errors (elmtui.view.element:el/type el))
-     (let* ((type (ignore-errors (elmtui.view.element:el/type el)))
-            (id (ignore-errors (elmtui.view.element:el/id el))))
+    ((base-element-p el)
+     (let ((type (elmtui.view.element:el/type el))
+           (id (elmtui.view.element:el/id el)))
        (format nil "~(~a~)~@[ id=~a~]" type id)))
     ((keywordp el) (string-downcase (symbol-name el)))
     (t (format nil "~A" el))))
 
 (defun %rect-summary (rect)
-  (if (and rect (ignore-errors (w rect)))
+  (if (typep rect 'rectangle)
       (format nil "~dx~d" (w rect) (h rect))
       (format nil "~A" rect)))
 
@@ -291,12 +289,9 @@
               ;; Apply cl-styles if a stylesheet is present in ctx. Use :objects so
               ;; set-computed-style is invoked and styles merge into inline.
               ;; (_ (log-info "expand element style 1 done ~A" p2))
-              (p2 (progn
-                    (ignore-errors
-                      (let ((sheet (elmtui.contracts:ctx-stylesheet ctx)))
-                        (when sheet
-                          (cl-styles.engine:apply-stylesheet-to-tree p2 sheet :return :objects))
-                        p2))
+              (p2 (let ((sheet (elmtui.contracts:ctx-stylesheet ctx)))
+                    (when sheet
+                      (cl-styles.engine:apply-stylesheet-to-tree p2 sheet :return :objects))
                     (ensure-node p2)))
               ;; (_ (log-info "ensure node done ~A" p2))
               ;; Ensure styles are present on every node before layout

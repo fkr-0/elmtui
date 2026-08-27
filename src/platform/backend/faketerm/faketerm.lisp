@@ -90,7 +90,10 @@
     (close (faketerm-instance-stream instance))
     (setf (faketerm-instance-stream instance) nil))
   (when (faketerm-instance-input-source instance)
-    (ignore-errors (cl-inputs.loop:close-input-source (faketerm-instance-input-source instance)))
+    (handler-case
+        (cl-inputs.loop:close-input-source (faketerm-instance-input-source instance))
+      (error (condition)
+        (format *error-output* "~&FAKETERM: input-source cleanup failed: ~A~%" condition)))
     (setf (faketerm-instance-input-source instance) nil
           (faketerm-instance-device instance) nil))
   t)

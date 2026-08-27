@@ -294,9 +294,9 @@
     (symbol (intern (string-upcase (symbol-name v)) :keyword))))
 
 (defun %style-plist-of (node)
-  (or (ignore-errors (elmtui.view.element:el/styles node))
-      (ignore-errors (elmtui.view.base-elements:element-style node))
-      nil))
+  "Return NODE's style only for the maintained base-element protocol."
+  (and (typep node 'base-element)
+       (element-style node)))
 
 (defmethod layout-node (node parent-rect _ctx)
   (declare (ignore _ctx))

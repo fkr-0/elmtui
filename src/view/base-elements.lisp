@@ -859,8 +859,8 @@ This function does not instantiate objects (to avoid triggering validation hooks
 It inspects the class metaobject directly to collect supported initargs."
   (let ((class (%class-of-type type-kw)))
     (when class
-      ;; Ensure class metaobject is finalized before slot introspection
-      (ignore-errors (sb-mop:finalize-inheritance class))
+      ;; Finalization is part of normal introspection; failures must remain visible.
+      (sb-mop:finalize-inheritance class)
       (remove-duplicates
        (mapcan (lambda (slot-def)
                  (copy-list (sb-mop:slot-definition-initargs slot-def)))
@@ -1178,7 +1178,7 @@ It inspects the class metaobject directly to collect supported initargs."
           :element-types (hash-table-count counts)
           :element-counts (alexandria:hash-table-alist counts))))
 
-(define-condition base-dsl-error (error)
+(define-condition base-dsl-error (elmtui.core.errors:elmtui-error)
   ((element :initarg :element :reader dsl-error-element)
    (reason :initarg :reason :reader dsl-error-reason)
    (context :initarg :context :reader dsl-error-context :initform nil))

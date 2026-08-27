@@ -95,7 +95,7 @@ while still allowing intentional styled spaces to be written."
          (or (char= char #\Null)
              (char= char #\Space)))))
 
-(define-condition buffers-not-compatible-error (error)
+(define-condition buffers-not-compatible-error (elmtui.core.errors:elmtui-error)
   ((front-buffer :initarg :front-buffer :reader buffers-not-compatible-error-front)
     (back-buffer :initarg :back-buffer :reader buffers-not-compatible-error-back)
     (reason :initarg :reason :reader buffers-not-compatible-error-reason))
