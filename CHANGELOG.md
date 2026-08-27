@@ -14,6 +14,13 @@ The project follows semantic versioning from the first published release.
   `docs/archive/legacy-root-notes/`.
 - Clarified that `actiwat` is an independent consumer/application repository,
   not a reusable ElmTUI release member.
+- Added standalone README/changelog/CLPM bundle contracts for `cl-events`,
+  `cl-inputs`, `cl-state`, and `cl-styles`, with path-independent regenerated locks.
+- Split generic `cl-inputs` from its optional `cl-events` integration; the
+  `cl-inputs/events` secondary system now owns event-bus adapter code while
+  compatibility entry points remain available from `cl-inputs.sink`.
+- Extended the release gate to run every reusable subsystem under both its own
+  CLPM bundle and the root integration bundle.
 
 ## [0.2.0] - 2026-07-10
 

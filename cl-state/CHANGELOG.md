@@ -8,11 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial project structure with state management, patches, transactions, undo/redo, and observers
-- Comprehensive test suite using FiveAM
-- CLPM bundle configuration for dependency management
+- Structurally shared persistent patch application plus an eager persistent correctness oracle.
+- Frozen strict-state snapshots and explicit value-ownership helpers for Elm-style state semantics.
+- Deterministic transactional/eager/shared differential traces and retained-snapshot tests.
+- Inspectable observer-notification failures with state/key/callback/value/cause context.
+- Path-independent CLPM bundle metadata and independent ASDF test execution.
 
 ### Changed
+- Clarified transaction nesting, rollback, observer ordering, and snapshot ownership semantics.
+- Public `application-state-data` is now a deprecated owned-snapshot read; explicit low-level live representation access remains in `cl-state.core`.
+- Initial project structure with state management, patches, transactions, undo/redo, and observers is retained as the 0.1.x compatibility surface.
+- Comprehensive test suite uses FiveAM and fails the ASDF test operation on real failures.
+
 - Renamed `cl-state.undo:undo` and `cl-state.undo:redo` to `history-undo` and `history-redo` to avoid naming conflicts with transaction-based undo/redo
 - Exported `undo` and `redo` from `cl-state.tx` for application-state based undo/redo operations
 

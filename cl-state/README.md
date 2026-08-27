@@ -18,7 +18,10 @@ A state management library for Common Lisp inspired by Elm Architecture and Redu
 ```bash
 cd /path/to/cl-state
 clpm bundle install
-clpm bundle exec sbcl --load run-tests-clpm-state.lisp
+clpm bundle exec --with-client sbcl -- \
+  --noinform --non-interactive \
+  --eval '(require :asdf)' \
+  --eval '(asdf:load-system "cl-state")'
 ```
 
 ### Using Quicklisp
@@ -42,17 +45,17 @@ Then in your Lisp:
 ;; Create a new state
 (defparameter *app-state* (make-state))
 
-;; Set some values
-(state-set *app-state* :user :name "Alice")
-(state-set *app-state* :user :age 30)
+;; Set nested values by passing a path as the KEY argument
+(state-set *app-state* '(:user :name) "Alice")
+(state-set *app-state* '(:user :age) 30)
 
 ;; Get values
 (get-state *app-state* '(:user :name)) ; => "Alice"
 
 ;; Use transactions for atomic updates
 (with-transaction (*app-state* :name :update-user)
-  (state-set *app-state* :user :name "Bob")
-  (state-set *app-state* :user :age 31))
+  (state-set *app-state* '(:user :name) "Bob")
+  (state-set *app-state* '(:user :age) 31))
 
 ;; Undo the transaction
 (undo *app-state*)
@@ -133,8 +136,8 @@ Execute state updates in a transaction.
 
 ```lisp
 (with-transaction (*app-state* :name :update-user)
-  (state-set *app-state* :user :name "Bob")
-  (state-set *app-state* :user :age 31))
+  (state-set *app-state* '(:user :name) "Bob")
+  (state-set *app-state* '(:user :age) 31))
 ```
 
 #### `undo` (app)
@@ -199,18 +202,27 @@ Remove an observer.
 (remove-observer *app-state* :user *observer-fn*)
 ```
 
+## Mutation, Transaction, and Observer Policy
+
+`state-set`, `apply-patch`, and `apply-patches` are the supported mutating APIs for an `application-state`. A successful direct mutation changes the logical model first, appends its log entry, increments the model version, and then invokes observers. Observers for one key run in registration order. If an observer signals an error, notification stops immediately and CL-STATE re-signals it as `observer-notification-error`, which exposes the state, key, callback, old/new values, notification phase, and original cause. A direct mutation is not rolled back merely because a post-mutation observer failed.
+
+`with-transaction` delays observer delivery until the outermost transaction for that same state commits. Same-state nested transactions join the outer boundary; they are not savepoints and do not create extra history entries. If the transaction body exits by error or another non-local transfer before commit, CL-STATE restores the affected logical values plus version, transaction-local log entries, history, and redo metadata. Rollback does not invoke observers. On success, one history entry is committed and changes are observed in mutation order; observers registered for each changed key run in registration order. An observer failure during this post-commit delivery is inspectable but does not undo the committed transaction.
+
+Transactions are scoped per `application-state`: a nested transaction on another state owns that state independently, while mutations to an already-active outer state remain part of its outer transaction. `undo` and `redo` replay committed history and intentionally retain their historical compatibility behavior: they do not create observer notifications or increment the model version.
+
+Hash-table and plist application-state backends have the same supported path, patch, transaction, rollback, undo/redo, and observer guarantees. Their physical representation and iteration/key order are not semantic guarantees.
+
+Strict Elm mode and frozen snapshots reject supported logical-state mutation before it occurs. Observer registration/removal is runtime metadata and remains allowed on frozen snapshots. The public `cl-state.api:application-state-data` facade returns an owned snapshot; it is not the mutable representation. `cl-state.core:application-state-data` remains the explicit low-level live-representation escape hatch and therefore bypasses the supported mutation, transaction, observer, and strict-mode policy.
+
 ## Testing
 
 Run the test suite:
 
 ```bash
-./rt-state.sh
-```
-
-Or programmatically:
-
-```lisp
-(asdf:test-system :cl-state)
+clpm bundle exec --with-client sbcl -- \
+  --noinform --non-interactive \
+  --eval '(require :asdf)' \
+  --eval '(asdf:test-system "cl-state")'
 ```
 
 ## Dependencies
@@ -233,6 +245,8 @@ cl-state/
 │   ├── tx.lisp         # Transaction support
 │   ├── undo.lisp       # Undo/redo history
 │   ├── observer.lisp   # Observer pattern
+│   ├── value-protocol.lisp # Value ownership/copy protocol
+│   ├── persistent.lisp # Persistent patch application
 │   └── api.lisp        # Public API re-exports
 ├── tests/              # Test files
 ├── cl-state.asd        # ASDF system definition

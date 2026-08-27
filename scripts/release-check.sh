@@ -37,17 +37,34 @@ required_files=(
   examples/README.md
   scripts/release-check.sh
   scripts/test-subsystems.sh
+  scripts/test-subproject-bundles.sh
   scripts/run-tests-warning-clean.sh
   cl-events/LICENSE
+  cl-events/README.md
+  cl-events/CHANGELOG.md
+  cl-events/clpmfile
+  cl-events/clpmfile.lock
   cl-events/cl-events.asd
   cl-events/cl-events-tests.asd
   cl-inputs/LICENSE
+  cl-inputs/README.md
+  cl-inputs/CHANGELOG.md
+  cl-inputs/clpmfile
+  cl-inputs/clpmfile.lock
   cl-inputs/cl-inputs.asd
   cl-inputs/tests/ansii-tests.lisp
   cl-state/LICENSE
+  cl-state/README.md
+  cl-state/CHANGELOG.md
+  cl-state/clpmfile
+  cl-state/clpmfile.lock
   cl-state/cl-state.asd
   cl-state/cl-state-tests.asd
   cl-styles/LICENSE
+  cl-styles/README.md
+  cl-styles/CHANGELOG.md
+  cl-styles/clpmfile
+  cl-styles/clpmfile.lock
   cl-styles/cl-styles.asd
 )
 
@@ -74,7 +91,13 @@ printf '\n==> checking staged and unstaged patch whitespace\n'
 git diff --check
 git diff --cached --check
 
-printf '\n==> validating reusable systems\n'
+printf '\n==> validating public API documentation metadata\n'
+scripts/check-docstrings.sh
+
+printf '\n==> validating standalone subsystem bundles\n'
+scripts/test-subproject-bundles.sh
+
+printf '\n==> validating reusable systems in the root bundle\n'
 scripts/test-subsystems.sh
 
 printf '\n==> running warning-clean ElmTUI integration suite\n'

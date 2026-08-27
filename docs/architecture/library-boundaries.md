@@ -38,6 +38,7 @@ and buildable without fetching a second repository.
 | Terminal byte decoding | `cl-inputs.decoder` | Map tokens to ElmTUI messages | Escape/UTF-8 decoder in `src/platform` |
 | Key sequence mapping | `cl-inputs.keymap` | Application key bindings/focus policy | Terminal escape keymap in ElmTUI |
 | Input devices and sinks | `cl-inputs.device.*`, `cl-inputs.sink` | Select/configure devices and route messages | Duplicate TTY/fake-device transport |
+| Optional input/event adapter | `cl-inputs/events`, `cl-inputs.events` | Load only when a generic `cl-events` bus sink is needed | Hard `cl-events` dependency in core `cl-inputs` |
 | Generic nested paths | `cl-state.utils` | Compatibility wrappers and component path composition | Independent path traversal engine |
 | State container and mutation log | `cl-state.core` | Application model conventions | Separate generic state container |
 | Patches and transactions | `cl-state.patch`, `cl-state.tx` | Produce patches from update functions | Parallel patch application/undo engine |
@@ -117,12 +118,15 @@ incomplete and fresh clones non-reproducible.
 
 ## Dependency tests
 
-Every release must prove both directions of the architecture:
+Every release must prove both the package-manager boundary and the root integration boundary:
 
 ```sh
-scripts/test-subsystems.sh   # each cl-* system independently
-scripts/release-check.sh     # independent systems + full ElmTUI integration
+scripts/test-subproject-bundles.sh # each cl-* system under its own CLPM lock
+scripts/test-subsystems.sh          # each cl-* system under the root bundle
+scripts/release-check.sh            # both layers + full ElmTUI integration
 ```
+
+Subproject `clpmfile` and `clpmfile.lock` files must contain no absolute local paths. `cl-inputs` core remains loadable without `cl-events`; its optional `cl-inputs/events` secondary system owns the event-bus adapter.
 
 A root-suite pass alone is insufficient: it can hide an undiscoverable
 secondary test system or permit an individual library runner to print failures
