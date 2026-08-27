@@ -4,7 +4,7 @@
   :description "CSS-like styling engine for arbitrary object trees (TEA friendly)."
   :author "ElmTUI contributors"
   :license "MIT"
-  :version "0.1.0"
+  :version "0.2.0"
   :depends-on (#:alexandria #:uiop)
   :serial t
   :components
@@ -21,6 +21,7 @@
   :in-order-to ((test-op (test-op "cl-styles/tests"))))
 
 (asdf:defsystem "cl-styles/tests"
+  :version "0.2.0"
   :depends-on (#:cl-styles #:fiveam)
   :serial t
   :components ((:file "tests/styles-tests")

@@ -4,6 +4,9 @@ All notable changes to `cl-styles` are recorded here. The library follows semant
 
 ## Unreleased
 
+Candidate version: **0.2.0**. This remains an in-tree candidate and is not a
+registry publication or separate-repository release.
+
 ### Added
 
 - Terminal geometry declarations for offsets and scroll positions.
