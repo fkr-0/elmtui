@@ -3,6 +3,7 @@
   :description "FiveAM tests for cl-events"
   :author "ElmTUI contributors"
   :license "MIT"
+  :version "0.2.0"
   :depends-on (#:cl-events #:fiveam)
   :components
   ((:file "tests/packages")
@@ -16,4 +17,9 @@
    (:file "tests/loop-tests")
    (:file "tests/api-tests"))
   :perform (test-op (o c)
-             (uiop:symbol-call :fiveam :run! :cl-events/tests)))
+             (declare (ignore o c))
+             (let ((results (uiop:symbol-call :fiveam :run :cl-events/tests)))
+               (uiop:symbol-call :fiveam :explain! results)
+               (unless (uiop:symbol-call :fiveam :results-status results)
+                 (error "The cl-events test suite failed."))
+               results)))
