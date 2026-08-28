@@ -31,13 +31,17 @@
     ("root-viewport-test-app" "ROOT-VIEWPORT-TEST-APP")
     ("scroll-panel-demo" "SCROLL-PANEL-DEMO-APP")
     ("tmux-hover-demo" "TMUX-HOVER-APP")
-    ("tmux-idle-screensaver" "TMUX-IDLE-APP")))
+    ("tmux-idle-screensaver" "TMUX-IDLE-APP")
+    ("wifi-menu" "WIFI-MENU-APP")))
+
 
 (defparameter *dropped-legacy-example-files*
   '("examples/boxes-app.lisp"
     "examples/colorblocks-app.lisp"
     "examples/colortext-app.lisp"
     "examples/comprehensive-widgets-demo.lisp"
+    "examples/dirlister_poc/dirlister_poc.asd"
+    "examples/dirlister_poc/dirlister_poc.lisp"
     "examples/dsl-integration-demo.lisp"
     "examples/grid-event-form-app.lisp"
     "examples/message-contract-demo.lisp"
@@ -46,6 +50,7 @@
     "examples/simple-counter.lisp"
     "examples/standardized-widgets-example.lisp"
     "examples/variant-examples.lisp"))
+
 
 (defun %assert-example-loads-and-has-entry (name)
   (let* ((file (elmtui.examples.runner::%resolve-example-file name))
@@ -159,3 +164,82 @@
     (is (> height 0))
     (is (not (search ":AUTO" rendered :test #'char-equal)))
     (is (search "#" rendered))))
+
+(test wifi-menu-parses-escaped-nmcli-output
+  (%assert-example-loads-and-has-entry "wifi-menu")
+  (let* ((pkg (find-package :elmtui.examples.wifi-menu))
+         (parse (symbol-function (find-symbol "PARSE-NMCLI-WIFI-OUTPUT" pkg)))
+         (active-p (symbol-function (find-symbol "WIFI-NETWORK-ACTIVE-P" pkg)))
+         (ssid (symbol-function (find-symbol "WIFI-NETWORK-SSID" pkg)))
+         (bssid (symbol-function (find-symbol "WIFI-NETWORK-BSSID" pkg)))
+         (signal (symbol-function (find-symbol "WIFI-NETWORK-SIGNAL" pkg)))
+         (networks (funcall parse
+                            (format nil "*:Cafe\\:Lab:AA\\:BB\\:CC\\:DD\\:EE\\:FF:77:WPA2:wlan0~% :Guest:11\\:22\\:33\\:44\\:55\\:66:42:--:wlan0~%"))))
+    (is (= 2 (length networks)))
+    (is (funcall active-p (first networks)))
+    (is (string= "Cafe:Lab" (funcall ssid (first networks))))
+    (is (string= "AA:BB:CC:DD:EE:FF" (funcall bssid (first networks))))
+    (is (= 77 (funcall signal (first networks))))))
+
+(test wifi-menu-connect-argv-never-contains-password
+  (%assert-example-loads-and-has-entry "wifi-menu")
+  (let* ((pkg (find-package :elmtui.examples.wifi-menu))
+         (make-network (symbol-function (find-symbol "MAKE-WIFI-NETWORK" pkg)))
+         (connect-argv (symbol-function (find-symbol "WIFI-CONNECT-ARGV" pkg)))
+         (network (funcall make-network :ssid "Lab WiFi" :bssid "AA:BB:CC:DD:EE:FF"
+                           :signal 70 :security "WPA2" :device "wlan0"))
+         (argv (funcall connect-argv network :ask-for-secrets t)))
+    (is (member "--ask" argv :test #'string=))
+    (is (member "Lab WiFi" argv :test #'string=))
+    (is (member "wlan0" argv :test #'string=))
+    (is (null (find "correct horse battery staple" argv :test #'string=)))
+    (is (null (find "password" argv :test #'string=)))))
+
+(test maintained-example-wrappers-delegate-to-generated-runners
+  (dolist (spec '(("focus-simple" "ELMTUI.EXAMPLES.FOCUS-SIMPLE" "RUN-FOCUS-SIMPLE" "RUN-FOCUS-SIMPLE-APP"
+                    (:backend-type :fake) (:platform :fake :platform-options nil :argv nil))
+                  ("dirli" "ELMTUI.EXAMPLES.DIRLI" "RUN-DIRLI" "RUN-DIRLI-APP"
+                    (:backend-type :fake) (:platform :fake :platform-options nil :argv nil))
+                  ("pong-below-cursor" "ELMTUI.EXAMPLES.PONG-BELOW-CURSOR" "RUN-PONG-BELOW-CURSOR" "RUN-PONG-BELOW-CURSOR-APP"
+                    (:backend-type :fake) (:platform :fake))
+                  ("scroll-panel-demo" "ELMTUI.EXAMPLES.SCROLL-PANEL-DEMO" "RUN-SCROLL-PANEL-DEMO" "RUN-SCROLL-PANEL-DEMO-APP"
+                    (:backend-type :fake) (:platform :fake))
+                  ("wifi-menu" "ELMTUI.EXAMPLES.WIFI-MENU" "RUN-WIFI-MENU" "RUN-WIFI-MENU-APP"
+                    (:backend-type :fake) (:platform :fake :platform-options nil :argv nil))))
+    (destructuring-bind (example package-name wrapper-name runner-name call-args expected-args) spec
+      (%assert-example-loads-and-has-entry example)
+      (let* ((pkg (find-package package-name))
+             (wrapper (find-symbol wrapper-name pkg))
+             (runner (find-symbol runner-name pkg))
+             (original (symbol-function runner))
+             (captured :not-called))
+        (unwind-protect
+             (progn
+               (setf (symbol-function runner)
+                     (lambda (&rest args) (setf captured args) :delegated))
+               (is (eq :delegated (apply wrapper call-args)))
+               (is (equal expected-args captured)))
+          (setf (symbol-function runner) original))))))
+
+(test fzf-finder-preserves-caller-items-and-prompt
+  (%assert-example-loads-and-has-entry "fzf-finder-real")
+  (let* ((pkg (find-package :elmtui.examples.fzf-finder))
+         (show (find-symbol "SHOW-FZF-FINDER" pkg))
+         (runner (find-symbol "RUN-FZF-FINDER" pkg))
+         (items-symbol (find-symbol "*FINDER-INITIAL-ITEMS*" pkg))
+         (prompt-symbol (find-symbol "*FINDER-INITIAL-PROMPT*" pkg))
+         (original (symbol-function runner))
+         (captured-items nil)
+         (captured-prompt nil))
+    (unwind-protect
+         (progn
+           (setf (symbol-function runner)
+                 (lambda (&rest args)
+                   (declare (ignore args))
+                   (setf captured-items (copy-list (symbol-value items-symbol))
+                         captured-prompt (symbol-value prompt-symbol))
+                   :delegated))
+           (is (eq :delegated (funcall show '("one" "two") :prompt "pick> " :backend-type :fake)))
+           (is (equal '("one" "two") captured-items))
+           (is (string= "pick> " captured-prompt)))
+      (setf (symbol-function runner) original))))

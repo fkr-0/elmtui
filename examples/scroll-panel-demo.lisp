@@ -19,25 +19,22 @@
 
 (defun scroll-panel-update (message app-state)
   (declare (ignore app-state))
-  (labels ((quit ()
-             (make-update-result :patches '(((:should-quit) t))))
-           (cmd (payload)
-             (make-update-result :commands (list `(:component-message :main-panel ,payload)))))
+  (labels ((quit () (make-update-result :patches '(((:should-quit) t))))
+           (cmd (payload) (make-update-result :commands (list (list :component-message :main-panel payload)))))
     (cond
       ((typep message 'key-event)
        (case (key-event-key message)
          ((:escape #\q #\Q) (quit))
-         (:up (cmd '(:scroll-up 1)))
-         (:down (cmd '(:scroll-down 1)))
-         (:pageup (cmd '(:page-up)))
-         (:pagedown (cmd '(:page-down)))
+         ((:arrow-up :up) (cmd '(:scroll-up 1)))
+         ((:arrow-down :down) (cmd '(:scroll-down 1)))
+         ((:page-up :pageup) (cmd '(:page-up)))
+         ((:page-down :pagedown) (cmd '(:page-down)))
          (:home (cmd '(:scroll-to-top)))
          (:end (cmd '(:scroll-to-bottom)))
-         (t (make-update-result))))
-      ((and (listp message) (eq (first message) :app-quit-requested))
-       (quit))
-      (t
-       (make-update-result)))))
+         (otherwise (make-update-result))))
+      ((and (consp message) (eq (first message) :app-quit-requested)) (quit))
+      (t (make-update-result)))))
+
 
 (defun scroll-panel-view (_state)
   (declare (ignore _state))
@@ -67,7 +64,8 @@
   :view-fn #'scroll-panel-view)
 
 (defun run-scroll-panel-demo (&key (backend-type :terminal))
-  (run-application 'scroll-panel-demo-app :backend-type backend-type))
+  (run-scroll-panel-demo-app :platform backend-type))
+
 
 (defun main ()
   (run-scroll-panel-demo))

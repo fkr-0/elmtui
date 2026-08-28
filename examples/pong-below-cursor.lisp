@@ -72,21 +72,14 @@
     ((typep message 'key-event)
      (let ((key (key-event-key message)))
        (cond
-         ((member key '(#\q #\Q #\Escape) :test #'eql)
-          (%quit-result))
-         ((member key '(:left #\h #\H) :test #'eql)
-          (%move-paddle app-state -1))
-         ((member key '(:right #\l #\L) :test #'eql)
-          (%move-paddle app-state 1))
-         (t
-          (make-update-result)))))
-    ((or (eql message :tick)
-         (and (listp message) (eq (first message) :tick)))
-     (%tick-update app-state))
-    ((and (listp message) (eq (first message) :app-quit-requested))
-     (%quit-result))
-    (t
-     (make-update-result))))
+         ((member key '(:escape #\q #\Q #\Escape) :test #'eql) (%quit-result))
+         ((member key '(:arrow-left :left #\h #\H) :test #'eql) (%move-paddle app-state -1))
+         ((member key '(:arrow-right :right #\l #\L) :test #'eql) (%move-paddle app-state 1))
+         (t (make-update-result)))))
+    ((or (eql message :tick) (and (consp message) (eq (first message) :tick))) (%tick-update app-state))
+    ((and (consp message) (eq (first message) :app-quit-requested)) (%quit-result))
+    (t (make-update-result))))
+
 
 (defun %field-lines (state)
   (let* ((ball-x (state-ref state :ball-x 0))
@@ -133,4 +126,4 @@
 
 (defun run-pong-below-cursor (&key (backend-type :terminal))
   (log-info "pong-below-cursor: start backend=~S" backend-type)
-  (run-application 'pong-below-cursor-app :backend-type backend-type))
+  (run-pong-below-cursor-app :platform backend-type))

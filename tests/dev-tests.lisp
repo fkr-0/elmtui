@@ -1,68 +1,79 @@
-;;;; DEV Module Tests
-;;;; Test suite for elmtui development utilities
 
-(uiop:define-package :elmtui.dev.tests
-  (:use :cl :fiveam :elmtui.dev)
-  (:export #:run-dev-tests))
-
+(uiop/package:define-package :elmtui.dev.tests (:use :cl :fiveam)
+                             (:import-from :elmtui.dev #:buffer->string
+                              #:runtime-snapshot #:format-runtime-snapshot
+                              #:format-element-tree)
+                             (:import-from
+                              :elmtui.platform.backend.common.virtual-buffer
+                              #:make-virtual-buffer #:set-buffer-cell-at)
+                             (:import-from :elmtui.view.base-elements
+                              #:container-element #:text-element)
+                             (:export #:run-dev-tests))
 (in-package :elmtui.dev.tests)
+(def-suite dev-test-suite :description
+ "Tests for maintained ElmTUI developer introspection utilities.")
+(in-suite dev-test-suite)
+(test buffer-to-string-is-pure
+ (let ((buffer (make-virtual-buffer 3 2)) (captured nil) (result nil))
+   (set-buffer-cell-at buffer 0 0 #\A nil)
+   (set-buffer-cell-at buffer 1 2 #\B nil)
+   (setf captured
+           (with-output-to-string (out)
+             (let ((*standard-output* out))
+               (setf result (buffer->string buffer)))))
+   (is (string= captured ""))
+   (is (string= result (format nil "A  ~%  B~%")))))
+(test runtime-snapshot-has-stable-shape
+ (let ((snapshot (runtime-snapshot)))
+   (is (listp (getf snapshot :event-loop)))
+   (is (integerp (getf snapshot :queue-length)))
+   (is (integerp (getf snapshot :subscription-count)))
+   (is (listp (getf snapshot :topics)))
+   (is (typep (getf snapshot :application-state-present-p) 'boolean))
+   (is (search "ElmTUI runtime snapshot" (format-runtime-snapshot snapshot)))))
+(test element-tree-format-shows-structure
+ (let* ((child (make-instance 'text-element :id :label :content "hello"))
+        (root
+         (make-instance 'container-element :id :root :children (list child)))
+        (output (format-element-tree root)))
+   (is (search ":CONTAINER" output))
+   (is (search "#ROOT" output))
+   (is (search ":TEXT" output))
+   (is (search "#LABEL" output))))
 
-;; (def-suite dev-test-suite
-;;   :description "Test suite for elmtui development utilities")
+(defun %maintained-runtime-lisp-files ()
+  "Return runtime Lisp files, excluding developer/tool-only source trees."
+  (let ((src-root (merge-pathnames #P"src/" (asdf:system-source-directory "elmtui"))))
+    (labels ((walk (directory)
+               (append (uiop:directory-files directory #P"*.lisp")
+                       (mapcan #'walk
+                               (remove-if
+                                (lambda (subdir)
+                                  (member (string-downcase
+                                           (car (last (pathname-directory subdir))))
+                                          '("dev" "tools")
+                                          :test #'string=))
+                                (uiop:subdirectories directory))))))
+      (walk src-root))))
 
-;; (in-suite dev-test-suite)
+(defun %active-ignore-errors-lines (pathname)
+  "Return non-comment source lines that invoke IGNORE-ERRORS in PATHNAME."
+  (with-open-file (stream pathname :direction :input)
+    (loop for line = (read-line stream nil nil)
+          for line-number from 1
+          while line
+          for trimmed = (string-left-trim '(#\Space #\Tab) line)
+          when (and (not (or (string= trimmed "")
+                             (char= (char trimmed 0) #\;)))
+                    (search "IGNORE-ERRORS" line :test #'char-equal))
+            collect (list pathname line-number line))))
 
-;; ;; Test for dev examples (if they exist)
-;; (test dev-example-functions
-;;   "Test dev example functions"
-;;   ;; These might not exist, but we can check if they're defined
-;;   (when (fboundp 'elmtui.dev:example-flexbox-layout)
-;;     (is (functionp #'elmtui.dev:example-flexbox-layout)
-;;         "example-flexbox-layout should be a function"))
+(test maintained-runtime-does-not-silently-ignore-errors
+  (let ((violations
+          (mapcan #'%active-ignore-errors-lines
+                  (%maintained-runtime-lisp-files))))
+    (is (null violations) "Runtime IGNORE-ERRORS policy violations: ~S" violations)))
 
-;;   (when (fboundp 'elmtui.dev:example-grid-layout)
-;;     (is (functionp #'elmtui.dev:example-grid-layout)
-;;         "example-grid-layout should be a function"))
-
-;;   (when (fboundp 'elmtui.dev:send-foo-message)
-;;     (is (functionp #'elmtui.dev:send-foo-message)
-;;         "send-foo-message should be a function"))
-
-;;   (when (fboundp 'elmtui.dev:run-faulty-async)
-;;     (is (functionp #'elmtui.dev:run-faulty-async)
-;;         "run-faulty-async should be a function"))
-
-;;   (when (fboundp 'elmtui.dev:demo-event-loop)
-;;     (is (functionp #'elmtui.dev:demo-event-loop)
-;;         "demo-event-loop should be a function")))
-
-;; ;; Test for dev-main if it exists
-;; (test dev-main-function
-;;   "Test dev-main function"
-;;   (when (fboundp 'elmtui.dev:dev-main)
-;;     (is (functionp #'elmtui.dev:dev-main)
-;;         "dev-main should be a function")))
-
-;; ;; Test basic package loading
-;; (test dev-package-loading
-;;   "Test that dev package loads correctly"
-;;   ;; Just check that we can access the package
-;;   (is (find-package :elmtui.dev)
-;;       "elmtui.dev package should exist"))
-
-;; ;; Test that exported symbols are available
-;; (test dev-exports
-;;   "Test that exported symbols are available"
-;;   ;; Check for exported symbols that might exist
-;;   (let ((package (find-package :elmtui.dev)))
-;;     (when package
-;;       ;; Just check that we can iterate through symbols without error
-;;       (let ((symbols nil))
-;;         (do-symbols (sym package)
-;;           (push sym symbols))
-;;         (is (> (length symbols) 0)
-;;             "Should have some symbols in package")))))
-
-;; (defun run-dev-tests ()
-;;   "Run all dev module tests"
-;;   (run! 'dev-test-suite))
+(defun run-dev-tests ()
+  "Run the maintained developer utility tests."
+  (run! 'dev-test-suite))
