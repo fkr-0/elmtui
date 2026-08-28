@@ -119,7 +119,55 @@ function, and a root viewport.  This reduced example follows the API used by
   :view-fn #'view)
 #+end_src
 
-=DEFAPPLICATION= generates the application runner, here =RUN-HELLO=.
+=DEFAPPLICATION= generates the application runner, here =RUN-HELLO=.  It is the
+normative full application constructor selected for ElmTUI's next stable major
+version; production applications should start here.  This example uses the
+transactional commit engine; =:state-semantics :strict-elm= selects the frozen
+replacement-snapshot engine without changing the update/patch contract.
+=DEFTEA-APP= remains supported as the smaller direct-transition teaching/small-app
+adapter and lowers to the same runtime transition vocabulary.  The foundations
+chapter below specifies that compatibility boundary precisely.
+
+* Documentation
+
+The long-form documentation is deliberately ordered from architecture to
+practice:
+
+1. [[file:docs/longform/01-foundations-and-elm-architecture.md][Foundations: Elm architecture in Common Lisp]] explains the TEA runtime,
+   quotes the actual model-replacement and mutable-state source paths, and
+   states precisely where strict Elm-style immutability does and does not hold.
+2. [[file:docs/longform/02-core-principles-widgets-and-patterns.md][Core principles, widgets, and patterns]] covers program parts, state/effect
+   ownership, conditions/restarts, polling, terminal UX, built-in widgets, and
+   widget-authoring contracts.
+3. [[file:docs/longform/03-hands-on-counter-and-async.md][Hands-on counter and async lookup]] builds a pure replacement-model counter
+   and extends the same architecture to a request-id-safe asynchronous
+   Wikipedia-style lookup.
+
+API reference pages are generated from live Common Lisp =DOCUMENTATION=
+metadata rather than being maintained as a second handwritten API source:
+
+#+begin_src sh
+scripts/build-api-docs.sh
+#+end_src
+
+The generated outputs are =docs/api/generated/api.md= and
+=docs/api/generated/api.html=.  The public-documentation audit is:
+
+#+begin_src sh
+scripts/check-docstrings.sh
+#+end_src
+
+The default audit is a debt ratchet: it fails if public documentation coverage
+regresses.  To require every supported exported binding to have documentation
+metadata, use the strict target:
+
+#+begin_src sh
+ELMTUI_DOCSTRING_STRICT=1 scripts/check-docstrings.sh
+#+end_src
+
+The same operations are exposed as the =bridge.yml= commands =docs=,
+=doc-audit=, and =doc-audit-strict=.  The non-regression audit also runs as part
+of =scripts/release-check.sh=.
 
 * Running examples
 
@@ -134,7 +182,10 @@ clpm bundle exec --with-client sbcl -- \
 #+end_src
 
 See [[file:examples/README.md][examples/README.md]] for the curated example map and
-entry points.
+entry points.  Command-line example discovery/building is intentionally outside
+the core =elmtui= system: =./examples.sh list= loads the dedicated
+=elmtui-examples-cli= ASDF system.  Image packaging similarly lives in
+=elmtui-packager=, so loading =elmtui= alone does not intern either CLI package.
 
 * Testing
 

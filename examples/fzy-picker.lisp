@@ -71,93 +71,55 @@
 ;;;===============================================================
 
 (defun fzy-update (message app-state)
-  "Handle application messages following Elm architecture."
+  "Update the optional fzy picker using canonical TEA patch paths."
   (let* ((chs (state-ref app-state :choices))
-          (height (state-ref app-state :height *picker-height*))
-          (query (state-ref app-state :query ""))
-          (avail (choices-available chs)))
-
-    (labels
-      ;; Helper: Create quit result
-      ((quit-result ()
-         (make-update-result :patches '((:should-quit t))))
-
-        ;; Helper: Extract key-event info from either a struct or a keyevent app message.
-        (extract-key-event (msg)
-          (cond
-            ((typep msg 'key-event)
-              (values (key-event-key msg)
-                (key-event-char msg)
-                (key-event-modifiers msg)))
-            ((and (listp msg) (eq (msg-type msg) :keyevent))
-              (let ((evt (msg-data msg :event)))
-                (if (typep evt 'key-event)
-                  (values (key-event-key evt)
-                    (key-event-char evt)
-                    (key-event-modifiers evt))
-                  (values (msg-data msg :key)
-                    (msg-data msg :char)
-                    (msg-data msg :modifiers)))))
-            (t (values nil nil nil))))
-
-        ;; Helper: Handle Enter key - print selection and quit
-        (handle-enter ()
-          (let* ((sel (state-ref app-state :selected-index))
-                  (picked (and sel (choices-get chs sel))))
-            (safe-print-selected picked)
-            (quit-result)))
-
-        ;; Helper: Update query and recompute search
-        (update-query (new-query)
-          (choices-search chs new-query)
-          (let* ((new-avail (choices-available chs))
-                  (new-sel (if (> new-avail 0) 0 nil)))
-            (make-update-result
-              :patches `((:query ,new-query)
-                          (:selected-index ,new-sel)))))
-
-        ;; Helper: Navigate selection
-        (navigate (delta)
-          (let* ((sel (or (state-ref app-state :selected-index) 0))
-                  (visible (min avail height))
-                  (new-sel (if (> visible 0)
-                             (piclamp (+ sel delta) 0 (1- visible))
-                             nil)))
-            (make-update-result
-              :patches `((:selected-index ,new-sel))))))
-
-      ;; Message dispatch
+         (height (state-ref app-state :height *picker-height*))
+         (query (state-ref app-state :query ""))
+         (available (choices-available chs)))
+    (labels ((quit-result () (make-update-result :patches '(((:should-quit) t))))
+             (extract-key-event (msg)
+               (cond
+                 ((typep msg 'key-event)
+                  (values (key-event-key msg) (key-event-char msg) (key-event-modifiers msg)))
+                 ((and (consp msg) (eq (msg-type msg) :keyevent))
+                  (let ((event (msg-data msg :event)))
+                    (if (typep event 'key-event)
+                        (values (key-event-key event) (key-event-char event) (key-event-modifiers event))
+                        (values (msg-data msg :key) (msg-data msg :char) (msg-data msg :modifiers)))))
+                 (t (values nil nil nil))))
+             (handle-enter ()
+               (let* ((selected (state-ref app-state :selected-index))
+                      (picked (and selected (choices-get chs selected))))
+                 (safe-print-selected picked)
+                 (quit-result)))
+             (update-query (new-query)
+               (choices-search chs new-query)
+               (let ((new-selected (and (plusp (choices-available chs)) 0)))
+                 (make-update-result :patches (list (list '(:query) new-query)
+                                                    (list '(:selected-index) new-selected)))))
+             (navigate (delta)
+               (let* ((selected (or (state-ref app-state :selected-index) 0))
+                      (visible (min available height))
+                      (new-selected (and (plusp visible) (piclamp (+ selected delta) 0 (1- visible)))))
+                 (make-update-result :patches (list (list '(:selected-index) new-selected))))))
       (cond
-        ((or (typep message 'key-event)
-           (and (listp message) (eq (msg-type message) :keyevent)))
-          (multiple-value-bind (key ch modifiers)
-            (extract-key-event message)
-            (cond
-              ((or (eq key :escape)
-                 (and (eq key #\c) (member :ctrl modifiers))
-                 (eq key :q))
-                (quit-result))
-              ((member key '(:enter :return) :test #'eq)
-                (handle-enter))
-              ((member key '(:up :down :k :j) :test #'eq)
-                (let ((delta (case key
-                               ((:up :k) -1)
-                               ((:down :j) 1)
-                               (t 0))))
-                  (navigate delta)))
-              ((member key '(:backspace :delete) :test #'eq)
-                (let* ((current-len (length query))
-                        (new-query (if (> current-len 0)
-                                     (subseq query 0 (1- current-len))
-                                     query)))
-                  (update-query new-query)))
-              ((and ch (>= (char-code ch) 32))
-                (let ((new-query (concatenate 'string query (string ch))))
-                  (update-query new-query)))
-              (t (make-update-result)))))
-
-        ;; Default: no-op
+        ((or (typep message 'key-event) (and (consp message) (eq (msg-type message) :keyevent)))
+         (multiple-value-bind (key character modifiers) (extract-key-event message)
+           (cond
+             ((or (eq key :escape)
+                  (and (member key '(:c #\c #\C) :test #'eql)
+                       (or (member :control modifiers) (member :ctrl modifiers))))
+              (quit-result))
+             ((member key '(:enter :return) :test #'eq) (handle-enter))
+             ((member key '(:arrow-up :up :k) :test #'eq) (navigate -1))
+             ((member key '(:arrow-down :down :j) :test #'eq) (navigate 1))
+             ((member key '(:backspace :delete) :test #'eq)
+              (update-query (if (plusp (length query)) (subseq query 0 (1- (length query))) query)))
+             ((and character (graphic-char-p character))
+              (update-query (concatenate 'string query (string character))))
+             (t (make-update-result)))))
         (t (make-update-result))))))
+
 
 ;;;===============================================================
 ;;; View Function

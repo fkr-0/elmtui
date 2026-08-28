@@ -44,41 +44,36 @@
     (labels ((set-input (new)
                (let* ((new-matches (calculate-matches items new))
                       (new-selected (if (null new-matches) 0 (min selected (1- (length new-matches))))))
-                 (make-update-result
-                  :patches `(((:input-text) ,new)
-                             ((:matches) ,new-matches)
-                             ((:selected-index) ,new-selected)))))
-             (quit ()
-               (make-update-result :patches '(((:should-quit) t)))))
+                 (make-update-result :patches (list (list '(:input-text) new)
+                                                    (list '(:matches) new-matches)
+                                                    (list '(:selected-index) new-selected)))))
+             (quit () (make-update-result :patches '(((:should-quit) t)))))
       (cond
         ((typep message 'key-event)
          (let ((key (key-event-key message))
                (ch (key-event-char message)))
            (cond
-             ((member key '(:escape #\q #\Q) :test #'eql) (quit))
+             ((eq key :escape) (quit))
              ((member key '(:enter :return) :test #'eq)
               (if (null matches)
                   (make-update-result)
-                  (make-update-result
-                   :patches `(((:selected-item) ,(nth selected matches))
-                              ((:should-quit) t)))))
-             ((eq key :up)
-              (if (null matches)
-                  (make-update-result)
-                  (make-update-result :patches `(((:selected-index) ,(max 0 (1- selected)))))))
-             ((eq key :down)
-              (if (null matches)
-                  (make-update-result)
-                  (make-update-result :patches `(((:selected-index) ,(min (1- (length matches)) (1+ selected)))))))
+                  (make-update-result :patches (list (list '(:selected-item) (nth selected matches))
+                                                     (list '(:should-quit) t)))))
+             ((member key '(:arrow-up :up) :test #'eq)
+              (if (null matches) (make-update-result)
+                  (make-update-result :patches (list (list '(:selected-index) (max 0 (1- selected)))))))
+             ((member key '(:arrow-down :down) :test #'eq)
+              (if (null matches) (make-update-result)
+                  (make-update-result :patches (list (list '(:selected-index)
+                                                           (min (1- (length matches)) (1+ selected)))))))
              ((member key '(:backspace :delete) :test #'eq)
               (set-input (if (plusp (length input)) (subseq input 0 (1- (length input))) "")))
              ((and ch (graphic-char-p ch))
               (set-input (concatenate 'string input (string ch))))
              (t (make-update-result)))))
-        ((and (listp message) (eq (first message) :app-quit-requested))
-         (quit))
-        (t
-         (make-update-result))))))
+        ((and (consp message) (eq (first message) :app-quit-requested)) (quit))
+        (t (make-update-result))))))
+
 
 (defun view-finder-app (app-state)
   (let* ((prompt (state-ref app-state :prompt "Find: "))
@@ -96,8 +91,12 @@
                          :content ,(format nil "~A ~A" (if (= idx selected) ">" " ") item))))
        (:text :id :help :content "Type to filter | Up/Down | Enter select | q/Esc quit")))))
 
-(defun %make-initial-finder-state ()
-  (make-initial-finder-state '()))
+(progn
+  (defparameter *finder-initial-items* '("alpha" "beta" "gamma") "Items used by the next finder run.")
+  (defparameter *finder-initial-prompt* "Find: " "Prompt used by the next finder run.")
+  (defun %make-initial-finder-state ()
+    (make-initial-finder-state *finder-initial-items* :prompt *finder-initial-prompt*)))
+
 
 (defapplication fzf-finder
   :root-viewport-id :fzf-finder-root
@@ -106,12 +105,17 @@
   :update-fn #'update-finder-app
   :view-fn #'view-finder-app)
 
-(defun show-fzf-finder (items &key (prompt "Find: "))
-  (declare (ignore items prompt))
-  (run-application 'fzf-finder))
+(defun show-fzf-finder (items &key (prompt "Find: ") (backend-type :terminal) platform-options argv)
+  "Run the finder with caller-provided ITEMS and PROMPT."
+  (let ((*finder-initial-items* (copy-list items))
+        (*finder-initial-prompt* prompt))
+    (run-fzf-finder :platform backend-type :platform-options platform-options :argv argv)))
 
-(defun run-fzf-on-stdin ()
-  (show-fzf-finder '("line1" "line2" "line3") :prompt "filter> "))
 
-(defun main ()
-  (run-fzf-finder))
+(defun run-fzf-on-stdin (&key (backend-type :terminal))
+  "Read newline-delimited choices from standard input and launch the finder."
+  (let ((items (loop for line = (read-line *standard-input* nil nil) while line collect line)))
+    (show-fzf-finder items :prompt "filter> " :backend-type backend-type)))
+
+
+(defun main () (run-fzf-on-stdin))

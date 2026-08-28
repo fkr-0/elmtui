@@ -226,10 +226,8 @@
 ;;;===============================================================
 
 (defun run-cursor-inspector (&key (prefill-from-tmux t) (tmux-mode :pane) (backend-type :terminal))
-  "Launch the cursor inspector example."
-  (log-info "Starting cursor-inspector with tmux-mode: ~S, backend: ~S"
-            tmux-mode backend-type)
-  (elmtui.app.api:run-application 'cursor-inspector-app
-    :backend-type backend-type
-    :platform-options (list :prefill-from-tmux prefill-from-tmux
-                            :tmux-prefill-mode tmux-mode)))
+  "Launch the cursor inspector through its generated runner."
+  (log-info "Starting cursor-inspector with tmux-mode: ~S, backend: ~S" tmux-mode backend-type)
+  (run-cursor-inspector-app
+   :platform backend-type
+   :platform-options (list :prefill-from-tmux prefill-from-tmux :tmux-prefill-mode tmux-mode)))

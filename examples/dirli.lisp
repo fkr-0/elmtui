@@ -26,33 +26,33 @@
 ;;;===============================================================
 
 (defun list-directory-contents (path)
-  "List directory contents with directories first, marked with trailing /."
+  "List PATH with a parent entry, directories first, then files."
   (handler-case
-      (append
-        ;; Directories first, with trailing slash
-        (mapcar (lambda (d)
-                  (concatenate 'string (enough-namestring d path) "/"))
-                (uiop:subdirectories path))
-        ;; Then files
-        (mapcar (lambda (f)
-                  (enough-namestring f path))
-                (uiop:directory-files path)))
-    (error (e)
-      (log-error "Error listing directory ~A: ~A" path e)
-      (list (format nil "Error listing ~A" path)))))
+      (let* ((path (uiop:ensure-directory-pathname path))
+             (parent (uiop:pathname-parent-directory-pathname path))
+             (parent-entry (unless (equal (namestring path) (namestring parent)) (list "../"))))
+        (append parent-entry
+                (mapcar (lambda (directory) (enough-namestring directory path))
+                        (uiop:subdirectories path))
+                (mapcar (lambda (file) (enough-namestring file path))
+                        (uiop:directory-files path))))
+    (error (condition)
+      (log-error "Error listing directory ~A: ~A" path condition)
+      nil)))
+
 
 ;;;===============================================================
 ;;; Helper Functions
 ;;;===============================================================
 
-(defun regenerate-listbox-model (lb-model &key items selected-index height)
-  "Regenerate a listbox model with selective field updates."
-  (init-listbox
-    (listbox-model-id lb-model)
-    :items (or items (listbox-model-items lb-model))
-    :height (or height (listbox-model-height lb-model))
-    :selected-index (or selected-index (listbox-model-selected-index lb-model))
-    :on-select (listbox-model-on-select lb-model)))
+(defun regenerate-listbox-model (lb-model &key (items nil items-p) (selected-index nil selected-index-p) (height nil height-p))
+  "Return a fresh listbox model while preserving unspecified fields."
+  (init-listbox (listbox-model-id lb-model)
+                :items (if items-p items (listbox-model-items lb-model))
+                :height (if height-p height (listbox-model-height lb-model))
+                :selected-index (if selected-index-p selected-index (listbox-model-selected-index lb-model))
+                :on-select (listbox-model-on-select lb-model)))
+
 
 (defun status-message-result (message)
   "Create an update result that sets only the status message."
@@ -63,135 +63,131 @@
 ;;; Update Function
 ;;;===============================================================
 
-(defun app-update (message app-state)
-  "Handle application messages following Elm architecture."
-  (labels
-      ((quit-result ()
-         (make-update-result :patches '((:should-quit t))))
-       (navigate-to-directory (path)
-         (handler-case
-             (let* ((new-items (list-directory-contents path))
-                    (lb-model (state-ref app-state :listbox-model))
-                    (new-lb-model (regenerate-listbox-model
-                                   lb-model
-                                   :items new-items
-                                   :selected-index (when new-items 0))))
-               (make-update-result
-                :patches `(((:listbox-model) ,new-lb-model)
-                           (:current-path ,path)
-                           (:status-message
-                            ,(format nil "Directory: ~A"
-                                     (enough-namestring
-                                      path
-                                      (uiop:pathname-parent-directory-pathname path)))))))
-           (error (e)
-             (status-message-result (format nil "Error: ~A" e))))))
+(progn
+  (defun %dirli-normalize-key (key)
+    (case key
+      ((:arrow-up :up) :up)
+      ((:arrow-down :down) :down)
+      ((:enter :return) :enter)
+      (:page-up :page-up)
+      (:page-down :page-down)
+      (:home :home)
+      (:end :end)
+      (otherwise key)))
+
+  (defun %dirli-navigate-result (app-state path)
+    (handler-case
+        (let* ((path (uiop:ensure-directory-pathname path))
+               (new-items (list-directory-contents path))
+               (lb-model (state-ref app-state :listbox-model))
+               (new-model (regenerate-listbox-model lb-model
+                                                     :items new-items
+                                                     :selected-index (and new-items 0))))
+          (make-update-result
+           :patches (list (list '(:listbox-model) new-model)
+                          (list '(:current-path) path)
+                          (list '(:status-message) (format nil "Directory: ~A" path)))))
+      (error (condition)
+        (status-message-result (format nil "Error: ~A" condition)))))
+
+  (defun %dirli-selected-result (app-state message)
+    (let* ((lb-model (state-ref app-state :listbox-model))
+           (selected-index (and lb-model (listbox-model-selected-index lb-model)))
+           (selected-item (or (and (consp message) (getf (rest message) :item))
+                              (and selected-index
+                                   (nth selected-index (listbox-model-items lb-model)))))
+           (current-path (state-ref app-state :current-path)))
+      (cond
+        ((null selected-item)
+         (status-message-result "No item selected"))
+        ((string= selected-item "../")
+         (%dirli-navigate-result app-state
+                                 (uiop:pathname-parent-directory-pathname current-path)))
+        (t
+         (let ((new-path (merge-pathnames selected-item current-path)))
+           (cond
+             ((uiop:directory-exists-p new-path)
+              (%dirli-navigate-result app-state new-path))
+             ((uiop:file-exists-p new-path)
+              (status-message-result (format nil "File: ~A" selected-item)))
+             (t
+              (status-message-result (format nil "Cannot access: ~A" selected-item)))))))))
+
+  (defun %dirli-resize-result (app-state message)
+    (let* ((width (getf (rest message) :width 80))
+           (height (getf (rest message) :height 24))
+           (available-height (max 5 (- height 5)))
+           (lb-model (state-ref app-state :listbox-model)))
+      (make-update-result
+       :patches (append
+                 (when lb-model
+                   (list (list '(:listbox-model)
+                               (regenerate-listbox-model lb-model :height available-height))))
+                 (list (list '(:terminal-width) width)
+                       (list '(:terminal-height) height))))))
+
+  (defun app-update (message app-state)
+    "Handle directory navigation, selection, resize, and quit messages."
     (cond
       ((typep message 'key-event)
-       (let ((key (key-event-key message)))
-         (if (or (member key '(:q :Q #\q #\Q) :test #'eql)
-                 (and (stringp key) (or (string= key "q") (string= key "Q")))
-                 (and (characterp key)
-                      (or (char= key #\q) (char= key #\Q))
-                      (member :control (key-event-modifiers message))))
-             (quit-result)
-             (let* ((lb-model (state-ref app-state :listbox-model)))
-               (multiple-value-bind (new-lb-model lb-cmds)
-                   (update-listbox `(:listbox-key-press :key ,key) lb-model)
-                 (make-update-result
-                  :patches `(((:listbox-model) ,new-lb-model))
-                  :commands lb-cmds))))))
-      ((eq message :item-selected)
-       (let* ((lb-model (state-ref app-state :listbox-model))
-              (selected-idx (and lb-model (listbox-model-selected-index lb-model)))
-              (item (when (and lb-model selected-idx)
-                      (nth selected-idx (listbox-model-items lb-model))))
-              (current-path (state-ref app-state :current-path)))
+       (let ((key (key-event-key message))
+             (modifiers (key-event-modifiers message))
+             (lb-model (state-ref app-state :listbox-model)))
          (cond
+           ((or (member key '(:q #\q #\Q) :test #'eql)
+                (and (member :control modifiers)
+                     (member key '(:q #\q) :test #'eql)))
+            (make-update-result :patches '(((:should-quit) t))))
            ((null lb-model)
-            (status-message-result "Listbox is not initialized yet"))
-           ((not item)
-            (status-message-result "No item selected"))
+            (make-update-result))
            (t
-            (let ((new-path (merge-pathnames item current-path)))
-              (cond
-                ((string= item "../")
-                 (navigate-to-directory
-                  (uiop:pathname-parent-directory-pathname current-path)))
-                ((uiop:directory-exists-p new-path)
-                 (navigate-to-directory new-path))
-                ((uiop:file-exists-p new-path)
-                 (status-message-result (format nil "File: ~A" item)))
-                (t
-                 (status-message-result
-                  (format nil "Cannot access: ~A" item)))))))))
+            (multiple-value-bind (new-model commands)
+                (update-listbox (list :listbox-key-press
+                                      :key (%dirli-normalize-key key))
+                                lb-model)
+              (make-update-result
+               :patches (list (list '(:listbox-model) new-model))
+               :commands commands))))))
+      ((or (eq message :item-selected)
+           (and (consp message) (eq (first message) :item-selected)))
+       (%dirli-selected-result app-state message))
       ((and (consp message) (eq (first message) :terminal-resized))
-       (let* ((msg-data (rest message))
-              (term-height (getf msg-data :height))
-              (available-height (max 5 (- term-height 5)))
-              (lb-model (state-ref app-state :listbox-model))
-              (current-height (and lb-model (listbox-model-height lb-model))))
-         (cond
-           ((null lb-model)
-            (make-update-result))
-           ((= available-height current-height)
-            (make-update-result))
-           (t
-            (let ((new-lb-model (regenerate-listbox-model
-                                  lb-model
-                                  :height available-height)))
-               (make-update-result
-                :patches `(((:listbox-model) ,new-lb-model)
-                           (:terminal-width ,(getf msg-data :width))
-                           (:terminal-height ,(getf msg-data :height)))))))))
+       (%dirli-resize-result app-state message))
       (t
        (make-update-result)))))
+
+
 
 ;;;===============================================================
 ;;; View Function
 ;;;===============================================================
 
 (defun app-view (app-state)
-  "Render the directory listing application."
+  "Render the live directory listbox and status information."
   (let* ((current-path (state-ref app-state :current-path))
-         (status-message (state-ref app-state :status-message))
-         (terminal-width (state-ref app-state :terminal-width))
-         (terminal-height (state-ref app-state :terminal-height)))
-    `(:container
-       :id :root
-       :style (:width :fill
-               :height :fill
-               :display :flex
-               :flex-direction :column
-               :gap 1
-               :padding 1)
-       :children
-       ((:text
-         :id :header
-         :content ,(format nil "Dirli - ~A" current-path)
-         :style (:fg-color :cyan :bold t))
-        (:text
-         :id :instructions
-         :content "↑↓: Navigate | Enter: Open | C-q: Quit"
-         :style (:fg-color :gray))
-        (:container
-         :id :listbox-container
-         :style (:width :fill :height :fill)
-         :children
-         ((:text
-           :id :listbox-placeholder
-           :content "Loading..."
-           :style (:width :fill :height :fill :text-align :center))))
-        (:text
-         :id :status
-         :content ,status-message
-         :style (:fg-color :yellow))
-        (:text
-         :id :footer
-         :content ,(format nil "Terminal: ~A x ~A"
-                           terminal-width
-                           terminal-height)
-         :style (:fg-color :gray))))))
+         (status-message (state-ref app-state :status-message ""))
+         (terminal-width (state-ref app-state :terminal-width 80))
+         (terminal-height (state-ref app-state :terminal-height 24))
+         (lb-model (state-ref app-state :listbox-model)))
+    `(:container :id :root
+      :style (:width :fill :height :fill :display :flex :flex-direction :column :gap 1 :padding 1)
+      :children
+      ((:text :id :header :content ,(format nil "Dirli - ~A" current-path) :style (:fg-color :cyan :bold t))
+       (:text :id :instructions :content "Up/Down: Navigate | Enter: Open | q: Quit" :style (:fg-color :gray))
+       (:container :id :listbox-container :style (:width :fill :height :fill)
+        :children (,(if lb-model
+                        (view-listbox app-state :widget-id :main-listbox
+                                      :items (listbox-model-items lb-model)
+                                      :height (listbox-model-height lb-model)
+                                      :selected-index (listbox-model-selected-index lb-model)
+                                      :on-select '(:item-selected)
+                                      :empty-text "Directory is empty"
+                                      :width :fill)
+                        '(:text :id :empty :content "Directory unavailable"))))
+       (:text :id :status :content ,status-message :style (:fg-color :yellow))
+       (:text :id :footer :content ,(format nil "Terminal: ~A x ~A" terminal-width terminal-height)
+              :style (:fg-color :gray))))))
+
 
 ;;;===============================================================
 ;;; Application Definition
@@ -223,9 +219,10 @@
 ;;; Entry Points
 ;;;===============================================================
 
-(defun run-dirli (&rest args)
-  "Run the Dirli directory listing application."
-  (apply #'elmtui.app.api:run-application 'dirli-app args))
+(defun run-dirli (&key (backend-type :terminal) platform-options argv)
+  "Run Dirli through the generated application runner."
+  (run-dirli-app :platform backend-type :platform-options platform-options :argv argv))
+
 
 (defun main ()
   "Main entry point for the application."
