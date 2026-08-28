@@ -1,5 +1,7 @@
 # Tasks: Rendering System & UI Components
 
+> **2026-08-20 audit:** unchecked items below are historical and are not directly dispatchable. Most target the orphan canvas/view-node renderer. Use [`tasks/README.md`](README.md) for the maintained `tree-renderer` backlog.
+
 This file lists pending tasks related to the ELMTUI rendering system, UI components, and layout.
 
 ## View System & Layout

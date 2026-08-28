@@ -42,7 +42,29 @@ example; `q`, `Escape`, and `Ctrl-C` are the common choices.
 | `glider-real.lisp` | Animated grid/rendering example |
 | `fzf-finder-real.lisp` | Finder-oriented application flow |
 | `dirli.lisp` | Directory-listing application |
+| `wifi-menu.lisp` | Live NetworkManager Wi-Fi selection driven by `nmcli` |
 | `pong-below-cursor.lisp` | Inline animation below the current cursor |
+
+The old nested `examples/dirlister_poc/` prototype has been retired. It had an
+invalid program entry point and duplicated the maintained `dirli.lisp` example.
+Use `elmtui.examples.dirli:run-dirli` for directory-listing work.
+
+## NetworkManager Wi-Fi menu
+
+`wifi-menu.lisp` is a maintained example for stateful external-command
+integration. It requires NetworkManager's `nmcli` executable. The menu refreshes
+visible access points asynchronously, supports explicit rescans, connects to the
+selected SSID, and can disconnect the selected Wi-Fi device.
+
+```lisp
+(asdf:load-system "elmtui-examples")
+(elmtui.examples.wifi-menu:run-wifi-menu)
+```
+
+Passwords are masked in the UI and are passed to `nmcli --ask` through standard
+input rather than process arguments. Merely loading or testing the example does
+not connect to or disconnect from a network; those mutations require explicit
+interactive user actions.
 
 ## Optional `cl-fzy` example
 
@@ -56,7 +78,10 @@ installing the `cl-fzy` ASDF system, load:
 ```
 
 The optional system is declared in `elmtui-examples-fzy.asd` and is not part of
-the default release test graph.
+the default release test graph. Its loader lives under `examples/support/` so
+support code is not mistaken for a runnable example. If `cl-fzy` is absent, the
+optional system reports a concise actionable diagnostic and points to the
+built-in `fzf-finder-real` alternative.
 
 ## Tmux examples
 

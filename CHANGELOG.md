@@ -23,6 +23,11 @@ The project follows semantic versioning from the first published release.
   default, while `:overflow :hidden` clips to nested content-box intersections.
 - Added terminal image fallback rendering using `:alt` text or `[image]` and
   regression coverage for source-order sibling painting.
+- Added maintained REPL/runtime introspection and optional `elmtui-dev` benchmark
+  tooling with deterministic result-shape/baseline tests; benchmark artifacts are
+  written beneath the repository rather than system temporary directories.
+- Added warning-clean coverage execution and bridge commands for benchmarks,
+  documentation generation/audit, and focused example verification.
 
 ### Changed
 

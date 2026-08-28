@@ -1,5 +1,7 @@
 # Tasks: Developer Experience & Documentation
 
+> **2026-08-20 audit:** superseded as an active checklist. Dev-tooling work was revalidated against current APIs and documentation duplicates were collapsed. See [`tasks/README.md`](README.md).
+
 This file lists pending tasks related to improving developer experience, code cleanup, and documentation for ELMTUI.
 
 ## General Code Cleanup

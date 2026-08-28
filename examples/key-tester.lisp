@@ -75,42 +75,25 @@
 ;;; ----------------------------------------------------------------------
 
 (defun key-tester-update (message app-state)
-  "Handles updates for the key tester application.
-   This function reacts to high-level messages from the keymap,
-   or raw key events for text input."
-  (log-info "Key Tester App received message: ~S" message)
-  (log-info "Key Tester App received state: ~S" app-state)
+  "Handle semantic keymap actions and raw/canonical key events safely."
   (let ((component (state-ref app-state :component)))
     (cond
-      ;; --- Global Quit Command ---
-      ((and (typep message 'key-event) (eq (key-event-key message) #\q))
-       (make-update-result :patches '((:should-quit t))))
-
-      ((and (listp message) (eq (first message) :app-quit-requested))
-       (make-update-result :patches '((:should-quit t))))
-
-      ;; --- Messages from our Keymap Actions ---
+      ((and (typep message 'key-event) (member (key-event-key message) '(:q #\q #\Q) :test #'eql))
+       (make-update-result :patches '(((:should-quit) t))))
+      ((and (consp message) (eq (first message) :app-quit-requested))
+       (make-update-result :patches '(((:should-quit) t))))
       ((equal message '(:delete-last-char))
-       (let ((new-comp (kt-handle-delete-last (copy-structure component))))
-         (make-update-result :patches `((:component ,new-comp)))))
-
+       (let ((new-component (kt-handle-delete-last (copy-structure component))))
+         (make-update-result :patches (list (list '(:component) new-component)))))
       ((equal message '(:clear-input))
-       (let ((new-comp (kt-handle-clear-input (copy-structure component))))
-         (make-update-result :patches `((:component ,new-comp)))))
-
-      ;; --- Raw Key Events for Echo and Input ---
-      ;; This handles printable characters. The keymap above handles Backspace/Escape.
+       (let ((new-component (kt-handle-clear-input (copy-structure component))))
+         (make-update-result :patches (list (list '(:component) new-component)))))
       ((or (typep message 'key-event)
-           (eql (car message) :keyevent))
+           (and (consp message) (member (first message) '(:keyevent :key-event) :test #'eq)))
+       (let ((new-component (key-tester-on-key-event (copy-structure component) message)))
+         (make-update-result :patches (list (list '(:component) new-component)))))
+      (t (make-update-result)))))
 
-       (let ((new-comp (key-tester-on-key-event (copy-structure component) message)))
-         (log-info "Key Tester App received key event: ~S" message)
-         (make-update-result :patches `((:component ,new-comp)))))
-
-      ;; --- Default Case ---
-      (t
-       (log-info "Key Tester App received unhandled message: ~S" message)
-       (make-update-result)))))
 
 ;; (ELMTUI.VIEW.DSL:RENDER-DSL-TO-RESOLVED-TREE
 ;;  (:ROOT-VIEWPORT :ID :KEY-TESTER-ROOT :INITIAL-TERMINAL-DIMENSIONS #1=(1 1) :INITIAL-CURSOR-POS #1# :CHILDREN

@@ -1,105 +1,88 @@
 ---
 # AI Metadata Tags
-ai_keywords: [Dev Implementation, Debug Tools Internals, REPL Integration, Tracing Hooks, Profiling Adapters, Conditional Compilation]
+ai_keywords: [Dev Implementation, Runtime Introspection, Virtual Buffer, Element Tree, REPL, Testing]
 ai_contexts: [implementation, development]
-ai_relations: ["./overview.md", "../core/implementation.md", "../view/implementation.md", "../ui/implementation.md", "../platform/implementation.md", "../../architecture/system-overview.md", "../../architecture/module-dependencies.md"]
+ai_relations: ["./overview.md", "../core/implementation.md", "../view/implementation.md", "../platform/implementation.md", "../../../tasks/README.md"]
 ---
 
 # Dev Module Implementation Details
 
-<!-- AI-IMPORTANCE:level=normal -->
-## Technical Overview
+## Ownership and load boundary
 
-The `dev` module's implementation involves creating hooks into the Elmtui core systems to extract debugging information or inject control commands. This might include custom rendering passes for visual debuggers, wrappers around event handlers for tracing, or interfaces to Lisp's built-in inspection and profiling tools.
+The maintained dev implementation is `src/dev/dev.lisp`. It is part of the main `elmtui` system and therefore must stay lightweight: loading `elmtui` must not start monitor threads, install tracing hooks, mutate application state, or pull in an alternate rendering/event stack.
 
-<!-- AI-CONTEXT-START:type=implementation -->
-## Core Implementation
+The implementation deliberately delegates to current owners instead of duplicating their state:
 
-### Debug Overlays / Visualizers
-- **Hooking into Rendering:** How the `dev` module integrates with the `view` or `platform` rendering pipeline to draw additional debug information (e.g., component boundaries, layout boxes, refresh regions).
-- **Data Structures:** Storing information about what to visualize.
-```lisp
-;; Hypothetical: A special variable to enable layout bounds drawing
-;; (defvar *draw-layout-bounds* nil)
+| Diagnostic | Owner queried by `elmtui.dev` |
+| --- | --- |
+| event-loop status / queue length | `elmtui.core.loop` |
+| topic/subscription diagnostics | `elmtui.core.topic-registry` |
+| application-state presence | `elmtui.core.globals` |
+| lowered element structure | `elmtui.view.base-elements` |
+| layout rectangle coordinates | `elmtui.view.geo` |
+| virtual-buffer contents | `elmtui.platform.backend.common.virtual-buffer` |
 
-;; In the rendering logic (view/platform module):
-;; (when elmtui-dev:*draw-layout-bounds*
-;;   (draw-debug-rectangle (component-x c) (component-y c) (component-width c) (component-height c)))
+This makes the dev module a presentation/introspection layer rather than another source of truth.
+
+## Runtime snapshot contract
+
+`runtime-snapshot` returns ordinary Lisp data. It does not retain references in a history buffer or install observers. The event-loop sub-plist comes from `get-event-loop-status`; the remaining keys are sampled independently at call time, so callers should treat the result as diagnostic rather than an atomic runtime transaction.
+
+`format-runtime-snapshot` accepts that plist and renders a stable, human-readable REPL summary. Keeping capture and formatting separate allows tests and future structured consumers to inspect the same data without parsing text.
+
+## Element-tree inspection
+
+`format-element-tree` accepts either one `base-element` or a list of sibling elements. It walks `element-children` depth-first and prints:
+
+- the canonical DSL element type;
+- an element id when present;
+- `(x,y) width×height` when a layout rectangle exists;
+- the resolved element style only when `:include-style t` is requested.
+
+It intentionally targets the maintained lowered-element protocol. The orphan `src/dev/view-debug.lisp` stack targets an older `ui-node` model and is not a dependency.
+
+## Virtual-buffer diagnostics
+
+`buffer->string` iterates rows and columns through the virtual-buffer public accessors and writes only to the local string output stream. This property is tested explicitly so the helper can be used safely in test assertions.
+
+`with-buffer-dump` uses `handler-bind` so the original condition is still active when the debugger is entered. The buffer is written to `*error-output*` as context; the macro does not swallow or replace the failure.
+
+## Adding developer tooling
+
+New tooling should follow these constraints:
+
+1. query maintained owner APIs rather than reaching into stale orphan packages;
+2. return structured Lisp data separately from presentation when practical;
+3. avoid background threads/hooks at system-load time;
+4. keep instrumentation opt-in and make overhead visible;
+5. add focused deterministic tests;
+6. use a dedicated optional ASDF system if a tool needs heavyweight dependencies or persistent instrumentation.
+
+The next validated tooling work is tracked as DEV-002 through DEV-004 in `tasks/README.md`. In particular, do not add the old event-monitor/dashboard files to ASDF just to make their packages visible; they must be redesigned around current APIs.
+
+## Tests
+
+`tests/dev-tests.lisp` defines `DEV-TEST-SUITE` and verifies:
+
+- `buffer->string` returns the expected text without writing to `*standard-output*`;
+- `runtime-snapshot` exposes the documented data shape and formats successfully;
+- `format-element-tree` includes parent/child types and ids.
+
+Run the focused checks through the project CLPM bundle, for example:
+
+```text
+clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+  --eval '(require :asdf)' \
+  --eval '(asdf:load-system "elmtui-tests")' \
+  --eval '(unless (uiop:symbol-call :elmtui.dev.tests :run-dev-tests) (uiop:quit 1))'
 ```
 
-### REPL Integration
-- **Accessing Application State:** Functions to get a handle to the current application instance, focused component, or component tree from the REPL.
-  ```lisp
-  ;; (defun current-app () *elmtui-current-application-instance*) ; If such a var exists
-  ;; (defun find-component-by-id (app id) ...)
-  ```
-- **Invoking Actions:** REPL functions to trigger actions like requesting focus, sending messages to components, or forcing a re-render.
+## Known limits
 
-### Event Tracing
-- **Wrapping Event Handlers:** Potentially using Lisp's method combination or advice to wrap event dispatch or component event handlers to log event details.
-- **Filtering and Formatting:** Options to filter traced events and format the output.
+- A snapshot is observational, not atomic across subsystems.
+- There is no maintained event/state causality history yet.
+- There is no maintained profiling API yet.
+- Element-tree inspection expects lowered base elements, not arbitrary component instances.
+- Buffer dumps intentionally omit terminal escape reconstruction and expose plain cell characters only.
 
-### Performance Monitoring Hooks
-- **Timing Wrappers:** Functions to wrap around critical sections (e.g., render cycle, event processing) to measure execution time.
-- **Data Aggregation:** Simple mechanisms to collect and display timing data.
-  ```lisp
-  ;; (defmacro with-timing ((&optional (label "Operation")) &body body)
-  ;;   `(let ((start (get-internal-real-time)))
-  ;;      (unwind-protect (progn ,@body)
-  ;;        (let ((end (get-internal-real-time)))
-  ;;          (format t "~a took ~,3f ms~%" ,label (/ (- end start) internal-time-units-per-millisecond))))))
-  ```
-
-### Conditional Compilation
-- Extensive use of feature flags (e.g., `:elmtui-dev-mode`) to ensure that debugging code is not compiled into production builds.
-  ```lisp
-  ;; #+elmtui-dev-mode
-  ;; (defun expensive-debug-check (object) ...)
-  ;;
-  ;; #-elmtui-dev-mode
-  ;; (defun expensive-debug-check (object) (declare (ignore object)) nil)
-  ```
-<!-- AI-CONTEXT-END -->
-
-<!-- AI-CONTEXT-START:type=development -->
-## Development Guide
-
-### Key Public APIs (for Elmtui Developers)
-*   `elmtui-dev:enable-tracing (&key event-types components)`
-*   `elmtui-dev:disable-tracing ()`
-*   `elmtui-dev:inspect-component-tree (app-instance)`
-*   `elmtui-dev:show-layout-bounds (boolean-flag)`
-*   `elmtui-dev:profile-render-pass (boolean-flag)`
-
-### Important Notes
-*   Most `dev` module functions should be designed to be callable from a Lisp REPL connected to a running Elmtui application.
-*   Be cautious about the performance overhead of enabled debugging tools.
-*   Ensure that dev tools do not inadvertently alter application state in unexpected ways unless that is their explicit purpose.
-
-### Adding New Dev Tools
-1.  Identify the information or control needed.
-2.  Find appropriate hook points in the core Elmtui modules.
-3.  Implement the tool, ensuring it can be conditionally compiled.
-4.  Provide clear REPL-callable functions to enable/disable or use the tool.
-<!-- AI-CONTEXT-END -->
-
-## Testing Strategy
-
-*   Testing that dev tools can be enabled and disabled correctly.
-*   Verifying that enabling dev tools does not break core application functionality.
-*   Testing that the information provided by dev tools is accurate (e.g., component state inspection).
-*   (Testing visual debuggers might require specialized approaches, possibly manual or snapshot-based if a "faketerm" renderer is available).
-
-## Known Limitations
-
-*   Some debugging tools might have a noticeable performance impact.
-*   The level of introspection might be limited by the design of the core modules.
-
-## Related Resources
-- [Dev Module Overview](./overview.md)
-- [Core Module Implementation Details](../core/implementation.md)
-- [View Module Implementation Details](../view/implementation.md)
-- [UI Module Implementation Details](../ui/implementation.md)
-- [Platform Module Implementation Details](../platform/implementation.md)
-- [System Overview](../../architecture/system-overview.md)
-- [Module Dependencies](../../architecture/module-dependencies.md)
+See `tasks/README.md` for the audited replacement tasks and the classification of orphan developer-tool sources.

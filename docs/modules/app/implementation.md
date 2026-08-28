@@ -56,7 +56,8 @@ The `app` module's implementation focuses on orchestrating the Elmtui runtime en
 ### Key Public APIs
 (List and briefly describe the main functions/macros exported by the `app` module for developers to use.)
 *   `run-application (app-spec &key backend-type platform-options)`: Starts an Elmtui application using a specification plist. This is the primary entry point for applications defined via `defapplication`.
-*   `defapplication`: Macro for declaratively defining an Elmtui application, generating a runner function that internally calls `run-application`.
+*   `defapplication`: Normative full application constructor for the next stable major version. It declaratively defines an ElmTUI application and generates a runner that internally calls `run-application`.
+*   `elmtui.app.tea-core:deftea-app`: Supported minimal direct-transition constructor for teaching and deliberately small applications. It shares the canonical runtime transition spec with `defapplication` but does not duplicate the latter's production configuration surface.
 *   `quit-application (app-instance)`: Programmatically stops an application.
 
 ```lisp
@@ -73,7 +74,7 @@ The `app` module's implementation focuses on orchestrating the Elmtui runtime en
   :platform-options '(:tty-path "/dev/tty"))
 ```
 
-;; If using defapplication (recommended for most apps):
+;; Use defapplication for normative production applications:
 (defapplication my-app
   :root-viewport-id :main-root-vp
   :initial-state-plist (my-init)

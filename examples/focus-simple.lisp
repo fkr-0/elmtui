@@ -49,62 +49,57 @@
           :exit-code 0)))
 
 (defun app-update (message app-state)
+  "Handle focus-demo semantic messages without mutating application state."
   (let ((patches nil) (commands nil))
-    (labels ((ret () (make-update-result :patches (nreverse patches) :commands (nreverse commands))))
-      (etypecase message
-        ((or symbol list)
-         (case (if (consp message) (car message) message)
-           (:lb-selected
-            (let* ((lb (cdr (assoc *listbox-id* (getf app-state :components))))
-                   (idx (listbox-model-selected-index lb))
-                   (item (when idx (nth idx (listbox-model-items lb)))))
-              (format t "Selected: ~A~%" item)
-              (push '(:should-quit t) patches)))
-           (:ok
-            (let* ((lb (cdr (assoc *listbox-id* (getf app-state :components))))
-                   (idx (listbox-model-selected-index lb))
-                   (item (when idx (nth idx (listbox-model-items lb)))))
-              (format t "OK: ~A~%" item)
-              (push '(:should-quit t) patches)))
-           (:cancel
-            (format t "Cancelled.~%")
-            (push '(:should-quit t) patches)
-            (push '(:exit-code 1) patches))
-           (:dispatch-to-component
-            (destructuring-bind (_ target . action) message
-              (declare (ignore _))
-              (cond
-                ((eq target *ok-id*) (push '(:ok) commands))
-                ((eq target *cancel-id*) (push '(:cancel) commands))
-                (t (let ((lb (cdr (assoc *listbox-id* (getf app-state :components)))))
-                     (multiple-value-bind (new-lb lb-cmds)
-                         (update-listbox (case (car action)
-                                           (:up   (list msg-listbox-key-press :key :up))
-                                           (:down (list msg-listbox-key-press :key :down))
-                                           (t     (list msg-listbox-key-press :key (car action))))
-                                         lb)
-                       (declare (ignore lb-cmds))
-                       (let* ((components (copy-alist (getf app-state :components)))
-                              (entry (assoc *listbox-id* components)))
-                         (when entry
-                           (setf (cdr entry) new-lb)
-                           (push `(:components ,components) patches)))))))))
-           (:focus-next
-            (let* ((fm (copy-list (getf app-state :focus-manager)))
-                   (ids (getf fm :focusable-elements))
-                   (cur (getf fm :current-focus-id))
-                   (pos (position cur ids))
-                   (next (if pos (nth (mod (1+ pos) (length ids)) ids) (first ids))))
-              (push `(:focus-manager (:current-focus-id ,next :focusable-elements ,ids)) patches)))
-           (:focus-prev
-            (let* ((fm (copy-list (getf app-state :focus-manager)))
-                   (ids (getf fm :focusable-elements))
-                   (cur (getf fm :current-focus-id))
-                   (pos (position cur ids))
-                   (prev (if pos (nth (mod (1- pos) (length ids)) ids) (first ids))))
-              (push `(:focus-manager (:current-focus-id ,prev :focusable-elements ,ids)) patches)))))
-        (t nil))
+    (labels ((ret () (make-update-result :patches (nreverse patches) :commands (nreverse commands)))
+             (components () (state-ref app-state :components))
+             (focus-manager () (state-ref app-state :focus-manager)))
+      (let ((tag (if (consp message) (first message) message)))
+        (case tag
+          (:lb-selected (push '((:should-quit) t) patches))
+          (:ok (push '((:should-quit) t) patches))
+          (:cancel
+           (push '((:should-quit) t) patches)
+           (push '((:exit-code) 1) patches))
+          (:dispatch-to-component
+           (let ((target (second message))
+                 (action (third message)))
+             (cond
+               ((eq target *ok-id*) (push '(:ok) commands))
+               ((eq target *cancel-id*) (push '(:cancel) commands))
+               (t
+                (let ((lb (cdr (assoc *listbox-id* (components)))))
+                  (when lb
+                    (multiple-value-bind (new-lb ignored-commands)
+                        (update-listbox (list msg-listbox-key-press
+                                              :key (case action
+                                                     (:up :up)
+                                                     (:down :down)
+                                                     (otherwise action)))
+                                        lb)
+                      (declare (ignore ignored-commands))
+                      (let* ((new-components (copy-alist (components)))
+                             (entry (assoc *listbox-id* new-components)))
+                        (setf (cdr entry) new-lb)
+                        (push (list :components new-components) patches)))))))))
+          (:focus-next
+           (let* ((fm (copy-list (focus-manager)))
+                  (ids (getf fm :focusable-elements))
+                  (cur (getf fm :current-focus-id))
+                  (pos (position cur ids))
+                  (next (if pos (nth (mod (1+ pos) (length ids)) ids) (first ids))))
+             (setf (getf fm :current-focus-id) next)
+             (push (list '(:focus-manager) fm) patches)))
+          (:focus-prev
+           (let* ((fm (copy-list (focus-manager)))
+                  (ids (getf fm :focusable-elements))
+                  (cur (getf fm :current-focus-id))
+                  (pos (position cur ids))
+                  (prev (if pos (nth (mod (1- pos) (length ids)) ids) (first ids))))
+             (setf (getf fm :current-focus-id) prev)
+             (push (list '(:focus-manager) fm) patches)))))
       (ret))))
+
 
 (defun app-view (app-state)
   `(:container :id :root
@@ -123,5 +118,6 @@
   :update-fn 'app-update
   :view-fn 'app-view)
 
-(defun run-focus-simple ()
-  (log-info "Run focus-simple via your runner, then navigate listbox and buttons (Tab)."))
+(defun run-focus-simple (&key (backend-type :terminal) platform-options argv)
+  "Run the focus/listbox example with the generated application runner."
+  (run-focus-simple-app :platform backend-type :platform-options platform-options :argv argv))

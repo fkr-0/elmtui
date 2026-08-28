@@ -24,3 +24,6 @@
 (:system "alexandria" :source "quicklisp")
 ;; API documentation is generated from ANSI CL DOCUMENTATION metadata by
 ;; ELMTUI-DOCS; no documentation dependency enters the runtime bundle.
+(:asd "elmtui-widgets-enhanced-tests.asd")
+(:asd "elmtui-dev.asd")
+(:asd "elmtui-dev-tests.asd")

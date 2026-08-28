@@ -60,4 +60,55 @@ commands:
   coverage:
     track: clpm
     run: |
-      clpm bundle exec --with-client sbcl -- --noinform --load coverage.lisp
+      set -eu
+      mkdir -p test-output
+      log="test-output/coverage-warning-clean.log"
+      if ! clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load coverage.lisp >"$log" 2>&1; then
+        cat "$log"
+        exit 1
+      fi
+      cat "$log"
+      test -s coverage/cover-index.html
+      if grep -nE '(^|[[:space:]])(STYLE-)?WARNING:' "$log"; then
+        echo "coverage: warning marker detected" >&2
+        exit 1
+      fi
+
+  examples-smoke:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+        --eval '(require :asdf)' \
+        --eval '(asdf:load-system "elmtui-tests")' \
+        --eval '(fiveam:run! '\''elmtui.tests.examples-smoke:examples-smoke-tests)'
+
+  benchmark:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+        --eval '(require :asdf)' \
+        --eval '(asdf:load-system "elmtui-dev")' \
+        --eval '(elmtui.dev.benchmark:run-benchmark-suite)'
+
+  benchmark-test:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+        --eval '(require :asdf)' \
+        --eval '(asdf:load-system "elmtui-dev-tests")' \
+        --eval '(elmtui.dev.benchmark.tests:run-benchmark-tests)'
+
+  docs:
+    track: clpm
+    run: |
+      scripts/build-api-docs.sh
+
+  doc-audit:
+    track: clpm
+    run: |
+      scripts/check-docstrings.sh
+
+  doc-audit-strict:
+    track: clpm
+    run: |
+      ELMTUI_DOCSTRING_STRICT=1 scripts/check-docstrings.sh

@@ -1,5 +1,7 @@
 # Tasks: Performance Testing & General Optimizations
 
+> **2026-08-20 audit:** superseded as an active checklist. Measurement tasks are consolidated into DEV-002/DEV-004; optimization tasks require measured evidence first. See [`tasks/README.md`](README.md).
+
 This file lists pending tasks for performance testing, benchmarking, and general optimizations in ELMTUI, with a primary focus on the event system.
 
 ## Event System Performance Testing

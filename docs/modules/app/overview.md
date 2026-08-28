@@ -51,8 +51,15 @@ The `app` module sits at the highest level of the Elmtui architecture, acting as
 
 ### Defining an Application
 
+`defapplication` is the normative full application constructor selected for the
+next stable major version. It is the production entry point for state/component
+initialization, CLI/binary configuration, keymaps, subscriptions, and generated
+runners. `deftea-app` remains supported as a smaller direct-transition adapter
+for teaching and deliberately minimal applications; both feed the same runtime
+transition specification.
+
 ```lisp
-;; Using defapplication macro (recommended approach)
+;; Using defapplication macro (normative production approach)
 (defapplication my-app
   :root-viewport-id :main-root-vp
   :initial-state-plist (my-init)

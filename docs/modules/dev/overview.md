@@ -1,219 +1,122 @@
 ---
 # AI Metadata Tags
-ai_keywords: [Dev Module, Development Tools, Debugging, Introspection, Event Monitoring, Transaction Viewer, View Debug, Performance Tools, Development Utilities]
+ai_keywords: [Dev Module, Development Tools, Debugging, Introspection, Runtime Snapshot, Buffer Dump, Element Tree, REPL]
 ai_contexts: [development, debugging, meta]
 ai_relations: [
   "./implementation.md",
-  "../app/overview.md",
   "../core/overview.md",
-  "../state/overview.md",
-  "../ui/overview.md",
   "../view/overview.md",
-  "../utils/overview.md",
-  "../../architecture/system-overview.md",
-  "../../architecture/module-dependencies.md",
-  "../../dev-guides/troubleshooting.md"
+  "../platform/overview.md",
+  "../../dev-guides/troubleshooting.md",
+  "../../../tasks/README.md"
 ]
 ---
 
 # Dev Module Overview
 
-<!-- AI-IMPORTANCE:level=normal -->
-## Core Functionality
+The maintained `elmtui.dev` package is intentionally small. It provides read-oriented helpers for inspecting the current runtime and renderer data from a Lisp REPL without introducing a second event loop, dashboard, transaction system, or rendering path.
 
-The `dev` module provides development and debugging tools for Elmtui applications. It includes utilities for monitoring events, inspecting component state, visualizing transactions, debugging view generation, and profiling performance. This module is essential for developers building and debugging Elmtui applications.
+The authoritative implementation is `src/dev/dev.lisp`, which is loaded by the main `elmtui` ASDF system. Older files under `src/dev/` such as `event-monitor.lisp`, `event-dashboard.lisp`, `transaction-viewer.lisp`, and `view-debug.lisp` are not part of a maintained ASDF system and must not be treated as available public APIs. Their status is tracked in `tasks/README.md`.
 
-## Main Features
+## Maintained public API
 
-- **Event Monitoring:** Real-time event flow inspection and logging
-- **State Debugging:** Component and application state introspection tools
-- **Transaction Visualization:** Visual representation of state transactions and changes
-- **View Debugging:** Tools for inspecting view generation and rendering pipeline
-- **Performance Profiling:** Timing and performance analysis utilities
-- **Component Introspection:** Deep inspection of component lifecycle and behavior
-- **Development Server:** Live development environment with hot reloading capabilities
-- **Error Analysis:** Enhanced error reporting and stack trace analysis
+### `runtime-snapshot`
 
-<!-- AI-CONTEXT-START:type=architecture -->
-## Architectural Design
+Returns a plist containing a side-effect-free snapshot of currently exposed runtime diagnostics:
 
-The `dev` module operates as a meta-layer over the core Elmtui functionality, providing observability and debugging capabilities without interfering with production code.
-
-### Key Components
-- **Development Framework ([`src/dev/dev.lisp`](src/dev/dev.lisp:1)):** Core development utilities and setup
-- **Event Monitor ([`src/dev/event-monitor.lisp`](src/dev/event-monitor.lisp:1)):** Real-time event tracking and analysis
-- **Event Throttling ([`src/dev/event-throttler.lisp`](src/dev/event-throttler.lisp:1)):** Performance testing with controlled event rates
-- **Transaction Viewer ([`src/dev/transaction-viewer.lisp`](src/dev/transaction-viewer.lisp:1)):** Visual state transaction inspection
-- **View Debugger ([`src/dev/view-debug.lisp`](src/dev/view-debug.lisp:1)):** View generation and rendering debugging
-- **Deprecation System ([`src/dev/deprecation.lisp`](src/dev/deprecation.lisp:1)):** API deprecation warnings and migration helpers
-
-### Design Principles
-- **Non-intrusive:** Development tools don't affect production performance
-- **Modular:** Each tool can be enabled/disabled independently
-- **Real-time:** Live monitoring and inspection capabilities
-- **Visual:** Graphical representations where helpful
-- **Extensible:** Easy to add new development tools
-<!-- AI-CONTEXT-END -->
-
-<!-- AI-CONTEXT-START:type=development -->
-## How to Use
-
-### Event Monitoring
+- `:event-loop` — the result of `elmtui.core.loop:get-event-loop-status`;
+- `:queue-length` — current queued-event count;
+- `:subscription-count` — current topic subscription count;
+- `:topics` — topics that currently have subscribers;
+- `:application-state-present-p` — whether the global application-state slot is populated.
 
 ```lisp
-;; Start event monitoring
-(dev:start-event-monitor 
-  :output-stream *standard-output*
-  :filter (lambda (event) (eq (event-type event) :input))
-  :format :detailed)
-
-;; Monitor specific event types
-(dev:monitor-events '(:input :state-change :render)
-  (lambda (event)
-    (format t "Event: ~A at ~A~%" event (get-universal-time))))
-
-;; Event statistics
-(dev:get-event-statistics :since (- (get-universal-time) 60))
+(elmtui.dev:runtime-snapshot)
 ```
 
-### State Debugging
+### `format-runtime-snapshot`
+
+Formats a snapshot for interactive inspection. With no argument it captures a fresh snapshot first.
 
 ```lisp
-;; Inspect component state
-(dev:inspect-component my-component)
-(dev:show-component-state my-component :detailed t)
-
-;; Watch state changes
-(dev:watch-state-changes 
-  (lambda (old-state new-state changes)
-    (format t "State changed: ~A~%" changes)))
-
-;; State history
-(dev:show-state-history :limit 10)
-(dev:replay-state-changes :from-timestamp timestamp)
+(format t "~A" (elmtui.dev:format-runtime-snapshot))
 ```
 
-### Transaction Debugging
+The formatter reports consumer-thread activity, active channels, queue length, processed-event count, average processing time, subscription count, topics, and whether application state is present.
+
+### `format-element-tree`
+
+Formats a lowered `elmtui.view.base-elements:base-element` tree. It shows element type and id, and includes layout rectangles when layout has been computed. Pass `:include-style t` to include the resolved style plist.
 
 ```lisp
-;; Enable transaction viewer
-(dev:enable-transaction-viewer)
-
-;; Manual transaction inspection
-(dev:inspect-transaction transaction-id)
-(dev:show-transaction-tree :show-rollbacks t)
-
-;; Transaction performance analysis
-(dev:analyze-transaction-performance :group-by :operation-type)
+(format t "~A"
+        (elmtui.dev:format-element-tree root-element
+                                        :include-style t))
 ```
 
-### View Debugging
+This helper operates on the maintained lowered element model, not the historical `ui-node` debugging stack.
+
+### `buffer->string`
+
+Returns the contents of a virtual terminal buffer as plain text. It does not write to `*standard-output*`, which makes it suitable for assertions, debugger output, and snapshot-style diagnostics.
 
 ```lisp
-;; Enable view debugging
-(dev:enable-view-debugging 
-  :show-dsl-forms t
-  :highlight-changes t
-  :show-performance t)
-
-;; Inspect view generation
-(dev:debug-view-generation my-component)
-(dev:show-view-tree my-component :expand-all t)
-
-;; View diff analysis
-(dev:compare-view-trees old-tree new-tree)
+(elmtui.dev:buffer->string buffer)
 ```
 
-### Performance Profiling
+### `with-buffer-dump`
+
+Runs a body with an error handler that prints the current virtual-buffer contents to `*error-output*` before invoking the debugger on the original condition.
 
 ```lisp
-;; Profile application performance
-(dev:start-profiling :components t :rendering t :events t)
-
-;; Get performance report
-(dev:get-performance-report 
-  :format :table
-  :sort-by :total-time
-  :limit 20)
-
-;; Memory usage analysis
-(dev:analyze-memory-usage :group-by :component-type)
-
-;; Benchmark operations
-(dev:benchmark
-  (lambda () (expensive-operation))
-  :iterations 1000
-  :warmup 100)
+(elmtui.dev:with-buffer-dump (buffer)
+  (operation-that-may-fail))
 ```
 
-### Development Server
+Use this when the rendered buffer is useful failure context. It is deliberately not a recovery mechanism.
+
+### `dev-main`
+
+Prints the formatted current runtime snapshot and returns the underlying plist. It is a quick REPL entry point rather than a separate development server.
 
 ```lisp
-;; Start development server with hot reloading
-(dev:start-dev-server 
-  :port 8080
-  :watch-directories '("src/" "examples/")
-  :auto-reload t
-  :debug-mode t)
-
-;; Development configuration
-(dev:configure-development
-  :log-level :debug
-  :show-warnings t
-  :enable-all-monitors t)
+(elmtui.dev:dev-main)
 ```
 
-### Component Introspection
+## What is not currently supported
 
-```lisp
-;; Deep component analysis
-(dev:analyze-component my-component
-  :show-lifecycle t
-  :show-props t
-  :show-state-history t
-  :show-event-handlers t)
+The maintained dev package does **not** currently promise:
 
-;; Component dependency graph
-(dev:show-component-dependencies 
-  :root-component app-root
-  :format :graphviz)
+- an event-monitor dashboard;
+- transaction-history UI or time-travel debugging;
+- a hot-reload development server;
+- component dependency visualization;
+- always-on profiling hooks;
+- per-widget debug renderers;
+- state replay APIs.
 
-;; Component performance
-(dev:profile-component my-component :duration 60)
-```
-<!-- AI-CONTEXT-END -->
+Some older documentation and orphan source files described or prototyped those capabilities. They are not loaded by maintained systems and several no longer compile against current APIs. New tooling should be built from current runtime/state/rendering contracts rather than reviving those files wholesale.
 
-<!-- AI-CONTEXT-START:type=implementation -->
-## Implementation Notes
+## Development direction
 
-### Development vs Production
-- **Conditional Compilation:** Development tools are conditionally compiled
-- **Feature Flags:** Runtime flags control which development features are active
-- **Performance Impact:** Minimal overhead when development tools are disabled
-- **Clean Separation:** Development code is clearly separated from production code
+The validated backlog in `tasks/README.md` keeps four development-tool directions:
 
-### Tool Integration
-- **REPL Integration:** All development tools work seamlessly with the REPL
-- **IDE Support:** Tools designed to work with Lisp IDEs and editors
-- **External Tools:** Integration with external debugging and profiling tools
-- **Web Interface:** Some tools provide web-based interfaces for better visualization
+1. reproducible runtime/event/render benchmarks before optimization;
+2. an opt-in structured event → update/state → render causality trace;
+3. one optional tested profiler instead of the two orphan profiler implementations;
+4. focused current API/troubleshooting documentation rather than broad duplicate guides.
 
-### Data Collection
-- **Event Logging:** Comprehensive event logging with configurable detail levels
-- **State Snapshots:** Automatic state snapshots at key points
-- **Performance Metrics:** Detailed timing and memory usage metrics
-- **Error Tracking:** Enhanced error information collection and reporting
-<!-- AI-CONTEXT-END -->
+Any new tool should remain opt-in, preserve runtime semantics, expose structured data before presentation, and have deterministic focused tests where practical.
 
-## Related Resources
+## Verification
 
-- [Implementation Details](./implementation.md)
-- [Troubleshooting Guide](../../dev-guides/troubleshooting.md)
-- [App Module Overview](../app/overview.md)
-- [Core Module Overview](../core/overview.md)
-- [State Module Overview](../state/overview.md)
-- [UI Module Overview](../ui/overview.md)
-- [View Module Overview](../view/overview.md)
-- [Utils Module Overview](../utils/overview.md)
-- [System Architecture Overview](../../architecture/system-overview.md)
-- [Module Dependencies](../../architecture/module-dependencies.md)
+The maintained dev helpers are covered by `tests/dev-tests.lisp`. The focused suite checks pure buffer conversion, runtime-snapshot shape/formatting, and lowered-element tree formatting.
+
+## Related resources
+
+- [Implementation details](./implementation.md)
+- [Current task audit](../../../tasks/README.md)
+- [Troubleshooting guide](../../dev-guides/troubleshooting.md)
+- [Core module overview](../core/overview.md)
+- [View module overview](../view/overview.md)
+- [Platform module overview](../platform/overview.md)

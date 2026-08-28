@@ -1,174 +1,94 @@
-;;;===============================================================
-;;; File: src/dev/dev.lisp
-;;; ElmTUI Dev Examples & Concept Documentation
 
-;;; Example 1: Message Validation and Restarts
-;; Demonstrates message contract validation, error signaling, and DRY restarts.
-
-(in-package :cl)
-
-                                        ;(eval-when (:compile-toplevel :load-toplevel :execute)
-(uiop:define-package :elmtui.dev
-  (:use :cl :elmtui.core.events :elmtui.core.conditions :elmtui.view.core
-    :elmtui.view.geo) ; Added :elmtui.view.geo
-  (:export :example-flexbox-layout
-    :example-grid-layout
-    :send-foo-message
-    :dev-main
-    :run-faulty-async
-    :demo-event-loop));)
-
+(uiop/package:define-package :elmtui.dev (:use :cl)
+                             (:import-from :elmtui.core.loop
+                              #:get-event-loop-status #:get-event-queue-length)
+                             (:import-from :elmtui.core.topic-registry
+                              #:subscription-count
+                              #:get-topics-with-subscribers)
+                             (:import-from :elmtui.core.globals #:*app-state*)
+                             (:import-from :elmtui.view.base-elements
+                              #:base-element #:element-id #:element-children
+                              #:element-style #:element-layout-rect
+                              #:dsl-element-type)
+                             (:import-from :elmtui.view.geo #:x #:y #:w #:h)
+                             (:import-from
+                              :elmtui.platform.backend.common.virtual-buffer
+                              #:buffer-height #:buffer-width #:buffer-cell-at
+                              #:buffer-cell-char)
+                             (:export #:buffer->string #:with-buffer-dump
+                              #:runtime-snapshot #:format-runtime-snapshot
+                              #:format-element-tree #:dev-main))
 (in-package :elmtui.dev)
-
-;;;-----------------------------------------------------------------------------
-;;; Interactive Example: Flexbox Layout
-;;;-----------------------------------------------------------------------------
-
-;; (defun example-flexbox-layout ()
-;;   "Interactive example demonstrating flexbox layout."
-;;   (let* ((child1 (make-styled-node :type :text :props '(:content "Child 1" :flex-grow 1)))
-;;           (child2 (make-styled-node :type :text :props '(:content "Child 2" :flex-grow 2)))
-;;           (child3 (make-styled-node :type :text :props '(:content "Child 3" :flex-grow 1)))
-;;           (container (make-styled-node :type :container
-;;                        :props '(:display :flex :flex-direction :row)
-;;                        :children (list child1 child2 child3)))
-;;           (screen-rect (make-instance 'rectangle :x 0 :y 0 :w 800 :h 600))) ; Use make-instance
-;;     (layout-tree container screen-rect)
-;;     (format t "Flexbox Layout Example:~%")
-;;     (dolist (child (ui-node-children container))
-;;       (format t "Child: ~A~%" (ui-node-props child)))))
-
-;; ;;;-----------------------------------------------------------------------------
-;; ;;; Interactive Example: CSS Grid Layout
-;; ;;;-----------------------------------------------------------------------------
-
-;; (defun example-grid-layout ()
-;;   "Interactive example demonstrating CSS Grid layout."
-;;   (let* ((child1 (make-styled-node :type :text :props '(:content "A" :grid-area "header")))
-;;          (child2 (make-styled-node :type :text :props '(:content "B" :grid-area "main")))
-;;          (child3 (make-styled-node :type :text :props '(:content "C" :grid-area "sidebar")))
-;;          (child4 (make-styled-node :type :text :props '(:content "D" :grid-area "footer")))
-;;          (container (make-styled-node :type :container
-;;                                       :props '(:display :grid
-;;                                                :grid-template-areas '(("header" "header" "header")
-;;                                                                       ("main" "sidebar" "sidebar")
-;;                                                                       ("footer" "footer" "footer"))
-;;                                                :grid-template-columns '(:fr 1 :fr 2 :fr 1)
-;;                                                :grid-template-rows '(:auto :auto :auto))
-;;                                       :children (list child1 child2 child3 child4)))
-;;          (screen-rect (make-instance 'rectangle :x 0 :y 0 :w 800 :h 600))) ; Use make-instance
-;;     (layout-tree container screen-rect)
-;;     (format t "Grid Layout Example:~%")
-;;     (dolist (child (ui-node-children container))
-;;       (format t "Child: ~A~%" (ui-node-props child)))))
-
-;; ;;; Register a message contract for type :foo
-;; (setf (gethash :foo elmtui.core.events:*message-contracts*)
-;;       (lambda (msg) (and (listp (elmtui.core.events:message-data msg))
-;;                          (member :bar (elmtui.core.events:message-data msg)))))
-
-;; (defun make-foo-message (data)
-;;   (elmtui.core.events:make-message :foo data))
-
-;; (defun send-foo-message (target data)
-;;   "Send a :foo message, demonstrating contract validation and restarts."
-;;   (elmtui.core.conditions:with-message-restarts (c)
-;;     (let ((msg (make-foo-message data)))
-;;       (elmtui.core.events:send-message target msg))))
-
-;; ;;; Example usage:
-;; ;; (send-foo-message some-relay '(:bar 42))   ;; Valid
-;; ;; (send-foo-message some-relay '(:baz 99))   ;; Triggers contract error, allows skip/replace/retry
-
-;; ;;; Example 2: Async Task with Error and Restarts
-;; ;; Demonstrates async task error handling, rollback, and custom result restarts.
-
-;; (defun faulty-task ()
-;;   (error "Simulated async failure."))
-
-;; (defun run-faulty-async ()
-;;   "Run an async task that fails, demonstrating async restarts."
-;;   (elmtui.core.conditions:with-async-restarts (c)
-;;     (let ((cmd (elmtui.core.async:cmd-async #'faulty-task)))
-;;       (elmtui.core.async:interpret-cmd cmd)
-;;       (elmtui.core.async:await-cmd cmd))))
-
-;; ;;; Example usage:
-;; ;; (run-faulty-async)
-;; ;; On error, choose to ignore, rollback, replace, provide result, or retry.
-
-;; ;;; Example 3: Event Loop with Subscriber, Error Handling, and Removal
-;; ;; Demonstrates event loop, subscriber registration, error isolation, and removal.
-
-;; (defvar *received* nil)
-
-;; (defun my-event-handler (event)
-;;   (push (elmtui.core.events:message-data event) *received*)
-;;   (when (equal (elmtui.core.events:message-data event) :fail)
-;;     (error "Handler error for demonstration.")))
-
-;; (defun demo-event-loop ()
-;;   "Start event loop, add subscriber, publish events, and handle errors."
-;;   (elmtui.core.loop:start-loop)
-;;   (let ((token (elmtui.core.loop:subscribe :demo #'my-event-handler)))
-;;     (declare (ignore token)) ; Ignore unused variable
-;;     ;; Publish valid event
-;;     (elmtui.core.loop:publish (elmtui.core.events:make-message :demo :ok))
-;;     ;; Publish event that triggers handler error (handled by conditions)
-;;     (elmtui.core.loop:publish (elmtui.core.events:make-message :demo :fail))
-;;     ;; Remove subscriber (dynamic removal, not yet implemented)
-;;     ;; (elmtui.core.loop:unsubscribe token)
-;;     (elmtui.core.loop:elm-stop-loop)))
-
-;; ;;; Example usage:
-;; ;; (demo-event-loop)
-;; ;; Observe error isolation and instrumentation in the event loop.
-
-;; ;;; Concept Summary:
-;; ;; - Message contracts are registered and enforced at runtime.
-;; ;; - DRY restart macros allow interactive or programmatic recovery from errors.
-;; ;; - Async tasks and event loop handlers are robust to errors, supporting rollback, replacement, and custom results.
-;; ;; - All critical operations are instrumented and log failures for debugging.
-
-;; (defun dev-main ()
-;;   (format t "Running ElmTUI Dev Examples...~%"))
-
-
-;; set app-message-processor
-;; (let ((ufn (getf
-;;             elmtui.platform.driver::*app-spec* :update-fn)))
-;; (setf elmtui.core.globals:*app-message-processor*
-;;             (lambda (msg)
-
-;;               (log:debug "DRIVER: Processing message in app-message-processor: ~S" msg)
-;;               (apply ufn (list elmtui.platform.driver::*current-app-model* msg)))))
-;; enqueue term size update
-;; (funcall (elmtui.platform.backend.terminal::terminal-instance-publish-fn
-;;           elmtui.platform.driver::*backend*) (list :terminal-resized :new-dimensions (list 33 33)))
-;; (elmtui.core.loop:start-loop )
-;; (elmtui.platform.driver::render-frame
-;;  elmtui.platform.driver::*app-spec*
-;;  elmtui.platform.driver::*current-app-model*
-;;  elmtui.platform.driver::*backend*)
-;; elmtui.platform.driver::*last-ctx*
 (defun buffer->string (buffer)
-  "Convert a virtual buffer to a string representation."
-  (let ((rows-count (elmtui.platform.backend.common.virtual-buffer:buffer-height buffer))
-         (cols-count (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer)))
-    (with-output-to-string
-      (a)
-      (dotimes (row rows-count)
-        (progn
-          (dotimes (col cols-count)
-            (let ((cell (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at buffer row col)))
-              (format t "~c" (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell))))
-          (format t "~%")))
-      (format t "~%"))))
-
+  "Return BUFFER as plain text without writing to *STANDARD-OUTPUT*."
+  (with-output-to-string (out)
+    (dotimes (row (buffer-height buffer))
+      (dotimes (col (buffer-width buffer))
+        (write-char (buffer-cell-char (buffer-cell-at buffer row col)) out))
+      (terpri out))))
 (defmacro with-buffer-dump ((buffer) &body body)
-  `(handler-bind
-     ((error (lambda (c)
-               (format *error-output* "~%Buffer state on error:~%~A"
-                 (buffer->string ,buffer))
-               (invoke-debugger c))))
+  "Run BODY and print BUFFER to *ERROR-OUTPUT* before entering the debugger on error."
+  `(handler-bind ((error
+                   (lambda (condition)
+                     (format *error-output* "~%Buffer state on error:~%~A"
+                             (buffer->string ,buffer))
+                     (invoke-debugger condition))))
      ,@body))
+(defun runtime-snapshot ()
+  "Return a side-effect-free snapshot of the maintained runtime diagnostics."
+  (list :event-loop (get-event-loop-status) :queue-length
+        (get-event-queue-length) :subscription-count (subscription-count)
+        :topics (get-topics-with-subscribers) :application-state-present-p
+        (not (null *app-state*))))
+(defun format-runtime-snapshot (&optional (snapshot (runtime-snapshot)))
+  "Format SNAPSHOT returned by RUNTIME-SNAPSHOT for interactive REPL use."
+  (with-output-to-string (out)
+    (let ((loop-status (getf snapshot :event-loop)))
+      (format out "ElmTUI runtime snapshot~%")
+      (format out "  consumer-thread-active: ~S~%"
+              (getf loop-status :consumer-thread-active))
+      (format out "  active-channels: ~S~%"
+              (getf loop-status :active-channels))
+      (format out "  queue-length: ~D~%" (getf snapshot :queue-length 0))
+      (format out "  processed-events: ~D~%"
+              (getf loop-status :processed-event-count 0))
+      (format out "  average-processing-time-ms: ~,3F~%"
+              (coerce (getf loop-status :average-processing-time-ms 0.0)
+                      'double-float))
+      (format out "  subscriptions: ~D~%"
+              (getf snapshot :subscription-count 0))
+      (format out "  topics: ~S~%" (getf snapshot :topics))
+      (format out "  application-state-present: ~S~%"
+              (getf snapshot :application-state-present-p)))))
+(defun format-element-tree (root &key (include-style nil))
+  "Render a compact textual view of a lowered BASE-ELEMENT tree.
+ROOT may be one BASE-ELEMENT or a list of sibling elements.  Layout coordinates
+are included when available; INCLUDE-STYLE adds the resolved style plist."
+  (with-output-to-string (out)
+    (labels ((walk (node depth)
+               (cond
+                ((typep node 'base-element)
+                 (let ((rect (element-layout-rect node)))
+                   (format out "~A- ~S"
+                           (make-string depth :initial-element #\ )
+                           (dsl-element-type node))
+                   (when (element-id node)
+                     (format out " #~A" (element-id node)))
+                   (when rect
+                     (format out " @ (~D,~D) ~Dx~D" (x rect) (y rect) (w rect)
+                             (h rect)))
+                   (when include-style
+                     (format out " style=~S" (element-style node)))
+                   (terpri out)
+                   (dolist (child (element-children node))
+                     (walk child (+ depth 2)))))
+                ((listp node) (dolist (child node) (walk child depth)))
+                (t
+                 (format out "~A- ~S~%"
+                         (make-string depth :initial-element #\ ) node)))))
+      (walk root 0))))
+(defun dev-main ()
+  "Print and return a current runtime snapshot."
+  (let ((snapshot (runtime-snapshot)))
+    (write-string (format-runtime-snapshot snapshot))
+    snapshot))

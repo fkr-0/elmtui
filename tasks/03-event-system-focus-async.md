@@ -1,5 +1,7 @@
 # Tasks: Event System, Focus & Async Integration
 
+> **2026-08-20 audit:** historical task sheet superseded by the current `cl-events` integration/runtime-convergence work. Use [`tasks/README.md`](README.md) for validated remaining work.
+
 This file lists pending tasks for the ELMTUI event system, focus management, and their integration with asynchronous operations.
 
 ## Focus Management

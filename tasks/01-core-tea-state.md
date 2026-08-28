@@ -1,5 +1,7 @@
 # Tasks: Core TEA & State Management Enhancements
 
+> **2026-08-20 audit:** historical task sheet. Completion claims and paths below do not reliably describe the current source graph. Use [`tasks/README.md`](README.md) for validated dispositions and the active backlog.
+
 This file lists pending tasks related to the core Elm Architecture (TEA) implementation and state management system enhancements for ELMTUI.
 
 ## Model Access Pattern
