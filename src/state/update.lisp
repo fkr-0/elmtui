@@ -23,6 +23,10 @@
   (:export
    #:*log-update-results*
    #:malformed-update-result-error
+   #:malformed-update-result-fn-name
+   #:malformed-update-result-reason
+   #:malformed-update-result-values
+   #:process-update-result
    #:update-context
    #:make-update-context
    #:context-patches
@@ -131,9 +135,13 @@ copied by the application when strict value semantics are required."
   (sref ctx path default))
 
 (define-condition malformed-update-result-error (elmtui.core.errors:elmtui-error)
-  ((update-fn-name :initarg :update-fn-name :reader malformed-update-result-fn-name :type symbol)
+  ((update-fn-name :initarg :update-fn-name :reader malformed-update-result-fn-name
+                   :type (or symbol function))
    (reason :initarg :reason :reader malformed-update-result-reason :type string)
-   (returned-values :initarg :returned-values :reader malformed-update-result-values :type list))
+   (returned-values :initarg :returned-values :reader malformed-update-result-values
+                    :type t))
+  (:documentation
+   "Describe an invalid update return without discarding the original values or function designator.")
   (:report (lambda (condition stream)
              (format stream "Malformed result from update function ~S: ~A. Values: ~S"
                      (malformed-update-result-fn-name condition)

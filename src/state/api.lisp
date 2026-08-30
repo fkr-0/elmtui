@@ -5,7 +5,16 @@
 (uiop:define-package :elmtui.state.api
   (:use :cl :log4cl :cl-state.api)
   (:reexport :cl-state.api :elmtui.state.update)
+  (:import-from :elmtui.state.update
+                #:malformed-update-result-error
+                #:malformed-update-result-fn-name
+                #:malformed-update-result-reason
+                #:malformed-update-result-values)
   (:export
+    #:malformed-update-result-error
+    #:malformed-update-result-fn-name
+    #:malformed-update-result-reason
+    #:malformed-update-result-values
     #:get-component-by-path
     #:store-component-at-path
     #:remove-component-at-path
@@ -80,29 +89,36 @@
     (application-state-plist state)))
 
 (defun invoke-update (update-fn msg state &key base-path)
-  "Invoke UPDATE-FN with an update context and return an UPDATE-RESULT."
+  "Invoke UPDATE-FN with an update context and return an UPDATE-RESULT.
+
+Malformed return shapes consistently signal MALFORMED-UPDATE-RESULT-ERROR so
+callers can inspect the function designator, reason, and original values."
   (let* ((ctx (elmtui.state.update:make-update-context state :base-path base-path))
-          (values (multiple-value-list (funcall update-fn msg ctx)))
-          (ctx-patches (elmtui.state.update:context-patches ctx))
-          (ctx-commands (elmtui.state.update:context-commands ctx))
-          (handled nil)
-          (extra-patches nil)
-          (extra-commands nil))
+         (values (multiple-value-list (funcall update-fn msg ctx)))
+         (ctx-patches (elmtui.state.update:context-patches ctx))
+         (ctx-commands (elmtui.state.update:context-commands ctx))
+         (handled nil)
+         (extra-patches nil)
+         (extra-commands nil))
     (cond
       ((and (= (length values) 1)
-         (typep (first values) 'update-result))
-        (let ((ur (first values)))
-          (setf handled (ur-handled ur)
-            extra-patches (ur-patches ur)
-            extra-commands (ur-commands ur))))
+            (typep (first values) 'update-result))
+       (let ((ur (first values)))
+         (setf handled (ur-handled ur)
+               extra-patches (ur-patches ur)
+               extra-commands (ur-commands ur))))
       ((= (length values) 2)
-        (setf extra-patches (first values)
-          extra-commands (second values)))
+       (multiple-value-setq (extra-patches extra-commands)
+         (elmtui.state.update:process-update-result
+           values :update-fn-name update-fn :log-p nil)))
       ((or (null values) (equal values '(nil)))
-        (setf extra-patches nil
-          extra-commands nil))
+       (setf extra-patches nil
+             extra-commands nil))
       (t
-        (error "Malformed update return: ~S" values)))
+       (error 'elmtui.state.update:malformed-update-result-error
+              :update-fn-name update-fn
+              :reason "Expected UPDATE-RESULT, two values (patches commands), or NIL"
+              :returned-values values)))
     (make-update-result
       :patches (append ctx-patches extra-patches)
       :commands (append ctx-commands extra-commands)
