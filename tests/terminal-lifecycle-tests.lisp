@@ -167,3 +167,35 @@
                      (search "(1+ row)" emit-section))
           "cursorposition event in driver must add 1 to convert 0-indexed to 1-indexed")))))
 
+(test display-buffer-promotes-rendered-back-buffer-without-cloning
+  "A presented frame becomes the immutable front-buffer snapshot by ownership transfer."
+  (let* ((front (make-virtual-buffer 2 1))
+         (back (make-virtual-buffer 2 1))
+         (backend (elmtui.platform.backend.terminal::make-terminal-instance
+                    :stream (make-broadcast-stream)))
+         (ctx (elmtui.contracts:make-app-context
+                :front-buffer front
+                :backend backend))
+         (diff-symbol 'elmtui.pipeline::compute-buffer-diff)
+         (apply-symbol 'elmtui.pipeline::apply-diff-to-backend)
+         (original-diff (symbol-function diff-symbol))
+         (original-apply (symbol-function apply-symbol)))
+    (setf (elmtui.contracts:ctx-back-buffer ctx) back)
+    (unwind-protect
+         (progn
+           (setf (symbol-function diff-symbol)
+                 (lambda (old new)
+                   (declare (ignore old new))
+                   nil)
+                 (symbol-function apply-symbol)
+                 (lambda (ops instance row col)
+                   (declare (ignore ops instance row col))
+                   t))
+           (let ((result (elmtui.pipeline:display-buffer ctx)))
+             (is (eq back (elmtui.contracts:ctx-front-buffer result))
+                 "DISPLAY-BUFFER should transfer the rendered back buffer instead of deep-copying it.")
+             (is (eq back (elmtui.contracts:ctx-back-buffer result))
+                 "The presented frame remains the completed back buffer for diagnostics.")))
+      (setf (symbol-function diff-symbol) original-diff
+            (symbol-function apply-symbol) original-apply))))
+

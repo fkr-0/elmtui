@@ -273,7 +273,7 @@
               (log:debug "PIPELINE: Displaying buffer with diff: ~A" (length diff))
               (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-y origin-x)
               (elmtui.platform.api:flush-output backend)
-              (setf (ctx-front-buffer ctx) (elmtui.platform.backend.common.virtual-buffer:copy-virtual-buffer back-buffer))
+              (setf (ctx-front-buffer ctx) back-buffer)
               (incf *display-frame-counter*)
               ctx))))
       (progn
