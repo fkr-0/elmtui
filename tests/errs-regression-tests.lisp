@@ -228,20 +228,28 @@
   (asdf:load-system :cl-inputs)
   (let* ((make-decoder (%pkg-fn* :cl-inputs.decoder "MAKE-DECODER"))
          (decode-chunk (%pkg-fn* :cl-inputs.decoder "DECODE-CHUNK"))
+         (buffered-byte-count (%pkg-fn* :cl-inputs.decoder "DECODER-BUFFERED-BYTE-COUNT"))
+         (input-token-kind (%pkg-fn* :cl-inputs.tokens "INPUT-TOKEN-KIND"))
+         (input-token-data (%pkg-fn* :cl-inputs.tokens "INPUT-TOKEN-DATA"))
          (next-token (%pkg-fn* :cl-inputs.loop "NEXT-TOKEN")))
     (multiple-value-bind (tokens decoder*)
         (funcall decode-chunk (funcall make-decoder)
                  (make-array 1 :element-type '(unsigned-byte 8) :initial-contents '(27)))
       (is (null tokens))
-      (is (= 1 (length (getf decoder* :buf)))))
+      (is (= 1 (funcall buffered-byte-count decoder*))))
     (multiple-value-bind (tokens _decoder)
         (funcall decode-chunk (funcall make-decoder)
                  (make-array 9 :element-type '(unsigned-byte 8)
                              :initial-contents '(27 91 60 48 59 48 59 48 77)))
       (declare (ignore _decoder))
-      (is (null tokens)))
+      (is (= 1 (length tokens)))
+      (is (eq :protocol (funcall input-token-kind (first tokens))))
+      (is (eq :unknown-sequence
+              (getf (funcall input-token-data (first tokens)) :category))))
     (signals error
       (funcall next-token nil :timeout -1))))
+
+
 
 (test subpackage-style-validation-and-cache
   (asdf:load-system :cl-styles)
@@ -292,11 +300,11 @@
 
 (test subpackage-restored-input-sink-publishes-to-event-bus
   (asdf:load-system :cl-events)
-  (asdf:load-system :cl-inputs)
+  (asdf:load-system :cl-inputs/events)
   (let* ((make-bus (%pkg-fn* :cl-events.bus "MAKE-EVENT-BUS"))
          (subscribe (%pkg-fn* :cl-events.bus "SUBSCRIBE"))
          (chan-take (%pkg-fn* :cl-events.channel "CHAN-TAKE"))
-         (event-bus-sink (%pkg-fn* :cl-inputs.sink "EVENT-BUS-SINK"))
+         (event-bus-sink (%pkg-fn* :cl-inputs.events "EVENT-BUS-SINK"))
          (make-token (%pkg-fn* :cl-inputs.tokens "MAKE-TOKEN"))
          (event-type (%pkg-fn* :cl-events.types "EVENT-TYPE"))
          (event-data (%pkg-fn* :cl-events.types "EVENT-DATA"))
@@ -308,6 +316,7 @@
     (let ((event (funcall chan-take ch)))
       (is (eq :input/token (funcall event-type event)))
       (is (eq token (funcall event-data (funcall event-data event)))))))
+
 
 (test subpackage-restored-device-defaults-fail-clearly
   (asdf:load-system :cl-inputs)

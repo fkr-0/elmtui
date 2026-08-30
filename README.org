@@ -223,10 +223,10 @@ ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
 
 #+begin_example
 elmtui.lisp/
-├── cl-events/          reusable event/runtime mechanics
-├── cl-inputs/          reusable terminal input subsystem
-├── cl-state/           reusable state subsystem
-├── cl-styles/          reusable style subsystem
+├── cl-events/          Git submodule: reusable event/runtime mechanics
+├── cl-inputs/          Git submodule: reusable terminal input subsystem
+├── cl-state/           Git submodule: reusable state subsystem
+├── cl-styles/          Git submodule: reusable style subsystem
 ├── src/
 │   ├── app/            application definition and TEA runtime policy
 │   ├── core/           ElmTUI event adapters, contracts, errors, globals
@@ -241,8 +241,10 @@ elmtui.lisp/
 └── scripts/            reproducible verification commands
 #+end_example
 
-The four =cl-*= libraries are tracked directly in this repository rather than
-as Git submodules, so a source archive is complete without additional fetches.
+The four =cl-*= libraries are real Git submodules.  ElmTUI pins each standalone
+library to an exact commit while the libraries retain independent histories and
+release identities.  Clone with =--recurse-submodules=, or initialize an existing
+checkout with =git submodule update --init --recursive=.
 
 * Design constraints
 

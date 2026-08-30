@@ -31,6 +31,10 @@ The project follows semantic versioning from the first published release.
 
 ### Changed
 
+- Replaced the embedded `cl-events`, `cl-inputs`, `cl-state`, and `cl-styles`
+  source trees with Git submodules pinned to their standalone repository commits;
+  ElmTUI integration tests now target the current `cl-inputs` public and optional
+  `cl-inputs/events` adapter contracts rather than historical in-tree internals.
 - `DEFAPPLICATION` is the recommended full application constructor while
   `DEFTEA-APP` remains the supported minimal direct-transition adapter.
 - Public `APPLICATION-STATE-DATA` compatibility reads now return owned snapshots;
