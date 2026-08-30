@@ -41,6 +41,25 @@
       (is (null diff)
           "Expected zero write ops for background spaces; got ~A ops." (length diff)))))
 
+(test incremental-diff-batches-one-long-contiguous-run-once
+  "Incremental diffing emits one write op for one same-style changed run."
+  (let* ((width 4096)
+         (front (make-virtual-buffer width 1))
+         (back (make-virtual-buffer width 1))
+         (text (make-string width :initial-element #\X))
+         (*compute-buffer-diff-first-call* nil))
+    (elmtui.platform.backend.common.virtual-buffer:write-string-to-buffer
+      back 0 0 text nil :max-width width)
+    (let ((diff (compute-buffer-diff front back)))
+      (is (= 1 (length diff))
+          "A contiguous run must not be duplicated into one op per cell.")
+      (let ((op (first diff)))
+        (is (eq :write-chars (getf op :type)))
+        (is (= 0 (getf op :row)))
+        (is (= 0 (getf op :start-col)))
+        (is (string= text (getf op :chars))
+            "The single batch must contain every changed character exactly once.")))))
+
 (test stty-sane-error-must-not-appear-on-stdout
   "Bug 2: stty sane must not route stderr to :output; use :error nil."
   (let* ((src (uiop:read-file-string
