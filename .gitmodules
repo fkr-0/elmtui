@@ -1,0 +1,12 @@
+[submodule "cl-events"]
+	path = cl-events
+	url = ../cl-events
+[submodule "cl-inputs"]
+	path = cl-inputs
+	url = ../cl-inputs
+[submodule "cl-state"]
+	path = cl-state
+	url = ../cl-state
+[submodule "cl-styles"]
+	path = cl-styles
+	url = ../cl-styles

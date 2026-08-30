@@ -1,6 +1,0 @@
-#!/usr/bin/bash
-# Wrapper for starting a REPL with cl-inputs loaded
-
-cd "$(dirname "$0")/.."
-
-clpm bundle exec --with-client sbcl
