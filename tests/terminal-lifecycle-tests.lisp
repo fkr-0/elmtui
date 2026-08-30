@@ -110,20 +110,18 @@
             "close-input-source must call disable-raw-char-mode or disable-raw-mode"))))))
 
 (test get-cursor-position-must-return-row-first-zero-indexed
-  "Bug 6: get-cursor-position must return (row col) 0-indexed; ESC[row;colR first part is row."
-  (let* ((src (uiop:read-file-string
-                (asdf:system-relative-pathname
-                  "elmtui"
-                  "cl-inputs/src/input/device/tty.lisp")))
-         (retpos (search "return-from get-cursor-position" src)))
-    (is-true retpos
-      "get-cursor-position must have a return-from form")
-    (when retpos
-      (let ((ret-section (subseq src retpos (min (+ retpos 120) (length src)))))
-        (is-false (search "values parsed-w parsed-h" ret-section)
-          "get-cursor-position must not return (col row) swapped without 0-indexing")
-        (is-true (search "1-" ret-section)
-          "get-cursor-position must subtract 1 to convert from 1-indexed ANSI to 0-indexed")))))
+  "Bug 6: get-cursor-position must return (row col) using the device's zero-indexed tracked coordinates."
+  (asdf:load-system :cl-inputs)
+  (let ((device (cl-inputs.device.tty:make-tty-device)))
+    (setf (slot-value device 'cl-inputs.device.tty::cursor-row) 7
+          (slot-value device 'cl-inputs.device.tty::cursor-col) 13)
+    (multiple-value-bind (row col)
+        (cl-inputs.terminal.api:get-cursor-position device)
+      (is (= 7 row)
+          "get-cursor-position must return row as its first value")
+      (is (= 13 col)
+          "get-cursor-position must return column as its second value"))))
+
 
 (test pipeline-offset-must-not-use-spurious-state-key
   "Bug 7: %root-viewport-offset must read :offset-x directly, not via :state sub-key."
