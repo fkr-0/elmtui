@@ -166,105 +166,110 @@ while still allowing intentional styled spaces to be written."
 ;;     (finish-output stream)
 ;;     t))
 (defun compute-buffer-diff (front-buffer back-buffer)
-  "Computes a list of operations to transform FRONT-BUFFER into BACK-BUFFER.
-Assumes buffers have the same dimensions.
-Optimizes by batching contiguous character updates with the same style."
+  "Compute write operations that transform FRONT-BUFFER into BACK-BUFFER.
+
+Contiguous changed cells with the same style are emitted as one write batch.
+Batch strings use an adjustable character vector so extending a long run is
+amortized linear rather than repeatedly copying the accumulated prefix."
   (check-type front-buffer virtual-terminal-buffer)
   (check-type back-buffer virtual-terminal-buffer)
-  (reset-rendering-stats) ; Reset stats at the beginning of a new diff computation
+  (reset-rendering-stats)
 
   (unless (and (= (buffer-width front-buffer) (buffer-width back-buffer))
-            (= (buffer-height front-buffer) (buffer-height back-buffer)))
+               (= (buffer-height front-buffer) (buffer-height back-buffer)))
     (error 'buffers-not-compatible-error
-      :front-buffer front-buffer
-      :back-buffer back-buffer
-      :reason "Buffer dimensions do not match."))
+           :front-buffer front-buffer
+           :back-buffer back-buffer
+           :reason "Buffer dimensions do not match."))
 
-  ;; First-time full redraw override
-  (when *compute-buffer-diff-first-call*
-    (setf *compute-buffer-diff-first-call* nil)
-    (log-debug "BUFFER DIFF: Initial full redraw.")
-    (incf (rendering-stats-full-redraws *current-rendering-stats*))
-    (let ((diff-ops '())
-           (height (buffer-height back-buffer))
-           (width (buffer-width back-buffer)))
-      (loop for r from 0 below height do
+  (labels ((make-batch (row col char style)
+             (let ((chars (make-array 16
+                                      :element-type 'character
+                                      :adjustable t
+                                      :fill-pointer 0)))
+               (vector-push-extend char chars)
+               (list :type :write-chars
+                     :row row
+                     :start-col col
+                     :chars chars
+                     :style style)))
+           (append-batch-char (batch char)
+             (vector-push-extend char (getf batch :chars)))
+           (finish-batch (batch diff-ops)
+             (when batch
+               (incf (rendering-stats-diff-batches-created
+                      *current-rendering-stats*))
+               (push batch diff-ops))
+             diff-ops))
+    (when *compute-buffer-diff-first-call*
+      (setf *compute-buffer-diff-first-call* nil)
+      (log-debug "BUFFER DIFF: Initial full redraw.")
+      (incf (rendering-stats-full-redraws *current-rendering-stats*))
+      (let ((diff-ops nil)
+            (height (buffer-height back-buffer))
+            (width (buffer-width back-buffer)))
+        (loop for row below height do
+          (let ((current-batch nil))
+            (loop for col below width do
+              (let* ((back-cell (buffer-cell-at back-buffer row col))
+                     (char (buffer-cell-char back-cell))
+                     (style (buffer-cell-style back-cell))
+                     (blank-p (%blank-background-cell-p back-cell)))
+                (incf (rendering-stats-cells-compared
+                       *current-rendering-stats*))
+                (unless blank-p
+                  (incf (rendering-stats-cells-changed
+                         *current-rendering-stats*)))
+                (cond
+                  ((and current-batch
+                        (not blank-p)
+                        (=? style (getf current-batch :style)))
+                   (append-batch-char current-batch char))
+                  (t
+                   (setf diff-ops (finish-batch current-batch diff-ops)
+                         current-batch (unless blank-p
+                                         (make-batch row col char style)))))))
+            (setf diff-ops (finish-batch current-batch diff-ops))))
+        (return-from compute-buffer-diff (nreverse diff-ops))))
+
+    (let ((diff-ops nil)
+          (height (buffer-height front-buffer))
+          (width (buffer-width front-buffer)))
+      (log-debug "BUFFER DIFF: Starting diff computation for buffers of size ~Ax~A"
+                 width height)
+      (loop for row below height do
         (let ((current-batch nil))
-          (loop for c from 0 below width do
-            (let* ((back-cell (buffer-cell-at back-buffer r c))
-                    (char (buffer-cell-char back-cell))
-                    (style (buffer-cell-style back-cell)))
-              (incf (rendering-stats-cells-compared *current-rendering-stats*)) ; Count even for full redraw
-              (unless (%blank-background-cell-p back-cell)
-                (incf (rendering-stats-cells-changed *current-rendering-stats*)))
-              (if current-batch
-                (if (and (not (%blank-background-cell-p back-cell))
-                         (=? style (getf current-batch :style)))
-                  (setf (getf current-batch :chars) (concatenate 'string (getf current-batch :chars) (string char)))
-                  (progn
-                    (push current-batch diff-ops)
-                    (incf (rendering-stats-diff-batches-created *current-rendering-stats*))
-                    (if (not (%blank-background-cell-p back-cell))
-                      (setf current-batch (list :type :write-chars :row r :start-col c :chars (string char) :style style))
-                      (setf current-batch nil))))
-                (when (not (%blank-background-cell-p back-cell))
-                  (setf current-batch (list :type :write-chars :row r :start-col c :chars (string char) :style style))))))
-          (when current-batch
-            (push current-batch diff-ops)
-            (incf (rendering-stats-diff-batches-created *current-rendering-stats*)))))
-      (return-from compute-buffer-diff (nreverse diff-ops))))
-  (let ((diff-ops '())
-         (height (buffer-height front-buffer))
-         (width (buffer-width front-buffer))
-         (equal-count 0)
-         (diff-count 0))
-
-    (log-debug "BUFFER DIFF: Starting diff computation for buffers of size ~Ax~A" width height)
-
-    (loop for r from 0 below height do
-      (let ((current-batch nil)) ; To hold (:type :write-chars :row r :start-col c :chars string :style s)
-        ;; (log-info "BUFFER DIFF: Processing row ~A" r)
-        (loop for c from 0 below width do
-          (incf (rendering-stats-cells-compared *current-rendering-stats*))
-          (let ((front-cell (buffer-cell-at front-buffer r c))
-                 (back-cell (buffer-cell-at back-buffer r c)))
-            (if (buffer-cell-equal-p front-cell back-cell)
-              (progn
-                (incf equal-count)
-                (when current-batch
-                  (push current-batch diff-ops)
-                  (incf (rendering-stats-diff-batches-created *current-rendering-stats*))
-                  (setf current-batch nil)))
-              (progn
-                (incf diff-count)
-                (incf (rendering-stats-cells-changed *current-rendering-stats*))
-                (let ((char (buffer-cell-char back-cell))
-                       (style (buffer-cell-style back-cell)))
-                  (if current-batch
-                    (if (and (char/= char #\Null)
-                          (=? style (getf current-batch :style))
-                          (= c (+ (getf current-batch :start-col) (length (getf current-batch :chars)))))
-                      (setf (getf current-batch :chars) (concatenate 'string (getf current-batch :chars) (string char)))
-                      (progn
-                        (push current-batch diff-ops)
-                        (incf (rendering-stats-diff-batches-created *current-rendering-stats*))
-                        (if (char/= char #\Null)
-                          (setf current-batch (list :type :write-chars :row r :start-col c :chars (string char) :style style))
-                          (setf current-batch nil))))
-                    (when (char/= char #\Null)
-                      (setf current-batch (list :type :write-chars :row r :start-col c :chars (string char) :style style))))))))
-          (when current-batch
-            (push current-batch diff-ops)
-            (incf (rendering-stats-diff-batches-created *current-rendering-stats*))))))
-    ;; (log-info "BUFFER DIFF: Cells compared - Equal: ~A, Different: ~A" equal-count diff-count)
-    (log-debug "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
-    ;; (log-info "BUFFER DIFF: Final diff-ops: ~A" diff-ops)
-    (log-debug "RENDERING STATS (diff): Compared=~A, Changed=~A, Batches=~A, FullRedraws=~A"
-      (rendering-stats-cells-compared *current-rendering-stats*)
-      (rendering-stats-cells-changed *current-rendering-stats*)
-      (rendering-stats-diff-batches-created *current-rendering-stats*)
-      (rendering-stats-full-redraws *current-rendering-stats*))
-    (nreverse diff-ops)))
+          (loop for col below width do
+            (incf (rendering-stats-cells-compared *current-rendering-stats*))
+            (let ((front-cell (buffer-cell-at front-buffer row col))
+                  (back-cell (buffer-cell-at back-buffer row col)))
+              (if (buffer-cell-equal-p front-cell back-cell)
+                  (setf diff-ops (finish-batch current-batch diff-ops)
+                        current-batch nil)
+                  (let ((char (buffer-cell-char back-cell))
+                        (style (buffer-cell-style back-cell)))
+                    (incf (rendering-stats-cells-changed
+                           *current-rendering-stats*))
+                    (cond
+                      ((char= char #\Null)
+                       (setf diff-ops (finish-batch current-batch diff-ops)
+                             current-batch nil))
+                      ((and current-batch
+                            (=? style (getf current-batch :style))
+                            (= col (+ (getf current-batch :start-col)
+                                      (length (getf current-batch :chars)))))
+                       (append-batch-char current-batch char))
+                      (t
+                       (setf diff-ops (finish-batch current-batch diff-ops)
+                             current-batch (make-batch row col char style))))))))
+          (setf diff-ops (finish-batch current-batch diff-ops))))
+      (log-debug "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
+      (log-debug "RENDERING STATS (diff): Compared=~A, Changed=~A, Batches=~A, FullRedraws=~A"
+                 (rendering-stats-cells-compared *current-rendering-stats*)
+                 (rendering-stats-cells-changed *current-rendering-stats*)
+                 (rendering-stats-diff-batches-created *current-rendering-stats*)
+                 (rendering-stats-full-redraws *current-rendering-stats*))
+      (nreverse diff-ops))))
 
 (defun log-buffer-contents (buffer message)
   "Log a sample of buffer contents for debugging."
