@@ -31,7 +31,9 @@
                 #:make-termcolor
                 #:terminal-color-simple
                 #:copy-term-style
-                #:style-to-terminal-style)
+                #:style-to-terminal-style
+                #:terminal-style-fg-color-val
+                #:terminal-style-bg-color-val)
   (:export #:run-platform-tests))
 
 (in-package :elmtui.platform.tests)
@@ -283,6 +285,13 @@
     (is (not (null term-style)))
     (is (not (null (terminal-style-fg-color term-style))))
     (is (not (null (terminal-style-bg-color term-style)))))
+
+  ;; Canonical cl-styles color tokens must survive the renderer boundary.
+  (let ((rgb-style (style-to-terminal-style
+                    '(:color (:rgb 12 34 56)
+                      :background-color (:rgb 65 43 21)))))
+    (is (equal '(12 34 56) (terminal-style-fg-color-val rgb-style)))
+    (is (equal '(65 43 21) (terminal-style-bg-color-val rgb-style))))
 
   ;; Test with empty style
   (let ((empty-style (style-to-terminal-style nil)))
