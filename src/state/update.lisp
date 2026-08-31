@@ -7,7 +7,6 @@
   (:import-from :cl-state.core
                 #:state-set
                 #:state-ref
-                #:deep-copy-data
                 #:application-state-plist)
   (:import-from :cl-state.utils
                 #:get-path
@@ -63,7 +62,7 @@ plist view. UPDATE code may therefore use SREF/SAPPLY/SDELETE destructively on
 its draft without changing the model supplied by the runtime. Custom mutable
 leaf objects remain application-owned atoms and must be treated as immutable or
 copied by the application when strict value semantics are required."
-  (let ((draft (deep-copy-data (application-state-plist state))))
+  (let ((draft (application-state-plist state)))
     (%make-update-context
      :state state
      :base-path base-path
@@ -73,11 +72,11 @@ copied by the application when strict value semantics are required."
 
 (defun context-patches (ctx)
   "Return recorded patches in original order."
-  (nreverse (update-context-patches ctx)))
+  (reverse (update-context-patches ctx)))
 
 (defun context-commands (ctx)
   "Return recorded commands in original order."
-  (nreverse (update-context-commands ctx)))
+  (reverse (update-context-commands ctx)))
 
 (defgeneric sref (obj path &optional default))
 
