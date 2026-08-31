@@ -325,6 +325,7 @@
     (setf (sref ctx :first) 1)
     (setf (sref ctx :second) 2)
     (setf (sref ctx :third) 3)
+    (is (equal '((:first 1) (:second 2) (:third 3)) (context-patches ctx)))
     (is (equal '((:first 1) (:second 2) (:third 3)) (context-patches ctx)))))
 
 (test context-commands-order
@@ -334,6 +335,7 @@
     (send-command ctx :first)
     (send-command ctx :second)
     (send-command ctx :third)
+    (is (equal '(:first :second :third) (context-commands ctx)))
     (is (equal '(:first :second :third) (context-commands ctx)))))
 
 (test context-patches-and-commands-together
