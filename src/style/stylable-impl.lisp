@@ -5,6 +5,8 @@
                 #:stylable-inline-style #:stylable-attributes #:stylable-state
                 #:stylable-parent #:stylable-children #:stylable-index
                 #:set-computed-style #:get-computed-style)
+  (:import-from :cl-styles.adapters
+                #:normalize-tui-declarations)
   (:import-from :elmtui.view.base-elements
                 #:base-element #:element-id #:element-classes #:element-style
                 #:element-children #:element-type #:element-props)
@@ -28,7 +30,7 @@
     (mapcar #'->sel (or (element-classes n) nil))))
 
 (defmethod cl-styles.protocols:stylable-inline-style ((n base-element))
-  (element-style n))
+  (normalize-tui-declarations (element-style n)))
 
 (defmethod cl-styles.protocols:stylable-attributes ((n base-element))
   nil)
