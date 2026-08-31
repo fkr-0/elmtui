@@ -81,29 +81,34 @@
       (terminal-color in)
       (list
        (cond
-         ;; RGB format: (:rgb r g b) or (r g b)
-         ((and (listp in) (= (length in) 3))
-          (if (eq (first in) :rgb)
-              ;; New format: (:rgb r g b)
-               (make-terminal-color :red (second in) :green (third in) :blue (third in) :bg bg)
-              ;; Legacy format: (r g b)
-              (make-terminal-color :red (first in) :green (second in) :blue (third in) :bg bg)))
-         ;; 256-color format: (:256 n) or (n)
-         ((and (listp in) (= (length in) 1))
-          (if (eq (first in) :256)
-              ;; New format: (:256 n) - invalid, should be (:256 n) where n is second element
-              ;; Actually looking at my parse output, it's (:256 n) which is a 2-element list
-              nil
-              ;; Legacy format: (n)
-              (if (integerp (car in))
-                  (make-terminal-color :color-256 (first in) :bg bg)
-                  ;; Could be (:sym)
-                  (and (symbolp (car in)) (make-terminal-color :simple (first in) :bg bg)))))
-         ;; Handle (:256 n) - 2-element list
-         ((and (listp in) (= (length in) 2) (eq (first in) :256))
+         ;; Canonical CL-STYLES RGB tokens.
+         ((and (= (length in) 4) (eq (first in) :rgb)
+               (every #'integerp (rest in)))
+          (make-terminal-color :red (second in)
+                               :green (third in)
+                               :blue (fourth in)
+                               :bg bg))
+         ;; RGBA is representable in the style layer; terminals ignore alpha.
+         ((and (= (length in) 5) (eq (first in) :rgba)
+               (every #'numberp (rest in)))
+          (make-terminal-color :red (second in)
+                               :green (third in)
+                               :blue (fourth in)
+                               :bg bg))
+         ;; Historical ElmTUI raw RGB triple.
+         ((and (= (length in) 3) (every #'integerp in))
+          (make-terminal-color :red (first in)
+                               :green (second in)
+                               :blue (third in)
+                               :bg bg))
+         ;; 256-color format: (:256 n) or legacy singleton (n).
+         ((and (= (length in) 2) (eq (first in) :256)
+               (integerp (second in)))
           (make-terminal-color :color-256 (second in) :bg bg))
-         ;; Keyword list
-         ((and (symbolp (first in)))
+         ((and (= (length in) 1) (integerp (first in)))
+          (make-terminal-color :color-256 (first in) :bg bg))
+         ;; Legacy singleton keyword color.
+         ((and (= (length in) 1) (keywordp (first in)))
           (make-terminal-color :simple (first in) :bg bg))
          (t nil)))
       (integer (make-terminal-color :color-256 in :bg bg))

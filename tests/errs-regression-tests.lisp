@@ -257,15 +257,21 @@
          (apply-tree (%pkg-fn* :cl-styles.engine "APPLY-STYLESHEET-TO-TREE"))
          (make-stylesheet (%pkg-fn* :cl-styles.sheet "MAKE-STYLESHEET"))
          (sheet (funcall make-stylesheet :rules nil))
+         (root (make-instance 'elmtui.view.base-elements:container-element
+                              :id :root :style '(:color :blue)))
          (cache (make-hash-table :test 'equal))
          (sentinel (list :cached)))
     (signals error
       (funcall validate-declarations '(:colro :red)))
     (setf (gethash (list :root sheet :patches :sig) cache) sentinel)
-    ;; Cache hit must return the cached object without walking ROOT.
-    (is (eq sentinel
-            (funcall apply-tree :root sheet
-                     :cache cache :previous-signature :sig)))))
+    ;; Compatibility cache arguments are accepted, but stale entries are never authoritative.
+    (let ((result (funcall apply-tree root sheet
+                           :return :objects
+                           :cache cache :previous-signature :sig)))
+      (is (not (eq sentinel result)))
+      (is (eq root (first result)))
+      (is (eq :blue
+              (getf (cl-styles.protocols:get-computed-style root) :color))))))
 
 (test subpackage-restored-promise-cancellation-is-stable
   (asdf:load-system :cl-events)
