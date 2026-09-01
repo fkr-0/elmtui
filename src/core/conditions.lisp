@@ -61,42 +61,42 @@
 
 
 
-(define-condition message-validation-error (elmtui.core.errors:elmtui-error)
+(define-condition message-validation-error (elmtui.core.errors:runtime-error)
   ((message :initarg :message :reader message :reader message-validation-error-message)
    (reason :initarg :reason :reader reason :reader message-validation-error-reason))
   (:report (lambda (c s)
              (format s "Message validation failed: ~A~%Reason: ~A"
                      (message c) (reason c)))))
 
-(define-condition command-execution-error (elmtui.core.errors:elmtui-error)
+(define-condition command-execution-error (elmtui.core.errors:runtime-error)
   ((cmd :initarg :cmd :reader cmd :reader command-execution-error-command)
    (reason :initarg :reason :reader reason :reader command-execution-error-reason))
   (:report (lambda (c s)
              (format s "Command execution failed: ~A~%Reason: ~A"
                      (cmd c) (reason c)))))
 
-(define-condition event-loop-dispatch-error (elmtui.core.errors:elmtui-error)
+(define-condition event-loop-dispatch-error (elmtui.core.errors:runtime-error)
   ((event :initarg :event :reader event :reader event-loop-dispatch-error-event)
    (reason :initarg :reason :reader reason :reader event-loop-dispatch-error-reason))
   (:report (lambda (c s)
              (format s "Event loop dispatch failed: ~A~%Reason: ~A"
                      (event c) (reason c)))))
 
-(define-condition async-task-error (elmtui.core.errors:elmtui-error)
+(define-condition async-task-error (elmtui.core.errors:runtime-error)
   ((task :initarg :task :reader task :reader async-task-error-task)
    (reason :initarg :reason :reader reason :reader async-task-error-reason))
   (:report (lambda (c s)
              (format s "Async task failed: ~A~%Reason: ~A"
                      (task c) (reason c)))))
 
-(define-condition state-update-error (elmtui.core.errors:elmtui-error)
+(define-condition state-update-error (elmtui.core.errors:runtime-error)
   ((state :initarg :state :reader state :reader state-update-error-state)
    (reason :initarg :reason :reader reason :reader state-update-error-reason))
   (:report (lambda (c s)
              (format s "State update failed: ~A~%Reason: ~A"
                      (state c) (reason c)))))
 
-(define-condition subscriber-handler-error (elmtui.core.errors:elmtui-error)
+(define-condition subscriber-handler-error (elmtui.core.errors:runtime-error)
   ((event :initarg :event :reader event :reader subscriber-handler-error-event)
    (handler :initarg :handler :reader handler :reader subscriber-handler-error-handler)
    (reason :initarg :reason :reader reason :reader subscriber-handler-error-reason))
@@ -104,14 +104,14 @@
              (format s "Subscriber handler failed: ~A~%Handler: ~A~%Reason: ~A"
                      (event c) (handler c) (reason c)))))
 
-(define-condition render-error (elmtui.core.errors:elmtui-error)
+(define-condition render-error (elmtui.core.errors:runtime-error)
   ((message :initarg :message :reader message :reader render-error-message)
    (reason :initarg :reason :reader reason :reader render-error-reason))
   (:report (lambda (c s)
              (format s "Render error: ~A~%Reason: ~A"
                      (message c) (reason c)))))
 
-(define-condition signal-subscriber-error (elmtui.core.errors:elmtui-error)
+(define-condition signal-subscriber-error (elmtui.core.errors:runtime-error)
   ((signal :initarg :signal :reader subscriber-signal :reader signal-subscriber-error-signal)
    (reason :initarg :reason :reader reason :reader signal-subscriber-error-reason))
   (:report (lambda (c s)

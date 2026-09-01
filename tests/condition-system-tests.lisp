@@ -143,6 +143,26 @@
     (is (search "COUNTER" (string-upcase printed)))))
 
 ;;; ---------------------------------------------------------------------------
+;;; Condition family hierarchy
+;;; ---------------------------------------------------------------------------
+
+(test concrete-runtime-conditions-share-family-and-platform-stays-separate
+  (dolist (type '(elmtui.core.conditions:message-validation-error
+                  elmtui.core.conditions:command-execution-error
+                  elmtui.core.conditions:event-loop-dispatch-error
+                  elmtui.core.conditions:async-task-error
+                  elmtui.core.conditions:state-update-error
+                  elmtui.core.conditions:subscriber-handler-error
+                  elmtui.core.conditions:render-error
+                  elmtui.core.conditions:signal-subscriber-error))
+    (is (subtypep type 'elmtui.core.errors:runtime-error)))
+  (is (subtypep 'elmtui.core.errors:state-error 'elmtui.core.errors:runtime-error))
+  (is (subtypep 'elmtui.core.errors:backend-error 'elmtui.core.errors:platform-error))
+  (is (subtypep 'elmtui.core.errors:runtime-error 'elmtui.core.errors:elmtui-error))
+  (is (subtypep 'elmtui.core.errors:platform-error 'elmtui.core.errors:elmtui-error))
+  (is-false (subtypep 'elmtui.core.errors:platform-error 'elmtui.core.errors:runtime-error)))
+
+;;; ---------------------------------------------------------------------------
 ;;; Generic WITH-RECOVERY contract
 ;;; ---------------------------------------------------------------------------
 
