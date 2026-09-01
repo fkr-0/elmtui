@@ -26,6 +26,8 @@
    #:elmtui-error-context
    #:elmtui-error-suggestions
    #:elmtui-error-module
+   #:runtime-error
+   #:platform-error
    #:state-error
    #:state-error-operation
    #:state-error-path
@@ -146,7 +148,15 @@ invoke restarts supplied around the signaling operation.")
           (format stream " suggestions: ~A" suggestions)))
       (call-next-method)))
 
-(define-condition state-error (elmtui-error)
+(define-condition runtime-error (elmtui-error) ()
+  (:documentation
+   "Base class for ElmTUI failures that occur during application/runtime execution."))
+
+(define-condition platform-error (elmtui-error) ()
+  (:documentation
+   "Base class for ElmTUI failures originating at a platform/backend boundary."))
+
+(define-condition state-error (runtime-error)
   ((operation :initarg :operation
      :reader state-error-operation
      :documentation "Operation that failed (get, set, update, etc.)")
@@ -248,7 +258,7 @@ invoke restarts supplied around the signaling operation.")
     (when-let ((position (dsl-error-position obj)))
       (format stream " position: ~A" position))))
 
-(define-condition backend-error (elmtui-error)
+(define-condition backend-error (platform-error)
   ((backend-type :initarg :backend-type
      :reader backend-error-type
      :documentation "Type of backend that failed")
