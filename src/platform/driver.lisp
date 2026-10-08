@@ -31,7 +31,6 @@
     #:term-stream
     #:backend-input-device #:backend-input-source)
   (:import-from :elmtui.platform.backend.terminal.diff-renderer
-    #:*compute-buffer-diff-first-call*
     #:compute-buffer-diff
     #:apply-diff-to-backend)
   (:import-from :elmtui.platform.backend.terminal
@@ -777,11 +776,10 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
     (shutdown-backend *backend*)
     (setf *backend* nil)
 
-    ;; Reset global state for app model, viewport, and buffer diff flag
+    ;; Reset application and viewport; first-frame policy is inferred from context.
     (setf *current-app-model* nil
       elmtui.core.globals:*app-state* nil
-      *root-viewport-id-path* nil ; Reset root viewport path
-      elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t)
+      *root-viewport-id-path* nil)
     (log:info "DRIVER: Platform shutdown complete.")))
 
 (defun run-app-platform (APP-SPEC
@@ -814,7 +812,6 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
     *previous-frame-buffer* nil
     *current-app-model* nil
     *root-viewport-id-path* nil
-    elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t
     *initial-render-done* nil
     *focus-manager* nil
     *preserve-underlay* nil
@@ -920,9 +917,8 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
               (when snapshot
                 ;; Save for restore on exit (seamless return to original state)
                 (save-tmux-capture snapshot)
-                (setf *previous-frame-buffer* snapshot)
-                ;; Prefill already synchronized visible state; do not force full redraw.
-                (setf elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* nil))))
+                ;; Prefill is a committed front frame for incremental diff.
+                (setf *previous-frame-buffer* snapshot))))
 
           ;; 4. Initialize the application model. This sets *app-message-processor*.
           (multiple-value-bind (im ic) (initialize-app-model app-spec)

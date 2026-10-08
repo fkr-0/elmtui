@@ -23,6 +23,8 @@
                                (:file "component-init-tests")
                                (:file "rendering-pipeline-tests")
                                (:file "pipeline-underlay-tests")
+                               (:file "render-presentation-tests")
+                               (:file "render-architecture-tests")
                                (:file "dsl-props-normalization-tests")
                                (:file "rendering-tests")
                                (:file "pipeline-contract-tests")
