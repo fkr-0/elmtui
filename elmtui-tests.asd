@@ -50,6 +50,7 @@
                                (:file "root-viewport-rewrite-tests")
                                (:file "viewport-scroll-integration-tests")
                                (:file "scroll-panel-tests")
+                               (:file "modal-dialog-tests")
                                (:file "driver-tests")
                                (:file "driver-subscription-tests")
                                (:file "runtime-effects-tests")
