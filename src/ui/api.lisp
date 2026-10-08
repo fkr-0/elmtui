@@ -453,10 +453,7 @@ Returns NIL for non-component/base-element DSL types."
     (values msg app-state)))
 
 
-(defmethod view ((component hash-table) app-state &key id-path)
-  "Fallback view method for raw hash-tables found in state, treating them as raw DSL."
-  (declare (ignore app-state id-path))
-  (gethash :dsl component))
+
 ;; (declaim (ftype (function (component t &key (:id-path list)) list) view))
 (defgeneric view (component app-state &key id-path &allow-other-keys)
   (:documentation "Generates a view representation (DSL spec) for a component instance.")
@@ -473,6 +470,11 @@ Returns NIL for non-component/base-element DSL types."
 
                    ;;:type (component-type component)
                    :children children)))
+
+(defmethod view ((component hash-table) app-state &key id-path)
+  "Fallback view method for raw hash-tables found in state, treating them as raw DSL."
+  (declare (ignore app-state id-path))
+  (gethash :dsl component))
 
 
 (defmethod view ((component null) app-state &key id-path)

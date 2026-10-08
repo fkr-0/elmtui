@@ -105,7 +105,7 @@
       ;; Cursor-relative
       (:below-cursor
         (values safe-w (if (> safe-h 0)
-                         (max 1 (- safe-h safe-r))
+                         (max 1 (- safe-h safe-r 1))
                          0)
           0))
       (:above-cursor
@@ -115,44 +115,45 @@
       (otherwise
         (values safe-w safe-h 0)))))
 
-(defun %overflow-effects (anchor height rows cursor-row overflow-policy issued)
+(defun
+  %overflow-effects
+  (anchor height rows cursor-row overflow-policy issued)
   "Return NEW-HEIGHT, NEW-ISSUED and overflow render commands based on current
 geometry.  NIL means the value should remain unchanged."
-  (let ((new-height nil)
-         (commands nil)
-         (new-issued issued))
-    (labels ((emit-scroll-delta (delta)
-               (cond
-                 ((> delta 0)
-                   (setf new-issued (+ issued delta))
-                   (push `(:render :scroll-down ,delta) commands))
-                 ((< delta 0)
-                   (setf new-issued (+ issued delta))
-                   (push `(:render :scroll-up ,(- delta)) commands))))
-              (truncate-height (limit)
-                (setf new-height (max 1 limit))))
-      (case anchor
+  (when (<= rows 0) (return-from %overflow-effects (values nil issued nil)))
+  (let
+    ((new-height nil) (commands nil) (new-issued issued))
+    (labels
+      ((emit-scroll-delta
+         (delta)
+         (cond
+           ((> delta 0)
+             (setf new-issued (+ issued delta))
+             (push ` (:render :scroll-down ,delta) commands))
+           ((< delta 0)
+             (setf new-issued (+ issued delta))
+             (push ` (:render :scroll-up , (- delta)) commands))))
+        (truncate-height (limit) (setf new-height (max 1 limit))))
+      (case
+        anchor
         (:below-cursor
-          (let* ((rows-remaining (max 0 (- rows cursor-row)))
-                  (needed (max 0 (- height rows-remaining))))
-            (case overflow-policy
-              (:scroll
-                (emit-scroll-delta (- needed issued)))
-              (:truncate
-                (when (> needed 0)
-                  (truncate-height (min height rows-remaining)))))))
+          (let*
+            ((rows-remaining (max 0 (- rows cursor-row 1)))
+              (needed (max 0 (- height rows-remaining))))
+            (case
+              overflow-policy
+              (:scroll (emit-scroll-delta (- needed issued)))
+              (:truncate (when (> needed 0) (truncate-height (min height rows-remaining)))))))
         (:above-cursor
-          (let* ((rows-available (max 0 cursor-row))
-                  (needed (max 0 (- height rows-available)))
-                  (desired-issued (- needed)))
-            (case overflow-policy
-              (:scroll
-                (emit-scroll-delta (- desired-issued issued)))
-              (:truncate
-                (when (> needed 0)
-                  (truncate-height (min height rows-available))))))))
-      (values new-height (if (/= new-issued issued) new-issued nil)
-        (nreverse commands)))))
+          (let*
+            ((rows-available (max 0 cursor-row))
+              (needed (max 0 (- height rows-available)))
+              (desired-issued (- needed)))
+            (case
+              overflow-policy
+              (:scroll (emit-scroll-delta (- desired-issued issued)))
+              (:truncate (when (> needed 0) (truncate-height (min height rows-available))))))))
+      (values new-height (if (/= new-issued issued) new-issued nil) (nreverse commands)))))
 
 (defun compute-anchor-solution (anchor desired-w desired-h term-cols term-rows cursor-r cursor-c)
   "Return five values:
@@ -203,7 +204,7 @@ geometry.  NIL means the value should remain unchanged."
         (:below-cursor
           ;; pivot is line below cursor; prefer to grow right, but if we run out of columns,
           ;; push left so the whole width is visible.
-          (let* ((start-r (max 0 cursor-r))
+          (let* ((start-r (max 0 (min (1+ cursor-r) (- term-rows h))))
                   (start-c (%clamp cursor-c 0 (max 0 (- term-cols w)))))
             (setf off-y start-r
               off-x start-c)
@@ -326,15 +327,13 @@ Returns two values: INSTANCE and CHILD-ID-PATH."
                                   (and style (getf style :height)))))
                          (and (numberp h) h)))
           (initial-term-size
-            (let* ((raw (or initial-terminal-dimensions
-                          (getf plist :initial-terminal-dimensions)
-                          '(80 24)))
+            (let* ((raw (or initial-terminal-dimensions (getf plist :initial-terminal-dimensions) (quote (0 0))))
                     (cols (if (and (listp raw) (numberp (first raw)))
                               (first raw)
-                              80))
+                              0))
                     (rows (if (and (listp raw) (numberp (second raw)))
                               (second raw)
-                              24)))
+                              0)))
               (list (max 0 cols) (max 0 rows))))
           (initial-cursor
             (let* ((raw (or initial-cursor-pos
@@ -375,9 +374,9 @@ Returns two values: INSTANCE and CHILD-ID-PATH."
           (rv-make-patch id-path '(:anchor-pos) ap)
           (rv-make-patch id-path '(:anchor-growth) growth)
           ;; env info
-          (rv-make-patch id-path '(:initial-cursor-pos) initial-cursor)
+          (rv-make-patch id-path '(:initial-cursor-pos) (and (or initial-cursor-pos (getf plist :initial-cursor-pos)) initial-cursor))
           (rv-make-patch id-path '(:cursor-pos) initial-cursor)
-          (rv-make-patch id-path '(:pos-known) t)
+          (rv-make-patch id-path '(:pos-known) (not (null (or initial-cursor-pos (getf plist :initial-cursor-pos)))))
           (rv-make-patch id-path '(:terminal-size) initial-term-size)
           (rv-make-patch id-path '(:size-known)
             (and (> (first initial-term-size) 0) (> (second initial-term-size) 0)))
@@ -476,14 +475,29 @@ for state updates, and COMMANDS is a list of render command plists."
              (setf (sref ctx :initial-cursor-pos) (list x y))))
           (ready? ()
             "Check if the terminal geometry is known."
-            (let ((term-size (sref ctx :terminal-size)))
-              (or (and (sref ctx :size-known)
-                    (and term-size (> (first term-size) 0) (> (second term-size) 0)))
+            (and
+              (sref ctx :pos-known)
+              (sref ctx :size-known)
+              (let
+                ((term-size (sref ctx :terminal-size)))
                 (and term-size (> (first term-size) 0) (> (second term-size) 0)))))
           (mark-first-ready! ()
             "Mark first ready and emit initial clear commands."
-            (when (and (ready?) (not (sref ctx :first-ready-done)))
-              (setf (sref ctx :first-ready-done) t))))
+            (when
+              (and (ready?) (not (sref ctx :first-ready-done)))
+              (setf (sref ctx :first-ready-done) t)
+              (when
+                (sref ctx :blank-on-exit t)
+                (push
+                  (list
+                    :render
+                    :blank-viewport
+                    (elmtui.view.geo:make-rectangle
+                      :pos
+                      (elmtui.view.geo:make-pos :x (sref ctx :offset-x 0) :y (sref ctx :offset-y 0))
+                      :size
+                      (elmtui.view.geo:make-size :w (sref ctx :width 0) :h (sref ctx :height 0))))
+                  render-commands)))))
         (when (listp message*)
           (case (msg-type message*)
           ((:terminalresized :terminal-resized :TERMINALRESIZED :TERMINAL-RESIZED)
@@ -918,7 +932,12 @@ for state updates, and COMMANDS is a list of render command plists."
                         (and (> (first term-size) 1) (> (second term-size) 1))))
           (term-cols (max 0 (or (first term-size) 0)))
           (term-rows (max 0 (or (second term-size) 0)))
-          (ready? (and size-known (> term-cols 0) (> term-rows 0)))
+          (ready? (and
+              (%state-value vp-state :pos-known)
+              (%state-value vp-state :first-ready-done)
+              size-known
+              (> term-cols 0)
+              (> term-rows 0)))
           (effective-id (or (%state-value vp-state :id) (first (last id-path))))
           (effective-id-viewport (let* ((name (string-upcase (string effective-id)))
                                          (pref "ROOT-VIEWPORT-"))

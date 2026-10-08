@@ -219,6 +219,57 @@
               elmtui.platform.driver::*last-ctx* nil
               elmtui.platform.driver::*previous-frame-buffer* nil)))))
 
+(test runtime-e2e-blocking-consumer-renders-only-after-event
+  "A blocked consumer performs no update or render while idle."
+  (let ((orig-pipeline (symbol-function 'elmtui.platform.driver::full-view-pipeline))
+        (orig-context (symbol-function 'elmtui.platform.driver::make-context-from-spec))
+        (orig-backend elmtui.platform.driver::*backend*)
+        (orig-processor elmtui.core.globals:*app-message-processor*)
+        (orig-model elmtui.platform.driver::*current-app-model*)
+        (orig-state elmtui.core.globals:*app-state*)
+        (renders 0)
+        (updates 0))
+    (unwind-protect
+         (progn
+           (setf elmtui.platform.driver::*backend* :test-backend
+                 (symbol-function 'elmtui.platform.driver::make-context-from-spec)
+                 (lambda (_spec model backend)
+                   (declare (ignore _spec))
+                   (elmtui.contracts:make-app-context
+                    :state model :backend backend :front-buffer nil))
+                 (symbol-function 'elmtui.platform.driver::full-view-pipeline)
+                 (lambda (ctx) (incf renders) ctx))
+           (elmtui.platform.driver::initialize-app-model
+            (list :name 'blocking-input-e2e
+                  :init-fn (lambda () (values '(:count 0) nil))
+                  :update-fn (lambda (_message model)
+                               (declare (ignore _message))
+                               (incf updates)
+                               (values (list :count (1+ (getf model :count))) nil))
+                  :view-fn (lambda (_state) (declare (ignore _state)) nil)
+                  :subscriptions-fn (lambda (_state) (declare (ignore _state)) nil)
+                  :root-viewport-id :root))
+           (elmtui.core.loop:start-loop)
+           (sleep 0.04)
+           (is (= 0 updates))
+           (is (= 0 renders))
+           (is-true (elmtui.core.loop:publish '(:app-message :pressed)))
+           (loop repeat 200 until (= 1 renders) do (sleep 0.001))
+           (is (= 1 updates))
+           (is (= 1 renders))
+           (sleep 0.04)
+           (is (= 1 updates))
+           (is (= 1 renders)))
+      (elmtui.core.loop:elm-stop-loop)
+      (setf (symbol-function 'elmtui.platform.driver::full-view-pipeline)
+            orig-pipeline
+            (symbol-function 'elmtui.platform.driver::make-context-from-spec)
+            orig-context
+            elmtui.platform.driver::*backend* orig-backend
+            elmtui.core.globals:*app-message-processor* orig-processor
+            elmtui.platform.driver::*current-app-model* orig-model
+            elmtui.core.globals:*app-state* orig-state))))
+
 (test runtime-e2e-tmux-idle-key-exit-emits-no-scroll-render-commands
   (let ((orig-render (symbol-function 'elmtui.platform.driver::execute-render-command))
         (orig-make-ctx (symbol-function 'elmtui.platform.driver::make-context-from-spec))
@@ -287,3 +338,49 @@
               elmtui.core.loop::*shutdown-requested* orig-shutdown
               elmtui.platform.driver::*last-ctx* nil
               elmtui.platform.driver::*previous-frame-buffer* nil)))))
+
+(test runtime-e2e-consumer-reentrant-publish-burst-preserves-fifo
+  "Publishing more messages than queue capacity from UPDATE must not deadlock."
+  (let ((original elmtui.core.globals:*app-message-processor*)
+        (seen nil))
+    (unwind-protect
+         (progn
+           (setf elmtui.core.globals:*app-message-processor*
+                 (lambda (event)
+                   (if (eq event :seed)
+                       (dotimes (i 160)
+                         (unless (elmtui.core.loop:publish
+                                  (list :app-message i))
+                           (error "Reentrant publish dropped ~D" i)))
+                       (push event seen))))
+           (elmtui.core.loop:start-loop)
+           (is-true (elmtui.core.loop:publish '(:app-message :seed)))
+           (loop repeat 500 until (= 160 (length seen)) do (sleep 0.002))
+           (is (= 160 (length seen)))
+           (is (equal (loop for i below 160 collect i) (reverse seen))))
+      (elmtui.core.loop:elm-stop-loop)
+      (setf elmtui.core.globals:*app-message-processor* original))))
+
+(test runtime-e2e-consumer-shutdown-wakes-blocked-reader-without-self-join
+  "Shutdown initiated on the consumer must not join its own thread."
+  (let ((orig-processor elmtui.core.globals:*app-message-processor*)
+        (thread nil))
+    (unwind-protect
+         (progn
+           (setf elmtui.core.globals:*app-message-processor*
+                 (lambda (_message) (declare (ignore _message)) nil))
+           (elmtui.core.loop:start-loop)
+           (setf thread elmtui.core.loop:*consumer-thread*)
+           (is-true (bt:thread-alive-p thread))
+           (is-true (elmtui.core.loop:publish :shutdown-command))
+           (loop repeat 300 while (bt:thread-alive-p thread)
+                 do (sleep 0.002))
+           (is-false (bt:thread-alive-p thread))
+           (is-true elmtui.core.loop::*shutdown-requested*)
+           ;; Stopping twice is safe, including when shutdown was requested by
+           ;; the application before the external teardown path runs.
+           (is-true (elmtui.core.loop:elm-stop-loop))
+           (is-false elmtui.core.loop:*consumer-thread*)
+           (is-false elmtui.core.loop::*active-event-channels*))
+      (elmtui.core.loop:elm-stop-loop)
+      (setf elmtui.core.globals:*app-message-processor* orig-processor))))

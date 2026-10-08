@@ -172,6 +172,36 @@
     (let ((bytes (string-to-utf-8-bytes string)))
       (device-write-bytes device bytes 0 (length bytes)))))
 
+(defun %device-terminal-size (device)
+  "Read Linux kernel geometry without consuming terminal input."
+  #+linux
+  (sb-alien:with-alien
+      ((size (sb-alien:struct terminal-window-size
+               (rows sb-alien:unsigned-short)
+               (cols sb-alien:unsigned-short)
+               (x sb-alien:unsigned-short)
+               (y sb-alien:unsigned-short))))
+    (when (zerop
+           (sb-alien:alien-funcall
+            (sb-alien:extern-alien
+             "ioctl"
+             (sb-alien:function sb-alien:int sb-alien:int
+                                sb-alien:unsigned-long sb-alien:system-area-pointer))
+            (cl-inputs.device.api:device-fd device)
+            #x5413 ; Linux TIOCGWINSZ
+            (sb-alien:alien-sap (sb-alien:addr size))))
+      (return-from %device-terminal-size
+        (values (sb-alien:slot size 'cols) (sb-alien:slot size 'rows)))))
+  (cl-inputs.terminal.api:get-terminal-size device))
+
+(defun %device-cursor-position (source)
+  "Probe once through the input router before starting the input thread."
+  (let* ((query (cl-inputs.loop:send-terminal-query source :cursor-position :timeout 0.5d0))
+         (response (cl-inputs.loop:wait-terminal-response source query :timeout 0.5d0))
+         (data (and response (cl-inputs.tokens:input-token-data response))))
+    (values (and data (1- (getf data :row)))
+            (and data (1- (getf data :column))))))
+
 (defun make-terminal-instance-for-device (&key device publish-fn (initial-clear nil))
   "Construct a terminal-instance around a cl-inputs DEVICE."
   (declare (ignore initial-clear))
@@ -188,7 +218,7 @@
              (height 24))
         ;; Cursor probes can time out on some pseudo terminals; keep sane defaults.
         (handler-case
-            (multiple-value-bind (r c) (cl-inputs.terminal.api:get-cursor-position device)
+            (multiple-value-bind (r c) (%device-cursor-position (terminal-instance-input-source instance))
               (when (and (numberp r) (>= r 0))
                 (setf row r))
               (when (and (numberp c) (>= c 0))
@@ -197,7 +227,7 @@
             (log-warn "TERMINAL: Failed to read initial cursor position; using defaults: ~A" e)))
         ;; Dimension probes can also fail in non-interactive environments.
         (handler-case
-            (multiple-value-bind (w h) (cl-inputs.terminal.api:get-terminal-size device)
+            (multiple-value-bind (w h) (%device-terminal-size device)
               (when (and (numberp w) (> w 0))
                 (setf width w))
               (when (and (numberp h) (> h 0))
@@ -363,10 +393,7 @@
       (log-info "TERMINAL: Shutdown Error: ~A" e)
       (log:error "TERMINAL: Error during primary shutdown: ~A" e)))
 
-  (handler-case (sb-ext:run-program "/bin/stty" '("sane") :search t :input nil :output nil :error nil)
-    (error (e)
-      (log-info "TERMINAL: stty sane Error: ~A" e)
-      (log:error "TERMINAL: stty sane failed: ~A" e)))
+
   (log-info "TERMINAL: Backend shutdown complete.")
   t)
 

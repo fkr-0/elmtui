@@ -271,8 +271,10 @@
                   (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer))))
             (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
               (log:debug "PIPELINE: Displaying buffer with diff: ~A" (length diff))
-              (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-y origin-x)
-              (elmtui.platform.api:flush-output backend)
+              ;; Diffing is still performed per update; no output occurs for equal buffers.
+              (when diff
+                ;; APPLY-DIFF-TO-BACKEND performs its final flush already.
+                (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-y origin-x))
               (setf (ctx-front-buffer ctx) back-buffer)
               (incf *display-frame-counter*)
               ctx))))

@@ -270,11 +270,6 @@ Set ELMTUI_VERBOSE_LOGS=1 to keep info/debug output."
          (package-designator (%read-example-package-designator example-file)))
     (declare (ignore _))
     (let ((entry (%resolve-entry-symbol package-designator example-name)))
-      (format t "Running example ~A via ~A::~A~@[ (backend ~A)~]~%"
-              (normalize-example-name example-name)
-              package-designator
-              (symbol-name entry)
-              backend-type)
       (%invoke-entry entry :backend-type backend-type))))
 
 (defun build-example-binary (example-name &key output-path backend-type)

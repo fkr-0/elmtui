@@ -159,7 +159,8 @@ silently converted to NIL."
         (cons :ui       (make-ui-channel))
         (cons :command  (make-command-channel))
         (cons :focus    (make-focus-channel))
-        (cons :message  (make-message-channel))))
+        ;; Enqueue bursts without keeping the input reader behind a rendered frame.
+        (cons :message  (make-message-channel :capacity 128))))
 
 ;; (defun wait-for-event (channels &key timeout)
 ;;   "Block until the **first ready event** arrives on one of CHANNELS.

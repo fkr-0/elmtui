@@ -167,24 +167,33 @@
         (cleanup-reactive-view view)))
     (is-false (application-state-observers state))))
 
-(test core-loop-poll-runtime-event-delegates-to-cl-events-loop
-  (let ((called nil)
-        (seen-timeout nil)
-        (orig (symbol-function 'cl-events.loop:poll-runtime-event)))
+(test core-loop-blocking-mailbox-delivers-event-and-stops-on-close
+  "The runtime receives directly from its mailbox without periodic polling."
+  (let* ((channel (make-message-channel :capacity 1))
+         (elmtui.core.loop::*default-event-channel* channel)
+         (elmtui.core.loop::*active-event-channels* (list channel))
+         (elmtui.core.loop::*consumer-deferred-in* nil)
+         (elmtui.core.loop::*consumer-deferred-out* nil))
     (unwind-protect
          (progn
-           (setf (symbol-function 'cl-events.loop:poll-runtime-event)
-                 (lambda (channels wait-fn &key timeout)
-                   (declare (ignore channels wait-fn))
-                   (setf called t
-                         seen-timeout timeout)
-                   (values nil nil)))
-           (multiple-value-bind (_ev _ch)
-               (elmtui.core.loop::%poll-runtime-event :timeout 0.11)
-             (declare (ignore _ev _ch)))
-           (is-true called)
-           (is (= 0.11 seen-timeout)))
-      (setf (symbol-function 'cl-events.loop:poll-runtime-event) orig))))
+           (multiple-value-bind (event origin)
+               (elmtui.core.loop::%poll-runtime-event :timeout 0)
+             (is-false event)
+             (is-false origin))
+           (is-true (cl-events.channel:chan-put
+                     (elmtui.core.event-channels:channel-of channel) :key))
+           (multiple-value-bind (event origin)
+               (elmtui.core.loop::%poll-runtime-event)
+             (is (eq :key event))
+             (is (eq channel origin)))
+           (cl-events.channel:chan-close
+            (elmtui.core.event-channels:channel-of channel))
+           (multiple-value-bind (event origin)
+               (elmtui.core.loop::%poll-runtime-event)
+             (is (eq :shutdown-loop event))
+             (is (eq channel origin))))
+      (cl-events.channel:chan-close
+       (elmtui.core.event-channels:channel-of channel)))))
 
 (test core-loop-bootstrap-selects-primary-channel-via-cl-events-policy
   (let ((select-called nil)
@@ -286,3 +295,26 @@
       ;; CLEANUP-REACTIVE-VIEW sends :SHUTDOWN to the managed worker; callers
       ;; intentionally receive a worker ID rather than a Bordeaux thread object.
       (cleanup-reactive-view view))))
+
+(test core-loop-shutdown-does-not-block-on-full-mailbox
+  "Closing a full channel wakes waiters without inserting a shutdown event."
+  (let* ((channel (make-message-channel :capacity 1))
+         (raw (elmtui.core.event-channels:channel-of channel))
+         (elmtui.core.loop::*active-event-channels* (list channel))
+         (elmtui.core.loop::*default-event-channel* channel)
+         (elmtui.core.loop::*consumer-thread* nil)
+         (elmtui.core.loop::*shutdown-requested-flag*
+           (elmtui.core.loop::make-shutdown-flag)))
+    (is-true (cl-events.channel:chan-put raw :pending))
+    (is-true (elmtui.core.loop:elm-stop-loop))
+    (is-true elmtui.core.loop::*shutdown-requested*)
+    (is (eq :closing (cl-events.channel:channel-state raw)))
+    (multiple-value-bind (ok status)
+        (cl-events.channel:chan-put raw :too-late :timeout 0)
+      (is-false ok)
+      (is (eq :closing status)))
+    (multiple-value-bind (item status)
+        (cl-events.channel:chan-take raw :timeout 0)
+      (is (eq :pending item))
+      (is (eq :ok status)))
+    (is (eq :closed (cl-events.channel:channel-state raw)))))
