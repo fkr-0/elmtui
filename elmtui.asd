@@ -162,6 +162,8 @@
                                 (:file "input")
                                 (:file "backend/common/ansi-styling")
                                 (:file "backend/common/virtual-buffer")
+                                ;; Pure, terminal-independent operations over virtual frames.
+                                (:file "render/diff")
                                 (:file "backend/terminal/terminal")
                                 (:file "tmux-capture" :depends-on ("backend/common/virtual-buffer" "backend/terminal/terminal"))
                                 (:file "backend/terminal/diff-renderer")
@@ -170,9 +172,10 @@
                                 (:file "backend/urxvt/urxvt")))
 
                 ;; ----------------------------------------------------------------
-                ;; 10) Integration and entrypoints
+                ;; 10) Render/presentation interface and integration
                 ;; ----------------------------------------------------------------
-                (:file "pipeline")
+                (:file "render/presentation" :depends-on ("platform"))
+                (:file "pipeline" :depends-on ("render/presentation"))
                 (:file "platform/driver" :depends-on ("core/system-events" "pipeline"))
 
 
