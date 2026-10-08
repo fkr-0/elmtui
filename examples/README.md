@@ -38,14 +38,24 @@ ELMTUI_EDITOR_FILE=/tmp/notes.txt ./examples.sh run mini-text-editor
 
 From Lisp, load `elmtui-examples` and call
 `(elmtui.examples.mini-text-editor:run-mini-text-editor :path "/tmp/notes.txt")`.
-The file is read at startup and written **only** on Ctrl+S. Ctrl+Q or Escape
-quits; unsaved changes require a second quit key. Arrows, Home/End, Page Up/Down,
+The file is read at startup and written **only** on Ctrl+S. A scratch
+buffer opens a **Save As** dialog to choose its filename; overwriting an
+existing file requires confirmation. Ctrl+Q or Escape quits clean buffers.
+When the buffer is modified, a bordered modal asks for Save [s], Discard [d]
+or Cancel [c / Enter / Esc]. Saving a nameless buffer from that dialog opens
+Save As and quits only after a successful save. Arrows, Home/End, Page Up/Down,
 Enter, Backspace, Delete and Tab are supported. A star in the header indicates
 unsaved changes. Saving runs as an asynchronous command so the TEA update
 function remains pure; modifications during a save retain the dirty flag.
 The cursor is rendered visibly inside the buffer; no terminal-wide redraw is
-requested while idle. Current limitations: fixed 12-row viewport, no undo,
-mouse editing, or syntax highlighting. For safety, a failed load aborts launch
+requested while idle. The frame and dialogs use ElmTUI's rendering pipeline.
+The dialog state, keyboard capture and bounded five-row presentation are reusable
+through `elmtui.ui.widgets.modal-dialog` (`open-modal-dialog`, `modal-handle-key`,
+`modal-dialog-view`). This is **modal-in-flow rendering**, not a compositor overlay:
+the hosting application routes keys to the dialog and reserves five content rows.
+The dialog result includes a return-focus token; focus restoration requires the
+host to apply it. Current limitations: fixed 12-row viewport, no undo,
+mouse editing, syntax highlighting or framework-managed overlay stacking. For safety, a failed load aborts launch
 rather than silently replacing an existing unreadable file.
 
 ## Input and terminal inspection
