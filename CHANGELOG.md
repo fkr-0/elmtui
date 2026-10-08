@@ -8,6 +8,13 @@ The project follows semantic versioning from the first published release.
 
 ### Added
 
+- Added `elmtui.render.diff`, a terminal-independent virtual-frame differ with
+  explicit first-frame policy and deterministic, per-call diff metrics.
+- Added a swappable `elmtui.render.presentation` protocol with a recording
+  presenter for TTY-free verification of write operations and buffer ownership.
+- Added architectural contract, deterministic frame-replay, failed-presentation
+  retry, compatibility, resize, and output-isolation regression tests.
+
 - Added a centralized cooperative polling primitive in `cl-events` and migrated
   ElmTUI readiness/shutdown waits to it, with deterministic timeout and
   cancellation coverage.
@@ -31,6 +38,15 @@ The project follows semantic versioning from the first published release.
 
 ### Changed
 
+- Routed the display pipeline through the presenter interface; unchanged frames
+  perform no backend writes or flushes and rejected frames do not advance the
+  authoritative front buffer. Idle event-driven periods do not render.
+- Moved cell comparison/batching out of the terminal backend. The terminal
+  compatibility wrapper retains diagnostic output statistics; the deprecated
+  shared first-call flag is ignored, and the driver no longer mutates it.
+- `present-frame` now optionally returns pure diff metrics as a third value,
+  preserving its first two return values for existing callers.
+
 - Replaced the embedded `cl-events`, `cl-inputs`, `cl-state`, and `cl-styles`
   source trees with Git submodules pinned to their standalone repository commits;
   ElmTUI integration tests now target the current `cl-inputs` public and optional
@@ -45,6 +61,9 @@ The project follows semantic versioning from the first published release.
   retaining inline-style priority and the existing flex/grid layout model.
 
 ### Fixed
+
+- Eliminated process-wide first-render state from frame comparisons, including
+  independent initial frames and resize handling for multiple presenters.
 
 - Fixed observer failure reporting and transaction rollback/notification ordering
   so failures remain inspectable without silently corrupting transaction state.
