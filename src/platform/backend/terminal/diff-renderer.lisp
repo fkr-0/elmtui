@@ -1,10 +1,7 @@
 ;;;===============================================================
 ;;; File: src/platform/backend/terminal/diff-renderer.lisp
-;;; Diffing Renderer Logic
-;;;
-;;; This file contains the logic to compute differences between
-;;; two virtual terminal buffers and apply those
-;;; differences to a terminal.
+;;; Terminal write adapter and compatibility/diagnostics facade.
+;;; The pure cell-diff algorithm is now in elmtui.render.diff.
 ;;;===============================================================
 
 (uiop:define-package :elmtui.platform.backend.terminal.diff-renderer
@@ -25,6 +22,7 @@
     #:terminal-style)
   (:import-from :cl-inputs.util #:string-to-utf-8-bytes)
   (:import-from :cl-inputs.device.api #:device-write-bytes)
+  (:import-from :elmtui.render.diff #:buffers-not-compatible-error)
   (:import-from :elmtui.platform.backend.common.virtual-buffer #:with-virtual-buffer-lock
     #:buffer-cell-at
     #:buffer-cell-style #:buffer-cell-char
@@ -47,7 +45,7 @@
     #:buffers-not-compatible-error
     #:rendering-stats ;; Export the new stats structure and accessor
     #:get-rendering-stats ;; Export the function to get stats
-    #:*compute-buffer-diff-first-call* ; <--- EXPORT ADDED HERE
+    #:*compute-buffer-diff-first-call* ; Deprecated; ignored for compatibility
     #:reset-rendering-stats)) ;; Export the function to reset stats
 
 (in-package :elmtui.platform.backend.terminal.diff-renderer)
@@ -62,7 +60,7 @@
   (cells-compared 0 :type fixnum)
   (cells-changed 0 :type fixnum)
   (diff-batches-created 0 :type fixnum)
-  (full-redraws 0 :type fixnum) ; Count full redraws triggered by *compute-buffer-diff-first-call*
+  (full-redraws 0 :type fixnum) ; Count explicitly requested initial-frame diffs
   ;; Diff application stats
   (ops-processed 0 :type fixnum)
   (style-changes-applied 0 :type fixnum)
@@ -82,29 +80,13 @@
   (setf *current-rendering-stats* (make-rendering-stats))
   (log-info "Rendering statistics reset."))
 
-(defparameter *compute-buffer-diff-first-call* t
-  "Non-nil to force a full redraw on first compute-buffer-diff call.")
+(defvar *compute-buffer-diff-first-call* nil
+  "Deprecated compatibility variable; ignored by the stateless diff algorithm.
+Pass :INITIAL-FRAME-P explicitly to COMPUTE-BUFFER-DIFF instead.")
 
-(defun %blank-background-cell-p (cell)
-  "Return true for untouched background cells that should not be emitted.
-This keeps the initial render from blanking the terminal with plain spaces,
-while still allowing intentional styled spaces to be written."
-  (let ((char (buffer-cell-char cell))
-        (style (buffer-cell-style cell)))
-    (and (null style)
-         (or (char= char #\Null)
-             (char= char #\Space)))))
 
-(define-condition buffers-not-compatible-error (elmtui.core.errors:elmtui-error)
-  ((front-buffer :initarg :front-buffer :reader buffers-not-compatible-error-front)
-    (back-buffer :initarg :back-buffer :reader buffers-not-compatible-error-back)
-    (reason :initarg :reason :reader buffers-not-compatible-error-reason))
-  (:report (lambda (condition stream)
-             (log4cl:log-warn (format nil "Buffers are not compatible for diffing. Front: ~A, Back: ~A. Reason: ~A"
-                                (buffers-not-compatible-error-front condition)
-                                (buffers-not-compatible-error-back condition)
-                                (buffers-not-compatible-error-reason condition))
-               stream))))
+
+
 ;; (defun apply-terminal-diff (terminal-instance diff-ops)
 ;;   "Applies the computed Doperations to the terminal.
 ;; Assumes it's called within WITH-TERMINAL-LOCK."
@@ -165,115 +147,23 @@ while still allowing intentional styled spaces to be written."
 ;;     (log:debug "APPLY-TERMINAL-DIFF: All ops processed. Flushing output.")
 ;;     (finish-output stream)
 ;;     t))
-(defun compute-buffer-diff (front-buffer back-buffer)
-  "Compute write operations that transform FRONT-BUFFER into BACK-BUFFER.
-
-Contiguous changed cells with the same style are emitted as one write batch.
-Batch strings use an adjustable character vector so extending a long run is
-amortized linear rather than repeatedly copying the accumulated prefix."
-  (check-type front-buffer virtual-terminal-buffer)
-  (check-type back-buffer virtual-terminal-buffer)
-  (reset-rendering-stats)
-
-  (unless (and (= (buffer-width front-buffer) (buffer-width back-buffer))
-               (= (buffer-height front-buffer) (buffer-height back-buffer)))
-    (error 'buffers-not-compatible-error
-           :front-buffer front-buffer
-           :back-buffer back-buffer
-           :reason "Buffer dimensions do not match."))
-
-  (labels ((make-batch (row col char style)
-             (let ((chars (make-array 16
-                                      :element-type 'character
-                                      :adjustable t
-                                      :fill-pointer 0)))
-               (vector-push-extend char chars)
-               (list :type :write-chars
-                     :row row
-                     :start-col col
-                     :chars chars
-                     :style style)))
-           (append-batch-char (batch char)
-             (vector-push-extend char (getf batch :chars)))
-           (finish-batch (batch diff-ops)
-             (when batch
-               (incf (rendering-stats-diff-batches-created
-                      *current-rendering-stats*))
-               (push batch diff-ops))
-             diff-ops))
-    (when *compute-buffer-diff-first-call*
-      (setf *compute-buffer-diff-first-call* nil)
-      (log-debug "BUFFER DIFF: Initial full redraw.")
-      (incf (rendering-stats-full-redraws *current-rendering-stats*))
-      (let ((diff-ops nil)
-            (height (buffer-height back-buffer))
-            (width (buffer-width back-buffer)))
-        (loop for row below height do
-          (let ((current-batch nil))
-            (loop for col below width do
-              (let* ((back-cell (buffer-cell-at back-buffer row col))
-                     (char (let
-        ((value (buffer-cell-char back-cell)))
-        (if (char= value #\Null) #\Space value)))
-                     (style (buffer-cell-style back-cell))
-                     (blank-p (%blank-background-cell-p back-cell)))
-                (incf (rendering-stats-cells-compared
-                       *current-rendering-stats*))
-                (unless blank-p
-                  (incf (rendering-stats-cells-changed
-                         *current-rendering-stats*)))
-                (cond
-                  ((and current-batch
-                        (not blank-p)
-                        (=? style (getf current-batch :style)))
-                   (append-batch-char current-batch char))
-                  (t
-                   (setf diff-ops (finish-batch current-batch diff-ops)
-                         current-batch (unless blank-p
-                                         (make-batch row col char style)))))))
-            (setf diff-ops (finish-batch current-batch diff-ops))))
-        (return-from compute-buffer-diff (nreverse diff-ops))))
-
-    (let ((diff-ops nil)
-          (height (buffer-height front-buffer))
-          (width (buffer-width front-buffer)))
-      (log-debug "BUFFER DIFF: Starting diff computation for buffers of size ~Ax~A"
-                 width height)
-      (loop for row below height do
-        (let ((current-batch nil))
-          (loop for col below width do
-            (incf (rendering-stats-cells-compared *current-rendering-stats*))
-            (let ((front-cell (buffer-cell-at front-buffer row col))
-                  (back-cell (buffer-cell-at back-buffer row col)))
-              (if (buffer-cell-equal-p front-cell back-cell)
-                  (setf diff-ops (finish-batch current-batch diff-ops)
-                        current-batch nil)
-                  (let ((char (let
-        ((value (buffer-cell-char back-cell)))
-        (if (char= value #\Null) #\Space value)))
-                        (style (buffer-cell-style back-cell)))
-                    (incf (rendering-stats-cells-changed
-                           *current-rendering-stats*))
-                    (cond
-                      ((char= char #\Null)
-                       (setf diff-ops (finish-batch current-batch diff-ops)
-                             current-batch nil))
-                      ((and current-batch
-                            (=? style (getf current-batch :style))
-                            (= col (+ (getf current-batch :start-col)
-                                      (length (getf current-batch :chars)))))
-                       (append-batch-char current-batch char))
-                      (t
-                       (setf diff-ops (finish-batch current-batch diff-ops)
-                             current-batch (make-batch row col char style))))))))
-          (setf diff-ops (finish-batch current-batch diff-ops))))
-      (log-debug "BUFFER DIFF: Final diff-ops count: ~A" (length diff-ops))
-      (log-debug "RENDERING STATS (diff): Compared=~A, Changed=~A, Batches=~A, FullRedraws=~A"
-                 (rendering-stats-cells-compared *current-rendering-stats*)
-                 (rendering-stats-cells-changed *current-rendering-stats*)
-                 (rendering-stats-diff-batches-created *current-rendering-stats*)
-                 (rendering-stats-full-redraws *current-rendering-stats*))
-      (nreverse diff-ops))))
+(defun compute-buffer-diff (front-buffer back-buffer &key (initial-frame-p (null front-buffer)))
+  "Legacy terminal-facing diff API, delegated to the pure renderer.
+INITIAL-FRAME-P is explicit, not process-wide mutable state.
+This wrapper updates terminal diagnostics only; the core is side-effect free."
+  (multiple-value-bind (operations metrics)
+      (elmtui.render.diff:compute-buffer-diff
+       front-buffer back-buffer :initial-frame-p initial-frame-p)
+    (reset-rendering-stats)
+    (setf (rendering-stats-cells-compared *current-rendering-stats*)
+          (elmtui.render.diff:diff-metrics-cells-compared metrics)
+          (rendering-stats-cells-changed *current-rendering-stats*)
+          (elmtui.render.diff:diff-metrics-cells-changed metrics)
+          (rendering-stats-diff-batches-created *current-rendering-stats*)
+          (elmtui.render.diff:diff-metrics-batches metrics)
+          (rendering-stats-full-redraws *current-rendering-stats*)
+          (elmtui.render.diff:diff-metrics-full-redraws metrics))
+    operations))
 
 (defun log-buffer-contents (buffer message)
   "Log a sample of buffer contents for debugging."

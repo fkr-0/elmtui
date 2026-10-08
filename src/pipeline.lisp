@@ -11,7 +11,6 @@
                 #:*terminal-debug-owned-region*)
   (:import-from :elmtui.platform.backend.common.virtual-buffer #:make-virtual-buffer #:copy-virtual-buffer)
   (:import-from :elmtui.contracts #:define-stage)
-  (:import-from :elmtui.platform.backend.terminal.diff-renderer #:compute-buffer-diff #:apply-diff-to-backend)
   (:import-from :elmtui.view.geo #:w #:h #:make-rectangle #:make-pos #:make-size)
   (:import-from :elmtui.utils #:get-path)
   ;; (:import-from :elmtui.style-lib.api #:stylesheet) ; legacy
@@ -233,54 +232,34 @@
 ;;     rendered-buffer))
 
 ;;; STAGE 6: Display the back buffer, handling diffing.
-(defun %backend-ready-for-display-p (backend)
-  "Return true when BACKEND is a maintained terminal backend with writable output."
-  (when (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
-    (let ((stream (elmtui.platform.api:term-stream backend)))
-      (or (and (streamp stream) (open-stream-p stream))
-          (and (elmtui.platform.backend.terminal:terminal-instance-cl-device backend) t)))))
-
 (define-stage display-buffer
   (app-context app-context)
   (ctx)
-  "Displays the back buffer, handling diffing and updating the front buffer."
-  (let* ((back-buffer (ctx-back-buffer ctx))
-          (front-buffer (ctx-front-buffer ctx))
-          (backend (ctx-backend ctx))
-          (origin-x 0)
-          (origin-y 0))
-    (if (and back-buffer (%backend-ready-for-display-p backend))
-      (multiple-value-bind (ox oy)
-        (%root-viewport-offset ctx)
-        (setf origin-x ox
-          origin-y oy)
-        (let* ((debug-frame-id *display-frame-counter*)
+  "Present the current back buffer using a swappable presentation backend.
+Only committed frames become the front buffer; idle/no-diff frames do no I/O."
+  (let ((back-buffer (ctx-back-buffer ctx))
+        (front-buffer (ctx-front-buffer ctx))
+        (backend (ctx-backend ctx)))
+    (if (and back-buffer (elmtui.render.presentation:presenter-ready-p backend))
+        (multiple-value-bind (origin-x origin-y)
+            (%root-viewport-offset ctx)
+          (let ((debug-frame-id *display-frame-counter*)
                 (debug-phase (%display-debug-phase front-buffer back-buffer))
                 (debug-owned-region (%display-owned-region origin-x origin-y back-buffer)))
-          (let ((*terminal-debug-frame-id* debug-frame-id)
-                (*terminal-debug-phase* debug-phase)
-                (*terminal-debug-owned-region* debug-owned-region))
-            (when (or (null front-buffer)
-                    (/= (elmtui.platform.backend.common.virtual-buffer:buffer-width front-buffer)
-                      (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer))
-                    (/= (elmtui.platform.backend.common.virtual-buffer:buffer-height front-buffer)
-                      (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer)))
-              (setf front-buffer
-                (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
-                  (elmtui.platform.backend.common.virtual-buffer:buffer-width back-buffer)
-                  (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer))))
-            (let ((diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front-buffer back-buffer)))
-              (log:debug "PIPELINE: Displaying buffer with diff: ~A" (length diff))
-              ;; Diffing is still performed per update; no output occurs for equal buffers.
-              (when diff
-                ;; APPLY-DIFF-TO-BACKEND performs its final flush already.
-                (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend origin-y origin-x))
-              (setf (ctx-front-buffer ctx) back-buffer)
-              (incf *display-frame-counter*)
-              ctx))))
-      (progn
-        (log:warn "PIPELINE: Display-buffer skipped as backend is not ready for output.")
-        ctx))))
+            (let ((*terminal-debug-frame-id* debug-frame-id)
+                  (*terminal-debug-phase* debug-phase)
+                  (*terminal-debug-owned-region* debug-owned-region))
+              (let ((operations
+                      (elmtui.render.presentation:present-frame
+                       backend front-buffer back-buffer
+                       :origin-row origin-y :origin-col origin-x)))
+                (log:debug "PIPELINE: Displaying buffer with diff: ~A" (length operations))
+                (setf (ctx-front-buffer ctx) back-buffer)
+                (incf *display-frame-counter*)
+                ctx))))
+        (progn
+          (log:warn "PIPELINE: Display-buffer skipped as presenter is not ready.")
+          ctx))))
 
 ;;; Compose stages 0-5 into a pipeline for rendering without display
 (define-pipeline render-pipeline-0-to-5
