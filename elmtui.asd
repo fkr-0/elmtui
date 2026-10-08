@@ -123,7 +123,8 @@
                                                 (:file "listbox")
                                                 (:file "counter")
                                                 (:file "scrollable-container")
-                                                (:file "scroll-panel")))
+                                                (:file "scroll-panel")
+                                                (:file "modal-dialog")))
                                 )
                   )
                 ;; UI-owned built-in DSL aliases (e.g. :root-viewport, :viewport, :text).
