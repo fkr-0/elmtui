@@ -24,6 +24,29 @@ example; `q`, `Escape`, and `Ctrl-C` are the common choices.
 | `focus-simple.lisp` | `elmtui.examples.focus-simple:run-focus-simple` | Focus traversal and button activation |
 | `mini-rainbow.lisp` | `elmtui.examples.mini-rainbow:run-mini-rainbow` | Compact styled layout |
 | `scroll-panel-demo.lisp` | `elmtui.examples.scroll-panel-demo:run-scroll-panel-demo` | Scrollable content and viewport behavior |
+| `mini-text-editor.lisp` | `elmtui.examples.mini-text-editor:run-mini-text-editor` | Editable multiline text buffer, cursor navigation and async file saving |
+
+## Mini text editor
+
+A compact, file-backed editor illustrating ElmTUI's state/update/view lifecycle.
+Start a scratch buffer with `./examples.sh run mini-text-editor`, or edit a
+UTF-8 text file by setting `ELMTUI_EDITOR_FILE`:
+
+```sh
+ELMTUI_EDITOR_FILE=/tmp/notes.txt ./examples.sh run mini-text-editor
+```
+
+From Lisp, load `elmtui-examples` and call
+`(elmtui.examples.mini-text-editor:run-mini-text-editor :path "/tmp/notes.txt")`.
+The file is read at startup and written **only** on Ctrl+S. Ctrl+Q or Escape
+quits; unsaved changes require a second quit key. Arrows, Home/End, Page Up/Down,
+Enter, Backspace, Delete and Tab are supported. A star in the header indicates
+unsaved changes. Saving runs as an asynchronous command so the TEA update
+function remains pure; modifications during a save retain the dirty flag.
+The cursor is rendered visibly inside the buffer; no terminal-wide redraw is
+requested while idle. Current limitations: fixed 12-row viewport, no undo,
+mouse editing, or syntax highlighting. For safety, a failed load aborts launch
+rather than silently replacing an existing unreadable file.
 
 ## Input and terminal inspection
 

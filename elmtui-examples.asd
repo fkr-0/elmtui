@@ -17,6 +17,7 @@
                (:file "tmux-idle-screensaver")
                (:file "pong-below-cursor")
                (:file "scroll-panel-demo")
+               (:file "mini-text-editor")
                (:file "game-of-life")
                (:file "root-viewport-test-app")
                (:file "fzf-finder-real")
