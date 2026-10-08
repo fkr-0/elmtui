@@ -265,6 +265,13 @@ This keeps compatibility with older examples that pass app instances."
 ;;; ---------------------------------------------------------------------------
 ;;; == Application State Bootstrap ==
 ;;; ---------------------------------------------------------------------------
+(defvar *frame-render-lock* (bt:make-lock "elmtui frame rendering")
+  "Serialize complete frames across startup and event-consumer threads.")
+
+(defun %render-frame (ctx)
+  (bt:with-lock-held (*frame-render-lock*)
+    (full-view-pipeline ctx)))
+
 (defun initialize-app-model (app-spec)
   (declare (type list app-spec))
   (let* (
@@ -384,7 +391,7 @@ This keeps compatibility with older examples that pass app instances."
                     (handler-case
                       (progn
                         (let ((elmtui.pipeline::*preserve-underlay* *preserve-underlay*))
-                          (setf *last-ctx* (full-view-pipeline ctx)))
+                          (setf *last-ctx* (%render-frame ctx)))
                         (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*))
                         (setf *initial-render-done* t))
                       (elmtui.contracts:pipeline-contract-violation (e)
@@ -400,6 +407,9 @@ This keeps compatibility with older examples that pass app instances."
 
 ;;; Helper: execute :render commands synchronously prior to view
 (defun execute-render-command (cmd backend)
+  (bt:with-lock-held (*frame-render-lock*) (%execute-render-command cmd backend)))
+
+(defun %execute-render-command (cmd backend)
   "Execute a :render command against BACKEND. Format examples:
    (:render :clear rect)
    (:render :blank-viewport rect)
@@ -425,12 +435,8 @@ This keeps compatibility with older examples that pass app instances."
             (when (and (numberp w) (numberp h) (> w 0) (> h 0))
               (cond
                 ((typep backend 'elmtui.platform.backend.terminal:terminal-instance)
-                  (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
-                    (let* ((front (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
-                            (back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h))
-                            (diff (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff front back)))
-                      (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend diff backend oy ox)
-                      (elmtui.platform.api:flush-output backend))))
+              (elmtui.platform.api:clear-screen backend rect)
+              (elmtui.platform.api:flush-output backend))
                 ((typep backend 'elmtui.backend.faketerm:faketerm-instance)
                   (let ((stream (elmtui.backend.faketerm::faketerm-instance-stream backend))
                          (buffer (elmtui.backend.faketerm::faketerm-instance-screen-buffer backend)))
@@ -446,9 +452,9 @@ This keeps compatibility with older examples that pass app instances."
         (:scroll
           (elmtui.platform.api:scroll backend (or arg1 -1)))
         (:scroll-down
-          (elmtui.platform.api:scroll backend (or arg1 1)))
+          (dotimes (row (max 0 (or arg1 1))) (elmtui.platform.api:scroll backend 1)))
         (:scroll-up
-          (elmtui.platform.api:scroll backend (- (or arg1 1))))
+          (dotimes (row (max 0 (or arg1 1))) (elmtui.platform.api:scroll backend -1)))
         (:clear-below-cursor
           (if (fboundp 'elmtui.platform.api:clear-below-cursor)
             (elmtui.platform.api:clear-below-cursor backend)
@@ -474,7 +480,7 @@ This keeps compatibility with older examples that pass app instances."
       (handler-case
         (progn
           (let ((elmtui.pipeline::*preserve-underlay* *preserve-underlay*))
-            (setf *last-ctx* (full-view-pipeline ctx)))
+            (setf *last-ctx* (%render-frame ctx)))
           (setf *previous-frame-buffer* (elmtui.contracts:ctx-front-buffer *last-ctx*))
           (setf *initial-render-done* t))
         (elmtui.contracts:pipeline-contract-violation (e)
@@ -514,24 +520,14 @@ This keeps compatibility with older examples that pass app instances."
   (let ((row 0)
          (col 0))
     ;; Reuse cached cursor from terminal backend when available.
-    (when (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
-      (let ((cached-row
-              (elmtui.platform.backend.terminal:terminal-instance-cursor-row backend))
-            (cached-col
-              (elmtui.platform.backend.terminal:terminal-instance-cursor-col backend)))
-        (when (and (numberp cached-row) (>= cached-row 0))
-          (setf row cached-row))
-        (when (and (numberp cached-col) (>= cached-col 0))
-          (setf col cached-col))))
-    ;; Probe only if cache looked invalid.
-    (when (and (= row 0) (= col 0))
-      (handler-case
-          (multiple-value-bind (r c) (get-cursor-position backend)
-            (when (and (numberp r) (numberp c) (>= r 0) (>= c 0))
-              (setf row r
-                    col c)))
-        (error (e)
-          (log-warn "DRIVER: Failed to read cursor position during startup: ~A" e))))
+    (when
+      (typep backend 'elmtui.platform.backend.terminal:terminal-instance)
+      (let
+        ((cached-row (elmtui.platform.backend.terminal::terminal-instance-cursor-start-row backend))
+          (cached-col
+            (elmtui.platform.backend.terminal::terminal-instance-cursor-start-col backend)))
+        (when (and (numberp cached-row) (>= cached-row 0)) (setf row cached-row))
+        (when (and (numberp cached-col) (>= cached-col 0)) (setf col cached-col))))
     (setf *last-cursor-pos* (cons row col))
     (funcall proc `(:cursorposition :col ,(1+ col) :row ,(1+ row)))
     t))
@@ -651,7 +647,7 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
         ;; Do not hard-block on JOIN here: input thread may be in a device read path.
         ;; Shutdown will poll and force-destroy as a bounded fallback.
         ;; Keep the stop flag set so the loop can observe it on the next timeout wakeup.
-        (setf (driver-context-input-thread ctx) nil)))
+        ))
     ctx))
 
 (defun make-context-from-spec (app-spec state backend)
@@ -659,11 +655,7 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   (let ((w (elmtui.platform.api:term-w backend))
          (h (elmtui.platform.api:term-h backend)))
     ;; Ensure the previous frame buffer matches the current terminal size
-    (unless (and *previous-frame-buffer*
-              (eql w (elmtui.platform.backend.common.virtual-buffer:buffer-width *previous-frame-buffer*))
-              (eql h (elmtui.platform.backend.common.virtual-buffer:buffer-height *previous-frame-buffer*)))
-      ;; If not, allocate a new buffer of the correct size
-      (setf *previous-frame-buffer* (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer w h)))
+
     ;; Construct and return the app context struct for rendering and event handling
     (elmtui.contracts:make-app-context
       :state state
@@ -978,7 +970,7 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
                                     (error (condition)
                                       (log-warn "DRIVER: input-loop stop failed during teardown: ~A"
                                                 condition)))
-                                  (setf *input-thread* nil)
+
                                   t)
                 *input-thread* (start-driver-input-loop ctx))
           (log-info "Driver input loop started: ~A" *input-thread*)))))

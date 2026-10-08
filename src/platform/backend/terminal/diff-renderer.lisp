@@ -212,7 +212,9 @@ amortized linear rather than repeatedly copying the accumulated prefix."
           (let ((current-batch nil))
             (loop for col below width do
               (let* ((back-cell (buffer-cell-at back-buffer row col))
-                     (char (buffer-cell-char back-cell))
+                     (char (let
+        ((value (buffer-cell-char back-cell)))
+        (if (char= value #\Null) #\Space value)))
                      (style (buffer-cell-style back-cell))
                      (blank-p (%blank-background-cell-p back-cell)))
                 (incf (rendering-stats-cells-compared
@@ -246,7 +248,9 @@ amortized linear rather than repeatedly copying the accumulated prefix."
               (if (buffer-cell-equal-p front-cell back-cell)
                   (setf diff-ops (finish-batch current-batch diff-ops)
                         current-batch nil)
-                  (let ((char (buffer-cell-char back-cell))
+                  (let ((char (let
+        ((value (buffer-cell-char back-cell)))
+        (if (char= value #\Null) #\Space value)))
                         (style (buffer-cell-style back-cell)))
                     (incf (rendering-stats-cells-changed
                            *current-rendering-stats*))

@@ -69,7 +69,7 @@
 ("cl-events/cl-events.asd" :version :newest :source :implicit-file :systems
  ("cl-events"))
 ("cl-inputs/cl-inputs.asd" :version :newest :source :implicit-file :systems
- ("cl-inputs" "cl-inputs/events" "cl-inputs/tests"))
+ ("cl-inputs" "cl-inputs/events" "cl-inputs/events-tests" "cl-inputs/tests"))
 ("cl-state/cl-state.asd" :version :newest :source :implicit-file :systems
  ("cl-state"))
 ("cl-styles/cl-styles.asd" :version :newest :source :implicit-file :systems
@@ -133,6 +133,7 @@
 ("cl-inputs/cl-inputs.asd"
  ((:system :name "elmtui") (:system :name "cl-inputs"))
  ((:system :name "cl-inputs/tests") (:system :name "cl-inputs"))
+ ((:system :name "cl-inputs/events-tests") (:system :name "cl-inputs/events"))
  ((:system :name "cl-inputs/events") (:system :name "cl-inputs"))
  (t (:asd-file :name "cl-inputs/cl-inputs.asd")))
 
@@ -191,6 +192,7 @@
  ((:system :name "elmtui-dev-tests") (:system :name "fiveam"))
  ((:system :name "cl-styles/tests") (:system :name "fiveam"))
  ((:system :name "cl-inputs/tests") (:system :name "fiveam"))
+ ((:system :name "cl-inputs/events-tests") (:system :name "fiveam"))
  (t
   (:project :name "fiveam" :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379"
    :source :implicit-vcs)))
@@ -201,3 +203,4 @@
 
 ("trivial-backtrace"
  ((:system :name "fiveam") (:system :name "trivial-backtrace")))
+

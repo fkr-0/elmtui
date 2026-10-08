@@ -401,7 +401,7 @@ If multiple attributes are requested, return a list of values in order."
     (:invisible (setf (terminal-style-invisible s) v))
     (otherwise (error "Invalid key ~A" k))))
 
-(defmethod =? ((c1 t) (c2 t)) (equalp c1 c2))
+
 
 (defmethod =? ((c1 null) (c2 null)) t)
 
