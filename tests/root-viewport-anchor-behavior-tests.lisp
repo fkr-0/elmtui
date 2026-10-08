@@ -223,5 +223,4 @@ blank only its viewport on exit, and restore the startup cursor without global c
       (is-false (has-render-cmd-p cmds :clear-below-cursor)
                 "Shutdown must not emit clear-below-cursor."))))
 
-(defun run-root-viewport-anchor-behavior-tests ()
-  (run! :elmtui/root-vp/behavior))
+(defun run-root-viewport-anchor-behavior-tests () (run! 'elmtui/root-vp/behavior))

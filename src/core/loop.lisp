@@ -112,11 +112,35 @@ as well as the view function for the application.")
   "Policy for consumer poll/dispatch errors.
 Can be a keyword (:stop/:restart) or a function receiving the signaled error.")
 
-(defun %poll-runtime-event (&key (timeout +default-poll-timeout-seconds+))
-  "Poll active runtime channels through cl-events loop helper."
-  (poll-runtime-event *active-event-channels*
-                      #'elmtui.core.event-channels:wait-for-event
-                      :timeout timeout))
+(defvar *consumer-deferred-in* nil
+  "Reentrant publishes from the consumer, accumulated without blocking it.")
+(defvar *consumer-deferred-out* nil
+  "FIFO of reentrant events waiting for the next dispatch.")
+
+(defun %take-deferred-consumer-event ()
+  (unless *consumer-deferred-out*
+    (setf *consumer-deferred-out* (nreverse *consumer-deferred-in*)
+          *consumer-deferred-in* nil))
+  (pop *consumer-deferred-out*))
+
+(defun %poll-runtime-event (&key timeout)
+  "Block on the single runtime mailbox, waking for events or channel closure.
+Reentrant consumer publishes are deferred until dispatch returns; no polling
+or idle rendering is needed. TIMEOUT is optional and primarily for tests."
+  (let ((origin (or *default-event-channel* (first *active-event-channels*))))
+    (unless origin
+      (return-from %poll-runtime-event (values :shutdown-loop nil)))
+    (let ((deferred (%take-deferred-consumer-event)))
+      (when deferred
+        (return-from %poll-runtime-event (values deferred origin))))
+    (multiple-value-bind (event status)
+        (cl-events.channel:chan-take
+         (elmtui.core.event-channels:channel-of origin) :timeout timeout)
+      (case status
+        (:ok (values event origin))
+        (:timeout (values nil nil))
+        ((:closed :cancelled) (values :shutdown-loop origin))
+        (otherwise (error "Runtime mailbox failed: ~S" status))))))
 
 (defun %handle-consumer-poll-error (e)
   "Resolve runtime error action using the configured consumer error policy."
@@ -136,7 +160,7 @@ Can be a keyword (:stop/:restart) or a function receiving the signaled error.")
          (channels (remove nil (mapcar #'cdr builtins)))
          (message-channel (select-primary-channel
                            channels
-                           :message
+                           :message-channel
                            #'elmtui.core.event-channels:name)))
     (unless message-channel
       (error "START-LOOP: Unable to initialize message channel."))
@@ -171,7 +195,9 @@ Can be a keyword (:stop/:restart) or a function receiving the signaled error.")
   (log-debug "LOOP: *app-sender* set to #'elmtui.core.loop:publish (single mailbox)")
   (when (or (null *consumer-thread*)
             (not (bt:thread-alive-p *consumer-thread*)))
-    (setf *shutdown-requested* nil)
+    (setf *shutdown-requested* nil
+          *consumer-deferred-in* nil
+          *consumer-deferred-out* nil)
     (setf *consumer-thread*
           (bt:make-thread #'event-consumer-loop :name "elmtui-event-consumer"))
     (log-info "LOOP: Started event consumer thread for channel system."))
@@ -350,59 +376,37 @@ Can be a keyword (:stop/:restart) or a function receiving the signaled error.")
                                              :modifiers (elmtui.core.event-types:key-event-modifiers e)))
 
 (defun elm-stop-loop ()
-  "Gracefully stop the event loop and consumer thread."
-  (log-info "ELM-STOP-LOOP: Function called. Current *shutdown-requested*: ~A" *shutdown-requested*)
-  (unless *shutdown-requested*
-    (log-info "LOOP: elm-stop-loop called. Initiating shutdown sequence.")
-    (setf *shutdown-requested* t)
-
-    ;; 1. Wake up the consumer thread if it's waiting on an event.
-    (log-info "LOOP: Sending :shutdown-loop signal to wake consumer thread.")
-    (when *active-event-channels*
-      (let* ((ch-obj (first *active-event-channels*)))
-        (when ch-obj
-          (let ((raw-ch (elmtui.core.event-channels:channel-of ch-obj)))
-            (when raw-ch
+  "Close the mailbox to wake blocked readers, then reap the consumer if external.
+Safe after an earlier shutdown request and safe from the consumer itself."
+  (setf *shutdown-requested* t)
+  ;; Closing does not wait for queue capacity, even if the queue is full.
+  (dolist (ch-obj *active-event-channels*)
+    (handler-case
+        (chan-close (elmtui.core.event-channels:channel-of ch-obj))
+      (error (condition)
+        (log-warn "LOOP: channel close failed during shutdown: ~A" condition))))
+  (let ((consumer *consumer-thread*))
+    ;; A consumer dispatching :shutdown-command must not join or destroy itself.
+    (unless (eq consumer (bt:current-thread))
+      (when (and consumer (bt:thread-alive-p consumer))
+        (let ((stopped-p
+                (poll-until (lambda () (not (bt:thread-alive-p consumer)))
+                            :timeout +consumer-join-timeout-seconds+
+                            :interval 0.01)))
+          (if stopped-p
               (handler-case
-                  (-> raw-ch :shutdown-loop)
+                  (bt:join-thread consumer)
                 (error (condition)
-                  (log-warn "LOOP: failed to wake consumer during shutdown: ~A" condition))))))))
-
-    ;; 2. Wait for the consumer thread to exit cleanly.
-    (when (and *consumer-thread* (bt:thread-alive-p *consumer-thread*))
-      (log:info "LOOP: Waiting for consumer thread to terminate...")
-      (let ((stopped-p
-              (poll-until
-               (lambda ()
-                 (not (and *consumer-thread*
-                           (bt:thread-alive-p *consumer-thread*))))
-               :timeout +consumer-join-timeout-seconds+
-               :interval 0.01)))
-        (if (not stopped-p)
-            (progn
-              (log:warn "LOOP: Consumer thread failed to terminate in ~,2F seconds. Forcing termination."
-                        +consumer-join-timeout-seconds+)
-              (bt:destroy-thread *consumer-thread*))
-            (progn
-              (handler-case
-                  (bt:join-thread *consumer-thread*)
-                (error (condition)
-                  (log-warn "LOOP: consumer join failed during shutdown: ~A" condition)))
-              (log:info "LOOP: Consumer thread terminated gracefully."))))
-      (setf *consumer-thread* nil))
-
-    ;; 3. Now that the consumer is stopped, it's safe to clean up channels.
-    (log-info "LOOP: Closing event channels.")
-    (dolist (ch-obj *active-event-channels*)
-      (handler-case
-          (chan-close (elmtui.core.event-channels:channel-of ch-obj))
-        (error (condition)
-          (log-warn "LOOP: channel close failed during shutdown: ~A" condition))))
-    (setf *active-event-channels* nil
-          *default-event-channel* nil)
-    (log-info "LOOP: *active-event-channels* set to NIL.")
-
-    (log-info "LOOP: Event system shutdown sequence complete.")))
+                  (log-warn "LOOP: consumer join failed: ~A" condition)))
+              (progn
+                (log-warn "LOOP: consumer did not stop; forcing termination.")
+                (bt:destroy-thread consumer)))))
+      (setf *consumer-thread* nil
+            *active-event-channels* nil
+            *default-event-channel* nil
+            *consumer-deferred-in* nil
+            *consumer-deferred-out* nil)))
+  t)
 
 
 (defun publish (event &key target-channel-name)
@@ -450,7 +454,10 @@ Returns T on success, NIL on drop. Safe after shutdown."
                          (list :app-message event))))
         (handler-case
             (progn
-              (-> the-channel event*)
+              ;; Do not deadlock publishing from the consumer into its own full queue.
+              (if (eq (bt:current-thread) *consumer-thread*)
+                  (push event* *consumer-deferred-in*)
+                  (-> the-channel event*))
               ;; Log outside of the critical section to avoid deadlock with Log4CL
               t)                                 ;; success
           (error (e)
