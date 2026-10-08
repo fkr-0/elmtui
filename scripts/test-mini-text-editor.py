@@ -21,7 +21,7 @@ spec.loader.exec_module(harness)
 
 
 class EditorApps(unittest.TestCase):
-    def app(self, name, *, initial=None):
+    def app(self, name, *, initial=None, scratch=False):
         path = harness.OPTIONS.output / (name + "-" + uuid.uuid4().hex[:8] + ".txt")
         if initial is not None:
             path.write_text(initial, encoding="utf-8")
@@ -29,7 +29,7 @@ class EditorApps(unittest.TestCase):
             name,
             "(elmtui.examples.mini-text-editor:run-mini-text-editor)",
             source="mini-text-editor.lisp",
-            environment={"ELMTUI_EDITOR_FILE": str(path)},
+            environment={} if scratch else {"ELMTUI_EDITOR_FILE": str(path)},
         )
         self.addCleanup(app.close)
         return app.start(), path
@@ -81,9 +81,69 @@ class EditorApps(unittest.TestCase):
         app.expect("Modified")
         app.key("C-q")
         app.expect("Unsaved changes")
+        app.expect("[d] Discard")
         self.assertNotIn("ELMTUI_E2E_SHELL_RESTORED", app.screen())
-        self.finish(app, "C-q")
+        app.key("c", literal=True)
+        app.expect("Dialog cancelled")
+        self.assertNotIn("ELMTUI_E2E_SHELL_RESTORED", app.screen())
+        app.key("C-q")
+        app.expect("[d] Discard")
+        self.finish(app, "d")
         self.assertFalse(path.exists(), "discard must not save the buffer")
+
+    def test_save_and_exit_from_confirmation(self):
+        app, target = self.app("editor-save-exit", initial="before")
+        app.expect("Mini Text Editor")
+        app.key("!", literal=True)
+        app.key("C-q")
+        app.expect("Unsaved changes")
+        self.finish(app, "s")
+        self.assertEqual(target.read_text(encoding="utf-8"), "!before")
+
+    def test_scratch_save_and_exit(self):
+        app, target = self.app("editor-scratch-exit", scratch=True)
+        app.expect("Mini Text Editor")
+        app.key("w", literal=True)
+        app.key("C-q")
+        app.expect("Unsaved changes")
+        app.key("s", literal=True)
+        app.expect("Save As")
+        app.key(str(target), literal=True)
+        self.finish(app, "Enter")
+        self.assertEqual(target.read_text(encoding="utf-8"), "w")
+
+    def test_scratch_save_as_dialog(self):
+        app, target = self.app("editor-save-as", scratch=True)
+        app.expect("Mini Text Editor")
+        app.key("M", literal=True)
+        app.key("C-s")
+        app.expect("Save As")
+        app.key(str(target), literal=True)
+        app.key("Enter")
+        app.expect("Saved")
+        self.assertEqual(target.read_text(encoding="utf-8"), "M")
+        self.finish(app, "C-q")
+
+    def test_overwrite_requires_confirmation(self):
+        app, target = self.app("editor-overwrite", scratch=True)
+        target.write_text("original", encoding="utf-8")
+        app.expect("Mini Text Editor")
+        app.key("N", literal=True)
+        app.key("C-s")
+        app.expect("Save As")
+        app.key(str(target), literal=True)
+        app.key("Enter")
+        app.expect("Overwrite?")
+        self.assertEqual(target.read_text(encoding="utf-8"), "original")
+        app.key("n", literal=True)
+        app.expect("Save As")
+        app.key(str(target), literal=True)
+        app.key("Enter")
+        app.expect("Overwrite?")
+        app.key("y", literal=True)
+        app.expect("Saved")
+        self.assertEqual(target.read_text(encoding="utf-8"), "N")
+        self.finish(app, "C-q")
 
 
 def main():

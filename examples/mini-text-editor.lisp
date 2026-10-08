@@ -34,6 +34,7 @@
          (lines (split-editor-lines content)))
     (list :path path :lines lines :row 0 :col 0 :goal 0 :top 0
           :version 0 :saved-version 0 :dirty nil :saving nil
+          :modal nil :dialog-input "" :quit-after-save nil
           :quit-armed nil :should-quit nil
           :status (if path "Ready | Ctrl+S save" "Scratch buffer | set ELMTUI_EDITOR_FILE to save"))))
 
@@ -153,11 +154,14 @@
                          (list :editor-save-failed (princ-to-string condition)))))
 
 (defun %request-quit (state)
-  (if (and (state-ref state :dirty nil)
-           (not (state-ref state :quit-armed nil)))
+  (if (state-ref state :dirty nil)
       (make-update-result
-       :patches '(((:quit-armed) t)
-                  ((:status) "Unsaved changes: Ctrl+Q again to discard; Ctrl+S saves")))
+       :patches `(((:modal)
+                   ,(elmtui.ui.widgets.modal-dialog:open-modal-dialog
+                     :title "Unsaved changes"
+                     :message "Save, discard or cancel?"
+                     :choices '((#\s . :save) (#\d . :discard) (#\c . :cancel))))
+                  ((:status) "Unsaved changes: choose Save, Discard or Cancel")))
       (make-update-result :patches '(((:should-quit) t)))))
 
 (defun %event-parts (message)
@@ -179,7 +183,97 @@
            (or (eql key letter)
                (and (characterp char) (char-equal char (char-downcase (char (symbol-name letter) 0))))))))
 
-(defun editor-update (message state)
+(defun %show-save-dialog (state &key (quit-after nil))
+  (declare (ignore state))
+  (make-update-result
+   :patches `(((:modal)
+               ,(elmtui.ui.widgets.modal-dialog:open-modal-dialog
+                 :kind :prompt :title "Save As"
+                 :message "Enter a filename"))
+              ((:quit-after-save) ,quit-after)
+              ((:status) "Save As: enter a filename"))))
+
+(defun %start-save (state path &key (quit-after nil))
+  (make-update-result
+   :patches `(((:modal) nil) ((:saving) t)
+              ((:quit-after-save) ,quit-after)
+              ((:status) "Saving..."))
+   :commands (list (%save-command path
+                                  (copy-seq (state-ref state :lines))
+                                  (state-ref state :version 0)))))
+
+(defun %cancel-dialog ()
+  (make-update-result
+   :patches '(((:modal) nil) ((:quit-after-save) nil)
+              ((:status) "Dialog cancelled"))))
+
+(defun %overwrite-dialog (state path)
+  (declare (ignore state))
+  (make-update-result
+   :patches `(((:dialog-input) ,path)
+              ((:modal)
+               ,(elmtui.ui.widgets.modal-dialog:open-modal-dialog
+                 :title "Overwrite?"
+                 :message (format nil "Replace existing file ~A?" path)
+                 :choices '((#\y . :overwrite) (#\n . :retry))))
+              ((:status) "Existing file: confirm overwrite"))))
+
+(defun %modal-update (message state)
+  "Capture dialog input before the editor may process any key."
+  (multiple-value-bind (key char modifiers) (%event-parts message)
+    (let ((dialog (state-ref state :modal)))
+      (when (and (consp message) (eq (first message) :app-quit-requested))
+        (return-from %modal-update (%cancel-dialog)))
+      (multiple-value-bind (next result)
+          (elmtui.ui.widgets.modal-dialog:modal-handle-key
+           dialog key char modifiers)
+        (if (null result)
+            (make-update-result :patches `(((:modal) ,next)))
+            (case (getf result :action)
+              (:cancel (%cancel-dialog))
+              (:discard
+               (make-update-result
+                :patches '(((:modal) nil) ((:should-quit) t))))
+              (:save
+               (if (state-ref state :path)
+                   (%start-save state (state-ref state :path) :quit-after t)
+                   (%show-save-dialog state :quit-after t)))
+              (:accept
+               (let ((path (getf result :value)))
+                 (cond
+                   ((uiop:directory-exists-p path)
+                    (make-update-result
+                     :patches '(((:status) "Filename is a directory"))))
+                   ((probe-file path)
+                    (%overwrite-dialog state path))
+                   (t
+                    (%start-save state path
+                                 :quit-after (state-ref state :quit-after-save nil))))))
+              (:overwrite
+               (%start-save state (state-ref state :dialog-input)
+                            :quit-after (state-ref state :quit-after-save nil)))
+              (:retry
+               (let ((reopen (%show-save-dialog state
+                                                :quit-after (state-ref state :quit-after-save nil))))
+                 reopen))
+              (otherwise (%cancel-dialog))))))))
+
+(defun %save-result (message state)
+  (let* ((path (second message))
+         (version (third message))
+         (current (state-ref state :version 0))
+         (quit-after (state-ref state :quit-after-save nil))
+         (clean (= version current)))
+    (make-update-result
+     :patches `(((:path) ,path)
+                ((:saving) nil) ((:quit-after-save) nil)
+                ((:saved-version) ,version)
+                ((:dirty) ,(not clean))
+                ((:should-quit) ,(and quit-after clean))
+                ((:status) ,(if clean "Saved"
+                                "Saved previous version; buffer modified"))))))
+
+(defun %editor-update-base (message state)
   (let ((row (state-ref state :row 0))
         (col (state-ref state :col 0)))
     (cond
@@ -193,7 +287,7 @@
                                      "Saved" "Saved previous version; buffer modified"))))))
       ((and (consp message) (eq (first message) :editor-save-failed))
        (make-update-result
-        :patches `(((:saving) nil)
+        :patches `(((:saving) nil) ((:quit-after-save) nil)
                    ((:status) ,(format nil "Save failed: ~A" (second message))))))
       ((and (consp message) (eq (first message) :app-quit-requested))
        (%request-quit state))
@@ -249,6 +343,28 @@
             (%insert-char state char))
            (t (make-update-result))))))))
 
+(defun editor-update (message state)
+  "Application-level dialog arbitration, then ordinary editing."
+  (cond
+    ((and (consp message) (eq (first message) :editor-saved))
+     (%save-result message state))
+    ((and (consp message) (eq (first message) :editor-save-failed))
+     (%editor-update-base message state))
+    ((state-ref state :modal)
+     (%modal-update message state))
+    ((and (consp message) (eq (first message) :app-quit-requested))
+     (%request-quit state))
+    (t
+     (multiple-value-bind (key char mods) (%event-parts message)
+       (cond
+         ((and key (%control-key-p key char mods :q 17))
+          (%request-quit state))
+         ((and key (%control-key-p key char mods :s 19)
+               (not (state-ref state :saving nil))
+               (null (state-ref state :path)))
+          (%show-save-dialog state))
+         (t (%editor-update-base message state)))))))
+
 (defun %row-display (text cursor-col active)
   (let* ((offset (if (and active (> cursor-col 55)) (- cursor-col 55) 0))
          (end (min (length text) (+ offset 62)))
@@ -262,6 +378,18 @@
                        (if (< end (length text)) "..." "")))
         (concatenate 'string start (if (< end (length text)) "..." "")))))
 
+(defun %editor-title (path dirty)
+  "Keep the title inside the editor border, even for long file paths."
+  (let* ((prefix "Mini Text Editor | ")
+         (mark (if dirty " *" ""))
+         (name (or path "[scratch]"))
+         (limit (- 72 (length prefix) (length mark)))
+         (display (if (> (length name) limit)
+                      (concatenate 'string "..."
+                                   (subseq name (- (length name) (- limit 3))))
+                      name)))
+    (concatenate 'string prefix display mark)))
+
 (defun editor-view (state)
   (let* ((lines (state-ref state :lines))
          (row (state-ref state :row 0))
@@ -271,23 +399,28 @@
          (dirty (state-ref state :dirty nil)))
     `(:container
        :id :editor-root
-       :style (:display :flex :flex-direction :column :width 78 :height 17)
+       :style (:display :flex :flex-direction :column :width 78 :height 19
+               :border t :border-style :single :border-width 1)
        :children
        ((:text :id :editor-header
-          :content ,(format nil "Mini Text Editor | ~A ~A"
-                            (or path "[scratch]") (if dirty "*" "")))
+          :content ,(%editor-title path dirty))
         (:text :id :editor-help
           :content "Arrows/Home/End/PgUp/PgDn move | Enter new line | Ctrl+S save | Ctrl+Q quit")
         ,@(loop for n below +visible-editor-lines+
                 for i = (+ n top)
-                collect `(:text
-                           :id ,(intern (format nil "EDITOR-ROW-~D" n) :keyword)
-                           :content ,(if (< i (length lines))
-                                         (format nil "~3D ~A ~A"
-                                                 (1+ i) (if (= i row) ">" " ")
-                                                 (%row-display (%line lines i)
-                                                               col (= i row)))
-                                         "~")))
+                unless (and (state-ref state :modal)
+                            (< 4 n 9))
+                  append (if (and (= n 4) (state-ref state :modal))
+                             (elmtui.ui.widgets.modal-dialog:modal-dialog-view
+                              (state-ref state :modal) :width 66)
+                             (list `(:text
+                                      :id ,(intern (format nil "EDITOR-ROW-~D" n) :keyword)
+                                      :content ,(if (< i (length lines))
+                                                    (format nil "~3D ~A ~A"
+                                                            (1+ i) (if (= i row) ">" " ")
+                                                            (%row-display (%line lines i)
+                                                                          col (= i row)))
+                                                    "~")))))
         (:text :id :editor-position
           :content ,(format nil "Ln ~D, Col ~D | ~D lines | ~A"
                             (1+ row) (1+ col) (length lines)
@@ -296,7 +429,7 @@
 (defapplication mini-text-editor-app
   :root-viewport-id :mini-editor-viewport
   :root-component-dsl '(:root-viewport :id :mini-editor-viewport
-                        :anchor :below-cursor :width 78 :height 17
+                        :anchor :below-cursor :width 78 :height 19
                         :blank-on-exit t :child-dsl-spec (:view nil))
   :initial-state-fn #'%initial-state
   :update-fn #'editor-update
