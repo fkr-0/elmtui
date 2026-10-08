@@ -109,8 +109,8 @@ previous buffer or changing a shared first-call flag. Prefilled tmux frames
 remain actual previous buffers and therefore receive incremental diffs.
 
 The terminal-facing `compute-buffer-diff` remains a compatibility wrapper:
-it delegates to the pure algorithm and separately copies its returned metrics
-into legacy terminal diagnostics. The old exported
+it delegates to the pure algorithm and returns per-call metrics, without
+mutating diagnostic counters. The old exported
 `*compute-buffer-diff-first-call*` variable is deprecated and **ignored**;
 no driver code writes it during app startup, prefill or shutdown. Callers must
 use the explicit frame argument instead. Terminal output still belongs to
@@ -123,11 +123,26 @@ spaces, isolation from global diagnostics and replay correctness.
 
 ## Deferred work
 
-The legacy **terminal writer** still records output metrics in a global
-diagnostics object. That is outside the pure comparison core; making output
-metrics per-presenter would be a separate API change. Further qualification
-should include PTY performance measurements and randomized property testing
-for styles, clipping and failure recovery.
+The terminal writer now records successful writes and output operations in
+each `terminal-instance` (operations, characters, cursor movements, style
+changes, and style resets). Mutations, snapshots, and resets use the same
+recursive terminal lock.
+
+```lisp
+(elmtui.platform.backend.terminal:terminal-output-statistics terminal)
+(elmtui.platform.backend.terminal:reset-terminal-output-statistics terminal)
+```
+
+Both return independent `terminal-output-stats` snapshots. Resetting one
+terminal does not affect any other terminal. The former global
+`rendering-stats`, `get-rendering-stats`, `reset-rendering-stats`, and
+process-wide mutable diagnostics were **removed**, not deprecated. Pure
+comparison still returns per-call `diff-metrics`; `present-frame` also
+returns them as the third value. No-op frames never enter the writer, and
+partial failures only count output operations that completed.
+
+Further qualification should include PTY performance measurements and
+randomized tests for styles, clipping, and partial failure recovery.
 
 The tree/layout engine is unchanged. Input remains the event-driven blocking
 consumer introduced previously. No separate library or plugin framework

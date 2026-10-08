@@ -41,9 +41,10 @@ The project follows semantic versioning from the first published release.
 - Routed the display pipeline through the presenter interface; unchanged frames
   perform no backend writes or flushes and rejected frames do not advance the
   authoritative front buffer. Idle event-driven periods do not render.
-- Moved cell comparison/batching out of the terminal backend. The terminal
-  compatibility wrapper retains diagnostic output statistics; the deprecated
-  shared first-call flag is ignored, and the driver no longer mutates it.
+- Moved cell comparison/batching out of the terminal backend; the terminal
+  diff wrapper is stateless. Terminal output counters now belong to each
+  `terminal-instance`, with explicit snapshot/reset operations, and are
+  independent across multiple terminals.
 - `present-frame` now optionally returns pure diff metrics as a third value,
   preserving its first two return values for existing callers.
 
@@ -59,6 +60,13 @@ The project follows semantic versioning from the first published release.
   and loop code after executable behavior was covered independently.
 - Normalized ElmTUI terminal geometry and color aliases through `cl-styles`, while
   retaining inline-style priority and the existing flex/grid layout model.
+
+### Removed
+
+- Removed the process-global rendering diagnostics API, including
+  `rendering-stats`, `get-rendering-stats`, and `reset-rendering-stats`.
+  Pure diff metrics remain per-call values and output counters require
+  an explicit terminal-instance.
 
 ### Fixed
 
