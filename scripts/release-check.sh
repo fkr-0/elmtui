@@ -6,16 +6,23 @@ cd "${ROOT_DIR}"
 
 printf '==> checking repository topology and release manifest\n'
 
-if [ -e .gitmodules ]; then
-  echo 'release-check: .gitmodules must not exist; reusable libraries are in-tree systems' >&2
-  exit 1
-fi
-
+# Standalone libraries are pinned Git submodules, not ordinary tracked files.
+# A plain git archive omits gitlinks: the release distribution must bundle them.
+test -f .gitmodules || { echo 'release-check: missing .gitmodules' >&2; exit 1; }
 for library in cl-events cl-inputs cl-state cl-styles; do
-  if find "${library}" -name .git -print -quit | grep -q .; then
-    echo "release-check: nested Git metadata found under ${library}" >&2
+  mode="$(git ls-files --stage -- "${library}" | awk '{print $1}')"
+  if [ "${mode}" != 160000 ]; then
+    echo "release-check: ${library} is not a tracked submodule (mode=${mode})" >&2
     exit 1
   fi
+  pinned="$(git rev-parse "HEAD:${library}")"
+  actual="$(git -C "${library}" rev-parse HEAD 2>/dev/null || true)"
+  if [ -z "${actual}" ] || [ "${actual}" != "${pinned}" ]; then
+    echo "release-check: ${library} is missing or not at pinned revision ${pinned} (actual=${actual})" >&2
+    exit 1
+  fi
+  git config -f .gitmodules --get "submodule.${library}.url" >/dev/null ||
+    { echo "release-check: missing URL for ${library}" >&2; exit 1; }
 done
 
 required_files=(
@@ -73,10 +80,15 @@ for file in "${required_files[@]}"; do
     echo "release-check: required file is missing: ${file}" >&2
     exit 1
   fi
-  if ! git ls-files --error-unmatch "${file}" >/dev/null 2>&1; then
-    echo "release-check: required file is not tracked: ${file}" >&2
-    exit 1
-  fi
+  # Git tracks the submodule gitlink, not individual files inside it.
+  case "${file}" in
+    cl-events/*|cl-inputs/*|cl-state/*|cl-styles/*) ;;
+    *)
+      if ! git ls-files --error-unmatch "${file}" >/dev/null 2>&1; then
+        echo "release-check: required file is not tracked: ${file}" >&2
+        exit 1
+      fi ;;
+  esac
 done
 
 if grep -Eq '"/|"[A-Za-z]:\\\\' \

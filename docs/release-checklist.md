@@ -11,8 +11,8 @@ scripts/release-check.sh
 The command must complete with exit status zero and prove:
 
 - both staged and unstaged patches contain no whitespace errors;
-- the four reusable systems are tracked in-tree and contain no nested Git metadata;
-- every release-critical file is tracked and will be present in a Git archive;
+- all four reusable systems are pinned, initialized Git submodules at their exact superproject gitlinks;
+- root release-critical files are tracked, and submodule contents are bundled explicitly (a plain Git archive omits submodule contents);
 - both the release/test and optional development CLPM bundles contain no
   machine-specific absolute paths;
 - `cl-events` passes independently;
@@ -46,7 +46,8 @@ Run that command from inside a tmux session.
 ## Architecture
 
 - [x] Every `cl-*` system can load and test without loading `elmtui`.
-- [x] All four `cl-*` systems are ordinary in-tree directories, not submodules.
+- [x] All four `cl-*` systems are independently versioned Git submodules.
+- [ ] Qualify a clean recursive clone and source distribution containing all four pinned submodules.
 - [x] The default examples and release tests do not require the optional sibling
       integration `cl-fzy`.
 - [x] SLY/Slynk is isolated in `dev/clpmfile` and absent from the release/test
@@ -90,8 +91,8 @@ The repository currently has no configured remote, so these remain manual:
 - [ ] Push the reviewed release commit.
 - [ ] Create an annotated `v0.2.0` tag.
 - [ ] Sign the tag or release artifacts if signing is part of the project policy.
-- [ ] Publish a source archive generated from the tag.
-- [ ] Verify the archive contains all ASDF files and license texts.
+- [ ] Publish a source distribution bundling the exact Git-pinned submodule contents (plain `git archive` is insufficient).
+- [ ] Verify the distribution contains all root and library ASDF files, CLPM metadata, and license texts.
 - [ ] Test installation from the archive in a fresh ASDF/CLPM environment.
 - [ ] Publish release notes derived from `CHANGELOG.md`.
 
