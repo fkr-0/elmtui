@@ -97,10 +97,11 @@
           (b (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* nil))
                (elmtui.render.diff:compute-buffer-diff front back))))
       (is (equalp a b)))
-    (let ((before (elmtui.platform.backend.terminal.diff-renderer:get-rendering-stats)))
+    (let* ((terminal (elmtui.platform.backend.terminal::make-terminal-instance :stream (make-broadcast-stream)))
+           (before (elmtui.platform.backend.terminal:terminal-output-statistics terminal)))
       (elmtui.render.presentation:compute-frame-operations front back)
       (is (equalp before
-                  (elmtui.platform.backend.terminal.diff-renderer:get-rendering-stats))))
+                  (elmtui.platform.backend.terminal:terminal-output-statistics terminal))))
     (let* ((legacy-a (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
                        (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff
                         front back :initial-frame-p nil)))
@@ -112,7 +113,8 @@
 (test presentation-exposes-per-call-metrics-without-global-accounting
   (let* ((back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 5 1))
          (presenter (elmtui.render.presentation:make-recording-presenter))
-         (before (elmtui.platform.backend.terminal.diff-renderer:get-rendering-stats)))
+         (terminal (elmtui.platform.backend.terminal::make-terminal-instance :stream (make-broadcast-stream)))
+         (before (elmtui.platform.backend.terminal:terminal-output-statistics terminal)))
     (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at back 0 3 #\S nil)
     (multiple-value-bind (operations acknowledged metrics)
         (elmtui.render.presentation:present-frame presenter nil back)
@@ -122,5 +124,56 @@
       (is (= 1 (elmtui.render.diff:diff-metrics-cells-changed metrics)))
       (is (= 1 (elmtui.render.diff:diff-metrics-full-redraws metrics))))
     (is (equalp before
-                (elmtui.platform.backend.terminal.diff-renderer:get-rendering-stats)))
+                (elmtui.platform.backend.terminal:terminal-output-statistics terminal)))
     (is (= 1 (length (elmtui.render.presentation:recorded-presentations presenter))))))
+
+(test distinct-terminal-instances-own-independent-output-counters
+  (let* ((one (elmtui.platform.backend.terminal::make-terminal-instance :stream (make-broadcast-stream)))
+         (two (elmtui.platform.backend.terminal::make-terminal-instance :stream (make-broadcast-stream)))
+         (operations '((:type :write-chars :row 0 :start-col 0 :chars "ABC" :style nil)
+                       (:type :write-chars :row 0 :start-col 3 :chars "D" :style nil))))
+    (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend operations one 0 0)
+    (let ((first (elmtui.platform.backend.terminal:terminal-output-statistics one))
+          (other (elmtui.platform.backend.terminal:terminal-output-statistics two)))
+      (is (= 2 (elmtui.platform.backend.terminal:terminal-output-stats-ops-processed first)))
+      (is (= 4 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written first)))
+      (is (= 1 (elmtui.platform.backend.terminal:terminal-output-stats-cursor-moves-applied first)))
+      (is (= 0 (elmtui.platform.backend.terminal:terminal-output-stats-ops-processed other)))
+      (is (= 0 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written other)))
+      (setf (elmtui.platform.backend.terminal:terminal-output-stats-chars-written first) 900)
+      (is (= 4 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written
+                (elmtui.platform.backend.terminal:terminal-output-statistics one)))))
+    (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend
+     '((:type :write-chars :row 1 :start-col 1 :chars "XY" :style nil)) two 0 0)
+    (is (= 2 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written
+              (elmtui.platform.backend.terminal:terminal-output-statistics two))))
+    (let ((empty (elmtui.platform.backend.terminal:reset-terminal-output-statistics one)))
+      (is (= 0 (elmtui.platform.backend.terminal:terminal-output-stats-ops-processed empty)))
+      (is (= 0 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written
+                (elmtui.platform.backend.terminal:terminal-output-statistics one))))
+      (is (= 2 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written
+                (elmtui.platform.backend.terminal:terminal-output-statistics two)))))))
+
+(test deleted-process-global-diagnostics
+  (let ((package (find-package :elmtui.platform.backend.terminal.diff-renderer)))
+    (dolist (name '("GET-RENDERING-STATS" "RESET-RENDERING-STATS"
+                    "*CURRENT-RENDERING-STATS*" "RENDERING-STATS"))
+      (is-false (find-symbol name package)))))
+
+(test output-counters-on-partial-writer-error-and-idle
+  (let* ((one (elmtui.platform.backend.terminal::make-terminal-instance :stream (make-broadcast-stream)))
+         (two (elmtui.platform.backend.terminal::make-terminal-instance :stream (make-broadcast-stream)))
+         (empty (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 3 1)))
+    (is-false (elmtui.render.presentation:present-frame one empty empty))
+    (is (= 0 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written
+              (elmtui.platform.backend.terminal:terminal-output-statistics one))))
+    (signals error
+      (elmtui.platform.backend.terminal.diff-renderer:apply-diff-to-backend
+       '((:type :write-chars :row 0 :start-col 0 :chars "A" :style nil)
+         (:type :not-supported)) one 0 0))
+    (is (= 1 (elmtui.platform.backend.terminal:terminal-output-stats-ops-processed
+              (elmtui.platform.backend.terminal:terminal-output-statistics one))))
+    (is (= 1 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written
+              (elmtui.platform.backend.terminal:terminal-output-statistics one))))
+    (is (= 0 (elmtui.platform.backend.terminal:terminal-output-stats-chars-written
+              (elmtui.platform.backend.terminal:terminal-output-statistics two))))))

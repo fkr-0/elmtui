@@ -207,7 +207,8 @@
   "Plain background stays untouched, styled spaces paint, and stats remain local."
   (let* ((back (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 3 1))
          (styled (elmtui.platform.backend.common.ansi-styling:make-terminal-style))
-         (before (elmtui.platform.backend.terminal.diff-renderer:get-rendering-stats)))
+         (terminal (elmtui.platform.backend.terminal::make-terminal-instance :stream (make-broadcast-stream)))
+         (before (elmtui.platform.backend.terminal:terminal-output-statistics terminal)))
     (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
      back 0 1 #\Space styled)
     (multiple-value-bind (operations metrics)
@@ -219,5 +220,5 @@
       (is (= 1 (elmtui.render.diff:diff-metrics-cells-changed metrics)))
       (is (= 1 (elmtui.render.diff:diff-metrics-batches metrics))))
     (is (equalp before
-                (elmtui.platform.backend.terminal.diff-renderer:get-rendering-stats))
-        "The pure diff must not change even legacy diagnostic statistics.")))
+                (elmtui.platform.backend.terminal:terminal-output-statistics terminal))
+        "Pure diff cannot change any terminal presenter's output counters.")))

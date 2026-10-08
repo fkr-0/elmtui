@@ -76,6 +76,13 @@
     #:terminal-instance-cursor-col
     #:terminal-instance-current-style
     #:terminal-instance-lock
+    #:terminal-output-statistics
+    #:reset-terminal-output-statistics
+    #:terminal-output-stats-ops-processed
+    #:terminal-output-stats-style-changes-applied
+    #:terminal-output-stats-cursor-moves-applied
+    #:terminal-output-stats-chars-written
+    #:terminal-output-stats-forced-style-resets
 
     #:render-ui-tree-to-buffer
     #:write-output
@@ -123,6 +130,14 @@
                 (uiop:print-backtrace :stream s))))
       (log-info "TERMINAL ~A ~A~%~A" label details bt))))
 
+(defstruct terminal-output-stats
+  "Successful terminal output operations belonging to one presenter instance."
+  (ops-processed 0 :type fixnum)
+  (style-changes-applied 0 :type fixnum)
+  (cursor-moves-applied 0 :type fixnum)
+  (chars-written 0 :type fixnum)
+  (forced-style-resets 0 :type fixnum))
+
 (defstruct terminal-instance
   (stream nil :type (or null stream))
   (cl-device nil :type (or null t))
@@ -140,7 +155,8 @@
   (front-buffer nil :type (or null virtual-terminal-buffer))
   (back-buffer nil :type (or null virtual-terminal-buffer))
   (publish-fn nil :type (or null function)) ; For signal handlers
-  (scrolled-lines 0 :type integer))
+  (scrolled-lines 0 :type integer)
+  (output-stats (make-terminal-output-stats) :type terminal-output-stats))
 
 (defmethod term-w ((instance terminal-instance)) (terminal-instance-width instance))
 (defmethod term-h ((instance terminal-instance)) (terminal-instance-height instance))
@@ -153,6 +169,19 @@
 (defmacro with-terminal-lock ((instance) &body body)
   `(bt:with-recursive-lock-held ((lock-of (terminal-instance-lock ,instance)))
      ,@body))
+
+(defun terminal-output-statistics (instance)
+  "Return an independent snapshot of INSTANCE's successful output counters."
+  (check-type instance terminal-instance)
+  (with-terminal-lock (instance)
+    (copy-terminal-output-stats (terminal-instance-output-stats instance))))
+
+(defun reset-terminal-output-statistics (instance)
+  "Reset only INSTANCE's output counters. Return an empty snapshot."
+  (check-type instance terminal-instance)
+  (with-terminal-lock (instance)
+    (setf (terminal-instance-output-stats instance) (make-terminal-output-stats))
+    (copy-terminal-output-stats (terminal-instance-output-stats instance))))
 
 (defun %terminal-device (instance)
   "Return the cl-inputs device attached to INSTANCE, or NIL."

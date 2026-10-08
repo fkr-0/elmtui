@@ -40,52 +40,23 @@
     #:buffer-width #:buffer-height #:buffer-cell-at
     #:buffer-cell-style #:buffer-cell-char
     #:default-buffer-cell #:copy-virtual-buffer)
+  (:import-from :elmtui.platform.backend.terminal
+    #:terminal-instance-output-stats
+    #:terminal-output-stats-ops-processed
+    #:terminal-output-stats-style-changes-applied
+    #:terminal-output-stats-cursor-moves-applied
+    #:terminal-output-stats-chars-written
+    #:terminal-output-stats-forced-style-resets
+    #:with-terminal-lock)
   (:export #:compute-buffer-diff
     #:apply-diff-to-backend
     #:buffers-not-compatible-error
-    #:rendering-stats ;; Export the new stats structure and accessor
-    #:get-rendering-stats ;; Export the function to get stats
-    #:*compute-buffer-diff-first-call* ; Deprecated; ignored for compatibility
-    #:reset-rendering-stats)) ;; Export the function to reset stats
+    #:*compute-buffer-diff-first-call*))
 
 (in-package :elmtui.platform.backend.terminal.diff-renderer)
 
-;;;-----------------------------------------------------------------------------
-;;; Rendering Statistics
-;;;-----------------------------------------------------------------------------
-
-(defstruct rendering-stats
-  "Structure to hold statistics about the rendering process."
-  ;; Diff computation stats
-  (cells-compared 0 :type fixnum)
-  (cells-changed 0 :type fixnum)
-  (diff-batches-created 0 :type fixnum)
-  (full-redraws 0 :type fixnum) ; Count explicitly requested initial-frame diffs
-  ;; Diff application stats
-  (ops-processed 0 :type fixnum)
-  (style-changes-applied 0 :type fixnum)
-  (cursor-moves-applied 0 :type fixnum)
-  (chars-written 0 :type fixnum)
-  (forced-style-resets 0 :type fixnum))
-
-(defvar *current-rendering-stats* (make-rendering-stats)
-  "Holds the statistics for the current rendering cycle or session.")
-
-(defun get-rendering-stats ()
-  "Returns a copy of the current rendering statistics."
-  (copy-rendering-stats *current-rendering-stats*))
-
-(defun reset-rendering-stats ()
-  "Resets the global rendering statistics."
-  (setf *current-rendering-stats* (make-rendering-stats))
-  (log-info "Rendering statistics reset."))
-
 (defvar *compute-buffer-diff-first-call* nil
-  "Deprecated compatibility variable; ignored by the stateless diff algorithm.
-Pass :INITIAL-FRAME-P explicitly to COMPUTE-BUFFER-DIFF instead.")
-
-
-
+  "Obsolete first-frame compatibility flag; use :INITIAL-FRAME-P instead.")
 
 ;; (defun apply-terminal-diff (terminal-instance diff-ops)
 ;;   "Applies the computed Doperations to the terminal.
@@ -148,22 +119,10 @@ Pass :INITIAL-FRAME-P explicitly to COMPUTE-BUFFER-DIFF instead.")
 ;;     (finish-output stream)
 ;;     t))
 (defun compute-buffer-diff (front-buffer back-buffer &key (initial-frame-p (null front-buffer)))
-  "Legacy terminal-facing diff API, delegated to the pure renderer.
-INITIAL-FRAME-P is explicit, not process-wide mutable state.
-This wrapper updates terminal diagnostics only; the core is side-effect free."
-  (multiple-value-bind (operations metrics)
-      (elmtui.render.diff:compute-buffer-diff
-       front-buffer back-buffer :initial-frame-p initial-frame-p)
-    (reset-rendering-stats)
-    (setf (rendering-stats-cells-compared *current-rendering-stats*)
-          (elmtui.render.diff:diff-metrics-cells-compared metrics)
-          (rendering-stats-cells-changed *current-rendering-stats*)
-          (elmtui.render.diff:diff-metrics-cells-changed metrics)
-          (rendering-stats-diff-batches-created *current-rendering-stats*)
-          (elmtui.render.diff:diff-metrics-batches metrics)
-          (rendering-stats-full-redraws *current-rendering-stats*)
-          (elmtui.render.diff:diff-metrics-full-redraws metrics))
-    operations))
+  "Delegate to pure frame diff. Return operations and per-call diff metrics;
+no global diagnostics are read or updated."
+  (elmtui.render.diff:compute-buffer-diff
+   front-buffer back-buffer :initial-frame-p initial-frame-p))
 
 (defun log-buffer-contents (buffer message)
   "Log a sample of buffer contents for debugging."
@@ -223,7 +182,9 @@ TERMINAL-OFFSET-ROW/COL shift the canvas so its (0,0) lands on the terminal."
   (check-type terminal-offset-row (integer 0 *))
   (check-type terminal-offset-col (integer 0 *))
 
-  (let* ((device (terminal-instance-cl-device backend-instance))
+  (with-terminal-lock (backend-instance)
+    (let* ((stats (terminal-instance-output-stats backend-instance))
+           (device (terminal-instance-cl-device backend-instance))
           (stream (terminal-instance-stream backend-instance))
           (cursor-row -1)
           (cursor-col -1)
@@ -231,7 +192,6 @@ TERMINAL-OFFSET-ROW/COL shift the canvas so its (0,0) lands on the terminal."
           (last-row -1))
 
     (dolist (op diff-ops)
-      (incf (rendering-stats-ops-processed *current-rendering-stats*))
       (ecase (getf op :type) ;; case: write-chars
         (:write-chars
           (let* ((canvas-row (getf op :row))
@@ -243,29 +203,30 @@ TERMINAL-OFFSET-ROW/COL shift the canvas so its (0,0) lands on the terminal."
 
             (when (and (>= last-row 0) (/= term-row last-row))
               (apply-style-diff backend-instance nil)
-              (incf (rendering-stats-forced-style-resets *current-rendering-stats*))
+              (incf (terminal-output-stats-forced-style-resets stats))
               (setf current-style nil))
 
             (unless (equal style current-style)
               (apply-style-diff backend-instance style)
-              (incf (rendering-stats-style-changes-applied *current-rendering-stats*))
+              (incf (terminal-output-stats-style-changes-applied stats))
               (setf current-style style))
 
             (unless (and (= term-row cursor-row) (= term-col cursor-col))
               (send-sequence backend-instance :cursor-set-position (1+ term-row) (1+ term-col))
-              (incf (rendering-stats-cursor-moves-applied *current-rendering-stats*))
+              (incf (terminal-output-stats-cursor-moves-applied stats))
               (setf cursor-row term-row
                 cursor-col term-col))
 
             (%write-string device stream chars)
-            (incf (rendering-stats-chars-written *current-rendering-stats*) (length chars))
+            (incf (terminal-output-stats-ops-processed stats))
+            (incf (terminal-output-stats-chars-written stats) (length chars))
             (incf cursor-col (length chars))
             (setf last-row term-row)))))
 
     ;; Leave terminal tidy and flush output
     (apply-style-diff backend-instance nil)
-    (incf (rendering-stats-forced-style-resets *current-rendering-stats*))
+    (incf (terminal-output-stats-forced-style-resets stats))
     (when device (cl-inputs.terminal.api:flush-output device))
     (when stream (finish-output stream))
-    t))
+    t)))
 ;; == end/apply-diff.lisp ==
