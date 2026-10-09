@@ -241,7 +241,7 @@ Subsequently, the separately owned EX11 tmux-capture policy issue
 was fixed by its owner (not by W5). On the new shared checkout,
 the complete root FiveAM suite returned exit 0:
 
-    4706 checks: 4700 PASS, 6 intentional live-tmux SKIP, 0 FAIL
+    4707 checks: 4701 PASS, 6 intentional live-tmux SKIP, 0 FAIL
 
 This supersedes the immediately preceding root failure count,
 without erasing that earlier observation. The 10/10 W8 stress,
