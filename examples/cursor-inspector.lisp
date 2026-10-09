@@ -77,6 +77,9 @@
           (t 1))))
 
 (defun %display-width (line)
+  "Return an approximate number of terminal columns in LINE. Zero-width marks
+occupy none and wide glyphs occupy two; this is not a full Unicode grapheme
+renderer."
   (loop for c across line sum (%codepoint-width c)))
 
 (defun %inspected-cell (line column)
@@ -101,6 +104,9 @@ A combining mark joins the prior base; a wide cell owns both columns."
         (if clusters (car (last clusters)) (list " " 0 1)))))
 
 (defun %clamp-position (lines x y)
+  "Clamp X and Y to captured LINES, snapping X to the starting column of a
+grapheme-like cell; coordinates index snapshot rows, not the live terminal
+cursor."
   (let* ((row (max 0 (min y (max 0 (1- (length lines))))))
          (text (%plain-line (%raw-line lines row)))
          (width (%display-width text))
@@ -241,6 +247,8 @@ A combining mark joins the prior base; a wide cell owns both columns."
     (format nil "~:[ ~;>~] ~5,'0D │ ~A" selected (1+ row) preview)))
 
 (defun %style-at (raw column)
+  "Return the parsed SGR style plist active at screen COLUMN in RAW or NIL for
+unstyled, out-of-range, or unparseable cells; column widths are approximate."
   (handler-case
       (loop with x = 0
             for (fragment . style) in (parse-ansi-string raw)
@@ -250,7 +258,9 @@ A combining mark joins the prior base; a wide cell owns both columns."
             do (setf x next))
     (error () nil)))
 
-(defun %b2-focus-rows (line column) "Render the exact target column centered in a 3x3 frame, clipped at left edge." (let* ((cell (%inspected-cell line column)) (target (second cell)) (width (third cell)) (glyph (if (= width 1) (first cell) "◇")) (window-start (max 0 (- target 20))) (relative (- target window-start)) (has-left (> relative 0)) (left-column (if has-left (1- relative) 0)) (top-offset (make-string left-column :initial-element #\Space)) (prefix (%slice-columns line window-start left-column)) (suffix (%slice-columns line (+ target width 1) 34))) (list (concatenate 'string top-offset (if has-left "┌─┐" "─┐")) (concatenate 'string prefix (if has-left "│" "") glyph "│" suffix) (concatenate 'string top-offset (if has-left "└─┘" "─┘")))))
+(defun %b2-focus-rows (line column) "Produce a three-row B2 focus PREVIEW with selected cell in the same column,
+clipped at the left boundary. This is not a physical terminal overlay; wide
+glyphs use a placeholder." (let* ((cell (%inspected-cell line column)) (target (second cell)) (width (third cell)) (glyph (if (= width 1) (first cell) "◇")) (window-start (max 0 (- target 20))) (relative (- target window-start)) (has-left (> relative 0)) (left-column (if has-left (1- relative) 0)) (top-offset (make-string left-column :initial-element #\Space)) (prefix (%slice-columns line window-start left-column)) (suffix (%slice-columns line (+ target width 1) 34))) (list (concatenate 'string top-offset (if has-left "┌─┐" "─┐")) (concatenate 'string prefix (if has-left "│" "") glyph "│" suffix) (concatenate 'string top-offset (if has-left "└─┘" "─┘")))))
 
 (defun %b1-line (content)
   "One 72-cell tooltip row with exact left/right Unicode boundaries."
