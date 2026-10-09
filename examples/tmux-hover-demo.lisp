@@ -132,7 +132,7 @@
          (tmux? (state-ref state :tmux-enabled nil))
          (status (state-ref state :status-message nil)))
     `(:container
-       :id :tmux-hover-root
+       :id :tmux-hover-content
        :style (:display :flex :flex-direction :column :padding 1 :width 80 :height 10)
        :children
        ((:text :content ,(format nil "tmux-hover-demo ~A" (if tmux? "[TMUX]" "[NO-TMUX]")))

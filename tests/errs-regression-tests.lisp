@@ -142,12 +142,12 @@
          (init-fn (symbol-function (find-symbol "%INITIAL-STATE" pkg)))
          (update-fn (symbol-function (find-symbol "APP-UPDATE" pkg)))
          (state (funcall init-fn))
-         (components-before (copy-alist (getf state :components)))
+         (components-before (copy-alist (getf state :demo-components)))
          (result (funcall update-fn '(:dispatch-to-component :choices :down) state)))
     (is-true (typep result 'update-result))
-    (is (equal components-before (getf state :components))
-        "APP-UPDATE must not mutate the original :components alist in place.")
-    (is (eq :components (first (first (ur-patches result)))))
+    (is (equal components-before (getf state :demo-components))
+        "APP-UPDATE must not mutate the original demo-components alist in place.")
+    (is (equal '(:demo-components) (first (first (ur-patches result)))))
     (is (assoc :choices (second (first (ur-patches result)))))))
 
 (test input-selector-handles-list-and-typed-key-events-consistently
