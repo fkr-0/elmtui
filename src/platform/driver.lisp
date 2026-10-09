@@ -153,6 +153,9 @@
 (defvar *initial-render-done* nil
   "Tracks if the initial render has been performed after terminal size and cursor position are known.")
 
+(defvar *startup-presentation-deferred* nil
+  "Defer painting until startup events have reserved terminal viewport rows.")
+
 (defvar *last-cursor-pos* '(0 . 0)
   "Last known cursor position as a cons (row . col). Used for anchoring.")
 
@@ -384,8 +387,11 @@ This keeps compatibility with older examples that pass app instances."
                   (error (e)
                     (log-warn "DRIVER: apply-update-effects failed: ~A" e)))
 
-                ;; Render the current frame unless we're shutting down.
-                (unless elmtui.core.loop:*shutdown-requested*
+                ;; During terminal bootstrap, wait for both geometry and cursor
+                ;; before presenting; scroll reservation must precede the
+                ;; first frame or its cells will be stranded in scrollback.
+                (unless (or elmtui.core.loop:*shutdown-requested*
+                            *startup-presentation-deferred*)
                   (let ((ctx (make-context-from-spec app-spec next-model *backend*)))
                     (handler-case
                       (progn
@@ -720,6 +726,7 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
 (defun shutdown-platform ()
   (log:info "DRIVER: Shutting down platform...")
   (%set-runtime-phase :shutting-down :reason "shutdown-platform called")
+  (setf *startup-presentation-deferred* nil)
   (%clear-app-subscriptions)
   ;; Stop the input thread if a stop function is available
   (when *stop-input-fn*
@@ -817,6 +824,7 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
     *current-app-model* nil
     *root-viewport-id-path* nil
     *initial-render-done* nil
+    *startup-presentation-deferred* t
     *focus-manager* nil
     *preserve-underlay* nil
     *use-alternate-screen* nil
@@ -941,9 +949,12 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
           (%set-runtime-phase :awaiting-terminal-info :reason "model initialized")
           (let ((proc elmtui.core.globals:*app-message-processor*))
             (when proc
-              (%emit-startup-terminalresized *backend* proc)
-              (%emit-startup-cursorposition *backend* proc))
-            (%set-runtime-phase :running :reason "startup terminal signals delivered"))
+              ;; Establish the anchor before assigning viewport geometry so the
+              ;; first size update reserves the physical rows before painting.
+              (%emit-startup-cursorposition *backend* proc)
+              (%emit-startup-terminalresized *backend* proc))
+            (%set-runtime-phase :running :reason "startup terminal signals delivered")
+            (setf *startup-presentation-deferred* nil))
 
           ;; Always produce an initial frame even when startup messages do not trigger one.
           (unless *initial-render-done*
