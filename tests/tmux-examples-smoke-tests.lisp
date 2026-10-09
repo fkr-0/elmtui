@@ -32,11 +32,12 @@
   (is (fboundp (find-symbol "RUN-TMUX-HOVER-DEMO" (find-package :elmtui-examples.tmux-hover-demo))))
   (is (fboundp (find-symbol "RUN-TMUX-IDLE" (find-package :elmtui.examples.tmux-idle)))))
 
-(test tmux-hover-update-and-view-smoke
+(test tmux-hover-delegated-inspector-update-and-view-smoke
+  "The hover compatibility runner uses the maintained cursor-inspector model."
   (load-system :elmtui-examples)
-  (let* ((init-fn (%fn :elmtui-examples.tmux-hover-demo "%INITIAL-STATE"))
-         (update-fn (%fn :elmtui-examples.tmux-hover-demo "HOVER-UPDATE"))
-         (view-fn (%fn :elmtui-examples.tmux-hover-demo "HOVER-VIEW"))
+  (let* ((init-fn (%fn :elmtui-examples.cursor-inspector "INITIAL-INSPECTOR-STATE"))
+         (update-fn (%fn :elmtui-examples.cursor-inspector "CURSOR-INSPECTOR-UPDATE"))
+         (view-fn (%fn :elmtui-examples.cursor-inspector "CURSOR-INSPECTOR-VIEW"))
          (state (funcall init-fn))
          (result (funcall update-fn (make-key-event :key #\l) state))
          (view (funcall view-fn state)))
@@ -143,14 +144,14 @@
          (idle-wrapper (%fn :elmtui.examples.tmux-idle "RUN-TMUX-IDLE"))
          (hover-wrapper (%fn :elmtui-examples.tmux-hover-demo "RUN-TMUX-HOVER-DEMO"))
          (idle-runner-sym (find-symbol "RUN-TMUX-IDLE-APP" idle-pkg))
-         (hover-legacy-runner-sym (find-symbol "RUN-TMUX-HOVER-APP" hover-pkg))
+         (hover-inspector-runner-sym (find-symbol "RUN-TMUX-HOVER-INSPECTOR" hover-pkg))
          (inspector-runner-sym (find-symbol "RUN-CURSOR-INSPECTOR" inspector-pkg))
          (idle-orig (and idle-runner-sym (symbol-function idle-runner-sym)))
          (inspector-orig (and inspector-runner-sym (symbol-function inspector-runner-sym)))
          (idle-captured nil)
          (inspector-captured nil))
     (is (fboundp idle-runner-sym))
-    (is (fboundp hover-legacy-runner-sym))
+    (is (fboundp hover-inspector-runner-sym))
     (is (fboundp inspector-runner-sym))
     (unwind-protect
          (progn

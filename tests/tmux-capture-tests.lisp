@@ -577,3 +577,14 @@ cd" . nil))))
                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
                  buffer 0 7))))))
+
+(test styled-tmux-terminal-final-newline-is-not-an-extra-row
+  "Tmux capture-pane -p emits one newline per physical row including the last."
+  (let* ((buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 20 4))
+         (content (format nil "~C[31mROW-ALPHA~%ROW-BETA~%~%~%" #\Escape)))
+    (elmtui.platform.tmux:prefill-buffer-from-styled-content
+      buffer (parse-ansi-string content) 20 4)
+    (is (char= #\R (elmtui.platform.backend.common.virtual-buffer:buffer-char buffer 0 0)))
+    (is (char= #\R (elmtui.platform.backend.common.virtual-buffer:buffer-char buffer 1 0)))
+    (is (char= #\Space (elmtui.platform.backend.common.virtual-buffer:buffer-char buffer 2 0)))
+    (is (char= #\Space (elmtui.platform.backend.common.virtual-buffer:buffer-char buffer 3 0)))))

@@ -45,20 +45,21 @@ class SliderPTY(unittest.TestCase):
         return app
 
     def wait_for_overlay(self, app):
-        """Observe real rendered SGR output while rejecting alternate screen."""
+        "Require the actual ElmTUI frame and never enter alternate screen."
         deadline = time.monotonic() + Options.timeout
         while time.monotonic() < deadline:
             raw_path = app.directory / "terminal.raw"
             raw = raw_path.read_bytes() if raw_path.exists() else b""
-            self.assertNotIn(b"\x1b[?1049h", raw, "Slider entered alternate mode")
-            self.assertNotIn(b"\x1b[2J", raw, "Slider cleared pane contents")
-            if b"\x1b[0;1;38;2;235;255;255;48;2;16;126;182m" in raw:
+            self.assertNotIn(b"\x1b[?1049h", raw)
+            self.assertNotIn(b"\x1b[?1049l", raw)
+            self.assertNotIn(b"\x1b[2J", raw, "Do not clear the original pane")
+            if "TMUX / CYAN SHIFT" in app.screen():
                 return raw
             if (app.directory / "exit-code").exists():
-                self.fail("Slider exited before first painted frame: " +
+                self.fail("Slider exited before first visible ElmTUI frame: " +
                           (app.directory / "stderr.txt").read_text()[-1800:])
             time.sleep(.08)
-        self.fail("No in-place frame produced; stderr: " +
+        self.fail("No visible normal-buffer slider frame; stderr: " +
                   (app.directory / "stderr.txt").read_text()[-1800:])
 
     def await_exit(self, app):
@@ -145,7 +146,7 @@ class SliderPTY(unittest.TestCase):
         self.assertIn("SLIDER-FINITE-UNDERLAY", app.screen())
 
     def test_lossless_history_on_early_exit(self):
-        """The alternate-screen lifecycle must not displace main scrollback."""
+        """Normal-buffer overlay must not displace main scrollback."""
         gate = Options.output / "restore-gate"
         prelude = (
             'for n in $(seq -w 1 75); do printf "EX10-HISTORY-%s\\n" "$n"; done\n'

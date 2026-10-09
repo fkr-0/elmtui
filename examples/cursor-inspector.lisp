@@ -18,10 +18,17 @@
 
 (defvar *inspector-launch-title* "CURSOR INSPECTOR")
 
+(defun %visible-pane-lines (content) "Convert a tmux -p pane snapshot into rows, excluding its final delimiter." (let ((lines (uiop:split-string (or content "") :separator ' (#\Newline)))) (when (and lines (string= (car (last lines)) "")) (setf lines (butlast lines))) (coerce lines 'vector)))
+
 (defun %capture (mode)
+  "PANE means physical visible rows; SCREEN retains the entire scrollback."
   (if (tmux-available-p)
       (handler-case
-          (capture-lines :mode mode)
+          (if (eq mode :pane)
+              (%visible-pane-lines
+                (uiop:run-program '("tmux" "capture-pane" "-e" "-p")
+                                  :output :string))
+              (capture-lines :mode mode))
         (error () #()))
       #()))
 
@@ -130,7 +137,7 @@ A combining mark joins the prior base; a wide cell owns both columns."
      (declare (ignore progress))
      (handler-case
          (if (tmux-available-p)
-             (list :inspector-capture mode (capture-lines :mode mode))
+             (list :inspector-capture mode (%capture mode))
              (list :inspector-capture-error "tmux unavailable"))
        (error (condition)
          (list :inspector-capture-error (princ-to-string condition)))))
@@ -243,6 +250,15 @@ A combining mark joins the prior base; a wide cell owns both columns."
             do (setf x next))
     (error () nil)))
 
+(defun %b2-focus-rows (line column) "Render the exact target column centered in a 3x3 frame, clipped at left edge." (let* ((cell (%inspected-cell line column)) (target (second cell)) (width (third cell)) (glyph (if (= width 1) (first cell) "◇")) (window-start (max 0 (- target 20))) (relative (- target window-start)) (has-left (> relative 0)) (left-column (if has-left (1- relative) 0)) (top-offset (make-string left-column :initial-element #\Space)) (prefix (%slice-columns line window-start left-column)) (suffix (%slice-columns line (+ target width 1) 34))) (list (concatenate 'string top-offset (if has-left "┌─┐" "─┐")) (concatenate 'string prefix (if has-left "│" "") glyph "│" suffix) (concatenate 'string top-offset (if has-left "└─┘" "─┘")))))
+
+(defun %b1-line (content)
+  "One 72-cell tooltip row with exact left/right Unicode boundaries."
+  (let* ((clipped (%slice-columns content 0 68))
+         (padding (make-string (max 0 (- 68 (%display-width clipped)))
+                               :initial-element #\Space)))
+    (concatenate 'string "│ " clipped padding " │")))
+
 (defun cursor-inspector-view (state)
   (let* ((lines (state-ref state :lines #()))
          (row (state-ref state :cursor-y 0))
@@ -251,55 +267,62 @@ A combining mark joins the prior base; a wide cell owns both columns."
          (plain (%plain-line raw))
          (cell (%inspected-cell plain col))
          (glyph (first cell))
+         (style (%style-at raw col))
+         (b2 (%b2-focus-rows plain col))
          (mode (state-ref state :mode :pane))
+         (status (state-ref state :status "Ready"))
          (title (state-ref state :title "CURSOR INSPECTOR"))
          (tmux? (state-ref state :tmux-enabled nil))
-         (top (max 0 (min (- row 3) (max 0 (- (length lines) 7)))))
-         (style (%style-at raw col)))
+         (fg (getf style :fg))
+         (bg (getf style :bg))
+         (attrs (getf style :attrs)))
     `(:container :id :inspector-frame
-       :style (:display :flex :flex-direction :column :width 78 :height 15
-               :padding 1)
+       :style (:display :flex :flex-direction :column
+               :width 76 :height 12 :padding 0 :gap 0)
        :children
-       ((:text :content ,(format nil "~A ~A" title (if tmux? "[TMUX]" "[NO-TMUX]"))
+       ((:text :content ,(format nil "~A ~A  |  B2 focus / B1 style"
+                                 title (if tmux? "[TMUX]" "[NO-TMUX]"))
                :style (:fg-color :cyan :bold t))
-        (:text :content ,(format nil "PANE / SCREEN  │  ~A  │  ~D rows  │  viewport ~D-~D"
-                                (if (eq mode :pane) "PANE" "SCROLLBACK")
-                                (length lines) (1+ top)
-                                (min (length lines) (+ top 7))))
-        (:text :content ,(state-ref state :status "Ready")
+        (:text :content ,(%slice-columns
+                          (format nil "PANE / SCREEN: ~A  |  ~A"
+                                  (if (eq mode :pane) "PANE" "SCROLLBACK") status) 0 72)
                :style (:fg-color :yellow))
-        ,@(loop for i from top below (+ top 7)
-                collect `(:text :content ,(%snapshot-row lines i col (= i row))
-                         :style (:fg-color ,(if (= i row) :green :white))))
-        (:text :content ,(format nil "Cursor: (~D, ~D)  Cell: ~S  U+~4,'0X  Width: ~D"
-                                col row glyph (char-code (char glyph 0))
-                                (third cell)))
-        (:text :content ,(format nil "Line: ~D columns  Style: ~S  Clipped: ~A"
-                                (%display-width plain) style
-                                (if (> (%display-width plain) 66) "yes" "no")))
-        (:text :content "MOVE  arrows/hjkl PgUp/PgDn  │  p pane / s scrollback / m toggle")
-        (:text :content "r safe refresh  │  q/Esc quit  │  cached underlay never overwritten by UI")
-        (:text :content "INSPECT / terminal-cell snapshot • screen coordinates 0-based")))))
+        (:text :content ,(%slice-columns (%snapshot-row lines row col t) 0 72)
+               :style (:fg-color :green))
+        (:text :content ,(format nil "  ~A" (first b2))
+               :style (:fg-color :cyan))
+        (:text :content ,(format nil "  ~A" (second b2))
+               :style (:fg-color :white :bold t))
+        (:text :content ,(format nil "  ~A" (third b2))
+               :style (:fg-color :cyan))
+        (:text :content "┌─ B1 / GLYPH + STYLE ───────────────────────────────────────────┐"
+               :style (:fg-color :cyan))
+        (:text :content ,(%b1-line
+                          (format nil "Cursor: (~D, ~D)  Glyph: ~S U+~4,'0X  Cells: ~D"
+                                  col row glyph (char-code (char glyph 0)) (third cell)))
+               :style (:fg-color :white :bg-color :black))
+        (:text :content ,(%b1-line
+                          (format nil "FG: ~S  BG: ~S  Attrs: ~S  Parsed: ~S"
+                                  fg bg attrs style))
+               :style (:fg-color :white :bg-color :black))
+        (:text :content ,(%b1-line "Specimen: Aa Bb 0123  [] {}")
+               :style (:fg-color ,(if (keywordp fg) fg :white)
+                       :bg-color ,(if (keywordp bg) bg :black)))
+        (:text :content "└──────────────────────────────────────────────────────────────────────┘"
+               :style (:fg-color :cyan))
+        (:text :content "arrows/hjkl move | p pane / s scrollback | r refresh | q/Esc quit"
+               :style (:fg-color :yellow))))))
 
-(defapplication cursor-inspector-app
-  :root-viewport-id :root
-  :root-component-dsl
-  '(:root-viewport :id :root
-    :anchor :below-cursor
-    :width 80 :height 15 :blank-on-exit nil
-    :child-dsl-spec (:view nil))
-  :initial-state-fn #'initial-inspector-state
-  :update-fn #'cursor-inspector-update
-  :view-fn #'cursor-inspector-view)
+(defapplication cursor-inspector-app :root-viewport-id :root :root-component-dsl ' (:root-viewport :id :root :anchor :bottom-left :overflow-policy :truncate :width 80 :height 13 :blank-on-exit nil :child-dsl-spec (:view nil)) :initial-state-fn #'initial-inspector-state :update-fn #'cursor-inspector-update :view-fn #'cursor-inspector-view)
 
 (defun run-cursor-inspector (&key (prefill-from-tmux t)
-                                 (tmux-mode :pane) (backend-type :terminal)
-                                 (title "CURSOR INSPECTOR"))
-  "Cursor inspector; both entry points share this maintained implementation."
+                                  (tmux-mode :pane) (backend-type :terminal)
+                                  (title "CURSOR INSPECTOR"))
+  "Inspect the original pane in the normal screen buffer, never alternate."
   (let ((*inspector-launch-mode* tmux-mode)
         (*inspector-launch-title* title))
     (run-cursor-inspector-app
      :platform backend-type
      :platform-options (list :prefill-from-tmux prefill-from-tmux
                              :tmux-prefill-mode tmux-mode
-                             :use-alternate-screen t))))
+                             :use-alternate-screen nil))))

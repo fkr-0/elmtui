@@ -12,11 +12,70 @@
 (defun slider-update (message state) (cond ((or (%pressed message :q #\q #\Q :escape :esc #\Escape) (and (consp message) (eq (first message) :app-quit-requested))) (%patch :should-quit t)) ((%pressed message :space #\Space #\p #\P) (%patch :running (not (state-ref state :running t)))) ((%pressed message :left :arrow-left) (%patch :dx -1)) ((%pressed message :right :arrow-right) (%patch :dx 1)) ((%pressed message :up :arrow-up #\+) (%patch :period (max 0.035 (- (state-ref state :period 0.085) 0.02)))) ((%pressed message :down :arrow-down #\-) (%patch :period (min 0.5 (+ (state-ref state :period 0.085) 0.02)))) ((or (eq message :tick) (and (consp message) (eq (first message) :tick))) (if (state-ref state :running t) (let* ((next (1+ (state-ref state :tick 0))) (limit (state-ref state :max-frames nil))) (%patch :tick next :should-quit (and limit (>= next limit)))) (make-update-result))) (t (make-update-result))))
 (defun slider-subscriptions (state) "A paused slider has no timer and no periodic idle writes." (when (and (state-ref state :running t) (not (state-ref state :should-quit nil))) (list :timer (list :interval (state-ref state :period 0.085) :message ' (:tick)))))
 (defun %cell-presentation (snapshot x y tick dx) (let* ((cell (aref (getf snapshot :cells) y x)) (style (cdr cell)) (width (getf snapshot :width)) (height (getf snapshot :height)) (hud (format nil " TMUX / CYAN SHIFT | FRAME ~4,'0D | ~A | SPACE PAUSE Q QUIT " tick (if (plusp dx) "EAST" "WEST"))) (index (mod (* (abs dx) tick) (+ width 8))) (left (if (minusp dx) (- width index) index)) (band (- x left)) (active (and (> y 0) (< y (1- height)) (<= 0 band) (< band 8))) (hud-p (and (zerop y) (< x (length hud)))) (fg (cond (hud-p ' (236 245 255)) (active ' (240 251 255)) (t (getf style :fg)))) (bg (cond (hud-p ' (38 35 94)) (active (cond ((or (= band 0) (= band 7)) ' (46 212 249)) ((evenp band) ' (55 46 132)) (t ' (32 102 153)))) (t (getf style :bg)))) (attrs (if (or active hud-p) ' (:bold) (getf style :attrs)))) (values (if hud-p (char hud x) (car cell)) fg bg attrs)))
-(defun %line-children (snapshot y tick dx) (let* ((width (getf snapshot :width)) (output nil) (start 0) (previous nil) (chars (make-string width :initial-element #\Space))) (labels ((flush-run (end style) (when (> end start) (push (list :text :id (intern (format nil "SLIDER-~D-~D" y start) :keyword) :content (subseq chars start end) :style (list :width (- end start) :height 1 :fg-color (first style) :bg-color (second style) :bold (and (member :bold (third style)) t) :italic (and (member :italic (third style)) t) :underline (and (member :underline (third style)) t))) output)))) (loop for x below width do (multiple-value-bind (ch fg bg attrs) (%cell-presentation snapshot x y tick dx) (setf (aref chars x) ch) (let ((style (list fg bg attrs))) (unless (or (null previous) (equal previous style)) (flush-run x previous) (setf start x)) (setf previous style)))) (flush-run width previous)) (nreverse output)))
-(defun slider-rows (snapshot tick dx) "Pure DSL frame: render untouched snapshot glyphs with a transient color band." (loop for y from 0 below (getf snapshot :height) collect (list :container :id (intern (format nil "SLIDER-ROW-~D" y) :keyword) :style (list :display :flex :flex-direction :row :height 1 :width (getf snapshot :width) :padding 0 :gap 0) :children (%line-children snapshot y tick dx))))
-(defun slider-view (state) (let* ((snap (state-ref state :snapshot *slider-snapshot*)) (width (getf snap :width)) (height (getf snap :height))) (list :container :id :slider-frame :style (list :display :flex :flex-direction :column :width width :height height :padding 0 :gap 0) :children (slider-rows snap (state-ref state :tick 0) (state-ref state :dx 1)))))
-(defun %initial-state () (list :snapshot *slider-snapshot* :tick 0 :dx 1 :running t :period *slider-initial-speed* :max-frames *slider-max-frames* :should-quit nil))
-(defapplication tmux-slider-app :root-viewport-id :tmux-slider-root :root-component-dsl ' (:root-viewport :id :tmux-slider-root :anchor :top-left :width 100 :height 35 :overflow-policy :truncate :blank-on-exit nil :child-dsl-spec (:view nil)) :initial-state-fn #'%initial-state :update-fn #'slider-update :view-fn #'slider-view :subscriptions-fn slider-subscriptions)
+(defun %line-children (snapshot y tick dx)
+  "Render original glyphs and transient style runs; avoid right-edge autowrap."
+  (let* ((width (max 0 (1- (getf snapshot :width))))
+         (output nil) (start 0) (previous nil)
+         (chars (make-string width :initial-element #\Space)))
+    (labels ((flush-run (end style)
+               (when (> end start)
+                 (push (list :text
+                             :id (intern (format nil "SLIDER-~D-~D" y start) :keyword)
+                             :content (subseq chars start end)
+                             :style (list :width (- end start) :height 1
+                                          :white-space :nowrap
+                                          :fg-color (first style)
+                                          :bg-color (second style)
+                                          :bold (and (member :bold (third style)) t)
+                                          :italic (and (member :italic (third style)) t)
+                                          :underline (and (member :underline (third style)) t)))
+                       output))))
+      (loop for x below width do
+        (multiple-value-bind (ch fg bg attrs)
+            (%cell-presentation snapshot x y tick dx)
+          (setf (aref chars x) ch)
+          (let ((style (list fg bg attrs)))
+            (unless (or (null previous) (equal previous style))
+              (flush-run x previous)
+              (setf start x))
+            (setf previous style))))
+      (flush-run width previous))
+    (nreverse output)))
+(defun slider-rows (snapshot tick dx)
+  "One logical row per captured pane row, with a spare rightmost cell."
+  (loop for y below (getf snapshot :height)
+        collect (list :container
+                      :id (intern (format nil "SLIDER-ROW-~D" y) :keyword)
+                      :style (list :display :flex :flex-direction :row
+                                   :height 1
+                                   :width (max 0 (1- (getf snapshot :width)))
+                                   :padding 0 :gap 0)
+                      :children (%line-children snapshot y tick dx))))
+(defun slider-view (state)
+  (let* ((snap (state-ref state :snapshot *slider-snapshot*))
+         (width (getf snap :width))
+         (height (getf snap :height)))
+    (list :container :id :slider-frame
+          :style (list :display :flex :flex-direction :column
+                       :width width :height height :padding 0 :gap 0)
+          :children (slider-rows snap (state-ref state :tick 0)
+                                  (state-ref state :dx 1)))))
+(defun %initial-state ()
+  (list :snapshot *slider-snapshot* :tick 0 :dx 1
+        :running t :period *slider-initial-speed*
+        :max-frames *slider-max-frames* :should-quit nil))
+(defapplication tmux-slider-app
+  :root-viewport-id :tmux-slider-root
+  :root-component-dsl
+  '(:root-viewport :id :tmux-slider-root
+    :anchor :top-left
+    :width 100 :height 35
+    :overflow-policy :truncate :blank-on-exit nil
+    :child-dsl-spec (:view nil))
+  :initial-state-fn #'%initial-state
+  :update-fn #'slider-update
+  :view-fn #'slider-view
+  :subscriptions-fn slider-subscriptions)
 (defun %slider-color-sgr (color background)
   "Encode parsed 8/256/true-color tmux styles without guessing color structs."
   (cond
@@ -70,6 +129,21 @@
             do (%slider-paint-cell snapshot x y highlighted)))
     (format t "~C8" #\Escape)
     (finish-output)))
+(defun %slider-hud (snapshot frame)
+  "Paint one bounded HUD row without newline, scroll or right-edge wrap."
+  (when (> (getf snapshot :width) 1)
+    (let* ((label (format nil " TMUX / CYAN SHIFT | FRAME ~4,'0D | SPACE PAUSE Q QUIT " frame))
+           (text (subseq label 0 (min (length label) (1- (getf snapshot :width))))))
+      (format t "~C[1;1H~C[0;1;38;2;235;255;255;48;2;38;35;94m~A~C[0m~C8"
+              #\Escape #\Escape text #\Escape #\Escape)
+      (finish-output))))
+(defun %slider-restore-hud (snapshot)
+  "Restore the HUD's original captured glyphs and SGR attributes."
+  (when (> (getf snapshot :width) 1)
+    (loop for x below (min (1- (getf snapshot :width)) 57)
+          do (%slider-paint-cell snapshot x 0 nil))
+    (format t "~C8" #\Escape)
+    (finish-output)))
 (defun %run-slider-overlay (snapshot speed frames)
   "Move a transient color band through the preserved tmux pane.
 No alternate buffer, newline, scroll or clear is ever requested."
@@ -89,6 +163,7 @@ No alternate buffer, newline, scroll or clear is ever requested."
          (progn
            (sb-posix:tcsetattr 0 sb-posix:tcsanow working)
            (%slider-band snapshot offset t)
+           (%slider-hud snapshot 0)
            (loop
              (sleep (if paused 0.04 speed))
              (let ((key (when (listen *standard-input*)
@@ -104,23 +179,25 @@ No alternate buffer, newline, scroll or clear is ever requested."
                (%slider-band snapshot offset nil)
                (setf offset (mod (+ offset step width) width))
                (%slider-band snapshot offset t)
+               (%slider-hud snapshot (1+ count))
                (incf count)
                (when (and frames (>= count frames)) (return)))))
       (%slider-band snapshot offset nil)
+      (%slider-restore-hud snapshot)
       (sb-posix:tcsetattr 0 sb-posix:tcsanow saved)
       (format t "~C[0m~C8" #\Escape #\Escape)
       (finish-output))))
 (defun run-tmux-slider (&key (backend-type :terminal) (speed 0.085) frames)
-  "Animate a styled translucent band in place; restore exact pane content on exit."
-  (unless (eq backend-type :terminal)
-    (error "Tmux slider requires the terminal backend."))
+  "Glide over the real pane in its normal buffer; never use alternate-screen."
+  (declare (ignore backend-type))
   (unless (tmux-available-p)
-    (format *error-output*
-            "tmux-slider requires a live tmux pane; no terminal state was changed.~%")
+    (format *error-output* "tmux-slider requires a live tmux pane; no terminal state was changed.~%")
     (return-from run-tmux-slider nil))
   (let ((snapshot (%capture-styled-pane)))
     (unless snapshot
-      (format *error-output*
-              "tmux-slider: styled pane capture failed; terminal left untouched.~%")
+      (format *error-output* "tmux-slider: styled pane capture failed; terminal left untouched.~%")
       (return-from run-tmux-slider nil))
+    ;; The native multi-run ElmTUI presenter remains under qualification.
+    ;; The direct normal-buffer painter is deterministic and restores every
+    ;; affected physical cell without a secondary screen or history writes.
     (%run-slider-overlay snapshot (max 0.035 (min 0.5 speed)) frames)))

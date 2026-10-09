@@ -541,17 +541,22 @@ Combining marks cannot be represented by the existing cell abstraction."
       (t 1))))
 
 (defun %walk-styled-cells (runs width writer)
-  "Traverse styled RUNS as terminal rows; WRITER may be NIL for counting.
-Only decoded text reaches WRITER, never raw ANSI control sequences."
+  "Traverse styled RUNS as physical terminal rows. A final capture-pane
+newline terminates the final row; it does not create a phantom extra row."
   (let ((row 0)
-        (col 0))
+        (col 0)
+        (final-run (find-if (lambda (item) (plusp (length (car item))))
+                            runs :from-end t)))
     (when (plusp width)
       (dolist (run runs)
         (loop for ch across (car run)
+              for offset from 0
               do (cond
                    ((char= ch #\Newline)
-                    (incf row)
-                    (setf col 0))
+                    (unless (and (eq run final-run)
+                                 (= offset (1- (length (car run)))))
+                      (incf row)
+                      (setf col 0)))
                    ((char= ch #\Return)
                     (setf col 0))
                    ((char= ch #\Tab)

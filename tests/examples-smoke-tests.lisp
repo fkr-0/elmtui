@@ -30,7 +30,6 @@
     ("rainbow-app" "RAINBOW-EXAMPLE-APP")
     ("root-viewport-test-app" "ROOT-VIEWPORT-TEST-APP")
     ("scroll-panel-demo" "SCROLL-PANEL-DEMO-APP")
-    ("tmux-hover-demo" "TMUX-HOVER-APP")
     ("tmux-idle-screensaver" "TMUX-IDLE-APP")
     ("wifi-menu" "WIFI-MENU-APP")))
 
@@ -107,6 +106,14 @@
           "Example ~A root DSL must carry an :id." name)
       (is (and view-fn (fboundp view-fn))
           "Example ~A must expose a callable wrapped view function." name))))
+
+(test tmux-hover-wrapper-delegates-to-maintained-inspector
+  "Hover is a compatibility runner; cursor-inspector owns the one TEA app."
+  (asdf:load-system "elmtui-examples")
+  (%assert-example-loads-and-has-entry "tmux-hover-demo")
+  (let* ((pkg (%example-package "tmux-hover-demo"))
+         (runner (find-symbol "RUN-TMUX-HOVER-INSPECTOR" pkg)))
+    (is (and runner (fboundp runner)))))
 
 (test maintained-examples-load
   (asdf:load-system "elmtui")
