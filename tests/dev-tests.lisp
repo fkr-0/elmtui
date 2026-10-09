@@ -51,7 +51,7 @@
                                 (lambda (subdir)
                                   (member (string-downcase
                                            (car (last (pathname-directory subdir))))
-                                          '("dev" "tools")
+                                          '("dev" "tools" "workbench")
                                           :test #'string=))
                                 (uiop:subdirectories directory))))))
       (walk src-root))))

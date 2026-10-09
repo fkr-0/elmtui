@@ -70,6 +70,18 @@ The project follows semantic versioning from the first published release.
 
 ### Fixed
 
+- Fixed root-viewport readiness when terminal geometry is known but an
+  initial cursor event or first-ready cleanup transition has not completed.
+  Corrected below-cursor overflow accounting and shutdown scroll restoration.
+- Initial terminal cursor probing now falls back to the tracked cl-inputs
+  device coordinates when the routed query is unavailable, preserving
+  one-based cursor events for root-viewport anchoring.
+- Updated the DEFAPPLICATION render regression to compare frames through the
+  resizing-aware presentation interface, and terminal shutdown regression
+  to verify cl-inputs cleanup rather than obsolete stty subprocess handling.
+- Scoped mainline runtime hygiene tests to exclude the separate optional Lisp
+  workbench, where package introspection and defensive documentation probes
+  are expected.
 - Eliminated process-wide first-render state from frame comparisons, including
   independent initial frames and resize handling for multiple presenters.
 
