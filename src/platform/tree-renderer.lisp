@@ -206,17 +206,19 @@ behavior for compatibility."
            (%render-string-content
             fallback buffer x y w h style white-space)))))))
 
+(defvar *absolute-layout-rectangles-p* nil
+  "Pipeline lists have absolute layout rects; direct legacy node tests use local rects.")
+
 (defun render-node (node buffer parent-x parent-y &optional inherited-clip)
+  "Paint nodes according to the active layout rectangle coordinate contract."
   (log-debug "Rendering node ~A of type ~A, typep ~A"
-             node
-             (type-of node)
-             (typep node 'base-element))
+             node (type-of node) (typep node 'base-element))
   (if (listp node)
       (dolist (n node)
         (render-node n buffer parent-x parent-y inherited-clip))
       (if (typep node 'base-element)
           (let ((rect (elmtui.view.element:el/layout-rect node)))
-            (log-debug "Rendering node ~A at parent pos (~A, ~A) with rect ~A"
+            (log-debug "Rendering node ~A with canvas origin (~A, ~A) rect ~A"
                        node parent-x parent-y rect)
             (when rect
               (let* ((abs-x (+ parent-x (x rect)))
@@ -240,12 +242,19 @@ behavior for compatibility."
                            (child-clip
                              (%child-render-clip node inherited-clip content-rect)))
                       (dolist (child (elmtui.view.element:el/children node))
-                        (render-node child buffer abs-x abs-y child-clip))))))))
-          (log-debug "Skipping non-element node ~A of type ~A" node (type-of node)))))
+                        (render-node
+                         child buffer
+                         (if *absolute-layout-rectangles-p* parent-x abs-x)
+                         (if *absolute-layout-rectangles-p* parent-y abs-y)
+                         child-clip))))))))
+          (log-debug "Skipping non-element node ~A of type ~A"
+                     node (type-of node)))))
 
-(defun render-laid-out-tree-to-buffer (laid-out-tree &key buffer (origin-x 0) (origin-y 0) (clear-buffer-p t))
+(defun render-laid-out-tree-to-buffer
+    (laid-out-tree &key buffer (origin-x 0) (origin-y 0) (clear-buffer-p t))
   (check-type buffer virtual-terminal-buffer)
-  (when clear-buffer-p
-    (clear-buffer buffer))
-  (render-node laid-out-tree buffer origin-x origin-y)
-  buffer)
+  (let ((*absolute-layout-rectangles-p* (listp laid-out-tree)))
+    (when clear-buffer-p
+      (clear-buffer buffer))
+    (render-node laid-out-tree buffer origin-x origin-y)
+    buffer))

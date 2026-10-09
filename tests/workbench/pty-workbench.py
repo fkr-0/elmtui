@@ -53,6 +53,7 @@ def launch(size):
 def capture(master, seconds, until=None, maximum=400000):
     deadline = time.monotonic() + seconds
     payload = bytearray()
+    query_tail = b""
     while time.monotonic() < deadline and len(payload) < maximum:
         readable, _, _ = select.select([master], [], [], min(.09, max(0, deadline - time.monotonic())))
         if readable:
@@ -63,6 +64,12 @@ def capture(master, seconds, until=None, maximum=400000):
             if not chunk:
                 break
             payload.extend(chunk)
+            # A real terminal answers cursor-position requests. The PTY
+            # harness must do the same for below-cursor anchoring.
+            probe = query_tail + chunk
+            for _ in range(probe.count(b"\x1b[6n")):
+                os.write(master, b"\x1b[1;1R")
+            query_tail = probe[-3:]
         if until is not None and until in payload:
             break
     return bytes(payload)
@@ -86,13 +93,16 @@ def exercise(size, folder):
         # The first header can precede the complete frame and the input loop.
         # Wait for the status line instead of sending keystrokes during setup.
         output.extend(capture(master, 8, b"Ready  |"))
+        must(b"\x1b[?1049h" not in output and b"\x1b[?1049l" not in output,
+             "no alternate-screen transitions", output)
         must(b"Lisp Workbench" in output, "startup frame", output)
         must(b"Transcript (0)" in output, "transcript title", output)
         must(b"> |" in output, "editor prompt", output)
         must(b"Ready  |" in output, "startup status", output)
         if size[0] >= 120:
             must(b"IMAGE / PACKAGES" in output, "wide inspector", output)
-        must(b"\x1b[?1049h" in output, "alternate-screen enter", output)
+        must(b"\x1b[?1049h" not in output and b"\x1b[?1049l" not in output,
+             "no alternate-screen transitions", output)
         output.extend(capture(master, .25))
         os.write(master, b"(+ 1 2)\r")
         # Frame diffs are fragmented; the submitted source is not guaranteed
@@ -114,8 +124,9 @@ def exercise(size, folder):
         os.write(master, b"\x7f" * 4)
         output.extend(capture(master, .3))
         os.write(master, b"\x04")
-        output.extend(capture(master, 3, b"\x1b[?1049l"))
-        must(b"\x1b[?1049l" in output, "alternate-screen restore", output)
+        output.extend(capture(master, 3))
+        must(b"\x1b[?1049h" not in output and b"\x1b[?1049l" not in output,
+             "normal-screen exit without alternate buffer", output)
         must(process.wait(timeout=2) == 0, "clean Ctrl+D exit", output)
         folder.mkdir(parents=True, exist_ok=True)
         trace = folder / f"{size[0]}x{size[1]}.trace"
