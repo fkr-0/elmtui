@@ -133,10 +133,7 @@
   :view-fn #'hover-view)
 
 (defun run-tmux-hover-demo (&key (backend-type :terminal) (mode :pane))
-  (log-info "tmux-hover-demo: start backend=~S mode=~S" backend-type mode)
-  (run-tmux-hover-app
-   :platform backend-type
-   :platform-options (list :prefill-from-tmux t
-                           :tmux-prefill-mode mode)))
+  "Run the unified tmux inspector while keeping the legacy app API available."
+  (run-tmux-hover-inspector :backend-type backend-type :mode mode))
 
 (defun run-tmux-hover-inspector (&key (backend-type :terminal) (mode :pane)) "Run the unified cursor inspector without changing the legacy hover app." (elmtui-examples.cursor-inspector:run-cursor-inspector :backend-type backend-type :tmux-mode mode :title "tmux-hover-demo"))
