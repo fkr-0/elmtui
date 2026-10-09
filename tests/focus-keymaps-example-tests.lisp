@@ -66,11 +66,9 @@
   (run! :focus/keymaps/example))
 
 (test typed-focus-state-dispatches-keys-and-allows-unbound-context
-  "DEFAPPLICATION's typed model must expose its focused component keymap."
-  (asdf:load-system :elmtui-examples)
-  (let* ((package (find-package :elmtui.examples.focus-simple))
-         (init (find-symbol "INITIALIZE-APP-STATE-FOCUS-SIMPLE-APP" package))
-         (state (funcall (symbol-function init)))
+  "The typed cl-state model must expose the focused component keymap."
+  (let* ((state (cl-state.core:make-state
+                 :initial (%copy-focus-fixture-state) :backend :plist))
          (seen nil)
          (elmtui.keymaps::*active-contexts* nil))
     (is-true (process-key-event
