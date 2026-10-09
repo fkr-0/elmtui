@@ -100,11 +100,15 @@ is normalized to an empty subscription function."
     (symbol   (intern (string-upcase x) "KEYWORD"))
     (string   (intern (string-upcase x) "KEYWORD"))))
 (defgeneric get-component-instance (id-path state)
+  (:documentation "Resolve a component ID path against an APPLICATION-STATE.
+ID-PATH accepts a scalar keyword, symbol or string, or a list of segments;
+:COMPONENTS is an optional leading path segment. Invalid states signal TYPE-ERROR.")
   (:method ((id-path list) (state application-state))
     "Retrieve a component instance from STATE by following ID-PATH."
-    (let* ((path-keys (if (eq :components (car id-path))
-                          (rest id-path)
-                          id-path))
+    (let* ((normalized-path (mapcar #'%kw id-path))
+           (path-keys (if (eq :components (car normalized-path))
+                          (rest normalized-path)
+                          normalized-path))
            (components-root (get-path :components state))
            ;; (id-path (if (listp id-path)
            ;;              (if (eql (first id-path) :components)
@@ -132,6 +136,7 @@ is normalized to an empty subscription function."
 
 (defmethod get-component-instance ((id-path t) (state t))
   "Retrieve a component instance by ID path symbol."
+  (check-type state application-state)
   (let ((idp
           (if (listp id-path)
               (mapcar #'%kw id-path)
@@ -181,16 +186,29 @@ is normalized to an empty subscription function."
 ;;; See src/ui/dsl-resolution.lisp for the new implementation.
 
 (defun validate-platform-options (platform platform-options)
-  "Validate PLATFORM-OPTIONS for the given PLATFORM, signalling an error on invalid keys."
+  "Validate a proper PLATFORM-OPTIONS keyword/value plist for PLATFORM."
   (declare (type symbol platform) (type list platform-options))
   (check-type platform-options list)
-  (dolist (key (loop for (k v) on platform-options by #'cddr collect k))
+  (unless (evenp (length platform-options))
+    (error "Platform options for ~S must contain key/value pairs: ~S" platform platform-options))
+  (loop for (key value) on platform-options by #'cddr do
     (unless (member key '(:initial-terminal-dimensions
                           :initial-cursor-position
                           :input-mode
                           :enable-mouse-support
                           :disable-mouse-support
                           :timeout
-                          :motion-events-p)
+                          :motion-events-p
+                          :prefill-from-tmux
+                          :tmux-prefill-mode
+                          :signal-keys-as-input
+                          :use-alternate-screen)
                     :test #'eq)
-      (error "Invalid platform option ~S for platform ~S" key platform))))
+      (error "Invalid platform option ~S for platform ~S" key platform))
+    (when (eq key :tmux-prefill-mode)
+      (unless (member value '(:pane :screen))
+        (error "Invalid tmux prefill mode ~S; expected :PANE or :SCREEN." value)))
+    (when (member key '(:prefill-from-tmux :signal-keys-as-input))
+      (check-type value boolean))
+    (when (and (eq key :use-alternate-screen) value)
+      (error "Alternate-screen mode is unsupported; normal scrollback must be preserved."))))

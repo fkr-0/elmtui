@@ -45,7 +45,7 @@ The API modules are loaded in the following order in the ASDF system:
 
 ## Platform Options Validation
 
-Platform options used by applications are validated during initialization. Valid options include:
+`elmtui.app.api:validate-platform-options` is an explicit validation helper for platform option plists. It checks even-length key/value structure, recognized keys, and selected values. It is **not currently called automatically** by every runtime entry point; the driver independently rejects alternate-screen mode before initialization. Call the helper when accepting externally supplied options. Valid keys include:
 
 - `:initial-terminal-dimensions`: Terminal size (width, height)
 - `:initial-cursor-position`: Starting cursor position (x, y)
@@ -54,8 +54,16 @@ Platform options used by applications are validated during initialization. Valid
 - `:disable-mouse-support`: Whether to disable mouse events
 - `:timeout`: Operation timeout value
 - `:motion-events-p`: Whether to report motion events
+- `:prefill-from-tmux`: Boolean; capture tmux content before rendering
+- `:tmux-prefill-mode`: Either `:pane` or `:screen`
+- `:signal-keys-as-input`: Boolean; forward signal keys as input events
+- `:use-alternate-screen`: Only `NIL` is supported; a true value is rejected to preserve normal scrollback
 
-The validation happens in `elmtui.app.api:validate-platform-options`, which is called from the application initialization process.
+Invalid keys, malformed pairs, unsupported tmux prefill modes, and non-boolean capture/input flags signal conditions rather than being silently accepted.
+
+## Component Instance Lookup
+
+`elmtui.app.api:get-component-instance` accepts an ID path as a keyword, symbol, string, or list of path segments. List segments are normalized to keywords consistently with scalar lookups, and the leading `:components` root is optional. The state argument must be a `cl-state.core:application-state`; invalid state objects signal `TYPE-ERROR` rather than recursively redispatching.
 
 ## Notes for Developers
 
