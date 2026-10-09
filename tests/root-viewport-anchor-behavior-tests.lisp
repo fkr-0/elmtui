@@ -18,6 +18,21 @@
 (def-suite elmtui/root-vp/behavior)
 (in-suite elmtui/root-vp/behavior)
 
+(test below-cursor-bottom-row-reserves-every-viewport-row
+  "For a zero-indexed last-row cursor, there are no rows below the cursor."
+  (multiple-value-bind (height issued commands)
+      (elmtui.ui.widgets.root-viewport::%overflow-effects
+       :below-cursor 20 35 34 :scroll 0)
+    (is (null height))
+    (is (= 20 issued))
+    (is (equal '((:render :scroll-down 20)) commands)))
+  (multiple-value-bind (height issued commands)
+      (elmtui.ui.widgets.root-viewport::%overflow-effects
+       :below-cursor 20 35 33 :scroll 0)
+    (is (null height))
+    (is (= 19 issued))
+    (is (equal '((:render :scroll-down 19)) commands))))
+
 (defclass root-vp-mock-child (elmtui.ui.api:component) ())
 
 (defmethod elmtui.ui.dsl-resolution:dsl-type ((type (eql :root-vp-mock-child)) &optional props)
