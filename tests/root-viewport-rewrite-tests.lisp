@@ -187,19 +187,19 @@ PATH is a list of keywords like (:app :rv :width)."
     st))
 
 (test overflow-below-cursor-scroll
-  ;; rows=20, cursor row=20 (1-based) → 1 row remaining; height=4 => need scroll-down 3.
+  ;; rows=20, cursor row=20 (1-based) → 0 rows below; height=4 => scroll 4.
   (let* ((st (%mk-state-for-overflow :below-cursor 20 80 20 0 30 4))
           (st-path '(:app :rv))
           (state (%plist-put-in '() st-path st))
           (ctx (%make-test-ctx st-path state)))
     (multiple-value-bind (patches commands)
       (%apply-overflow-y ctx :scroll 0 0)
-      (is (find '(:render :scroll-down 3) commands :test #'equal)
+      (is (find '(:render :scroll-down 4) commands :test #'equal)
         "Below-cursor + overflow :scroll → issue :scroll-down by the deficit.")
       (is (some (lambda (p) (and (equal (first p) (append st-path '(:issued-scroll-net)))
-                              (= (second p) 3)))
+                              (= (second p) 4)))
             patches)
-        "Issued scroll net must accumulate by 3."))))
+        "Issued scroll net must accumulate by 4."))))
 
 (test overflow-below-cursor-truncate
   ;; Same geometry, but policy :truncate → height becomes 1; no commands.
