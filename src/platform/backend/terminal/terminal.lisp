@@ -231,7 +231,8 @@
     (values (and data (1- (getf data :row)))
             (and data (1- (getf data :column))))))
 
-(defun make-terminal-instance-for-device (&key device publish-fn (initial-clear nil))
+(defun make-terminal-instance-for-device (&key device publish-fn (initial-clear nil)
+                                             (signal-keys-as-input nil))
   "Construct a terminal-instance around a cl-inputs DEVICE."
   (declare (ignore initial-clear))
   (let ((stream (or (and device (device-output-stream device))
@@ -241,6 +242,15 @@
                       :cl-device device
                       :input-source (and device (cl-inputs.api:make-ready-input-source :device device))
                       :publish-fn publish-fn)))
+      ;; The input source already saved original termios for restoration.
+      ;; Opt in before UI startup; default SIGINT behavior is unchanged.
+      (when signal-keys-as-input
+        (let* ((input (cl-inputs.device.api:device-input-stream device))
+               (fd (sb-sys:fd-stream-fd input))
+               (attrs (sb-posix:tcgetattr fd)))
+          (setf (sb-posix:termios-lflag attrs)
+                (logand (sb-posix:termios-lflag attrs) (lognot sb-posix:isig)))
+          (sb-posix:tcsetattr fd sb-posix:tcsanow attrs)))
       (let* ((row 0)
              (col 0)
              (width 80)
@@ -377,11 +387,14 @@
   (apply #'initialize-backend :tty initargs))
 
 (defmethod initialize-backend ((backend-type (eql :tty))
-                                &key publish-fn (tty-path "/dev/tty") (device nil) (initial-clear nil) &allow-other-keys)
+                                &key publish-fn (tty-path "/dev/tty") (device nil) (initial-clear nil)
+                                     (signal-keys-as-input nil) &allow-other-keys)
   (handler-case
     (let ((dev (or device (cl-inputs.device.api:make-device :tty :path tty-path))))
       (log-info "TERMINAL: Initialized backend using cl-inputs device at ~A" tty-path)
-      (make-terminal-instance-for-device :device dev :publish-fn publish-fn :initial-clear initial-clear))
+      (make-terminal-instance-for-device :device dev :publish-fn publish-fn
+                                         :initial-clear initial-clear
+                                         :signal-keys-as-input signal-keys-as-input))
     (error (e)
       (format t "TERMINAL: Initialization Error: ~A~%" e)
       (format t "~{~A~%~}" (uiop:print-backtrace))
