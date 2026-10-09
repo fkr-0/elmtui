@@ -1,0 +1,303 @@
+{
+  "schema": "elmtui.workbench.qualification-matrix/v1",
+  "generatedOn": "2026-10-09",
+  "description": "Contract cases, not execution results. QA worker must implement actual tests and replace not-run statuses only with evidence.",
+  "terminalSizes": [
+    {
+      "cols": 80,
+      "rows": 24
+    },
+    {
+      "cols": 120,
+      "rows": 40
+    },
+    {
+      "cols": 160,
+      "rows": 50
+    }
+  ],
+  "lanes": [
+    "editor",
+    "eval",
+    "completion",
+    "inspector",
+    "integration"
+  ],
+  "kinds": [
+    "unit",
+    "pty",
+    "static"
+  ],
+  "cases": [
+    {
+      "id": "editor-multiline-defun",
+      "lane": "editor",
+      "kind": "unit",
+      "scenario": "Incomplete defun remains in editor; complete form submits only on explicit valid boundary",
+      "oracle": "editor state transitions and source equality",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "editor-quoted-brackets",
+      "lane": "editor",
+      "kind": "unit",
+      "scenario": "Nested quasiquote, strings, comments, escaped delimiters do not break multiline detection",
+      "oracle": "reader-aware completeness regression",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "editor-unicode-display",
+      "lane": "editor",
+      "kind": "unit",
+      "scenario": "Wide glyph, combining marks, emoji and cursor vertical movement use display-cell coordinates",
+      "oracle": "assert expected row and screen column",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "editor-undo-history",
+      "lane": "editor",
+      "kind": "unit",
+      "scenario": "Undo, yank and history navigation never lose unsent draft",
+      "oracle": "state snapshot before and after navigation",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "editor-paste-controls",
+      "lane": "editor",
+      "kind": "pty",
+      "scenario": "Multiline pasted input with embedded tabs/newlines remains unchanged and never triggers unexpected EVAL",
+      "oracle": "capture buffer and request count",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "eval-persistent-image",
+      "lane": "eval",
+      "kind": "unit",
+      "scenario": "Defparameter and defun persist across independently scheduled evaluations",
+      "oracle": "subsequent source reads earlier definitions",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "eval-package-context",
+      "lane": "eval",
+      "kind": "unit",
+      "scenario": "In-package persists while unrelated worker context does not leak",
+      "oracle": "current package assertions",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "eval-multiple-values",
+      "lane": "eval",
+      "kind": "unit",
+      "scenario": "Multiple values are returned with CL REPL history variables preserved",
+      "oracle": "ordered typed value events",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "eval-streams",
+      "lane": "eval",
+      "kind": "unit",
+      "scenario": "stdout, stderr and nonlocal conditions captured without terminal side effects",
+      "oracle": "tagged event order and no unsolicited writes",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "eval-cancel-race",
+      "lane": "eval",
+      "kind": "unit",
+      "scenario": "Cancel pending/running EVAL, then execute next expression without stale output overwriting UI",
+      "oracle": "request IDs, bounded completion and late-result rejection",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "eval-infinite-loop",
+      "lane": "eval",
+      "kind": "pty",
+      "scenario": "Long-running evaluation does not freeze keystrokes or prevent user-visible cancel",
+      "oracle": "bounded Ctrl+C response with documented limitations",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "completion-incomplete",
+      "lane": "completion",
+      "kind": "unit",
+      "scenario": "Incomplete source, package qualification and reader strings/comments safely produce candidates or empty result",
+      "oracle": "candidate insertion spans and no eval side effects",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "completion-rotation",
+      "lane": "completion",
+      "kind": "unit",
+      "scenario": "Candidate ranking and selection changes use stable identity and generation",
+      "oracle": "deterministic ordering",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "completion-stale-generation",
+      "lane": "completion",
+      "kind": "unit",
+      "scenario": "Out-of-order async results and stale doc timers are ignored",
+      "oracle": "generation and cancellable dwell assertions",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "completion-above-cursor",
+      "lane": "completion",
+      "kind": "pty",
+      "scenario": "Popup appears above cursor when room available and flips below at top edge",
+      "oracle": "actual PTY screenshot cursor row vs menu bounding box",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "completion-doc-dwell",
+      "lane": "completion",
+      "kind": "pty",
+      "scenario": "Selected item documentation appears after dwell and disappears on selection change",
+      "oracle": "timed PTY before/after captures with unchanged editor latency",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "inspector-packages",
+      "lane": "inspector",
+      "kind": "unit",
+      "scenario": "Package list and ASDF systems read without loading arbitrary systems",
+      "oracle": "stable snapshot and read-only behavior",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "inspector-values",
+      "lane": "inspector",
+      "kind": "unit",
+      "scenario": "Bound specials, unbound symbols and symbol descriptions are represented correctly",
+      "oracle": "structured snapshots, no guessed lexical locals",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "inspector-cycles",
+      "lane": "inspector",
+      "kind": "unit",
+      "scenario": "Cyclic values and printable custom objects have strict depth/length/time bounds",
+      "oracle": "bounded output; no runaway traversal",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "inspector-refresh",
+      "lane": "inspector",
+      "kind": "pty",
+      "scenario": "After EVAL changes variable value, UI inspector updates without stealing focus",
+      "oracle": "both panel captures and cursor ownership",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "inspector-slynk-optional",
+      "lane": "inspector",
+      "kind": "unit",
+      "scenario": "Local workbench loads without Slynk; optional remote adapter degrades gracefully",
+      "oracle": "clean load without dev bundle",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-80x24",
+      "lane": "integration",
+      "kind": "pty",
+      "scenario": "At 80x24 REPL remains editable, inspector collapses, popup clips safely",
+      "oracle": "full screen capture and key echo",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-120x40",
+      "lane": "integration",
+      "kind": "pty",
+      "scenario": "At 120x40 REPL/inspector split, popup and docs anchored correctly",
+      "oracle": "frame cells and focus assertions",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-160x50",
+      "lane": "integration",
+      "kind": "pty",
+      "scenario": "At 160x50 panes and long docs reflow with no truncated cursor",
+      "oracle": "screen capture after resize",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-resize",
+      "lane": "integration",
+      "kind": "pty",
+      "scenario": "Repeated 80x24 -> 160x50 -> 120x40 resize preserves editor text and selection",
+      "oracle": "snapshot geometry and text",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-termios",
+      "lane": "integration",
+      "kind": "pty",
+      "scenario": "Normal exit, error, interrupt and repeated launch restore termios and cursor",
+      "oracle": "before/after stty -g and terminal state capture",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-no-spinner",
+      "lane": "integration",
+      "kind": "pty",
+      "scenario": "Idle frame does not cause uncontrolled repaint or CPU spin",
+      "oracle": "PTY output byte count after idle and bounded CPU evidence",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-warning-clean",
+      "lane": "integration",
+      "kind": "static",
+      "scenario": "Optional ASDF system compiles and startup emits no new compiler warnings",
+      "oracle": "CLPM SBCL compile transcript and exit code",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-reader-security",
+      "lane": "integration",
+      "kind": "unit",
+      "scenario": "Passive syntax inspection never executes #. reader evaluation or arbitrary highlighted forms",
+      "oracle": "sentinel side-effect remains untouched",
+      "required": true,
+      "status": "not-run"
+    },
+    {
+      "id": "integration-remote-opt-in",
+      "lane": "integration",
+      "kind": "unit",
+      "scenario": "Local mode does not open a TCP listener; remote Slynk requires explicit request",
+      "oracle": "port/listener and dependency check",
+      "required": true,
+      "status": "not-run"
+    }
+  ]
+}
