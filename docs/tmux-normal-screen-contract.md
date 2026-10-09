@@ -56,8 +56,9 @@ and capture geometry. Include a specimen rendered using the *captured*
 style. Standard, 256-color and RGB styles are all valid.
 
 **Current limitation:** B1 is embedded in the bottom-left inspector panel.
-The RGB/256 specimen currently falls back to white/black rather than
-rendering the parsed style. Fixed/follow anchoring is not yet available.
+The specimen now reproduces captured RGB and 256-palette foreground/
+background and selected SGR attributes; the strict private-tmux color test
+passes. Fixed/follow anchoring is not yet available.
 
 ## Capture API versus restoration API
 
@@ -119,9 +120,10 @@ resize/shutdown for both directions (70/70 unique markers and exact SGR).
 **P0:** B2 Unicode border over the exact real selected cell; independent
 positioned B1 with no target occlusion or history mutation.
 
-**P1:** RGB/256 specimen styling, Unicode combining/wide continuation,
-cursor-follow collision/clamping, user-visible coordinates/statistics,
-and removal of the dormant alternate-screen transition helper.
+**P1:** Unicode combining/wide continuation, independent cursor-follow
+collision/clamping, user-visible coordinates/statistics, and removal of
+the dormant alternate-screen transition helper. RGB/256 specimen styling
+was qualified separately by the strict B1 real-tmux regression test.
 
 Retain the canonical ABC/OCP task identities when implementing and reviewing.
 A green component test is never sufficient to close a red strict gate.
