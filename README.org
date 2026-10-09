@@ -212,8 +212,8 @@ scripts/check-docstrings.sh
 #+end_src
 
 The default audit is a debt ratchet: it fails if public documentation coverage
-regresses. On 2026-10-09 this gate passed at 65.0% coverage
-(1,819 unique exported bindings; 637 missing docstrings). This is not the
+regresses. On 2026-10-09 this gate passed at 67.7% coverage
+(1,819 unique exported bindings; 587 missing docstrings on the latest check). This is not the
 same as complete API documentation.  To require every supported exported binding to have documentation
 metadata, use the strict target:
 
