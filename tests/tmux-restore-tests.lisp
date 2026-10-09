@@ -97,3 +97,27 @@
     (restore-to-tmux-capture buffer1)
     (let ((cell (buffer-cell-at buffer1 0 0)))
       (is (char= (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell) #\B)))))
+
+(test restore-styled-capture-retains-formatting
+  "A saved buffer must keep text and SGR after the working buffer is cleared."
+  (let* ((buffer (make-virtual-buffer 12 2))
+         (text (format nil "~C[31;44;1;4mTOP~%BOTTOM" #\Escape)))
+    (unwind-protect
+         (progn
+           (elmtui.platform.tmux:prefill-buffer-from-styled-content
+            buffer (elmtui.platform.tmux:parse-ansi-string text) 12 2)
+           (save-tmux-capture buffer)
+           (clear-buffer buffer)
+           (restore-to-tmux-capture buffer)
+           (is (char= #\T (buffer-cell-char (buffer-cell-at buffer 0 0))))
+           (is (char= #\B (buffer-cell-char (buffer-cell-at buffer 1 0))))
+           (let ((style (buffer-cell-style (buffer-cell-at buffer 1 0))))
+             (is (eq :red
+                     (elmtui.platform.backend.common.ansi-styling:terminal-color-simple
+                      (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color style))))
+             (is (eq :blue
+                     (elmtui.platform.backend.common.ansi-styling:terminal-color-simple
+                      (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color style))))
+             (is (elmtui.platform.backend.common.ansi-styling:terminal-style-bold style))
+             (is (elmtui.platform.backend.common.ansi-styling:terminal-style-underline style))))
+      (clear-saved-tmux-capture))))
