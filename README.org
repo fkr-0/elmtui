@@ -223,7 +223,9 @@ ELMTUI_DOCSTRING_STRICT=1 scripts/check-docstrings.sh
 
 The same operations are exposed as the =bridge.yml= commands =docs=,
 =doc-audit=, and =doc-audit-strict=.  The non-regression audit also runs as part
-of =scripts/release-check.sh=.
+of =scripts/release-check.sh=. For the interpretation of audit counts, the
+source-verified terminal-style and contract APIs, and regression-test coverage,
+see [[file:docs/api/README.md][the API documentation and verification guide]].
 
 * Running examples
 
