@@ -138,7 +138,7 @@ geometry.  NIL means the value should remain unchanged."
         anchor
         (:below-cursor
           (let*
-            ((rows-remaining (max 0 (- rows cursor-row 1)))
+            ((rows-remaining (max 0 (- rows cursor-row)))
               (needed (max 0 (- height rows-remaining))))
             (case
               overflow-policy
@@ -932,12 +932,9 @@ for state updates, and COMMANDS is a list of render command plists."
                         (and (> (first term-size) 1) (> (second term-size) 1))))
           (term-cols (max 0 (or (first term-size) 0)))
           (term-rows (max 0 (or (second term-size) 0)))
-          (ready? (and
-              (%state-value vp-state :pos-known)
-              (%state-value vp-state :first-ready-done)
-              size-known
-              (> term-cols 0)
-              (> term-rows 0)))
+          ;; Geometry is sufficient to render; cursor position only refines anchoring.
+          ;; :first-ready-done marks initial cleanup commands, not view readiness.
+          (ready? (and size-known (> term-cols 0) (> term-rows 0)))
           (effective-id (or (%state-value vp-state :id) (first (last id-path))))
           (effective-id-viewport (let* ((name (string-upcase (string effective-id)))
                                          (pref "ROOT-VIEWPORT-"))

@@ -61,19 +61,19 @@
             "The single batch must contain every changed character exactly once.")))))
 
 (test stty-sane-error-must-not-appear-on-stdout
-  "Bug 2: stty sane must not route stderr to :output; use :error nil."
+  "TTY shutdown restores through cl-inputs without spawning stty."
   (let* ((src (uiop:read-file-string
-                (asdf:system-relative-pathname
-                  "elmtui"
-                  "src/platform/backend/terminal/terminal.lisp")))
-         (stty-pos (search "run-program" src))
-         (stty-section (when stty-pos
-                         (subseq src stty-pos
-                           (min (+ stty-pos 200) (length src))))))
-    (is-true stty-section
-      "shutdown-backend stty run-program call not found in terminal.lisp")
-    (is-false (search ":error :output" stty-section)
-      "stty sane must not route stderr to :output; use :error nil.")))
+               (asdf:system-relative-pathname
+                "elmtui" "src/platform/backend/terminal/terminal.lisp")))
+         (start (search "defmethod shutdown-backend" src))
+         (stop (and start (search ";;;---" src :start2 (+ start 10))))
+         (section (and start (subseq src start (or stop (length src))))))
+    (is-true section)
+    (when section
+      (is-true (search "cl-inputs.loop:close-input-source" section))
+      (is-true (search "cl-inputs.device.api:close-device" section))
+      (is-false (search "run-program" section))
+      (is-false (search ":error :output" section)))))
 
 (test root-viewport-ready-without-terminalresized-event
   "Bug 4: root-viewport must have size-known=t and return non-nil view after init."
