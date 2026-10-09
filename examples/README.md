@@ -202,3 +202,43 @@ A maintained example must:
 
 Experimental snippets and debugging reproductions belong outside the maintained
 ASDF example system until they satisfy this contract.
+
+## Neon Life and Glider (animated)
+
+These dashboard apps use the ElmTUI diff renderer and shared `neon-kit` RGB palette (no raw ANSI).
+
+```sh
+./examples.sh run neon-life
+./examples.sh run neon-glider
+```
+
+`neon-life` simulates Conway B3/S23 on a toroidal 36x16 grid with two gliders
+and a blinker. Status shows generation, live-cell population and tick period.
+`neon-glider` animates a bouncing particle with an eight-position comet trail,
+direction readout and per-frame position telemetry.
+
+Both have cyan/violet/amber panels and square-corner frames. Use Space/P to
+pause, N to step while paused, +/- to adjust speed, R to reset and Q/Escape
+to exit. Pausing removes the periodic timer subscription.
+
+The original entry points are also available:
+
+```sh
+./examples.sh run game-of-life
+./examples.sh run glider-real
+```
+
+`glider-real` preserves `elmtui.examples.glider:run-glider-animation` and
+`glider-animation-app` while delegating rendering and physics to neon-glider.
+The maintained `game-of-life` has its own timed grid implementation.
+
+Run the state-machine suite and PTY lifecycle checks:
+
+```sh
+clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+  --eval '(require :asdf)' --eval '(asdf:test-system "elmtui-neon-tests")'
+python3 tests/e2e/neon-life-glider-pty.py -v
+```
+
+The PTY suite checks timer advancement, frozen frames while paused, exact
+single-step, reset, Q exit and restoration of terminal attributes.

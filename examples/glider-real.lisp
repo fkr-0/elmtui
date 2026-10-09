@@ -1,102 +1,38 @@
-;;;===============================================================
-;;; Glider Animation (maintained example)
-;;;===============================================================
-
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (unless (find-package :elmtui.examples.neon-glider)
+    (load (merge-pathnames #P"neon-glider.lisp"
+                           (or *load-truename* *compile-file-truename*)))))
 (uiop:define-package :elmtui.examples.glider
-  (:use :cl :log4cl)
+  (:use :cl)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.core.event-types #:key-event #:key-event-key)
-  (:import-from :elmtui.state.api #:state-ref #:make-update-result)
-  (:export #:run-glider-animation))
-
+  (:import-from :elmtui.state.api #:state-ref)
+  (:export #:run-glider-animation #:glider-update #:glider-view))
 (in-package :elmtui.examples.glider)
 
 (defun %initial-state ()
-  (list :x 2
-        :y 2
-        :dx 1
-        :dy 1
-        :w 60
-        :h 18
-        :tick 0
-        :should-quit nil))
+  (append (elmtui.examples.neon-glider:initial-state) '(:w 44 :h 13)))
 
 (defun %bounce-step (x y dx dy w h)
-  (let* ((nx (+ x dx))
-         (ny (+ y dy))
-         (ndx dx)
-         (ndy dy))
-    (when (or (< nx 0) (>= nx w))
-      (setf ndx (- ndx)
-            nx (+ x ndx)))
-    (when (or (< ny 0) (>= ny h))
-      (setf ndy (- ndy)
-            ny (+ y ndy)))
-    (values nx ny ndx ndy)))
+  (elmtui.examples.neon-glider:bounce-step x y dx dy w h))
 
-(defun glider-update (message app-state)
-  (cond
-    ((typep message 'key-event)
-     (case (key-event-key message)
-       ((:escape #\q #\Q) (make-update-result :patches '(((:should-quit) t))))
-       (t (make-update-result))))
-    ((and (listp message) (eq (first message) :tick))
-     (let* ((x (state-ref app-state :x 0))
-            (y (state-ref app-state :y 0))
-            (dx (state-ref app-state :dx 1))
-            (dy (state-ref app-state :dy 1))
-            (w (state-ref app-state :w 60))
-            (h (state-ref app-state :h 18))
-            (tick (state-ref app-state :tick 0)))
-       (multiple-value-bind (nx ny ndx ndy) (%bounce-step x y dx dy w h)
-         (make-update-result
-          :patches `(((:x) ,nx)
-                     ((:y) ,ny)
-                     ((:dx) ,ndx)
-                     ((:dy) ,ndy)
-                     ((:tick) ,(1+ tick)))))))
-    ((and (listp message) (eq (first message) :app-quit-requested))
-     (make-update-result :patches '(((:should-quit) t))))
-    (t (make-update-result))))
-
-(defun %trail-cell (x y i)
-  `(:text
-    :id ,(intern (format nil "TRAIL-~D" i) :keyword)
-    :style (:position (:left ,x :top ,y) :fg-color :cyan)
-    :content "·"))
+(defun glider-update (message state)
+  (elmtui.examples.neon-glider:glider-update message state))
 
 (defun glider-view (state)
-  (let* ((x (state-ref state :x 0))
-         (y (state-ref state :y 0))
-         (dx (state-ref state :dx 1))
-         (dy (state-ref state :dy 1))
-         (w (state-ref state :w 60))
-         (h (state-ref state :h 18))
-         (tick (state-ref state :tick 0)))
-    `(:container
-      :id :glider-content
-      :style (:display :flex :flex-direction :column :width 80 :height 22 :padding 1)
-      :children
-      ((:text :content ,(format nil "glider-real: q/esc quit | pos=(~D,~D) vel=(~D,~D) tick=~D"
-                                x y dx dy tick))
-       (:container
-        :id :arena
-        :style (:position :relative :width ,w :height ,h :box :single)
-        :children
-        (,@(loop for i from 1 to 4
-                 collect (%trail-cell (max 0 (- x i)) (max 0 (- y i)) i))
-         (:text
-          :id :glider
-          :style (:position (:left ,x :top ,y) :fg-color :green :bold t)
-          :content "█")))))))
+  (elmtui.examples.neon-glider:glider-view state))
 
 (defapplication glider-animation-app
   :root-viewport-id :glider-root
-  :root-component-dsl '(:root-viewport :id :glider-root)
+  :root-component-dsl '(:root-viewport :id :glider-root
+                        :anchor :below-cursor :width 74 :height 23
+                        :blank-on-exit t :child-dsl-spec (:view nil))
   :initial-state-fn #'%initial-state
   :update-fn #'glider-update
-  :view-fn #'glider-view)
+  :view-fn #'glider-view
+  :subscriptions-fn (lambda (state)
+                      (when (state-ref state :running t)
+                        (list :timer (list :interval (state-ref state :period 0.12)
+                                           :message (list :tick))))))
 
 (defun run-glider-animation (&key (backend-type :terminal))
-  (log-info "glider-real: start backend=~S" backend-type)
   (run-glider-animation-app :platform backend-type))
