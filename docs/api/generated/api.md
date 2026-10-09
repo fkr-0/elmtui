@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1185 of 1822 bindings documented; 637 have no metadata (65.0% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1235 of 1822 bindings documented; 587 have no metadata (67.8% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -5806,7 +5806,9 @@ Returns summary of contract executions for debugging
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Base condition for a failed ElmTUI contract. Records FUNCTION-NAME, EXPECTED-TYPE, ACTUAL-VALUE, and optional CONTEXT; its report prints these fields.
+```
 
 ## ELMTUI.CONTRACTS:CTX-ATOMIC-TREE
 
@@ -5908,25 +5910,33 @@ Return the viewport rectangle associated with APP-CONTEXT.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the actual offending value recorded in a CONTRACT-VIOLATION condition.
+```
 
 ## ELMTUI.CONTRACTS:CV-CONTEXT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return optional contextual information for a CONTRACT-VIOLATION, or NIL when no context was supplied.
+```
 
 ## ELMTUI.CONTRACTS:CV-EXPECTED-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the expected type descriptor recorded in a CONTRACT-VIOLATION condition.
+```
 
 ## ELMTUI.CONTRACTS:CV-FUNCTION-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the function name recorded in a CONTRACT-VIOLATION condition, identifying the rejected contract boundary.
+```
 
 ## ELMTUI.CONTRACTS:DEFINE-PIPELINE
 
@@ -6135,49 +6145,65 @@ Construct an APP-CONTEXT from the supplied pipeline state, tree stages, buffers,
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an ATOMIC-TREE with ROOT holding the tree after visibility and overflow decisions.
+```
 
 ## ELMTUI.CONTRACTS:MAKE-DSL-TREE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a DSL-TREE with ROOT holding a nested declarative DSL list before conversion to UI nodes.
+```
 
 ## ELMTUI.CONTRACTS:MAKE-LAID-OUT-TREE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a LAID-OUT-TREE with ROOT holding the tree after geometry has been resolved.
+```
 
 ## ELMTUI.CONTRACTS:MAKE-RAW-TREE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a RAW-TREE whose ROOT holds the generated UI-node tree before stylesheet application.
+```
 
 ## ELMTUI.CONTRACTS:MAKE-STYLED-TREE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a STYLED-TREE with ROOT holding the UI-node tree after styles have been applied.
+```
 
 ## ELMTUI.CONTRACTS:MAKE-SUBSCRIPTION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a SUBSCRIPTION descriptor with TYPE, CONFIG plist, and MESSAGE-FN for converting incoming event data into an application message.
+```
 
 ## ELMTUI.CONTRACTS:MESSAGE-CONTRACT-VIOLATION
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Specialized CONTRACT-VIOLATION for a message rejected by its schema or required validation mode.
+```
 
 ## ELMTUI.CONTRACTS:PIPELINE-CONTRACT-VIOLATION
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Pipeline error condition recording STAGE, EXPECTED-TYPE, GOT-OBJECT, and optional STACK-TRACE; signaled for failed pipeline type contracts.
+```
 
 ## ELMTUI.CONTRACTS:RAW-TREE
 
@@ -6227,13 +6253,17 @@ Subscription descriptor for Elm Architecture
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Specialized CONTRACT-VIOLATION for subscription generation or validation failures.
+```
 
 ## ELMTUI.CONTRACTS:SUBSCRIPTION-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when OBJECT is a SUBSCRIPTION structure produced by the framework subscription constructor; otherwise return NIL.
+```
 
 ## ELMTUI.CONTRACTS:SUGGEST-MESSAGE-SCHEMA
 
@@ -6259,7 +6289,9 @@ interactive diagnostic path.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Specialized CONTRACT-VIOLATION signaled for invalid update input, update execution, or update result contracts.
+```
 
 ## ELMTUI.CONTRACTS:VALIDATE-COMMANDS
 
@@ -6378,25 +6410,33 @@ Validates the result of an update function
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Specialized CONTRACT-VIOLATION signaled when a view function fails validation or returns an invalid view.
+```
 
 ## ELMTUI.CONTRACTS:VIOLATION-EXPECTED
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the expected type descriptor recorded in a PIPELINE-CONTRACT-VIOLATION.
+```
 
 ## ELMTUI.CONTRACTS:VIOLATION-GOT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the offending object recorded in a PIPELINE-CONTRACT-VIOLATION.
+```
 
 ## ELMTUI.CONTRACTS:VIOLATION-STAGE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the stage identifier recorded in a PIPELINE-CONTRACT-VIOLATION.
+```
 
 ## ELMTUI.CORE.ASYNC:*ASYNC-ERRORS*
 
@@ -10438,7 +10478,9 @@ This is useful for ensuring thread safety when accessing shared resources.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return ANSI SGR control strings for requested ATTRS of a TERMINAL-STYLE in argument order. NIL styles return NIL; list styles are interpreted as explicit key/value entries.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:AS-PLIST
 
@@ -10477,7 +10519,9 @@ Creates a deep copy of a style plist, including any nested lists like RGB values
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Write every character of string SEQ as a byte to FD while holding LOCKABLE, then flush FD. Extra ARGS are ignored; stream write errors propagate.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:FUZZ-COLOR
 
@@ -10508,25 +10552,33 @@ Checks if the given style S is a terminal style.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a TERMINAL-COLOR using shorthand R, G, B, SIMPLE, BG, and COLOR-256 keyword arguments; return the new color descriptor.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:MAKE-TERMINAL-COLOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a TERMINAL-COLOR with RED, GREEN, BLUE, SIMPLE, BG, and COLOR-256 keyword slots. Unspecified channels remain NIL; no color conversion occurs.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:MAKE-TERMINAL-STYLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a TERMINAL-STYLE with FG-COLOR and BG-COLOR descriptors and independent attribute flags. Every omitted slot starts as NIL.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:NO-COLOR-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true if TERMINAL-COLOR has no RGB component, simple keyword, or 256-color index. The BG flag does not count as a color.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:STYLE-TO-TERMINAL-STYLE
 
@@ -10545,109 +10597,145 @@ Converts a style plist to a terminal-style instance, ensuring a valid
 
 Kinds: type
 
-_No documentation metadata._
+```text
+A terminal color descriptor holding optional RGB components, a simple color keyword, a 256-color index, and a background-selection flag.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-COLOR-BG
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the BG flag stored in TERMINAL-COLOR; this flag selects background SGR encoding when no overriding BG argument is supplied.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-COLOR-SIMPLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the SIMPLE color keyword stored in TERMINAL-COLOR, or NIL when its color representation is RGB, indexed, or unspecified.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+A mutable terminal style descriptor with foreground and background colors plus bold, italic, underline, faint, blink, inverse, strike, and invisible attributes.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-BG-COLOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the BG-COLOR slot of TERMINAL-STYLE. It may contain a TERMINAL-COLOR or NIL and may be changed through the SETF accessor.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-BG-COLOR-VAL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Extract STYLE background as an RGB integer list, 256-color palette index, or simple color keyword. Return NIL if the background is absent or unrecognized.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-BLINK
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the BLINK attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-BOLD
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the BOLD attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-FAINT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the FAINT attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-FG-COLOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the FG-COLOR slot of TERMINAL-STYLE. It may contain a TERMINAL-COLOR or NIL and may be changed through the SETF accessor.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-FG-COLOR-VAL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Extract STYLE foreground as an RGB integer list, 256-color palette index, or simple color keyword. Return NIL if the foreground is absent or unrecognized.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-INVERSE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the INVERSE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-INVISIBLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the INVISIBLE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-ITALIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the ITALIC attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-KV
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Update one TERMINAL-STYLE slot selected by K using V. Accepted keys are FG, BG, BOLD, ITALIC, UNDERLINE, FAINT, BLINK, INVERSE, STRIKE, and INVISIBLE; unknown keys signal an error.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-STRIKE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the STRIKE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:TERMINAL-STYLE-UNDERLINE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or, with SETF, change the UNDERLINE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.ANSI-STYLING:UPDATE-STYLE!
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Merge UPDATE-STYLE into mutable STYLE and return changed attribute key/value pairs. A NIL STYLE creates a fresh style; raw plist STYLE inputs are ignored and return NIL.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL
 
@@ -10997,19 +11085,25 @@ _No documentation metadata._
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the integer cursor COLUMN tracked by TERMINAL-INSTANCE, initially zero.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-INSTANCE-CURSOR-ROW
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the integer cursor ROW tracked by TERMINAL-INSTANCE, initially zero.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-INSTANCE-CURSOR-VISIBLE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the cursor visibility flag stored in TERMINAL-INSTANCE; it is initially true.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-INSTANCE-FRONT-BUFFER
 
@@ -11021,7 +11115,9 @@ _No documentation metadata._
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the current integer HEIGHT stored in TERMINAL-INSTANCE; the default for a new instance is 24 rows.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-INSTANCE-LOCK
 
@@ -11033,13 +11129,17 @@ _No documentation metadata._
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the optional STREAM slot of a TERMINAL-INSTANCE. It holds the terminal output stream when one is attached.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-INSTANCE-WIDTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the current integer WIDTH stored in TERMINAL-INSTANCE; the default for a new instance is 80 columns.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-OUTPUT-STATISTICS
 
