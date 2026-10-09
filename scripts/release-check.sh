@@ -103,6 +103,10 @@ printf '\n==> checking staged and unstaged patch whitespace\n'
 git diff --check
 git diff --cached --check
 
+printf '\n==> verifying cold ASDF compilation and dependency ordering\n'
+clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+  --eval '(asdf:compile-system :elmtui :force t)'
+
 printf '\n==> validating public API documentation metadata\n'
 scripts/check-docstrings.sh
 

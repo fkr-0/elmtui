@@ -31,6 +31,8 @@ jobs:
           sudo sh ./install.sh
       - name: Install locked bundle
         run: clpm bundle install
+      - name: Verify cold ASDF compilation and package prerequisites
+        run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:compile-system :elmtui :force t)'
       - name: Run FiveAM regression suite
         run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
       - name: Verify independent subproject bundles and public dependency direction
