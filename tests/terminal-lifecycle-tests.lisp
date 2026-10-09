@@ -29,6 +29,25 @@
 
 (in-suite terminal-lifecycle-suite)
 
+(test terminal-style-transition-does-not-reenter-nonrecursive-lock
+  "An atomic terminal frame must be able to emit SGR without locking twice."
+  (uiop:with-temporary-file (:stream stream :direction :output
+                              :element-type '(unsigned-byte 8))
+    (let* ((backend (elmtui.platform.backend.terminal::make-terminal-instance
+                     :stream stream))
+           (color (elmtui.platform.backend.common.ansi-styling:make-termcolor
+                    :simple :cyan))
+           (style (elmtui.platform.backend.common.ansi-styling:make-terminal-style
+                    :fg-color color)))
+      (elmtui.platform.backend.terminal:with-terminal-lock (backend)
+        (is-true (elmtui.platform.backend.terminal::apply-style-diff backend style)))
+      (is (eq :cyan
+              (elmtui.platform.backend.common.ansi-styling::termcolor-simple
+               (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color
+                (elmtui.platform.backend.terminal:terminal-instance-current-style backend)))))
+      (is (plusp (file-length stream))))))
+
+
 (test first-render-background-cells-must-not-produce-write-ops
   "Bug 1: background spaces must not emit write ops on first render."
   (let* ((width 10)

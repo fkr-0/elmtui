@@ -95,7 +95,7 @@ DSL cases handled:
                   :id ,root-id
                   ;; :initial-terminal-dimensions ,term-size
                   ;; :initial-cursor-pos          ,cursor-pos
-                  :children                    ,inner)))
+                  :children                    ,(list inner))))
       (cond
         ((null dsl) nil)
         ;; ───────────────────────────────────────────────────────────────
