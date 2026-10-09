@@ -33,10 +33,14 @@ jobs:
         run: clpm bundle install
       - name: Run FiveAM regression suite
         run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
-      - name: Check documented public symbols
-        run: scripts/check-docstrings.sh
       - name: Generate API reference
         run: scripts/build-api-docs.sh
+      - name: Test API reference qualification guards
+        run: python3 -m unittest discover -s tests/reference -p 'test_*.py' -v
+      - name: Qualify API reference structure against live exports
+        run: python3 scripts/qualify-api-reference.py --structure-only
+      - name: Enforce public-docstring debt threshold
+        run: scripts/check-docstrings.sh
       - name: Neon unit tests
         run: |
           clpm bundle exec --with-client sbcl -- --noinform --non-interactive \

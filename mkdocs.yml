@@ -50,5 +50,6 @@ nav:
       - Full example catalog: guide/examples-catalog.md
   - Reference:
       - API and documentation: reference.md
+      - Exported symbol reference: guide/generated-api.md
       - Workbench technical guide: guide/workbench-user-guide.md
       - Release status: release.md
