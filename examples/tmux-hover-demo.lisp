@@ -2,23 +2,7 @@
 ;;; Tmux Hover Demo
 ;;;===============================================================
 
-(uiop:define-package :elmtui-examples.tmux-hover-demo
-  (:use :cl :log4cl)
-  (:import-from :alexandria #:clamp)
-  (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.core.event-types
-                #:key-event
-                #:key-event-key)
-  (:import-from :elmtui.state.api
-                #:state-ref
-                #:make-update-result)
-  (:import-from :elmtui.core.async
-                #:cmd-async)
-  (:import-from :elmtui.platform.tmux
-                #:tmux-available-p
-                #:capture-lines)
-  (:export #:run-tmux-hover-demo))
-
+(uiop:define-package :elmtui-examples.tmux-hover-demo (:use :cl :log4cl) (:import-from :alexandria #:clamp) (:import-from :elmtui.app #:defapplication) (:import-from :elmtui.core.event-types #:key-event #:key-event-key) (:import-from :elmtui.state.api #:state-ref #:make-update-result) (:import-from :elmtui.core.async #:cmd-async) (:import-from :elmtui.platform.tmux #:tmux-available-p #:capture-lines) (:export #:run-tmux-hover-demo #:run-tmux-hover-inspector))
 (in-package :elmtui-examples.tmux-hover-demo)
 
 (defun %initial-state ()
@@ -154,3 +138,5 @@
    :platform backend-type
    :platform-options (list :prefill-from-tmux t
                            :tmux-prefill-mode mode)))
+
+(defun run-tmux-hover-inspector (&key (backend-type :terminal) (mode :pane)) "Run the unified cursor inspector without changing the legacy hover app." (elmtui-examples.cursor-inspector:run-cursor-inspector :backend-type backend-type :tmux-mode mode :title "tmux-hover-demo"))
