@@ -1,0 +1,48 @@
+name: ElmTUI verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lisp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install SBCL and prerequisites
+        run: sudo apt-get update && sudo apt-get install -y sbcl curl tar git
+      - name: Install CLPM 0.4.1 and verify its SHA512
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o /tmp/clpm.tar.gz https://files.clpm.dev/clpm/clpm-0.4.1-linux-amd64.tar.gz
+          curl -fsSL --retry 3 -o /tmp/clpm.DIGESTS https://files.clpm.dev/clpm/clpm-0.4.1.DIGESTS
+          expected=$(grep 'clpm-0.4.1-linux-amd64.tar.gz' /tmp/clpm.DIGESTS | awk '{print $1}')
+          test -n "$expected"
+          echo "$expected  /tmp/clpm.tar.gz" | sha512sum --check
+          mkdir -p /tmp/clpm-unpack
+          tar -xzf /tmp/clpm.tar.gz -C /tmp/clpm-unpack
+          cd /tmp/clpm-unpack/clpm-0.4.1-linux-amd64
+          sudo sh ./install.sh
+      - name: Install locked bundle
+        run: clpm bundle install
+      - name: Run FiveAM regression suite
+        run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
+      - name: Check documented public symbols
+        run: scripts/check-docstrings.sh
+      - name: Generate API reference
+        run: scripts/build-api-docs.sh
+      - name: Neon unit tests
+        run: |
+          clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+            --eval '(require :asdf)' \
+            --eval '(asdf:test-system "elmtui-neon-tests")'
+      - name: Workbench independent tests
+        run: python3 -m unittest discover -s tests/workbench/independent -p 'test_*.py' -v
+      - name: Workbench real PTY
+        run: python3 tests/workbench/pty-workbench.py
