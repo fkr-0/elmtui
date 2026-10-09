@@ -6,7 +6,7 @@
 
 - [x] Main `elmtui.asd` and `elmtui-examples.asd` identify version **0.2.0**; the local `v0.2.0` tag already exists. The separate `elmtui-workbench.asd` declares **0.1.0**.
 - [x] Full root FiveAM run via `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp`: **4,743 passed / 6 intentionally skipped / 0 failed** (2026-10-09). All six skips require explicitly enabled live tmux integration. Re-run at release commit.
-- [x] `scripts/check-docstrings.sh`: non-regression gate passed; **1,819 unique exported bindings, 637 missing, 65.0% documented**. This is a ratchet pass, **not** complete public API documentation.
+- [x] `scripts/check-docstrings.sh`: non-regression gate passed; **1,819 unique exported bindings, 587 missing, 67.7% documented**. This is a ratchet pass, **not** complete public API documentation.
 - [x] README `defapplication` declaration and the standalone counter/async tutorial definitions smoke-loaded using the repository CLPM/SBCL bundle. This does not establish PTY/UI e2e.
 - [x] Site source layout and `mkdocs.yml` are present. This is source readiness only, **not** a successful site build.
 
@@ -26,7 +26,7 @@
 
 - [x] Three longform chapters exist, use `:text :content` in live view examples, and distinguish `deftea-app` direct replacement from default transactional `defapplication`. Runnable declarations and selected test/effect forms were checked against the current exports.
 - [ ] Re-run the complete docs smoke against the frozen release revision with unchanged dependencies, including illustrative examples that require adapters/fixtures, plus a real terminal smoke. Explanatory `...` source excerpts and intentionally bad patterns are **not** standalone executable programs.
-- [ ] Grow docstring coverage beyond the current 65.0% ratchet and regenerate the public API reference (`scripts/build-api-docs.sh`); review exported widget contracts, focus/keymap behavior and edge cases. Concurrent documentation agents may change this baseline.
+- [ ] Grow docstring coverage beyond the latest 67.7% ratchet and regenerate the public API reference (`scripts/build-api-docs.sh`); review exported widget contracts, focus/keymap behavior and edge cases. Concurrent documentation agents may change this baseline.
 - [ ] Validate website, Workbench screenshots and PDF-independent MkDocs output in the actual publish environment.
 
 ## Reproduction

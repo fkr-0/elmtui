@@ -320,7 +320,7 @@ root-viewport policy into `cl-events` or `cl-inputs`.
 - Core test suite: **4,743 pass, 6 live-tmux skips, 0 fail** under
   `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp`
   in a shared working tree; this is not a clean-clone/PTY qualification.
-- `scripts/check-docstrings.sh`: pass (65.0% coverage; 637 / 1,819 missing).
+- `scripts/check-docstrings.sh`: pass (67.7% coverage; 587 / 1,819 missing on the latest check).
 - `python3 -m mkdocs build --strict`: not run successfully because the
   `mkdocs` Python module is unavailable in the current environment.
 - Historic P0/P1 fixes recorded above describe integration code, not independent
