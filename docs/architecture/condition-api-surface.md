@@ -78,7 +78,7 @@ An SBCL runtime inspection of all loaded `ELMTUI*`, `CL-EVENTS*`, `CL-STATE*`, `
 | External occurrences whose home package differs | 950 |
 | Exported symbols homed in `SB-*` implementation packages | 0 |
 
-The largest facade re-export groups are `CL-EVENTS.API` (191), `ELMTUI.STATE` (157), `CL-STYLES.API` (137), `ELMTUI.STATE.API` (129), `CL-STATE.API` (123), and `CL-INPUTS` (118). This confirms **no SB-PCL-style implementation-private symbol leak** was found in the loaded packages, but is **not** proof that each of the 950 re-export occurrences was individually curated. Maintain explicit facade manifests in a separate compatibility-reviewed API reduction; preserve existing exports until then.
+The largest facade re-export groups are `CL-EVENTS.API` (191), `ELMTUI.STATE` (157), `CL-STYLES.API` (137), `ELMTUI.STATE.API` (129), `CL-STATE.API` (123), and `CL-INPUTS` (118). **Only two public occurrences have a symbol home outside the ElmTUI/CL-* project families:** `COMMON-LISP:USE-VALUE` is exported by `ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER`, then re-exported by `ELMTUI`. This historical standard restart-name symbol is retained during the 0.2.x compatibility window; it is not a new ElmTUI reader or function and can be deprecated separately at an API-major boundary. The focused export-boundary test permits exactly those two occurrences and rejects new foreign-family exports. This confirms **no SB-PCL-style implementation-private symbol leak** was found in the loaded packages, but is **not** proof that each of the remaining 948 same-family re-export occurrences was individually curated. Maintain explicit facade manifests in a separate compatibility-reviewed API reduction; preserve existing exports until then.
 
 A focused regression in `tests/condition-system-tests.lisp` now verifies all `ELMTUI.CORE.ERRORS` and `ELMTUI.CORE.CONDITIONS` external symbols are owned by their named package, and that generic condition readers are not external.
 
@@ -86,8 +86,8 @@ The docstring ratchet (`scripts/check-docstrings.sh`) on this audit reported **1
 
 ## Verification and constraints
 
-- `tests/condition-system-tests.lisp`: 3,451 focused checks passed, 0 failed, including an all-framework implementation-private export regression.
-- Required full suite: 8,049 checks; 8,043 passed, 6 opt-in live-tmux checks skipped, 0 failed.
+- `tests/condition-system-tests.lisp`: 3,454 focused checks passed, 0 failed, including implementation-private and cross-family export regressions.
+- Required full suite: 8,052 checks; 8,046 passed, 6 opt-in live-tmux checks skipped, 0 failed.
 - `ELMTUI.CORE.CONDITIONS:SIGNAL-SUBSCRIBER-ERROR` report now calls its prefixed reader instead of inadvertently calling `CL:SIGNAL`.
 - `elmtui.asd` now gives `core/conditions` an explicit dependency on `core/errors` to avoid out-of-order package reads on fresh compilation.
 - Pre-existing warnings from LOG4CL method redefinitions and a constant type mismatch in `tests/api-tests.lisp` occur during test loading; no warning originated from the changed condition class/report or focused tests.
