@@ -167,7 +167,7 @@ or DEFAULT if KEY is not present. If KEY is not provided, return the plist itsel
   (SetTheme :stylesheet t)
   (StateChanged :model symbol :slot keyword :value t)
   (AsyncProgressUpdate :task-id symbol :progress t)
-  (KeyEvent :event t :key symbol :char t :modifiers list)
+  (KeyEvent :event t :key (or symbol character) :char t :modifiers list)
   (MouseEvent :type keyword :button integer :row integer :col integer :modifiers list)
   (WindowResize :width integer :height integer)
   (CursorPosition :row integer :col integer)
