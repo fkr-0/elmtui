@@ -89,8 +89,8 @@
   (labels ((quit-result ()
              (make-update-result :patches '(((:should-quit) t)))))
     (flet ((handle-key (key ch type)
-             (log4cl:log-info "mini-rainbow: key event key=~S char=~S type=~S"
-                              key ch type)
+             (declare (ignore type))
+
              (cond
                ((or (member key '(:escape :q :Q))
                     (member ch '(#\q #\Q)))
