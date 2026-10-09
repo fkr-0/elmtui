@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-export ELMTUI_DOCSTRING_MAX_MISSING="${ELMTUI_DOCSTRING_MAX_MISSING:-782}"
+export ELMTUI_DOCSTRING_MAX_MISSING="${ELMTUI_DOCSTRING_MAX_MISSING:-562}"
 export ELMTUI_DOCSTRING_STRICT="${ELMTUI_DOCSTRING_STRICT:-0}"
 
 tmp="$(mktemp)"
@@ -63,7 +63,7 @@ cat >"$tmp" <<'LISP'
           total missing (* 100.0 (/ (- total missing) total)))
   (let* ((strict (string= "1" (or (uiop:getenv "ELMTUI_DOCSTRING_STRICT") "0")))
          (max-missing (parse-integer
-                       (or (uiop:getenv "ELMTUI_DOCSTRING_MAX_MISSING") "782")))
+                       (or (uiop:getenv "ELMTUI_DOCSTRING_MAX_MISSING") "562")))
          (limit (if strict 0 max-missing)))
     (when (> missing limit)
       (format *error-output*
