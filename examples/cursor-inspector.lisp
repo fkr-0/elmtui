@@ -316,8 +316,14 @@ glyphs use a placeholder." (let* ((cell (%inspected-cell line column)) (target (
                                   fg bg attrs style))
                :style (:fg-color :white :bg-color :black))
         (:text :content ,(%b1-line "Specimen: Aa Bb 0123  [] {}")
-               :style (:fg-color ,(if (keywordp fg) fg :white)
-                       :bg-color ,(if (keywordp bg) bg :black)))
+               :style (:fg-color ,(or fg :white)
+                       :bg-color ,(or bg :black)
+                       :bold ,(not (null (member :bold attrs)))
+                       :underline ,(not (null (member :underline attrs)))
+                       :italic ,(not (null (member :italic attrs)))
+                       :inverse ,(not (null (member :inverse attrs)))
+                       :faint ,(not (null (member :faint attrs)))
+                       :strike ,(not (null (member :strike attrs)))))
         (:text :content "└──────────────────────────────────────────────────────────────────────┘"
                :style (:fg-color :cyan))
         (:text :content "arrows/hjkl move | p pane / s scrollback | r refresh | q/Esc quit"
