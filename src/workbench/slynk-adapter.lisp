@@ -1,0 +1,3 @@
+(defpackage :elmtui.workbench.slynk (:use :cl) (:export :slynk-capability-report))
+(in-package :elmtui.workbench.slynk)
+(defun slynk-capability-report (&key request-id) "Capability probe only. No network listener or remote SLY session is created." (let ((loaded (not (null (find-package :slynk))))) (list :kind :slynk-capability :request-id request-id :package-loaded loaded :remote-inspection :not-implemented :transport :disabled :local-backend :native :follow-up "Add Slynk to a separate optional CLPM system, implement explicit authenticated remote client connection and scoped object handles.")))
