@@ -234,6 +234,22 @@ Earlier mentions of a first-75ms startup window above are historical
 and superseded by the verified opt-in backend initialization.
 No approval, full release qualification, or push is claimed.
 
+
+## After cross-lane reconciliation: root suite clean
+
+Subsequently, the separately owned EX11 tmux-capture policy issue
+was fixed by its owner (not by W5). On the new shared checkout,
+the complete root FiveAM suite returned exit 0:
+
+    4706 checks: 4700 PASS, 6 intentional live-tmux SKIP, 0 FAIL
+
+This supersedes the immediately preceding root failure count,
+without erasing that earlier observation. The 10/10 W8 stress,
+30/30 W6 live PTY matrix, 21/21 independent workbench suite,
+and 3/3 native W5 PTY smoke are the verified W5 qualification
+set. The W5 source, runner, and user guide were committed locally
+in guarded per-claim commits; remote push and approval remain separate.
+
 ## Ownership and remaining risks
 
 Existing staged/unstaged/untracked checkout state, bridge manifest and submodule changes were preserved. No W1–W7 files were edited, no release-owned source modified, no push or publication. Generated Lisp forms were used for runtime probes but no tracked Lisp source file was created or modified.
