@@ -1312,3 +1312,43 @@ validation code, but are not enforced here directly."
                                  keyword-syms)))))
            (setf (,out-acc ,ctx-var) result)
            ,ctx-var)))))
+
+(unless (documentation 'make-dsl-tree 'function) (setf (documentation 'make-dsl-tree 'function) "Construct a DSL-TREE with ROOT holding a nested declarative DSL list before conversion to UI nodes."))
+
+(unless (documentation 'make-raw-tree 'function) (setf (documentation 'make-raw-tree 'function) "Construct a RAW-TREE whose ROOT holds the generated UI-node tree before stylesheet application."))
+
+(unless (documentation 'make-styled-tree 'function) (setf (documentation 'make-styled-tree 'function) "Construct a STYLED-TREE with ROOT holding the UI-node tree after styles have been applied."))
+
+(unless (documentation 'make-atomic-tree 'function) (setf (documentation 'make-atomic-tree 'function) "Construct an ATOMIC-TREE with ROOT holding the tree after visibility and overflow decisions."))
+
+(unless (documentation 'make-laid-out-tree 'function) (setf (documentation 'make-laid-out-tree 'function) "Construct a LAID-OUT-TREE with ROOT holding the tree after geometry has been resolved."))
+
+(unless (documentation 'contract-violation 'type) (setf (documentation 'contract-violation 'type) "Base condition for a failed ElmTUI contract. Records FUNCTION-NAME, EXPECTED-TYPE, ACTUAL-VALUE, and optional CONTEXT; its report prints these fields."))
+
+(unless (documentation 'update-contract-violation 'type) (setf (documentation 'update-contract-violation 'type) "Specialized CONTRACT-VIOLATION signaled for invalid update input, update execution, or update result contracts."))
+
+(unless (documentation 'view-contract-violation 'type) (setf (documentation 'view-contract-violation 'type) "Specialized CONTRACT-VIOLATION signaled when a view function fails validation or returns an invalid view."))
+
+(unless (documentation 'subscription-contract-violation 'type) (setf (documentation 'subscription-contract-violation 'type) "Specialized CONTRACT-VIOLATION for subscription generation or validation failures."))
+
+(unless (documentation 'message-contract-violation 'type) (setf (documentation 'message-contract-violation 'type) "Specialized CONTRACT-VIOLATION for a message rejected by its schema or required validation mode."))
+
+(unless (documentation 'pipeline-contract-violation 'type) (setf (documentation 'pipeline-contract-violation 'type) "Pipeline error condition recording STAGE, EXPECTED-TYPE, GOT-OBJECT, and optional STACK-TRACE; signaled for failed pipeline type contracts."))
+
+(unless (documentation 'cv-function-name 'function) (setf (documentation 'cv-function-name 'function) "Return the function name recorded in a CONTRACT-VIOLATION condition, identifying the rejected contract boundary."))
+
+(unless (documentation 'cv-expected-type 'function) (setf (documentation 'cv-expected-type 'function) "Return the expected type descriptor recorded in a CONTRACT-VIOLATION condition."))
+
+(unless (documentation 'cv-actual-value 'function) (setf (documentation 'cv-actual-value 'function) "Return the actual offending value recorded in a CONTRACT-VIOLATION condition."))
+
+(unless (documentation 'cv-context 'function) (setf (documentation 'cv-context 'function) "Return optional contextual information for a CONTRACT-VIOLATION, or NIL when no context was supplied."))
+
+(unless (documentation 'violation-stage 'function) (setf (documentation 'violation-stage 'function) "Return the stage identifier recorded in a PIPELINE-CONTRACT-VIOLATION."))
+
+(unless (documentation 'violation-expected 'function) (setf (documentation 'violation-expected 'function) "Return the expected type descriptor recorded in a PIPELINE-CONTRACT-VIOLATION."))
+
+(unless (documentation 'violation-got 'function) (setf (documentation 'violation-got 'function) "Return the offending object recorded in a PIPELINE-CONTRACT-VIOLATION."))
+
+(unless (documentation 'make-subscription 'function) (setf (documentation 'make-subscription 'function) "Construct a SUBSCRIPTION descriptor with TYPE, CONFIG plist, and MESSAGE-FN for converting incoming event data into an application message."))
+
+(unless (documentation 'subscription-p 'function) (setf (documentation 'subscription-p 'function) "Return true when OBJECT is a SUBSCRIPTION structure produced by the framework subscription constructor; otherwise return NIL."))

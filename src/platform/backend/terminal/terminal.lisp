@@ -908,3 +908,15 @@ This method should be implemented by subclasses of low-level-terminal."
 (defmethod set-input-mode ((instance terminal-instance) mode)
   (declare (ignore mode)) ; Raw mode is handled by initialize/shutdown.
   t)
+
+(unless (documentation 'terminal-instance-stream 'function) (setf (documentation 'terminal-instance-stream 'function) "Return the optional STREAM slot of a TERMINAL-INSTANCE. It holds the terminal output stream when one is attached."))
+
+(unless (documentation 'terminal-instance-width 'function) (setf (documentation 'terminal-instance-width 'function) "Return the current integer WIDTH stored in TERMINAL-INSTANCE; the default for a new instance is 80 columns."))
+
+(unless (documentation 'terminal-instance-height 'function) (setf (documentation 'terminal-instance-height 'function) "Return the current integer HEIGHT stored in TERMINAL-INSTANCE; the default for a new instance is 24 rows."))
+
+(unless (documentation 'terminal-instance-cursor-visible-p 'function) (setf (documentation 'terminal-instance-cursor-visible-p 'function) "Return the cursor visibility flag stored in TERMINAL-INSTANCE; it is initially true."))
+
+(unless (documentation 'terminal-instance-cursor-row 'function) (setf (documentation 'terminal-instance-cursor-row 'function) "Return the integer cursor ROW tracked by TERMINAL-INSTANCE, initially zero."))
+
+(unless (documentation 'terminal-instance-cursor-col 'function) (setf (documentation 'terminal-instance-cursor-col 'function) "Return the integer cursor COLUMN tracked by TERMINAL-INSTANCE, initially zero."))
