@@ -279,3 +279,67 @@
                        "Layout resolves for ~A" example-name)
               (is-true (elmtui.contracts:ctx-back-buffer out)
                        "Paint buffer exists for ~A" example-name))))))))
+
+(test repaired-examples-have-deterministic-visible-native-views
+  "Dirli rows, rainbow bands and key tester content are terminal DSL, not empty boxes."
+  (asdf:load-system :elmtui-examples)
+  (dolist (entry '(("dirli" "ELMTUI.EXAMPLES.DIRLI" "APP-VIEW" "DIRLI")
+                   ("rainbow-app" "ELMTUI.EXAMPLES.RAINBOW-APP" "RAINBOW-CONTENT-VIEW" "CHROMATIC")
+                   ("mini-rainbow" "ELMTUI.EXAMPLES.MINI-RAINBOW" "VIEW" "RAINBOW / mini")
+                   ("key-tester" "ELMTUI-EXAMPLES.KEY-TESTER" "KEY-TESTER-VIEW" "Key Tester")))
+    (destructuring-bind (name package view-name title) entry
+      (let* ((config (%registered-app-config-for-example
+                      name (second (assoc name *maintained-examples* :test #'string=))))
+             (init-symbol (find-symbol
+                           (format nil "INITIALIZE-APP-STATE-~A"
+                                   (second (assoc name *maintained-examples* :test #'string=)))
+                           package))
+             (state (funcall (symbol-function init-symbol)))
+             (view (symbol-function (find-symbol view-name package)))
+             (first-view (funcall view state))
+             (second-view (funcall view state)))
+        (declare (ignore config))
+        (is (equal first-view second-view)
+            "Unchanged state must give stable DSL for ~A" name)
+        (is (search title (prin1-to-string first-view) :test #'char-equal)
+            "~A must expose visible output text" name)))))
+
+(test dirli-key-navigation-does-not-enter-directory-implicitly
+  (asdf:load-system :elmtui-examples)
+  (let* ((pkg (find-package "ELMTUI.EXAMPLES.DIRLI"))
+         (initial (funcall (symbol-function (find-symbol "%DIRLI-INITIAL-STATE" pkg))))
+         (update (symbol-function (find-symbol "APP-UPDATE" pkg)))
+         (before (elmtui.ui.widgets.listbox:listbox-model-selected-index
+                  (getf initial :listbox-model)))
+         (result (funcall update
+                          (elmtui.core.event-types:make-key-event :key :arrow-down)
+                          initial)))
+    (is (null (elmtui.state.api:ur-commands result)))
+    (is (equal before
+               (elmtui.ui.widgets.listbox:listbox-model-selected-index
+                (getf initial :listbox-model))))
+    (is (assoc '(:listbox-model)
+               (elmtui.state.api:ur-patches result) :test #'equal))))
+
+(test key-tester-edits-copy-without-corrupting-previous-model
+  (asdf:load-system :elmtui-examples)
+  (let* ((pkg (find-package "ELMTUI-EXAMPLES.KEY-TESTER"))
+         (initial (funcall (symbol-function (find-symbol "%KEY-TESTER-INITIAL-STATE" pkg))))
+         (update (symbol-function (find-symbol "KEY-TESTER-UPDATE" pkg)))
+         (typed (funcall update
+                         (elmtui.core.event-types:make-key-event :key :a :char #\a)
+                         initial))
+         (component (second (assoc '(:component)
+                                   (elmtui.state.api:ur-patches typed) :test #'equal))))
+    (is (equal "" (example.key-tester::key-tester-input
+                   (getf initial :component))))
+    (is (string= "a" (example.key-tester::key-tester-input component)))
+    (let* ((next-state (list :component component))
+           (backspace (funcall update
+                               (elmtui.core.event-types:make-key-event :key :backspace)
+                               next-state))
+           (revised (second (assoc '(:component)
+                                   (elmtui.state.api:ur-patches backspace)
+                                   :test #'equal))))
+      (is (string= "" (example.key-tester::key-tester-input revised)))
+      (is (string= "a" (example.key-tester::key-tester-input component))))))

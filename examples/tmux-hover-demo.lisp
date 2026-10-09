@@ -67,21 +67,21 @@
     ((typep message 'key-event)
      (let ((key (key-event-key message)))
        (cond
-         ((or (eql key #\q) (eql key #\Escape))
+         ((member key '(:q :escape :esc #\q #\Q #\Escape) :test #'eql)
           (make-update-result :patches '(((:should-quit) t))))
-         ((member key '(:up #\k #\K) :test #'eql)
+         ((member key '(:up :arrow-up :k #\k #\K) :test #'eql)
           (multiple-value-bind (x y) (%bounded-cursor app-state 0 -1)
             (make-update-result :patches `(((:cursor-x) ,x) ((:cursor-y) ,y)))))
-         ((member key '(:down #\j #\J) :test #'eql)
+         ((member key '(:down :arrow-down :j #\j #\J) :test #'eql)
           (multiple-value-bind (x y) (%bounded-cursor app-state 0 1)
             (make-update-result :patches `(((:cursor-x) ,x) ((:cursor-y) ,y)))))
-         ((member key '(:left #\h #\H) :test #'eql)
+         ((member key '(:left :arrow-left :h #\h #\H) :test #'eql)
           (multiple-value-bind (x y) (%bounded-cursor app-state -1 0)
             (make-update-result :patches `(((:cursor-x) ,x) ((:cursor-y) ,y)))))
-         ((member key '(:right #\l #\L) :test #'eql)
+         ((member key '(:right :arrow-right :l #\l #\L) :test #'eql)
           (multiple-value-bind (x y) (%bounded-cursor app-state 1 0)
             (make-update-result :patches `(((:cursor-x) ,x) ((:cursor-y) ,y)))))
-         ((member key '(#\r #\R) :test #'eql)
+         ((member key '(:r #\r #\R) :test #'eql)
           ;; TEA: I/O must not happen in update-fn; dispatch capture as a command.
           (make-update-result
            :commands
@@ -143,7 +143,7 @@
 
 (defapplication tmux-hover-app
   :root-viewport-id :tmux-hover-root
-  :root-component-dsl '(:root-viewport :id :tmux-hover-root)
+  :root-component-dsl '(:root-viewport :id :tmux-hover-root :anchor :below-cursor :width 80 :height 11 :blank-on-exit nil :child-dsl-spec (:view nil))
   :initial-state-fn #'%initial-state
   :update-fn #'hover-update
   :view-fn #'hover-view)

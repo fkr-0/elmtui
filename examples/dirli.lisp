@@ -13,7 +13,8 @@
   (:import-from :elmtui.ui.widgets.listbox
                 #:init-listbox #:update-listbox #:view-listbox
                 #:listbox-model-id #:listbox-model-items
-                #:listbox-model-selected-index #:listbox-model-height
+                #:listbox-model-selected-index #:listbox-model-scroll-offset
+                #:listbox-model-height
                 #:listbox-model-on-select)
   (:import-from :elmtui.core.event-types
                 #:key-event #:key-event-key #:key-event-modifiers)
@@ -138,6 +139,8 @@
                 (and (member :control modifiers)
                      (member key '(:q #\q) :test #'eql)))
             (make-update-result :patches '(((:should-quit) t))))
+           ((eq (%dirli-normalize-key key) :enter)
+            (%dirli-selected-result app-state '(:item-selected)))
            ((null lb-model)
             (make-update-result))
            (t
@@ -163,31 +166,36 @@
 ;;;===============================================================
 
 (defun app-view (app-state)
-  "Render the live directory listbox and status information."
-  (let* ((current-path (state-ref app-state :current-path))
-         (status-message (state-ref app-state :status-message ""))
-         (terminal-width (state-ref app-state :terminal-width 80))
-         (terminal-height (state-ref app-state :terminal-height 24))
-         (lb-model (state-ref app-state :listbox-model)))
-    `(:container :id :root
-      :style (:width :fill :height :fill :display :flex :flex-direction :column :gap 1 :padding 1)
-      :children
-      ((:text :id :header :content ,(format nil "Dirli - ~A" current-path) :style (:fg-color :cyan :bold t))
-       (:text :id :instructions :content "Up/Down: Navigate | Enter: Open | q: Quit" :style (:fg-color :gray))
-       (:container :id :listbox-container :style (:width :fill :height :fill)
-        :children (,(if lb-model
-                        (view-listbox app-state :widget-id :main-listbox
-                                      :items (listbox-model-items lb-model)
-                                      :height (listbox-model-height lb-model)
-                                      :selected-index (listbox-model-selected-index lb-model)
-                                      :on-select '(:item-selected)
-                                      :empty-text "Directory is empty"
-                                      :width :fill)
-                        '(:text :id :empty :content "Directory unavailable"))))
-       (:text :id :status :content ,status-message :style (:fg-color :yellow))
-       (:text :id :footer :content ,(format nil "Terminal: ~A x ~A" terminal-width terminal-height)
-              :style (:fg-color :gray))))))
-
+  "Display only the visible slice of the current directory listing."
+  (let* ((path (state-ref app-state :current-path))
+         (status (state-ref app-state :status-message ""))
+         (model (state-ref app-state :listbox-model))
+         (items (and model (listbox-model-items model)))
+         (selected (and model (listbox-model-selected-index model)))
+         (offset (if model (listbox-model-scroll-offset model) 0))
+         (height (if model (listbox-model-height model) 15))
+         (visible (subseq items (min offset (length items))
+                         (min (length items) (+ offset height)))))
+    `(:container :id :dirli-content
+       :style (:display :flex :flex-direction :column :width 76 :height 23)
+       :children
+       ((:text :id :dirli-title :content ,(format nil "DIRLI  /  ~A" path)
+               :style (:fg-color :cyan :bold t))
+        (:text :id :dirli-help
+               :content "Arrows / j k navigate  |  Enter open  |  q quit")
+        (:text :id :dirli-count
+               :content ,(format nil "~D entries  -  selection ~D"
+                                 (length items) (if selected (1+ selected) 0))
+               :style (:fg-color :yellow))
+        ,@(loop for item in visible
+                for index from offset
+                collect `(:text
+                           :id ,(intern (format nil "DIRLI-ITEM-~D" index) :keyword)
+                           :content ,(format nil "~A ~A"
+                                              (if (eql index selected) ">" " ") item)
+                           :style (:fg-color ,(if (eql index selected) :cyan :white))))
+        (:text :id :dirli-status :content ,status
+               :style (:fg-color :yellow))))))
 
 ;;;===============================================================
 ;;; Application Definition
@@ -202,7 +210,7 @@
                           :items items
                           :height 10
                           :selected-index (when items 0)
-                          :on-select '(:item-selected))
+                          :on-select nil)
           :status-message "Welcome to Dirli! Navigate directories with arrow keys."
           :should-quit nil
           :terminal-width 80
@@ -211,7 +219,7 @@
 (defapplication dirli-app
   :root-viewport-id :dirli-vp
   :initial-state-fn #'%dirli-initial-state
-  :root-component-dsl '(:container :id :root)
+  :root-component-dsl '(:root-viewport :id :dirli-vp :anchor :below-cursor :width 80 :height 23 :blank-on-exit t :child-dsl-spec (:view nil))
   :update-fn 'app-update
   :view-fn 'app-view)
 

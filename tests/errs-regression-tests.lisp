@@ -166,10 +166,16 @@
 (test tmux-idle-subscriptions-stop-after-quit
   (%load-example "tmux-idle-screensaver")
   (let* ((pkg (find-package "ELMTUI.EXAMPLES.TMUX-IDLE"))
-         (subs-fn (symbol-function (find-symbol "IDLE-SUBSCRIPTIONS" pkg))))
-    (is (null (funcall subs-fn '(:should-quit t))))
+         (subs-fn (symbol-function (find-symbol "IDLE-SUBSCRIPTIONS" pkg)))
+         (ready '(:should-quit nil
+                  :components (:tmux-idle-root (:first-ready-done t))))
+         (stopped '(:should-quit t
+                    :components (:tmux-idle-root (:first-ready-done t)))))
     (is (equal '(:timer (:interval 0.4 :message (:tick)))
-               (funcall subs-fn '(:should-quit nil))))))
+               (funcall subs-fn '(:should-quit nil))))
+    (is (null (funcall subs-fn stopped)))
+    (is (equal '(:timer (:interval 0.4 :message (:tick)))
+               (funcall subs-fn ready)))))
 
 (test tmux-hover-reports-capture-errors-in-model
   (%load-example "tmux-hover-demo")

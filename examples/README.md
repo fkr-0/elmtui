@@ -158,6 +158,23 @@ support code is not mistaken for a runnable example. If `cl-fzy` is absent, the
 optional system reports a concise actionable diagnostic and points to the
 built-in `fzf-finder-real` alternative.
 
+## Repaired directory, rainbow and key-inspection examples
+
+`dirli.lisp` now renders its list as native ElmTUI text rows; arrows (or
+`j`/`k`) move the selection without inadvertently entering a directory.
+Only Enter opens the selected directory; `q` exits.
+
+`rainbow-app.lisp` and `mini-rainbow.lisp` display deterministic colored
+glyph bands (rather than blank background boxes). Space toggles horizontal
+and vertical layouts; `q` exits. `key-tester.lisp` displays printable keys
+and their normalized names; Backspace edits and Escape clears the input.
+
+Run the private-terminal regression sweep, including the tmux restore cases:
+
+```sh
+python3 tests/e2e/tmux-scrollback-restoration.py
+```
+
 ## Tmux examples
 
 | File | Purpose |

@@ -70,6 +70,16 @@ The project follows semantic versioning from the first published release.
 
 ### Fixed
 
+- Repaired the remaining maintained directory, rainbow, keyboard-inspection,
+  and tmux demonstrations: native Dirli list rendering/explicit Enter,
+  deterministic colored rainbow glyphs and orientation changes, functional
+  key tester edit/backspace/Escape paths, typed tmux-hover navigation, and
+  delayed tmux-idle timer start to avoid state-transaction conflicts.
+- Added isolated tmux PTY tests that seed 70 historical scrollback rows,
+  snapshot the pre-app pane, verify animation/controls, and prove that all
+  history rows and shell-underlay markers survive exit without leaked overlays
+  or modified termios.
+
 - Prevented the terminal driver from presenting startup frames before the
   below-cursor viewport scroll reservation. Startup now installs the cursor
   anchor before dimensions, defers frames through bootstrapping, and commits
