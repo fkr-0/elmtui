@@ -29,6 +29,16 @@
 
 (in-suite terminal-lifecycle-suite)
 
+(test gray-palette-aliases-produce-valid-terminal-sgr
+  "A semantic gray color must render instead of leaving the TUI blank."
+  (dolist (color '(:gray :grey :bright-black))
+    (let* ((style (elmtui.platform.backend.common.ansi-styling:style-to-terminal-style
+                    (list :fg-color color :bg-color color)))
+           (fg (first (elmtui.platform.backend.common.ansi-styling:ansi-seqs style :fg-color)))
+           (bg (first (elmtui.platform.backend.common.ansi-styling:ansi-seqs style :bg-color))))
+      (is (string= (format nil "~C[90m" #\Escape) fg))
+      (is (string= (format nil "~C[100m" #\Escape) bg)))))
+
 (test terminal-style-transition-does-not-reenter-nonrecursive-lock
   "An atomic terminal frame must be able to emit SGR without locking twice."
   (uiop:with-temporary-file (:stream stream :direction :output
