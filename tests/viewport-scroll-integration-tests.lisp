@@ -38,6 +38,16 @@
 
 (in-suite viewport-scroll-integration)
 
+(test alternate-screen-preflight-refuses-without-touching-backend
+  "Normal-buffer mode is mandatory: reject alternate-screen before initialization."
+  (let ((sentinel (gensym "BACKEND")))
+    (let ((elmtui.platform.driver::*backend* sentinel))
+      (signals error
+        (elmtui.platform.driver:run-app-platform
+         '(:name :reject-alternate) :backend-type :terminal
+         :platform-options '(:use-alternate-screen t)))
+      (is (eq sentinel elmtui.platform.driver::*backend*)))))
+
 ;;;---------------------------------------------------------------
 ;;; Test Helpers
 ;;;---------------------------------------------------------------
@@ -429,7 +439,7 @@
 (defun get-prop (state compid prop)
   (state-ref state (list :components compid prop)))
 (test scroll-net-tracking
-  "Verify scroll tracking accumulates correctly."
+  "Only ordered acknowledgments consume pending effects and record displacement."
   (let* ((state (elmtui.state:make-application-state))
           (rv (make-root-viewport :test-rv2 :anchor :below-cursor))
           (id-path '(:components :test-rv2)))
@@ -443,7 +453,10 @@
       (declare (ignore comp cmds))
       (elmtui.state:apply-patches state patches))
 
-    ;; Simulate scroll events
+    ;; These are pre-issued scrolls awaiting ordered terminal notifications.
+    (setf (state-ref state (append id-path '(:issued-scroll-net))) 4
+          (state-ref state (append id-path '(:pending-scroll-ops))) '(3 2 -1))
+    ;; Simulate scroll completions
     (let ((result1 (update rv '(:terminal-scrolled :direction :down :amount 3) state :id-path id-path)))
       (elmtui.state:apply-patches state (elmtui.state.api:ur-patches result1)))
 
@@ -453,11 +466,55 @@
     (let ((result3 (update rv '(:terminal-scrolled :direction :up :amount 1) state :id-path id-path)))
       (elmtui.state:apply-patches state (elmtui.state.api:ur-patches result3)))
 
-    ;; Check accumulated scroll
-    (let ((net-scroll
-            (state-ref state (list :components :test-rv2 :issued-scroll-net))))
-      (is (= net-scroll 4) (format nil "Net scroll got ~A should be 3 + 2 - 1 = 4"
-                             net-scroll)))))
+    ;; Requested scrolls are consumed, while committed displacement survives.
+    (is (= 0 (state-ref state (append id-path '(:issued-scroll-net)))))
+    (is (null (state-ref state (append id-path '(:pending-scroll-ops)))))
+    (is (= 4 (state-ref state (append id-path '(:scrolled-net)))))
+    (is (equal '(0 14) (state-ref state (append id-path '(:cursor-pos)))))
+    (let ((result (update rv '(:terminal-scrolled :direction :down :amount 4)
+                          state :id-path id-path)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches result)))
+    (is (= 4 (state-ref state (append id-path '(:scrolled-net))))
+        "An unsolicited duplicate acknowledgment must not mutate scroll state")))
+
+(test nested-viewport-scroll-is-local
+  "An inner viewport moves its content without issuing terminal scroll effects."
+  (let* ((state (make-application-state))
+         (vp (elmtui.ui.widgets.viewport:make-viewport :id :inner))
+         (id-path '(:components :inner)))
+    (multiple-value-bind (component patches commands)
+        (init vp :id-path id-path :initial-width 20 :initial-height 150)
+      (declare (ignore component commands))
+      (elmtui.state:apply-patches state patches))
+    (let* ((result (update vp '(:scroll-by :dx 0 :dy 5) state :id-path id-path))
+           (commands (elmtui.state.api:ur-commands result)))
+      (elmtui.state:apply-patches state (elmtui.state.api:ur-patches result))
+      (is (null (remove-if-not
+                 (lambda (cmd)
+                   (and (consp cmd) (eq (first cmd) :render)
+                        (member (second cmd) '(:scroll-up :scroll-down :scroll))))
+                 commands)))
+      (is (= 5 (state-ref state (append id-path '(:scroll-y))))))))
+
+(test driver-scroll-effect-produces-ordered-notification
+  "The real effect executor reports the direction and magnitude it executed."
+  (let* ((filepath "/tmp/test-scroll-ack.log")
+         (backend (make-test-backend filepath))
+         (messages nil))
+    (unwind-protect
+        (progn
+          (is (elmtui.platform.driver::%execute-render-command-and-notify
+               '(:render :scroll-down 3) backend
+               (lambda (msg) (push msg messages))))
+          (is (equal '(:terminal-scrolled :direction :down :amount 3)
+                     (first messages)))
+          (is (elmtui.platform.driver::%execute-render-command-and-notify
+               '(:render :scroll-up 2) backend
+               (lambda (msg) (push msg messages))))
+          (is (equal '(:terminal-scrolled :direction :up :amount 2)
+                     (first messages))))
+      (shutdown-backend backend)
+      (ignore-errors (delete-file filepath)))))
 
 
 ;; (let* ((state (elmtui.state:make-application-state))

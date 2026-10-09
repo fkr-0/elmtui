@@ -177,19 +177,20 @@
     (is (equal '(:timer (:interval 0.4 :message (:tick)))
                (funcall subs-fn ready)))))
 
-(test tmux-hover-reports-capture-errors-in-model
-  (%load-example "tmux-hover-demo")
-  (let* ((pkg (find-package "ELMTUI-EXAMPLES.TMUX-HOVER-DEMO"))
-         (update-fn (symbol-function (find-symbol "HOVER-UPDATE" pkg)))
-         (view-fn (symbol-function (find-symbol "HOVER-VIEW" pkg)))
-         (result (funcall update-fn '(:tmux-lines-error "boom")
+(test tmux-hover-delegated-inspector-reports-capture-errors
+  "The hover compatibility runner shares cursor-inspector's error model."
+  (%load-example "cursor-inspector")
+  (let* ((pkg (find-package "ELMTUI-EXAMPLES.CURSOR-INSPECTOR"))
+         (update-fn (symbol-function (find-symbol "CURSOR-INSPECTOR-UPDATE" pkg)))
+         (view-fn (symbol-function (find-symbol "CURSOR-INSPECTOR-VIEW" pkg)))
+         (result (funcall update-fn '(:inspector-capture-error "boom")
                           '(:lines #("old") :cursor-x 0 :cursor-y 0))))
     (is-true (typep result 'update-result))
     (is (search "boom" (prin1-to-string (ur-patches result)) :test #'char-equal))
     (is (search "boom"
                 (prin1-to-string
                  (funcall view-fn '(:lines #() :cursor-x 0 :cursor-y 0
-                                    :status-message "tmux capture failed: boom")))
+                                    :status "Refresh failed: boom")))
                 :test #'char-equal))))
 
 (defun %pkg-sym (package-designator name)

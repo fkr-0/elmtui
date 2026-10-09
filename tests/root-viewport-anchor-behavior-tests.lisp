@@ -18,6 +18,21 @@
 (def-suite elmtui/root-vp/behavior)
 (in-suite elmtui/root-vp/behavior)
 
+(test zero-dimension-startup-never-queues-zero-scroll
+  "A cursor report before terminal dimensions must not reserve a phantom effect."
+  (multiple-value-bind (rv idp ignored state)
+      (init-root :below-cursor 100 35 2 1)
+    (declare (ignore ignored))
+    (setf (state-ref state (append idp '(:terminal-size))) '(0 0)
+          (state-ref state (append idp '(:size-known))) nil
+          (state-ref state (append idp '(:height))) 13)
+    (upd rv idp state '(:cursorposition :col 1 :row 2))
+    (is (null (state-ref state (append idp '(:pending-scroll-ops)))))
+    (is (= 0 (state-ref state (append idp '(:issued-scroll-net)))))
+    (upd rv idp state '(:terminalresized :width 100 :height 35))
+    (is (null (state-ref state (append idp '(:pending-scroll-ops)))))
+    (is (consp (elmtui.ui.api:view rv state :id-path idp)))))
+
 (test below-cursor-bottom-row-reserves-every-viewport-row
   "For a zero-indexed last-row cursor, there are no rows below the cursor."
   (multiple-value-bind (height issued commands)
@@ -140,6 +155,63 @@
       (is (state-patch-p patches idp '(:height) 10)
         "Viewport height patch recorded on resize")
       (is-true (has-render-cmd-p cmds :scroll-down)))))
+
+(test bottom-row-scroll-acknowledgment-reanchors-without-repeating
+  "A bottom-row anchor must wait for scrolling and then use the shifted anchor."
+  (multiple-value-bind (rv idp _ state) (init-root :below-cursor 20 10 10 1)
+    (declare (ignore _))
+    (setf (state-ref state (append idp '(:height))) 4)
+    (multiple-value-bind (patches updated commands)
+        (upd rv idp state '(:terminalresized :width 20 :height 10))
+      (declare (ignore patches updated))
+      (is-true (has-render-cmd-p commands :scroll-down 4)))
+    (is (equal '(4) (state-ref state (append idp '(:pending-scroll-ops)))))
+    (is (null (elmtui.ui.api:view rv state :id-path idp))
+        "Do not paint into rows which are still awaiting scroll completion")
+    (multiple-value-bind (patches updated commands)
+        (upd rv idp state '(:terminalresized :width 20 :height 10))
+      (declare (ignore patches updated))
+      (is (not (has-render-cmd-p commands :scroll-down))
+          "An outstanding scroll suppresses duplicate requests"))
+    (upd rv idp state '(:terminal-scrolled :direction :down :amount 4))
+    (is (null (state-ref state (append idp '(:pending-scroll-ops)))))
+    (is (= 0 (state-ref state (append idp '(:issued-scroll-net)))))
+    (is (= 4 (state-ref state (append idp '(:scrolled-net)))))
+    (is (equal '(1 6) (state-ref state (append idp '(:cursor-pos)))))
+    ;; An actual terminal cursor-position report is *physical*. CSI S
+    ;; moves pane content but does not move that hardware cursor.
+    (multiple-value-bind (patches updated commands)
+        (upd rv idp state '(:cursorposition :col 1 :row 10))
+      (declare (ignore patches updated))
+      (is (not (has-render-cmd-p commands :scroll-down))
+          "Re-probing the physical cursor must not reserve another scroll"))
+    (is (equal '(1 6) (state-ref state (append idp '(:cursor-pos))))
+        "Logical content anchor remains shifted after a physical cursor probe")
+    (is (consp (elmtui.ui.api:view rv state :id-path idp))
+        "Layout is now permitted after the anchor was shifted")
+    (multiple-value-bind (patches updated commands)
+        (upd rv idp state '(:terminalresized :width 20 :height 10))
+      (declare (ignore patches updated))
+      (is (not (has-render-cmd-p commands :scroll-down))
+          "The new cursor-relative anchor already has room for all four rows"))))
+
+(test scroll-acknowledgment-must-match-ordered-request
+  "Unsolicited and failed scrolls must not corrupt anchored geometry."
+  (multiple-value-bind (rv idp _ state) (init-root :below-cursor 20 10 10 1)
+    (declare (ignore _))
+    (setf (state-ref state (append idp '(:height))) 3)
+    (upd rv idp state '(:terminalresized :width 20 :height 10))
+    (is (equal '(3) (state-ref state (append idp '(:pending-scroll-ops)))))
+    (upd rv idp state '(:terminal-scrolled :direction :up :amount 3))
+    (is (equal '(3) (state-ref state (append idp '(:pending-scroll-ops)))))
+    (is (equal '(1 10) (state-ref state (append idp '(:cursor-pos)))))
+    (upd rv idp state '(:terminal-scroll-failed :direction :down :amount 3))
+    (is (null (state-ref state (append idp '(:pending-scroll-ops)))))
+    (is (= 0 (state-ref state (append idp '(:issued-scroll-net)))))
+    (is (= 0 (state-ref state (append idp '(:scrolled-net)))))
+    (is (state-ref state (append idp '(:scroll-effect-failed))))
+    (is (null (elmtui.ui.api:view rv state :id-path idp))
+        "Failed scrolling must not permit rendering into unavailable rows")))
 
 (test above-cursor-overflow-scrolls-up
   (multiple-value-bind (rv idp statep state) (init-root :above-cursor 40 20 3 10)
