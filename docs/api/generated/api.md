@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1235 of 1822 bindings documented; 587 have no metadata (67.8% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1378 of 1822 bindings documented; 444 have no metadata (75.6% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -6709,7 +6709,9 @@ Example:
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Asynchronous task failure retaining task and reason for handler inspection.
+```
 
 ## ELMTUI.CORE.CONDITIONS:ASYNC-TASK-ERROR-REASON
 
@@ -6731,7 +6733,9 @@ Return the asynchronous task associated with CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Failed command execution; preserves original command and diagnostic reason.
+```
 
 ## ELMTUI.CORE.CONDITIONS:COMMAND-EXECUTION-ERROR-COMMAND
 
@@ -6753,25 +6757,33 @@ Return the command execution failure reason carried by CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Constraint validation failure preserving the violated rule designator.
+```
 
 ## ELMTUI.CORE.CONDITIONS:CONSTRAINT-VALIDATION-ERROR-CONSTRAINT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the violated constraint designator.
+```
 
 ## ELMTUI.CORE.CONDITIONS:ELMTUI-VALIDATION-ERROR
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Validation base condition retaining the path, offending value and message.
+```
 
 ## ELMTUI.CORE.CONDITIONS:EVENT-LOOP-DISPATCH-ERROR
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Event dispatch failure; preserves dispatched event and error reason.
+```
 
 ## ELMTUI.CORE.CONDITIONS:EVENT-LOOP-DISPATCH-ERROR-EVENT
 
@@ -6793,7 +6805,9 @@ Return the event dispatch failure reason carried by CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Event validation failure preserving failed event type and original value.
+```
 
 ## ELMTUI.CORE.CONDITIONS:LOG-CONDITION
 
@@ -6807,7 +6821,9 @@ Log CONDITION with the given LEVEL.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Failed deserialization retaining serialized data and original cause condition.
+```
 
 ## ELMTUI.CORE.CONDITIONS:MESSAGE-DESERIALIZATION-ERROR-DATA
 
@@ -6829,7 +6845,9 @@ Return the underlying condition that caused message deserialization to fail.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Failed serialization retaining message data and original cause condition.
+```
 
 ## ELMTUI.CORE.CONDITIONS:MESSAGE-SERIALIZATION-ERROR-DATA
 
@@ -6851,7 +6869,9 @@ Return the underlying condition that caused message serialization to fail.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Rejected application message; retains the message and failure reason via prefixed readers.
+```
 
 ## ELMTUI.CORE.CONDITIONS:MESSAGE-VALIDATION-ERROR-MESSAGE
 
@@ -6873,19 +6893,25 @@ Return the validation failure reason carried by CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Property validation failure preserving the invalid property designator.
+```
 
 ## ELMTUI.CORE.CONDITIONS:PROPERTY-VALIDATION-ERROR-PROPERTY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the rejected UI property name or designator.
+```
 
 ## ELMTUI.CORE.CONDITIONS:RENDER-ERROR
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Rendering failure carrying a diagnostic message and underlying reason.
+```
 
 ## ELMTUI.CORE.CONDITIONS:RENDER-ERROR-MESSAGE
 
@@ -6907,7 +6933,9 @@ Return the render failure reason carried by CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Failure of a signal subscriber retaining the delivered signal and reason. Reporting does not invoke CL:SIGNAL.
+```
 
 ## ELMTUI.CORE.CONDITIONS:SIGNAL-SUBSCRIBER-ERROR-REASON
 
@@ -6929,7 +6957,9 @@ Return the signal being delivered when CONDITION was signaled.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+State update failure retaining the affected state and failure reason.
+```
 
 ## ELMTUI.CORE.CONDITIONS:STATE-UPDATE-ERROR-REASON
 
@@ -6951,7 +6981,9 @@ Return the state associated with the failed update in CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Subscriber callback failure preserving input event, callback and failure reason.
+```
 
 ## ELMTUI.CORE.CONDITIONS:SUBSCRIBER-HANDLER-ERROR-EVENT
 
@@ -6981,13 +7013,17 @@ Return the subscriber handler failure reason carried by CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Type validation failure retaining expected type, original value and path.
+```
 
 ## ELMTUI.CORE.CONDITIONS:TYPE-VALIDATION-ERROR-EXPECTED-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the expected type designator used in validation.
+```
 
 ## ELMTUI.CORE.CONDITIONS:VALIDATION-ERROR-MESSAGE
 
@@ -7001,13 +7037,17 @@ Return the framework-prefixed validation message carried by CONDITION.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the optional path locating the offending value.
+```
 
 ## ELMTUI.CORE.CONDITIONS:VALIDATION-ERROR-VALUE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the original offending Lisp value, without coercion.
+```
 
 ## ELMTUI.CORE.CONDITIONS:WITH-MESSAGE-RESTARTS
 
@@ -7162,7 +7202,9 @@ explain validation failures, and underlying-condition preserves causal errors.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Platform backend operation failure exposing backend type and attempted operation.
+```
 
 ## ELMTUI.CORE.ERRORS:BACKEND-ERROR-OPERATION
 
@@ -7184,7 +7226,9 @@ Return the backend type associated with CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Component operation failure retaining component type, identifier and operation for recovery handling.
+```
 
 ## ELMTUI.CORE.ERRORS:COMPONENT-ERROR-ID
 
@@ -7214,7 +7258,9 @@ Return the component type associated with CONDITION.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Invalid component definition. Exposes rejected macro argument and validation category.
+```
 
 ## ELMTUI.CORE.ERRORS:DEFCOMPONENT-ERROR-ARG
 
@@ -7252,7 +7298,9 @@ Return true when KEY belongs to the canonical diagnostic context vocabulary.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Declarative UI form failure, preserving the offending DSL form and source position.
+```
 
 ## ELMTUI.CORE.ERRORS:DSL-ERROR-FORM
 
@@ -7405,7 +7453,9 @@ Base class for ElmTUI failures that occur during application/runtime execution.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Runtime state access or mutation failure. Inspect STATE-ERROR-OPERATION, STATE-ERROR-PATH and STATE-ERROR-TYPE.
+```
 
 ## ELMTUI.CORE.ERRORS:STATE-ERROR-OPERATION
 
@@ -7484,19 +7534,25 @@ production async dispatch.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Add FN to CHAN's filter list and rebuild its underlying filtered channel; return CHAN.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:CHANNEL-OF
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the underlying CL-EVENTS channel owned by a typed EVENT-CHANNEL instance.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:CHANNEL-PRIORITY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return CHAN's :HIGH, :NORMAL, or :LOW priority.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:COMMAND-CHANNEL
 
@@ -7518,7 +7574,9 @@ Common superclass for all typed event channels.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or replace the channel wrapper's list of registered filter functions.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:FOCUS-CHANNEL
 
@@ -7532,7 +7590,9 @@ Focus-Channel events.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or replace the channel wrapper's registered handler list; handlers are not invoked automatically by RECEIVE-EVENT.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:KEYBOARD-CHANNEL
 
@@ -7546,7 +7606,9 @@ Keyboard-Channel events.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a typed command channel, forwarding keyword options such as :PRIORITY, :FILTERS and :CAPACITY.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:MAKE-EVENT-CHANNEL
 
@@ -7560,37 +7622,49 @@ Low-level helper – CLASS is a subclass symbol of `event-channel'.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a typed focus channel, forwarding keyword options such as :PRIORITY, :FILTERS and :CAPACITY.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:MAKE-KEYBOARD-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a typed keyboard channel, forwarding keyword options such as :PRIORITY, :FILTERS and :CAPACITY.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:MAKE-MESSAGE-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a typed message channel, forwarding keyword options such as :PRIORITY, :FILTERS and :CAPACITY.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:MAKE-MOUSE-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a typed mouse channel, forwarding keyword options such as :PRIORITY, :FILTERS and :CAPACITY.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:MAKE-SYSTEM-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a typed system channel, forwarding keyword options such as :PRIORITY, :FILTERS and :CAPACITY.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:MAKE-UI-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a typed UI channel, forwarding keyword options such as :PRIORITY, :FILTERS and :CAPACITY.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:MESSAGE-CHANNEL
 
@@ -7612,43 +7686,57 @@ Mouse-Channel events.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the typed event channel's symbolic identifier.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:PRIORITY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or replace the wrapper's dispatch priority, one of :HIGH, :NORMAL, or :LOW.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:RECEIVE-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Receive an item from CHAN's underlying CL-EVENTS channel using the blocking receive operation.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:REGISTER-EVENT-HANDLER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Push FN onto CHAN's registered handler list and return CHAN; this does not automatically dispatch received events.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:REMOVE-EVENT-FILTER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Remove FN from CHAN's filter list and update the underlying filtered channel; return CHAN.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:SEND-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Send EV into CHAN's underlying CL-EVENTS channel using its normal send operation.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:SET-CHANNEL-PRIORITY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Set CHAN's symbolic priority to NEW and return the assigned value.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:STANDARD-EVENT-CHANNELS
 
@@ -7694,7 +7782,9 @@ Ui-Channel events.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Remove FN from CHAN's registered handler list and return CHAN.
+```
 
 ## ELMTUI.CORE.EVENT-CHANNELS:WAIT-FOR-EVENT
 
@@ -7718,55 +7808,73 @@ Conditions: channel/probe conditions propagate to the caller unchanged.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Pipe class selecting its THEN or ELSE nested pipe by calling the predicate in :CONDITION on each event.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:FILTER-PIPE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Pipe class whose :FILTER function receives an event; a false value drops it and a true value retains the original event.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:MAKE-PIPELINE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a pipeline with an ordered list of PIPES and optional FALLTHROUGH flag, which defaults to true.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:PIPE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Base class of event-processing pipes, specialized by filters, transformations, and conditional branches.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:PIPELINE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+An ordered event-processing pipeline with mutable PIPES and FALLTHROUGH slots.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:PIPELINE-FALLTHROUGH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the pipeline's FALLTHROUGH flag controlling what happens when a stage returns NIL.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:PIPELINE-PIPES
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the ordered list of pipe objects processed by a pipeline.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:PROCESS-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Run EVENT through each pipeline pipe in order. A stage returning NIL clears the event when FALLTHROUGH is true, otherwise processing returns NIL immediately.
+```
 
 ## ELMTUI.CORE.EVENT-PIPELINE:TRANSFORM-PIPE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Pipe class whose :TRANSFORM function maps an incoming event to the next stage's value.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:COMMAND-EVENT
 
@@ -8795,37 +8903,49 @@ Manages focus state and navigation in the application.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the identifier of the currently active focus context, or NIL.
+```
 
 ## ELMTUI.CORE.FOCUS:FOCUS-MANAGER-CONTEXT-DATA
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the focus manager's hash table mapping context identifiers to stored focus-context records.
+```
 
 ## ELMTUI.CORE.FOCUS:FOCUS-MANAGER-CURRENT-FOCUS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the identifier of the currently focused widget, or NIL.
+```
 
 ## ELMTUI.CORE.FOCUS:FOCUS-MANAGER-FOCUS-HISTORY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the focus manager's stack of previously focused widget identifiers.
+```
 
 ## ELMTUI.CORE.FOCUS:FOCUS-MANAGER-FOCUS-RING-DIRTY-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set whether the cached focusable widget ring must be recalculated.
+```
 
 ## ELMTUI.CORE.FOCUS:FOCUS-MANAGER-FOCUSABLE-ELEMENTS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the ordered list of focusable widget identifiers used by focus traversal.
+```
 
 ## ELMTUI.CORE.FOCUS:FOCUS-PREVIOUS-FROM-HISTORY
 
@@ -9324,67 +9444,89 @@ The macro expands to evaluating to the thread object itself.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Clear global topic and channel subscriptions, reset the subscription identifier counter, and return true.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:DISPATCH-TOPIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Call all handlers matching TOPIC with MESSAGE; when APP-STATE is non-NIL, pass it as a second argument. Return collected handler results.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:FIND-HANDLERS-FOR-TOPIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return matching topic handler functions in their priority-sorted dispatch order.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:FIND-SUBSCRIPTIONS-FOR-TOPIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return matching subscription tokens for TOPIC-NAME, stably ordered with :HIGH first, then :NORMAL and :LOW.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:GET-ALL-SUBSCRIPTIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return an alist mapping each subscribed topic pattern to its registered handler functions.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:GET-CHANNEL-SUBSCRIPTIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return an alist of topic patterns and channel subscription objects for CHANNEL-ID.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:GET-TOPICS-WITH-SUBSCRIBERS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return distinct topic patterns subscribed through either topic or channel registries, sorted by printed representation.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:LIST-SUBSCRIPTIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return topic subscription tokens for PATTERN, or tokens for all patterns if PATTERN is NIL. Does not include channel subscriptions.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:PUBLISH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Publish MESSAGE to handlers matching TOPIC-NAME, collecting each handler's return value; alias of PUBLISH-TO-TOPIC.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:PUBLISH-TO-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Call active handlers for TOPIC matching CHANNEL-ID and collect their return values; channel identifiers compare with EQL.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:PUBLISH-TO-TOPIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Call all topic handlers matching TOPIC-NAME in priority order, collecting and returning each result.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:SUBSCRIBE
 
@@ -9406,151 +9548,201 @@ Subscribe HANDLER to PATTERN, guarded by PREDICATE-FN.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Register HANDLER-FN for TOPIC and CHANNEL-ID; return a channel subscription object for later removal.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:SUBSCRIPTION-COUNT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the total number of registrations across the topic subscription and channel subscription tables.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:SUBSCRIPTION-INFO
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return plists with :ID, :PATTERN, and :PRIORITY for topic subscriptions, optionally filtered by PATTERN.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:UNSUBSCRIBE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Remove a topic subscription using the token returned by SUBSCRIBE and return true, including when already absent.
+```
 
 ## ELMTUI.CORE.TOPIC-REGISTRY:UNSUBSCRIBE-FROM-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Remove the supplied channel subscription object from its topic and channel pair; return true.
+```
 
 ## ELMTUI.CORE.TOPICS:FIND-TOPIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Look up NAME in the process-wide topic registry and return the registered topic or NIL.
+```
 
 ## ELMTUI.CORE.TOPICS:FIND-TOPICS-BY-PATTERN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return registered topic objects whose segment paths match PATTERN, including wildcard segments.
+```
 
 ## ELMTUI.CORE.TOPICS:LIST-TOPICS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the currently registered topic objects in hash-table traversal order; no ordering is guaranteed.
+```
 
 ## ELMTUI.CORE.TOPICS:MAKE-TOPIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a topic with NAME, optional PARENT and DESCRIPTION. Also adds the new topic to its parent's children, but does not register it.
+```
 
 ## ELMTUI.CORE.TOPICS:MAKE-TOPIC-SUBSCRIPTION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a subscription holding PATTERN, HANDLER, and optional priority of :HIGH, :NORMAL, or :LOW.
+```
 
 ## ELMTUI.CORE.TOPICS:REGISTER-TOPIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Register TOPIC globally by its topic name, replacing any prior entry under that name, and return TOPIC.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Topic structure containing a symbol or string name, optional parent, child list, and optional description.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-ANCESTORS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return TOPIC's parents from nearest to farthest; return NIL for a root topic.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-CHILDREN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the list of immediate child topics; making a topic with a parent adds to this list.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-DESCENDANTS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return all child topic objects recursively. Immediate children appear before recursively visited descendants.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-DESCRIPTION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return TOPIC's optional descriptive string, or NIL if no description was supplied.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-MATCH-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true if TOPIC1 is TOPIC2 or a descendant of TOPIC2, using object identity for ancestry.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the topic's original symbol or string name.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-PARENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return TOPIC's parent topic object or NIL for a root.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-PATH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return topic name segments from the root through TOPIC. A root string containing slashes is split into path segments.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-PATTERN-MATCH-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Match PATTERN against TOPIC by case-insensitive path segments; * matches one segment and # matches the remaining suffix, including an empty suffix.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-SUBSCRIPTION
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Subscription structure containing a pattern, a handler function, and a :HIGH, :NORMAL, or :LOW priority.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-SUBSCRIPTION-HANDLER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the handler function stored in a topic subscription.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-SUBSCRIPTION-PATTERN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the string or symbol pattern matched by a topic subscription.
+```
 
 ## ELMTUI.CORE.TOPICS:TOPIC-SUBSCRIPTION-PRIORITY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a subscription's dispatch priority, one of :HIGH, :NORMAL, or :LOW.
+```
 
 ## ELMTUI.DEV:BUFFER->STRING
 
@@ -11388,7 +11580,7 @@ The -e flag ensures escape sequences are included for style preservation.
 Kinds: function
 
 ```text
-Shortcut for capturing the entire tmux screen.
+Return ANSI-styled tmux pane content including scrollback via CAPTURE-PANE-STRING with MODE :SCREEN. Read-only; potentially larger than the visible pane.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:CLEAR-SAVED-TMUX-CAPTURE
@@ -11420,7 +11612,7 @@ Create a virtual buffer populated from tmux output.
 Kinds: function
 
 ```text
-Return a styled snapshot of the visible pane without copying scrollback.
+Return a new WIDTH-by-HEIGHT styled visible-pane cell grid, or NIL outside tmux. Captures only; does not repaint cells or restore history.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:PARSE-ANSI-SGR
@@ -11446,8 +11638,7 @@ A combined reset/set such as ESC[0;31m clears old attributes first.
 Kinds: function
 
 ```text
-Capture the terminal-visible underlay with styles, returning its saved snapshot.
-This is the driver's historical entry point, now style-aware by default.
+Prefill BACKEND from styled visible tmux cells and return an independent cell snapshot. No full history is saved, so this does not guarantee resize-safe quit.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:PREFILL-BACKEND-FROM-TMUX-STYLED
@@ -11455,9 +11646,7 @@ This is the driver's historical entry point, now style-aware by default.
 Kinds: function
 
 ```text
-Prefill both backend frames from the styled visible tmux pane.
-The snapshot is independently allocated, suitable for deferred restoration.
-Tmux history is not re-rendered or modified by this function.
+Fill terminal backend front/back buffers from visible pane SGR cells and return a separate styled snapshot. No scrollback history is replayed or protected from shrink.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:PREFILL-BUFFER-FROM-STRING
@@ -11483,7 +11672,7 @@ No scrollback-sized intermediate buffer or terminal I/O is required.
 Kinds: function
 
 ```text
-Restore BUFFER to the saved tmux capture state.
+Copy saved cell characters and styles into virtual BUFFER, returning BUFFER. No physical repaint, cursor restoration, or tmux scrollback recovery occurs here.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:SAVE-TMUX-CAPTURE
@@ -11491,7 +11680,7 @@ Restore BUFFER to the saved tmux capture state.
 Kinds: function
 
 ```text
-Save a copy of BUFFER for later restoration.
+Copy a bounded visible-pane cell BUFFER into the saved slot. This does not snapshot tmux scrollback or protect history from later resize-induced displacement.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:SPLIT-BY-ANSI-SEQUENCES
@@ -11522,25 +11711,33 @@ _No documentation metadata._
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Condition signaled when two virtual terminal buffers cannot be compared during incremental diff generation.
+```
 
 ## ELMTUI.RENDER.DIFF:BUFFERS-NOT-COMPATIBLE-ERROR-BACK
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the destination buffer retained by a buffer-compatibility condition.
+```
 
 ## ELMTUI.RENDER.DIFF:BUFFERS-NOT-COMPATIBLE-ERROR-FRONT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the prior rendered buffer retained by a buffer-compatibility condition.
+```
 
 ## ELMTUI.RENDER.DIFF:BUFFERS-NOT-COMPATIBLE-ERROR-REASON
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the explanation for a buffer-compatibility failure.
+```
 
 ## ELMTUI.RENDER.DIFF:COMPUTE-BUFFER-DIFF
 
@@ -11557,31 +11754,41 @@ Operations carry zero-based frame coordinates and batched :WRITE-CHARS values.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Structure recording compared cells, changed cells, emitted batches, and full redraw count for one diff.
+```
 
 ## ELMTUI.RENDER.DIFF:DIFF-METRICS-BATCHES
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return how many write batches were emitted by a buffer-diff computation.
+```
 
 ## ELMTUI.RENDER.DIFF:DIFF-METRICS-CELLS-CHANGED
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the number of terminal cells requiring output in a buffer-diff computation.
+```
 
 ## ELMTUI.RENDER.DIFF:DIFF-METRICS-CELLS-COMPARED
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the number of cells examined during a buffer-diff computation.
+```
 
 ## ELMTUI.RENDER.DIFF:DIFF-METRICS-FULL-REDRAWS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return how many full redraw frames were accounted for by a buffer-diff computation.
+```
 
 ## ELMTUI.RENDER.PRESENTATION:CLEAR-RECORDINGS
 
@@ -12268,13 +12475,17 @@ Represents a single argument in a variant definition.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the keyword naming an argument in a declared message variant.
+```
 
 ## ELMTUI.STATE.MSG:ARG-DEF-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type specifier required for an argument in a declared message variant.
+```
 
 ## ELMTUI.STATE.MSG:CANONICALIZE-MESSAGE-VARIANT
 
@@ -12442,19 +12653,25 @@ Represents the schema for a message type defined by defmsg.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the source docstring recorded for a declared message schema.
+```
 
 ## ELMTUI.STATE.MSG:MESSAGE-SCHEMA-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the symbol naming the message type represented by this schema.
+```
 
 ## ELMTUI.STATE.MSG:MESSAGE-SCHEMA-VARIANTS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the list of declared variant definitions belonging to a message schema.
+```
 
 ## ELMTUI.STATE.MSG:MESSAGE-VARIANT-P
 
@@ -12494,25 +12711,33 @@ Represents a single message variant definition.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the optional raw argument specification recorded for a message variant.
+```
 
 ## ELMTUI.STATE.MSG:VARIANT-DEFINITION-ARGS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the ordered argument descriptors for a declared message variant.
+```
 
 ## ELMTUI.STATE.MSG:VARIANT-DEFINITION-CONSTRUCTOR-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the symbol naming the constructor generated for this message variant.
+```
 
 ## ELMTUI.STATE.MSG:VARIANT-DEFINITION-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the canonical keyword name of a declared message variant.
+```
 
 ## ELMTUI.STATE.UPDATE:*LOG-UPDATE-RESULTS*
 
@@ -13129,67 +13354,89 @@ Model for a listbox widget.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the number of visible listbox rows used for paging and scroll calculations.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:LISTBOX-MODEL-ID
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the identity used to associate this listbox model with its UI widget.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:LISTBOX-MODEL-ITEMS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the ordered list of items displayed by the listbox.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:LISTBOX-MODEL-ON-SELECT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the message template dispatched by the listbox when selection changes.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:LISTBOX-MODEL-SCROLL-OFFSET
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the zero-based index of the first visible listbox item.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:LISTBOX-MODEL-SELECTED-INDEX
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the selected zero-based item index, or NIL for no selection.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:MSG-LISTBOX-KEY-PRESS
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message-type constant :LISTBOX-KEY-PRESS; accepts a :KEY field for Up, Down, Home, End and paging navigation.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:MSG-LISTBOX-SCROLL-DOWN
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message-type constant :LISTBOX-SCROLL-DOWN; the optional :AMOUNT determines downward scroll steps.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:MSG-LISTBOX-SCROLL-UP
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message-type constant :LISTBOX-SCROLL-UP; the optional :AMOUNT determines upward scroll steps.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:MSG-LISTBOX-SELECT-INDEX
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message-type constant :LISTBOX-SELECT-INDEX; supply :INDEX to select an item directly.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:MSG-LISTBOX-SET-ITEMS
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message-type constant :LISTBOX-SET-ITEMS; supply :ITEMS to replace the list and clamp selection and scroll offset.
+```
 
 ## ELMTUI.UI.WIDGETS.LISTBOX:UPDATE-LISTBOX
 
@@ -14542,7 +14789,9 @@ Check if the area of obj1 is less than the area of obj2.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a list of border rectangles within RECTANGLE, optionally selecting :TOP, :BOTTOM, :LEFT or :RIGHT and WIDTH. The :ALL case excludes NIL intersections; invalid side signals an error.
+```
 
 ## ELMTUI.VIEW.GEO:CLAMP
 
@@ -14556,13 +14805,17 @@ Clamps VALUE to be within the range [MIN, MAX].
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Test whether a rectangle contains a position, two-element (x y) list, or another rectangle. Point right/bottom bounds are exclusive; a contained rectangle uses its full extents.
+```
 
 ## ELMTUI.VIEW.GEO:CORNER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a new POS at the selected rectangle corner :TOP-LEFT, :TOP-RIGHT, :BOTTOM-LEFT or :BOTTOM-RIGHT. Invalid corner signals an error.
+```
 
 ## ELMTUI.VIEW.GEO:DIM
 
@@ -14607,7 +14860,9 @@ Get the position component (:x or :y) of a rectangle's dimension.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Mutate RECTANGLE using RESIZE-DIMENSION! with positive AMOUNT on SIDE. The actual edge adjustment follows RESIZE-DIMENSION!; inspect :LEFT/:TOP semantics rather than assuming an outward move.
+```
 
 ## ELMTUI.VIEW.GEO:H
 
@@ -14626,25 +14881,33 @@ Get the height of the object (size or rectangle).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a one-cell-thick bounding rectangle through two POS endpoints, including both endpoints. Diagonal points signal an error.
+```
 
 ## ELMTUI.VIEW.GEO:MAKE-POS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a POS with :X and :Y coordinates, defaulting both to zero. Coordinates use nonnegative integer slots.
+```
 
 ## ELMTUI.VIEW.GEO:MAKE-RECTANGLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a RECTANGLE with :POS and :SIZE slots. Each defaults to the corresponding zero-valued structure.
+```
 
 ## ELMTUI.VIEW.GEO:MAKE-SIZE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a SIZE with nonnegative integer :W width and :H height slots, defaulting to zero.
+```
 
 ## ELMTUI.VIEW.GEO:MOVE!
 
@@ -14658,13 +14921,17 @@ Move the object to absolute (x, y) then by relative (dx, dy) (mutating).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Adjust a rectangle with negative width or height by shifting its origin and negating the affected dimension; return the mutated rectangle.
+```
 
 ## ELMTUI.VIEW.GEO:OVERLAP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a newly constructed rectangle for the positive-area intersection of R1 and R2, or NIL if their interiors do not intersect.
+```
 
 ## ELMTUI.VIEW.GEO:POS
 
@@ -14683,19 +14950,25 @@ Get the pos struct of the object (rectangle).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the X coordinate of a POS. Its nonnegative integer slot may be updated through (SETF POS-X) .
+```
 
 ## ELMTUI.VIEW.GEO:POS-Y
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the Y coordinate of a POS. Its nonnegative integer slot may be updated through (SETF POS-Y) .
+```
 
 ## ELMTUI.VIEW.GEO:RECT-DIFF
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return zero to four rectangles covering the area of R1 outside its intersection with R2. Without overlap, return a list containing R1.
+```
 
 ## ELMTUI.VIEW.GEO:RECTANGLE
 
@@ -14716,19 +14989,25 @@ Side-effects: None
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the POS structure owned by a RECTANGLE. Mutating its slots changes the rectangle origin.
+```
 
 ## ELMTUI.VIEW.GEO:RECTANGLE-SIZE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the SIZE structure owned by a RECTANGLE. Mutating its slots changes the rectangle dimensions.
+```
 
 ## ELMTUI.VIEW.GEO:RECTANGLE-UNION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a new bounding rectangle enclosing two input rectangles; this is a bounding box, not a disjoint-region union.
+```
 
 ## ELMTUI.VIEW.GEO:RECTANGLE-UNION-LIST
 
@@ -14742,13 +15021,17 @@ Calculate the union of a list of rectangles.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Mutate a rectangle edge selected by :SIDE and :AMOUNT. :RIGHT/:BOTTOM add amount to width/height; :LEFT/:TOP shift the origin by amount and subtract it from width/height. Negative resulting dimensions signal an error.
+```
 
 ## ELMTUI.VIEW.GEO:SHRINK-VIEW!
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Call RESIZE-DIMENSION! with negated AMOUNT on the selected side and return the same rectangle, mutated.
+```
 
 ## ELMTUI.VIEW.GEO:SIZE
 
