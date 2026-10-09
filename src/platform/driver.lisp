@@ -591,13 +591,14 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
   (clear-subscription-registry *active-app-subscriptions*))
 
 (defun %refresh-app-subscriptions (app-spec model)
-  "Refresh active app subscriptions according to APP-SPEC and MODEL."
-  (let ((subs-fn (%resolve-subscriptions-fn app-spec))
-        (*state-mutation-policy*
-          (if (eq (getf app-spec :state-semantics) :strict-elm)
-              :forbid
-              :allow)))
-    (reconcile-model-subscriptions subs-fn model *active-app-subscriptions*)))
+  "Arm subscriptions only after initial terminal geometry and presentation."
+  (unless *startup-presentation-deferred*
+    (let ((subs-fn (%resolve-subscriptions-fn app-spec))
+          (*state-mutation-policy*
+            (if (eq (getf app-spec :state-semantics) :strict-elm)
+                :forbid
+                :allow)))
+      (reconcile-model-subscriptions subs-fn model *active-app-subscriptions*))))
 ;;; ---------------------------------------------------------------------------
 ;;; == Context Construction ==
 ;;; ---------------------------------------------------------------------------
@@ -958,7 +959,10 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
 
           ;; Always produce an initial frame even when startup messages do not trigger one.
           (unless *initial-render-done*
-            (force-render-current-frame app-spec))))
+            (force-render-current-frame app-spec))
+          ;; Do not start recurring timers while the initial viewport state
+          ;; transaction or forced presentation is still in flight.
+          (%refresh-app-subscriptions app-spec *current-app-model*)))
 
     ;; 5. Build the driver context and start the driver-managed input loop when the backend exposes cl-inputs handles.
     ;; Guarded by (when *backend* ...) so that a failed setup (nil backend) does not error here.

@@ -75,24 +75,46 @@
 ;;; ----------------------------------------------------------------------
 
 (defun key-tester-update (message app-state)
-  "Handle semantic keymap actions and raw/canonical key events safely."
-  (let ((component (state-ref app-state :component)))
+  "Handle raw keys as immutable component updates, including editing shortcuts."
+  (let* ((original (state-ref app-state :component))
+         (event (cond
+                  ((typep message 'key-event) message)
+                  ((and (consp message)
+                        (member (first message) '(:keyevent :key-event) :test #'eq))
+                   (getf (rest message) :event))))
+         (key (and event (key-event-key event)))
+         (char (and event (elmtui.core.event-types:key-event-char event)))
+         (mods (and event (key-event-modifiers event))))
     (cond
-      ((and (typep message 'key-event) (member (key-event-key message) '(:q #\q #\Q) :test #'eql))
+      ((or (and event (member key '(:q #\q #\Q) :test #'eql))
+           (equal message '(:quit))
+           (equal message '(:app-quit-requested)))
        (make-update-result :patches '(((:should-quit) t))))
-      ((and (consp message) (eq (first message) :app-quit-requested))
-       (make-update-result :patches '(((:should-quit) t))))
-      ((equal message '(:delete-last-char))
-       (let ((new-component (kt-handle-delete-last (copy-structure component))))
-         (make-update-result :patches (list (list '(:component) new-component)))))
-      ((equal message '(:clear-input))
-       (let ((new-component (kt-handle-clear-input (copy-structure component))))
-         (make-update-result :patches (list (list '(:component) new-component)))))
-      ((or (typep message 'key-event)
-           (and (consp message) (member (first message) '(:keyevent :key-event) :test #'eq)))
-       (let ((new-component (key-tester-on-key-event (copy-structure component) message)))
-         (make-update-result :patches (list (list '(:component) new-component)))))
+      ((or event (member message '((:delete-last-char) (:clear-input)) :test #'equal))
+       (let ((component (copy-structure original)))
+         (cond
+           ((or (equal message '(:clear-input))
+                (member key '(:escape :esc) :test #'eq))
+            (setf (key-tester-input component) ""))
+           ((or (equal message '(:delete-last-char))
+                (eq key :backspace))
+            (let ((input (key-tester-input component)))
+              (when (plusp (length input))
+                (setf (key-tester-input component)
+                      (subseq input 0 (1- (length input)))))))
+           ((and (characterp char)
+                 (<= 32 (char-code char) 126)
+                 (null mods))
+            (setf (key-tester-input component)
+                  (concatenate 'string (key-tester-input component)
+                               (string char)))))
+         (when event
+           (setf (key-tester-echo component)
+                 (normalized-key->string (key-event->normalized-key event))))
+         (make-update-result
+          :patches (list (list '(:component) component)))))
       (t (make-update-result)))))
+
 
 
 ;; (ELMTUI.VIEW.DSL:RENDER-DSL-TO-RESOLVED-TREE
@@ -141,11 +163,7 @@
   :initial-state-fn #'%key-tester-initial-state
   ;; Make the root viewport explicit so this app behaves like an inline terminal tool
   ;; instead of inheriting whatever the default wrapper happens to do.
-  :root-component-dsl '(:root-viewport
-                        :id :key-tester-root
-                        :anchor :below-cursor
-                        :blank-on-exit t
-                        :children (:layout :id :key-tester-widget))
+  :root-component-dsl '(:root-viewport :id :key-tester-root :anchor :below-cursor :width 80 :height 10 :blank-on-exit t :child-dsl-spec (:view nil))
   :update-fn 'key-tester-update
   :view-fn 'key-tester-view)
 

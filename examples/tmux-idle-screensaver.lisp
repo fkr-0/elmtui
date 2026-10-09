@@ -214,7 +214,9 @@ If preferred slice has no mutable points, fallback to top-left slice."
   (let* ((points (state-ref state :mutable-points #()))
          (ticks (state-ref state :ticks 0))
          (current (state-ref state :current-mutations nil))
-         (status (state-ref state :status-label "Press any key to exit"))
+         (status (format nil "~A  |  Tick ~3,'0D"
+                         (state-ref state :status-label "Press any key to exit")
+                         ticks))
          (base-buffer (state-ref state :base-buffer (make-virtual-buffer +idle-width+ +idle-height+)))
          (frame-buffer (copy-virtual-buffer base-buffer))
          (height (buffer-height frame-buffer))
@@ -247,9 +249,8 @@ If preferred slice has no mutable points, fallback to top-left slice."
            (:text :content ,(format nil "mutable chars: ~D" mutable-count)))))))
 
 (defun idle-subscriptions (app-state)
-  ;; Returning NIL lets the runtime reconcile and cancel the active timer on quit.
+  "Offer animation ticks while active; driver arms them after first paint."
   (unless (state-ref app-state :should-quit nil)
-    ;; Keep interval short so exit-after-label is responsive.
     '(:timer (:interval 0.4 :message (:tick)))))
 
 (defapplication tmux-idle-app

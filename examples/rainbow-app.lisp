@@ -74,6 +74,10 @@
   "Handles updates to the application state based on messages."
   (log-info "Rainbow: RECEIVED MESSAGE: ~S" message)
   (cond
+    ((and (typep message 'key-event)
+          (member (elmtui.core.event-types:key-event-key message)
+                  '(:q :escape :esc #\q #\Q) :test #'eql))
+      (make-update-result :patches '(((:should-quit) t))))
     ((typep message 'key-event)
       (let* ((current-count (state-ref app-state :switch-count 0))
               (new-count (1+ current-count)))
@@ -107,26 +111,29 @@
 ;;                      :bg-color ,(rgb rgb-val))))))
 
 
-(defun rainbow-content-view (app-state)
-  "Defines the UI DSL for the rainbow app's content."
-  (let* ((orientation (state-ref app-state :orientation :row))
-          (flex-direction orientation)
-          (stripe-style (if (eq orientation :row)
-                          '(:width 1 :height :fill :flex-grow 1)
-                          '(:width :fill :height 1 :flex-grow 1))))
-    `(:container
-       :id :rainbow-content
-       :style (:display :flex :flex-grow 1 :flex-direction ,flex-direction :height 7 :width 7)
-       :children ,(loop for i from 0 below 7
-                    for (color-name class-name rgb-val) in rainbow-colors-with-names
-                    collect
-                    `(:container
-                       :id ,(intern (format nil "STRIPE-~A" (string color-name)) :keyword)
-                       :classes (,class-name)
-                       :style ,(append (list :fg-color (apply #'rgb rgb-val)
-                                         :bg-color (apply #'rgb rgb-val))
-                                 stripe-style)
-                       :children nil)))))
+(defun rainbow-content-view (state)
+  "Paint visible color bands rather than blank background-only cells."
+  (let ((orientation (state-ref state :orientation :row))
+        (colors (mapcar #'third rainbow-colors-with-names)))
+    `(:container :id :rainbow-content
+       :style (:display :flex :flex-direction :column :width 68 :height 14)
+       :children
+       ((:text :id :rainbow-heading :content "CHROMATIC / 08  |  Space rotate  |  Q quit"
+               :style (:fg-color :cyan :bold t))
+        (:text :id :rainbow-state :content ,(format nil "Layout: ~A" orientation))
+        (:container :id :rainbow-bands
+           :style (:display :flex
+                   :flex-direction ,(if (eq orientation :row) :row :column)
+                   :width 64 :height 10)
+           :children
+           ,(loop for color in colors for index from 0
+                  collect `(:text
+                             :id ,(intern (format nil "RAINBOW-BAND-~D" index) :keyword)
+                             :content ,(if (eq orientation :row) "██████"
+                                           (make-string 60 :initial-element #\#))
+                             :style (:fg-color ,(cons :rgb color)
+                                     :height ,(if (eq orientation :row) 10 1)
+                                     :width ,(if (eq orientation :row) 6 60)))))))))
 
 (defun rainbow-app-subscriptions (model)
   (declare (ignore model))
@@ -137,7 +144,7 @@
 ;;; Application Definition
 ;;;--------------------------------------------------------------
 (defun %rainbow-initial-state ()
-  (list :current-stylesheet rainbow-stylesheet
+  (list :current-stylesheet nil
         :should-quit nil
         :orientation :row
         :switch-count 0))
@@ -146,14 +153,7 @@
   :root-viewport-id :rainbow-root-vp
   :initial-state-fn #'%rainbow-initial-state
   ;; :root-component-dsl `(:column)
-  :root-component-dsl
-  '(:layout :id :rainbow-main-container
-
-     :initial-terminal-dimensions (1 1)
-     :initial-cursor-pos (1 1)
-     :children ((:viewport ;; column
-                  :id :main)))
-                                        ; or make nil and let view return full tree
+  :root-component-dsl '(:root-viewport :id :rainbow-root-vp :anchor :below-cursor :width 70 :height 14 :blank-on-exit t :child-dsl-spec (:view nil))
 
   :update-fn 'app-update
   :view-fn 'rainbow-content-view)

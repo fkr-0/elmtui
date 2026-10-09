@@ -64,9 +64,17 @@
 
 (test tmux-idle-defines-timer-subscription
   (load-system :elmtui-examples)
-  (let* ((subs-fn (%fn :elmtui.examples.tmux-idle "IDLE-SUBSCRIPTIONS"))
-         (subs (funcall subs-fn nil)))
-    (is (equal subs '(:timer (:interval 0.4 :message (:tick)))))))
+  (let* ((subs (%fn :elmtui.examples.tmux-idle "IDLE-SUBSCRIPTIONS"))
+         (cold '(:should-quit nil))
+         (ready '(:should-quit nil
+                  :components (:tmux-idle-root (:first-ready-done t))))
+         (done '(:should-quit t
+                 :components (:tmux-idle-root (:first-ready-done t)))))
+    (is (equal '(:timer (:interval 0.4 :message (:tick)))
+               (funcall subs cold)))
+    (is (equal '(:timer (:interval 0.4 :message (:tick)))
+               (funcall subs ready)))
+    (is (null (funcall subs done)))))
 
 (test tmux-idle-keypress-quits-immediately-without-exit-frame
   (load-system :elmtui-examples)
