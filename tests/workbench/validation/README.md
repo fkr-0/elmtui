@@ -29,6 +29,17 @@ untrusted input: the fixture only echoes single byte input and quits.
 
 Independent reviewer required; no self-approval or publication.
 
+## Independent supporting-library oracle
+
+`runner.py` also executes `scripts/test-subsystems.sh` through the
+`dependency_oracle` gate. This separately calls `asdf:test-system` for
+`cl-events`, `cl-inputs`, `cl-state` and `cl-styles`. Each library must
+execute nonzero FiveAM checks, report zero failures, and return successfully.
+This dependency gate is independent of the 30 Workbench application cases,
+the startup fixture and the main ElmTUI test suite. Its complete command,
+stdout/stderr, exit code and verdict are included in the JSON evidence report.
+The gate fails closed when any library fails or is skipped.
+
 ## Current live application runner
 
 The real W5 launcher now exists. Run all 30 executable case-specific
@@ -42,9 +53,9 @@ raw terminal bytes, cursor/geometry, input events, and before/after stty.
 It uses exact independent CLPM/SBCL module tests for unit cases and actual
 CLPM/SBCL launches for PTY cases. No fixture counts as an application pass.
 
-Exit codes are strict: 0 = all 30 passed; 1 = at least one tested failure;
-2 = no failed cases, but one or more cases not run. The most recent live
-run has 29 PASS, 1 FAIL, 0 NOT RUN. The failing bracketed-paste end-to-end
-case remains a release blocker until the workbench consumes a single
-typed :paste payload without evaluating any contained newline. Verify
-the generated result.json instead of extrapolating from the summary line.
+Exit codes are strict: 0 = all 30 application cases and all mandatory
+independent checks passed; 1 = at least one tested failure; 2 = no failed
+checks, but one or more application cases not run. The October 9 integrated
+run reported 30 PASS, 0 FAIL, 0 NOT RUN, and a passing independent four-library
+dependency oracle. Verify the generated result.json for current results;
+an independent review verdict remains a separate release requirement.
