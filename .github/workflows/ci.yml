@@ -33,8 +33,14 @@ jobs:
         run: clpm bundle install
       - name: Run FiveAM regression suite
         run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
+      - name: Verify independent subproject bundles and public dependency direction
+        run: scripts/test-subproject-bundles.sh
+      - name: Verify reusable libraries inside the root CLPM bundle
+        run: scripts/test-subsystems.sh
       - name: Generate API reference
         run: scripts/build-api-docs.sh
+      - name: Reject stale checked-in public API references
+        run: git diff --exit-code -- docs/api/generated/api.md docs/api/generated/api.html
       - name: Test API reference qualification guards
         run: python3 -m unittest discover -s tests/reference -p 'test_*.py' -v
       - name: Qualify API reference structure against live exports
