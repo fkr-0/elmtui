@@ -59,7 +59,8 @@
       (elmtui.platform.driver::%clear-app-subscriptions)
       (setf *app-sender* old-sender))))
 
-(test driver-restore-saved-capture-applies-diff
+(test driver-restore-saved-capture-applies-physical-diff
+  "Restoration patches the visible pane, not a stale cached front buffer."
   (let* ((front (make-virtual-buffer 4 1))
          (back (make-virtual-buffer 4 1))
          (snapshot (make-virtual-buffer 4 1))
@@ -88,7 +89,9 @@
            (is-true (elmtui.platform.driver::%restore-saved-tmux-capture-on-backend backend))
            (is-true diff-called)
            (is-true apply-called)
-           (is (char= #\B (buffer-cell-char (buffer-cell-at front 0 0)))))
+           ;; The physical pane was diffed through APPLY-DIFF-TO-BACKEND.
+           ;; Do not mutate the old viewport-local front buffer as a side effect.
+           (is (char= #\A (buffer-cell-char (buffer-cell-at front 0 0)))))
       (clear-saved-tmux-capture)
       (setf (symbol-function 'elmtui.platform.driver::compute-buffer-diff) orig-diff)
       (setf (symbol-function 'elmtui.platform.driver::apply-diff-to-backend) orig-apply))))

@@ -62,7 +62,7 @@ geometry.  NIL means the value should remain unchanged."
       (let ((excess (max 0 (- height rows))))
         (when (> excess 0)
           (case overflow-policy
-            (:scroll (emit-scroll :down excess))
+            (:scroll nil) ; inner scrolling moves content, never the physical terminal
             (:truncate (truncate-height (min height rows))))))
       (values new-height (if (/= new-issued issued) new-issued nil)
         (nreverse commands)))))

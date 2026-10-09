@@ -277,6 +277,8 @@ This keeps compatibility with older examples that pass app instances."
   (bt:with-lock-held (*frame-render-lock*)
     (full-view-pipeline ctx)))
 
+(defun %synchronize-resized-terminal-backend (message) "Apply real resize geometry before layout and before shutdown restoration." (when (and *backend* (consp message) (eq (first message) :terminalresized)) (let ((width (getf (rest message) :width)) (height (getf (rest message) :height))) (when (and (typep *backend* 'elmtui.platform.backend.terminal:terminal-instance) (integerp width) (integerp height) (plusp width) (plusp height) (or (/= width (term-w *backend*)) (/= height (term-h *backend*)))) (handle-backend-resize *backend* width height) (setf *previous-frame-buffer* nil)))) nil)
+
 (defun initialize-app-model (app-spec)
   (declare (type list app-spec))
   (let* (
@@ -312,6 +314,7 @@ This keeps compatibility with older examples that pass app instances."
       (setf elmtui.core.globals:*app-message-processor*
         (lambda (msg)
           (log:debug "DRIVER: *app-message-processor* received ~S" msg)
+          (%synchronize-resized-terminal-backend msg)
           ;; Ignore messages once shutdown has been requested to prevent double-appshutdown.
           (unless elmtui.core.loop:*shutdown-requested*
           ;; Handle quit request
@@ -369,11 +372,15 @@ This keeps compatibility with older examples that pass app instances."
                       (log-warn "DRIVER: model-driven appshutdown cleanup failed: ~A" e)))
                   (setf elmtui.core.loop:*shutdown-requested* t))
                 ;; Runtime effect manager: command execution + subscription refresh.
+                ;; Scroll acks captured locally so root-viewport sees completion
+                ;; before the frame render below.
+                (let ((scroll-acks nil))
                 (handler-case
                     (apply-update-effects
                      :commands commands
                      :render-command-fn (lambda (cmd)
-                                          (handler-case (execute-render-command cmd *backend*)
+                                          (handler-case (%execute-render-command-and-notify cmd *backend*
+                                                          (lambda (ack) (push ack scroll-acks)))
                                             (error (e) (log-warn "DRIVER: render command failed: ~A" e))))
                      :command-processor-fn cmd-proc-fn
                      :message-queue message-queue
@@ -389,6 +396,24 @@ This keeps compatibility with older examples that pass app instances."
                     (error condition))
                   (error (e)
                     (log-warn "DRIVER: apply-update-effects failed: ~A" e)))
+                (dolist (ack (nreverse scroll-acks))
+                  (handler-case
+                      (multiple-value-bind (ack-model ack-cmds)
+                          (funcall update-fn ack next-model)
+                        (setf next-model ack-model
+                              *current-app-model* ack-model
+                              elmtui.core.globals:*app-state* ack-model)
+                        (when ack-cmds
+                          (run-commands-with-policy
+                           ack-cmds
+                           :render-command-fn (lambda (cmd)
+                                                (handler-case
+                                                    (execute-render-command cmd *backend*)
+                                                  (error (condition)
+                                                    (log-warn "DRIVER: scroll-ack cmd failed: ~A"
+                                                              condition)))))))
+                    (error (e)
+                      (log-warn "DRIVER: scroll ack processing failed: ~A" e)))))
 
                 ;; During terminal bootstrap, wait for both geometry and cursor
                 ;; before presenting; scroll reservation must precede the
@@ -416,6 +441,18 @@ This keeps compatibility with older examples that pass app instances."
 ;;; Helper: execute :render commands synchronously prior to view
 (defun execute-render-command (cmd backend)
   (bt:with-lock-held (*frame-render-lock*) (%execute-render-command cmd backend)))
+
+(defun %execute-render-command-and-notify (cmd backend &optional (notifier #'publish))
+  "Execute an effect, then enqueue its ordered scroll completion or failure."
+  (let* ((op (and (consp cmd) (eq (first cmd) :render) (second cmd)))
+         (scroll-p (member op '(:scroll-down :scroll-up)))
+         (amount (and scroll-p (third cmd)))
+         (result (execute-render-command cmd backend)))
+    (when (and scroll-p (integerp amount) (> amount 0))
+      (funcall notifier (list (if result :terminal-scrolled :terminal-scroll-failed)
+                     :direction (if (eq op :scroll-down) :down :up)
+                     :amount amount)))
+    result))
 
 (defun %execute-render-command (cmd backend)
   "Execute a :render command against BACKEND. Format examples:
@@ -464,9 +501,11 @@ This keeps compatibility with older examples that pass app instances."
         (:scroll
           (elmtui.platform.api:scroll backend (or arg1 -1)))
         (:scroll-down
-          (dotimes (row (max 0 (or arg1 1))) (elmtui.platform.api:scroll backend 1)))
+          (prog1 (elmtui.platform.api:scroll backend (max 0 (or arg1 1)))
+            (setf *previous-frame-buffer* nil *initial-render-done* nil)))
         (:scroll-up
-          (dotimes (row (max 0 (or arg1 1))) (elmtui.platform.api:scroll backend -1)))
+          (prog1 (elmtui.platform.api:scroll backend (- (max 0 (or arg1 1))))
+            (setf *previous-frame-buffer* nil *initial-render-done* nil)))
         (:clear-below-cursor
           (if (fboundp 'elmtui.platform.api:clear-below-cursor)
             (elmtui.platform.api:clear-below-cursor backend)
@@ -683,22 +722,52 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
 ;;; == Platform Shutdown Logic ==
 ;;; ---------------------------------------------------------------------------
 
+(defun %resynchronize-live-tmux-geometry (backend) "Prefer actual tmux pane cells to stale PTY ioctl dimensions after resize." (when (and backend (tmux-available-p) (typep backend 'elmtui.platform.backend.terminal:terminal-instance)) (handler-case (let* ((raw (uiop:run-program ' ("tmux" "display-message" "-p" "#{pane_width} #{pane_height}") :output :string)) (parts (remove "" (uiop:split-string (string-trim ' (#\Space #\Tab #\Newline) raw) :separator ' (#\Space #\Tab)) :test #'string=)) (width (and (= (length parts) 2) (parse-integer (first parts) :junk-allowed nil))) (height (and (= (length parts) 2) (parse-integer (second parts) :junk-allowed nil)))) (when (and width height (plusp width) (plusp height) (or (/= width (term-w backend)) (/= height (term-h backend)))) (handle-backend-resize backend width height) (setf *previous-frame-buffer* nil))) (error (condition) (log-warn "Tmux pane geometry probe failed: ~A" condition)))) backend)
+
 (defun %restore-saved-tmux-capture-on-backend (backend)
-  "Restore saved tmux capture onto BACKEND and present it."
-  (when (and backend
-          (elmtui.platform.tmux:has-saved-tmux-capture)
-          (terminal-instance-front-buffer backend))
-    (let* ((front (terminal-instance-front-buffer backend))
-            (before (and front (copy-virtual-buffer front))))
-      (when (and before front)
-        (elmtui.platform.tmux:restore-to-tmux-capture front)
-        (let ((diff (compute-buffer-diff before front)))
-          (handler-case
-              (apply-diff-to-backend diff backend 0 0)
-            (error (condition)
-              (log-warn "DRIVER: tmux capture restore presentation failed: ~A" condition))))
-        (setf (terminal-instance-back-buffer backend) (copy-virtual-buffer front))))
-    t))
+  "Reconcile the actual tmux pane with saved styled cells at physical positions.
+The layout-stage frame is viewport-local and cannot be used as a pane diff."
+  (%resynchronize-live-tmux-geometry backend)
+  (let* ((saved elmtui.platform.tmux::*saved-tmux-capture*)
+         (tw (term-w backend))
+         (th (term-h backend))
+         (painted (and saved (tmux-available-p)
+                       (elmtui.platform.tmux:make-buffer-from-tmux-styled tw th))))
+    (when (and saved painted)
+      (let* ((sw (elmtui.platform.backend.common.virtual-buffer:buffer-width saved))
+             (sh (elmtui.platform.backend.common.virtual-buffer:buffer-height saved))
+             (pw (elmtui.platform.backend.common.virtual-buffer:buffer-width painted))
+             (ph (elmtui.platform.backend.common.virtual-buffer:buffer-height painted))
+             (width (min sw pw tw))
+             (height (min sh ph th)))
+        (when (and (plusp width) (plusp height))
+          (let ((before (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer width height))
+                (after (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer width height)))
+            (loop for row below height do
+              (loop for col below width do
+                (let ((old (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                            saved (+ row (- sh height)) col))
+                      (now (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                            painted (+ row (- ph height)) col)))
+                  (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
+                   before row col
+                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char now)
+                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style now))
+                  (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
+                   after row col
+                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char old)
+                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style old)))))
+            (handler-case
+                (apply-diff-to-backend (compute-buffer-diff before after)
+                                       backend (- th height) 0)
+              (error (condition)
+                (log-warn "DRIVER: tmux physical pane restore failed: ~A" condition)))
+            (let ((pos *last-cursor-pos*))
+              (when (and (consp pos) (integerp (car pos)) (integerp (cdr pos)))
+                (set-cursor-position backend
+                                     (max 0 (min (+ (car pos) (- th sh)) (1- th)))
+                                     (max 0 (min (cdr pos) (1- tw))))))
+            t))))))
 
 (defun %set-alternate-screen-mode (backend enabled-p)
   "Enter or leave terminal alternate screen mode for a maintained terminal backend.
@@ -817,6 +886,10 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
   (declare (type list app-spec)
     (type keyword backend-type)
     (type (or string null) tty-path))
+  ;; Normal scrollback is a hard invariant, including for tmux-backed apps.
+  ;; Reject before starting input, terminal I/O or background event threads.
+  (when (getf platform-options :use-alternate-screen)
+    (error "ElmTUI does not support alternate-screen mode; use the normal terminal buffer."))
   (log-info "Running RUN_APP_PLATFORM")
   ;; Reset all driver-level state variables at the start.
   (setf *app-spec* app-spec
