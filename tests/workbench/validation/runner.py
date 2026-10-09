@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Evidence-first W6 qualification: fixture green != application green.
+"""Evidence-first W6 qualification: actual app oracles, no fixture substitution.
 
-Represent all 30 matrix cases. Until W5 supplies a genuine launcher,
-report all cases NOT RUN; never substitute a synthetic terminal fixture.
+Represent all 30 matrix cases and run only implemented real oracles.
+Unimplemented cases remain NOT RUN; passing a fixture never implies app success.
 """
 import argparse
 from datetime import datetime, timezone
@@ -16,6 +16,8 @@ import subprocess
 import sys
 import time
 import uuid
+
+from live_cases import run_case_oracles
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -91,11 +93,17 @@ def main():
     launcher = launcher_status()
     dependency = ("W5 launcher absent: " + ", ".join(launcher["missing"])
                   if not launcher["present"] else
-                  "W5 launcher present but app-specific oracle execution not yet validated")
-    rows = [{"id": c["id"], "lane": c["lane"], "kind": c["kind"],
-             "required": c["required"], "oracle": c["oracle"], "status": "not-run",
-             "reason": dependency, "command": None, "exit_code": None,
-             "elapsed_seconds": 0, "warnings": [], "evidence": None} for c in cases]
+                  "No independently executable oracle implemented for this matrix case")
+    observed = run_case_oracles(cases, ROOT, out, check) if launcher["present"] else {}
+    rows = []
+    for case in cases:
+        receipt = observed.get(case["id"], {"status": "not-run", "reason": dependency,
+                                            "command": None, "exit_code": None,
+                                            "elapsed_seconds": 0, "warnings": [], "evidence": None})
+        rows.append({"id": case["id"], "lane": case["lane"], "kind": case["kind"],
+                     "required": case["required"], "oracle": case["oracle"], **receipt})
+    counts = {status: sum(row["status"] == status for row in rows)
+              for status in ("passed", "failed", "not-run")}
     report = {
         "schema": "elmtui.workbench.qa-evidence/v1", "task": TASK,
         "recorded_utc": datetime.now(timezone.utc).isoformat(),
@@ -103,8 +111,9 @@ def main():
         "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
                                capture_output=True, text=True).stdout.strip(),
         "launcher": launcher,
-        "qualification": {"total": 30, "passed": 0, "failed": 0, "not_run": 30,
-            "note": "Fixture/catalog/baseline checks never qualify workbench cases"},
+        "qualification": {"total": 30, "passed": counts["passed"],
+                          "failed": counts["failed"], "not_run": counts["not-run"],
+            "note": "Only case-specific executed oracles qualify; fixture/catalog/baseline never do"},
         "checks": checks, "cases": rows,
         "elapsed_seconds": round(time.monotonic() - started, 3),
         "review": {"required": True, "independent_verdict": "pending"}}
@@ -114,10 +123,15 @@ def main():
         print(name, item["result"], "exit=", item.get("exit_code"),
               "warnings=", item.get("warning_count", 0),
               "seconds=", item.get("elapsed_seconds"))
-    print("APPLICATION_CASES: PASS=0 FAIL=0 NOT_RUN=30")
+    print("APPLICATION_CASES: PASS=%d FAIL=%d NOT_RUN=%d" %
+          (counts["passed"], counts["failed"], counts["not-run"]))
+    if counts["not-run"]:
+        print("UNQUALIFIED:", ", ".join(row["id"] for row in rows if row["status"] == "not-run"))
     print("DEPENDENCY:", dependency)
     print("EVIDENCE:", out / "result.json")
-    return 0 if all(r["result"] in ("passed", "skipped") for r in checks.values()) else 1
+    if counts["failed"] or any(r["result"] == "failed" for r in checks.values()):
+        return 1
+    return 2 if counts["not-run"] else 0
 
 
 if __name__ == "__main__":
