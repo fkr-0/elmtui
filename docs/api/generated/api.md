@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1184 of 1822 bindings documented; 638 have no metadata (65.0% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1185 of 1822 bindings documented; 637 have no metadata (65.0% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -5376,7 +5376,11 @@ Read CLI argument KEY from STATE at (:cli KEY), returning DEFAULT when absent.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Resolve a component ID path against an APPLICATION-STATE.
+ID-PATH accepts a scalar keyword, symbol or string, or a list of segments;
+:COMPONENTS is an optional leading path segment. Invalid states signal TYPE-ERROR.
+```
 
 ## ELMTUI.APP.API:MAKE-RUNTIME-APP-SPEC
 
@@ -5441,7 +5445,7 @@ Run the application with the given app-spec and platform options.
 Kinds: function
 
 ```text
-Validate PLATFORM-OPTIONS for the given PLATFORM, signalling an error on invalid keys.
+Validate a proper PLATFORM-OPTIONS keyword/value plist for PLATFORM.
 ```
 
 ## ELMTUI.APP.EXTENSION:EXTRACT-PLATFORM-OPTIONS

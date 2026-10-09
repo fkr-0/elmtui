@@ -209,7 +209,10 @@
       (let ((comp1-map (elmtui.state:get-path '(:components :main-column :comp1) (elmtui.state:application-state-data app-state))))
         (is (not (null comp1-map)))
         (is (equal (get-path :state comp1-map) "comp1 state"))
-        (is (typep (elmtui.app:get-component-instance '(:main-column :comp1) app-state) 'app-init-test-component)))
+        (is (typep (elmtui.app:get-component-instance '(:main-column :comp1) app-state) 'app-init-test-component))
+        (is (typep (elmtui.app:get-component-instance '(main-column comp1) app-state) 'app-init-test-component))
+        (is (typep (elmtui.app:get-component-instance '("main-column" "comp1") app-state) 'app-init-test-component))
+        (is (typep (elmtui.app:get-component-instance '(components main-column comp1) app-state) 'app-init-test-component)))
 
       (let* ((parent1-map (elmtui.state:get-path '(:components :main-column :parent1) (elmtui.state:application-state-data app-state)))
               (child1-id (first (gethash :children-ids parent1-map))))
