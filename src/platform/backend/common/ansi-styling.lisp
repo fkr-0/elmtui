@@ -682,3 +682,51 @@ the escape sequence as byte stream."
   "Returns the simple color keyword from a terminal-color instance."
   (when color
     (terminal-color-simple color)))
+
+(unless (documentation 'terminal-color 'type) (setf (documentation 'terminal-color 'type) "A terminal color descriptor holding optional RGB components, a simple color keyword, a 256-color index, and a background-selection flag."))
+
+(unless (documentation 'terminal-style 'type) (setf (documentation 'terminal-style 'type) "A mutable terminal style descriptor with foreground and background colors plus bold, italic, underline, faint, blink, inverse, strike, and invisible attributes."))
+
+(unless (documentation 'make-terminal-color 'function) (setf (documentation 'make-terminal-color 'function) "Construct a TERMINAL-COLOR with RED, GREEN, BLUE, SIMPLE, BG, and COLOR-256 keyword slots. Unspecified channels remain NIL; no color conversion occurs."))
+
+(unless (documentation 'make-terminal-style 'function) (setf (documentation 'make-terminal-style 'function) "Construct a TERMINAL-STYLE with FG-COLOR and BG-COLOR descriptors and independent attribute flags. Every omitted slot starts as NIL."))
+
+(unless (documentation 'make-termcolor 'function) (setf (documentation 'make-termcolor 'function) "Construct a TERMINAL-COLOR using shorthand R, G, B, SIMPLE, BG, and COLOR-256 keyword arguments; return the new color descriptor."))
+
+(unless (documentation 'terminal-color-simple 'function) (setf (documentation 'terminal-color-simple 'function) "Return the SIMPLE color keyword stored in TERMINAL-COLOR, or NIL when its color representation is RGB, indexed, or unspecified."))
+
+(unless (documentation 'terminal-color-bg 'function) (setf (documentation 'terminal-color-bg 'function) "Return the BG flag stored in TERMINAL-COLOR; this flag selects background SGR encoding when no overriding BG argument is supplied."))
+
+(unless (documentation 'no-color-p 'function) (setf (documentation 'no-color-p 'function) "Return true if TERMINAL-COLOR has no RGB component, simple keyword, or 256-color index. The BG flag does not count as a color."))
+
+(unless (documentation 'terminal-style-fg-color 'function) (setf (documentation 'terminal-style-fg-color 'function) "Read the FG-COLOR slot of TERMINAL-STYLE. It may contain a TERMINAL-COLOR or NIL and may be changed through the SETF accessor."))
+
+(unless (documentation 'terminal-style-bg-color 'function) (setf (documentation 'terminal-style-bg-color 'function) "Read the BG-COLOR slot of TERMINAL-STYLE. It may contain a TERMINAL-COLOR or NIL and may be changed through the SETF accessor."))
+
+(unless (documentation 'terminal-style-fg-color-val 'function) (setf (documentation 'terminal-style-fg-color-val 'function) "Extract STYLE foreground as an RGB integer list, 256-color palette index, or simple color keyword. Return NIL if the foreground is absent or unrecognized."))
+
+(unless (documentation 'terminal-style-bg-color-val 'function) (setf (documentation 'terminal-style-bg-color-val 'function) "Extract STYLE background as an RGB integer list, 256-color palette index, or simple color keyword. Return NIL if the background is absent or unrecognized."))
+
+(unless (documentation 'terminal-style-bold 'function) (setf (documentation 'terminal-style-bold 'function) "Read or, with SETF, change the BOLD attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-italic 'function) (setf (documentation 'terminal-style-italic 'function) "Read or, with SETF, change the ITALIC attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-underline 'function) (setf (documentation 'terminal-style-underline 'function) "Read or, with SETF, change the UNDERLINE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-faint 'function) (setf (documentation 'terminal-style-faint 'function) "Read or, with SETF, change the FAINT attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-blink 'function) (setf (documentation 'terminal-style-blink 'function) "Read or, with SETF, change the BLINK attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-inverse 'function) (setf (documentation 'terminal-style-inverse 'function) "Read or, with SETF, change the INVERSE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-strike 'function) (setf (documentation 'terminal-style-strike 'function) "Read or, with SETF, change the STRIKE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-invisible 'function) (setf (documentation 'terminal-style-invisible 'function) "Read or, with SETF, change the INVISIBLE attribute slot of TERMINAL-STYLE. NIL represents an unset or disabled attribute."))
+
+(unless (documentation 'terminal-style-kv 'function) (setf (documentation 'terminal-style-kv 'function) "Update one TERMINAL-STYLE slot selected by K using V. Accepted keys are FG, BG, BOLD, ITALIC, UNDERLINE, FAINT, BLINK, INVERSE, STRIKE, and INVISIBLE; unknown keys signal an error."))
+
+(unless (documentation 'update-style! 'function) (setf (documentation 'update-style! 'function) "Merge UPDATE-STYLE into mutable STYLE and return changed attribute key/value pairs. A NIL STYLE creates a fresh style; raw plist STYLE inputs are ignored and return NIL."))
+
+(unless (documentation 'ansi-seqs 'function) (setf (documentation 'ansi-seqs 'function) "Return ANSI SGR control strings for requested ATTRS of a TERMINAL-STYLE in argument order. NIL styles return NIL; list styles are interpreted as explicit key/value entries."))
+
+(unless (documentation 'exec-sequence 'function) (setf (documentation 'exec-sequence 'function) "Write every character of string SEQ as a byte to FD while holding LOCKABLE, then flush FD. Extra ARGS are ignored; stream write errors propagate."))
