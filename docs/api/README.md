@@ -32,13 +32,26 @@ or that the text is semantically correct. The current default missing-count maxi
 a tighter local ratchet. `ELMTUI_DOCSTRING_STRICT=1` requires zero missing entries.
 
 At the initial 2026-10-09 documentation checkpoint, the root audit found
-**1,819 unique bindings, 587 missing (67.7% documented)**. Later same-day
-remediation passes may reduce the missing count; always rerun the audit before
-reporting current coverage. The generated reference
-reported **1,822 entries, 587 missing (67.8% documented)** under its
-separate `elmtui-docs` load context. These denominators are not directly
-interchangeable. The remaining 587 missing entries are genuine debt, not
-an approved blanket allowlist.
+**1,819 unique bindings, 587 missing (67.7% documented)**. After the
+current source-grounded remediation, **1,819 unique bindings have 261 missing
+(85.7% documented)** and the separate generated reference reports **1,822
+entries, 261 missing (85.7% documented)**. These denominators are not directly
+interchangeable. Re-run both audits against the exact intended release commit;
+the 261 remaining missing bindings are genuine debt, not an approved blanket
+allowlist.
+
+**Scope qualification:** The audit loads `elmtui`, including
+`src/core/public-api-docstrings.lisp`, which supplies compatibility
+documentation for exports originating in `cl-state`, `cl-events`,
+`cl-inputs`, and `cl-styles`. Those injected docstrings are **not**
+automatically present when a reusable library is loaded alone. Verified on
+2026-10-09: loading only `cl-state` leaves
+`(documentation 'cl-state.patch:patch-op 'function)` equal to `NIL`.
+Thus **85.7% is a combined ElmTUI load-context metric**, not proof that
+each independent submodule is 85.7% documented. Promote needed documentation
+into the respective standalone source-of-truth repositories through their
+separate release owners and qualify independent CLPM loading before
+advertising library-local coverage.
 
 ## Source-verified API contracts
 
