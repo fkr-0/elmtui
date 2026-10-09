@@ -111,7 +111,9 @@ The -e flag ensures escape sequences are included for style preservation."
     (otherwise (%run-tmux "capture-pane" "-e" "-p" "-S" "-"))))
 
 (defun capture-screen-string ()
-  "Shortcut for capturing the entire tmux screen."
+  "Return ANSI-styled tmux pane content including scrollback via
+CAPTURE-PANE-STRING with MODE :SCREEN. Read-only; potentially larger than the
+visible pane."
   (capture-pane-string :mode :screen))
 
 (defun capture-lines (&key (mode :pane))
@@ -506,8 +508,8 @@ A combined reset/set such as ESC[0;31m clears old attributes first."
     (copy-virtual-buffer buffer)))
 
 (defun prefill-backend-from-tmux (backend &key (mode :pane))
-  "Capture the terminal-visible underlay with styles, returning its saved snapshot.
-This is the driver's historical entry point, now style-aware by default."
+  "Prefill BACKEND from styled visible tmux cells and return an independent cell
+snapshot. No full history is saved, so this does not guarantee resize-safe quit."
   (prefill-backend-from-tmux-styled backend :mode mode))
 
 ;;;----------------------------------------------------------------
@@ -616,7 +618,8 @@ No scrollback-sized intermediate buffer or terminal I/O is required."
       buffer)))
 
 (defun make-buffer-from-tmux-styled (width height &key (mode :pane))
-  "Return a styled snapshot of the visible pane without copying scrollback."
+  "Return a new WIDTH-by-HEIGHT styled visible-pane cell grid, or NIL outside tmux.
+Captures only; does not repaint cells or restore history."
   (when (tmux-available-p)
     (let ((content (%capture-visible-pane-string :mode mode)))
       (when content
@@ -626,9 +629,9 @@ No scrollback-sized intermediate buffer or terminal I/O is required."
           buffer)))))
 
 (defun prefill-backend-from-tmux-styled (backend &key (mode :pane))
-  "Prefill both backend frames from the styled visible tmux pane.
-The snapshot is independently allocated, suitable for deferred restoration.
-Tmux history is not re-rendered or modified by this function."
+  "Fill terminal backend front/back buffers from visible pane SGR cells and return
+a separate styled snapshot. No scrollback history is replayed or protected from
+shrink."
   (when (and (tmux-available-p)
              (typep backend 'terminal-instance))
     (let* ((width (term-w backend))
@@ -658,7 +661,9 @@ Tmux history is not re-rendered or modified by this function."
   (not (null *saved-tmux-capture*)))
 
 (defun save-tmux-capture (buffer)
-  "Save a copy of BUFFER for later restoration."
+  "Copy a bounded visible-pane cell BUFFER into the saved slot. This does not
+snapshot tmux scrollback or protect history from later resize-induced
+displacement."
   (when (typep buffer 'virtual-terminal-buffer)
     (setf *saved-tmux-capture* (copy-virtual-buffer buffer))))
 
@@ -667,7 +672,8 @@ Tmux history is not re-rendered or modified by this function."
   (setf *saved-tmux-capture* nil))
 
 (defun restore-to-tmux-capture (buffer)
-  "Restore BUFFER to the saved tmux capture state."
+  "Copy saved cell characters and styles into virtual BUFFER, returning BUFFER. No
+physical repaint, cursor restoration, or tmux scrollback recovery occurs here."
   (when (and *saved-tmux-capture*
              (typep buffer 'virtual-terminal-buffer))
     (with-virtual-buffer-lock (buffer)
