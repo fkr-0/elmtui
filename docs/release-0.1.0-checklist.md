@@ -1,51 +1,44 @@
-# ElmTUI 0.1.0 — release checklist and documentation audit
+# ElmTUI 0.2.0 — release qualification checklist
 
-**State:** candidate preparation; NO release/tag approval. Audit date: 2026-10-09.
+**State:** NOT RELEASE-APPROVED. Evidence checked 2026-10-09 in the live, shared ElmTUI checkout; no tag/push/publication authorized. Retained filename `release-0.1.0-checklist.md` for link compatibility.
 
-## P0 — release blockers
+## Verified local checks
 
-- [ ] **Version/history policy.** Current ASDF/README describe 0.2.0, and the local tagged release `v0.2.0` predates this planned 0.1.0. Do not overwrite that tag or silently renumber semver history. Decide whether 0.1.0 is a documented public-reset version or choose a higher version.
-- [x] **Licensing and provenance.** Root `LICENSE`, all current ElmTUI ASDF license metadata (including examples and the optional Workbench), README and changelog now say MIT; `NOTICE.md` records the maintainer-owned predecessor `uncharming-tui` and historical GPL grants. The four supporting libraries retain their separate MIT license files. The recorded git author identities correspond to the same maintainer, who confirmed ownership of the predecessor. Continue the separate security/third-party asset audit before publishing a new tagged release.
-- [ ] **Workbench W5 PTY.** Recorded 2026-10-09 attempts failed to render a real startup frame at 80×24, 120×40 and 160×50. Fix and independently verify startup, real evaluation and output capture, completion above caret, delayed docs, inspector, resize, real key decoding, Ctrl+C/D and clean alternate-screen/termios restoration.
-- [ ] **Example regressions.** Finish existing operator tasks for cursor inspector/tmux, rainbow styling, Pong height, Wi-Fi sizing/scrolling, key tester, connector, and all other maintained examples. PTY e2e is mandatory, especially scrollback clean exit and zero idle terminal writes.
-- [ ] **Clean release unit.** Public GitHub repositories `fkr-0/cl-events`, `fkr-0/cl-inputs`, `fkr-0/cl-state`, `fkr-0/cl-styles` now exist and contain their currently pinned ElmTUI submodule HEAD commits on `main`. Untracked workbench and modified cl-inputs/cl-state submodules still cannot be silently omitted from a tagged release. Freeze exact commits of all five repositories after reconciling local standalone-vs-submodule histories; verify fresh public recursive clones.
-- [ ] **Security/publication audit.** Review tracked source, history and screenshots for credentials/private paths. Confirm binaries and generated logs do not enter the published tree.
+- [x] Main `elmtui.asd` and `elmtui-examples.asd` identify version **0.2.0**; the local `v0.2.0` tag already exists. The separate `elmtui-workbench.asd` declares **0.1.0**.
+- [x] Full root FiveAM run via `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp`: **4,743 passed / 6 intentionally skipped / 0 failed** (2026-10-09). All six skips require explicitly enabled live tmux integration. Re-run at release commit.
+- [x] `scripts/check-docstrings.sh`: non-regression gate passed; **1,819 unique exported bindings, 637 missing, 65.0% documented**. This is a ratchet pass, **not** complete public API documentation.
+- [x] README `defapplication` declaration and the standalone counter/async tutorial definitions smoke-loaded using the repository CLPM/SBCL bundle. This does not establish PTY/UI e2e.
+- [x] Site source layout and `mkdocs.yml` are present. This is source readiness only, **not** a successful site build.
 
-## P1 — accurate, extensive documentation
+## Remaining mandatory release blockers
 
-- [ ] Reconcile `README.org` version text, include the flagship Workbench and hero screenshot after asset delivery, provide a quickstart verified from a clean clone.
-- [ ] Test all code snippets against release ASDF APIs. Specifically: `defapplication` versus `deftea-app` state semantics, exported package names, constructor arguments, file save promises, root viewport flags and subscriptions/effects.
-- [ ] Publish TEA fundamentals; app lifecycle; effects/commands; state ownership; focus/keymaps; terminal input; styles; rendering/diff/idle; layouts/viewports; widget authoring; async testing; packaging; troubleshooting; Workbench.
-- [ ] Inventory real exported widgets and documented contracts. `src/ui/widgets/` contains widgets, but supporting 'extensive widget library' requires an auditable list of stable widgets with examples and verification, not just files.
-- [ ] Distinguish supported SBCL/POSIX terminals from hypothetical portable implementations; don't claim fully immutable states in transactional mode, universal modified-key support, enforced Ctrl+C preemption of arbitrary Lisp or Slynk as a mandatory dependency.
-- [ ] Regenerate API reference via `scripts/build-api-docs.sh` and run `scripts/check-docstrings.sh`. The existing ratchet permits hundreds of missing descriptions; treat public API documentation as outstanding, not complete.
-- [ ] Build curated site in strict mode, check navigation/crosslinks, contrast and mobile width, provide title/alt/captions. Do not publish internal review logs, patch payloads or draft designs as public docs by accident.
+- [ ] **Version/tag policy.** A `v0.2.0` tag exists locally; do not force-move it. Decide whether this work qualifies as an existing 0.2.0 release fix or needs a new version/tag. Reconcile the separately versioned Workbench and freeze exact SHA/submodule dependencies.
+- [ ] **License/provenance and assets.** MIT is stated in root and subsystem metadata; independently finish predecessor/authorship, third-party dependencies, bundled images/fonts, screenshots, NOTICE and security/secret-history review before public publication. Historical GPL grants are not retroactively relicensed.
+- [ ] **Clean public checkout.** Independently verify public visibility of ElmTUI and `cl-events`, `cl-inputs`, `cl-state`, `cl-styles`; confirm each pinned submodule commit is public and a fresh `git clone --recurse-submodules` loads and tests. Shared checkout changes/untracked files must not enter a release by accident.
+- [ ] **Workbench real PTY.** Recorded 2026-10-09 W5 failures included no startup frame in 80×24, 120×40 and 160×50 sessions. Obtain independent passing startup/evaluation/completion/docs/inspector/resize/input/interrupt/EOF/termios and normal-screen scrollback/cleanup evidence. **Never substitute alternate-screen mode** for the required normal-screen behavior.
+- [ ] **Maintained examples.** Complete current cursor inspector/hover/slider, rainbow, Pong, Wi-Fi, key-tester and other example regressions with genuine PTY/tmux, resize, no-idle-write and exit/scrollback checks. A green root FiveAM run does not waive these.
+- [ ] **Site strict build and review.** `python3 -m mkdocs build --strict` is **unavailable locally** (No module named `mkdocs`). Provision MkDocs Material, run `python3 scripts/prepare-site.py` then strict build, check navigation/links, mobile/contrast and content curation. Verify hosted Pages deployment/HTTPS, not merely the YAML workflow.
+- [ ] **CI and packaging.** Verify actual GitHub Actions `ci.yml` and `pages.yml` runs from a clean commit. Complete independent support-library suites, Workbench PTY and packager smoke; collect warnings, skips, logs, dependency SHA and release artifact checksums.
+- [ ] **Release assets.** Produce and review `website/assets/workbench-hero.webp`, `website/assets/terminal-slider.gif`, curated examples screenshots, alt text and privacy/attribution review. Asset filenames alone do not satisfy the gate.
+- [ ] **Publication approval.** Review release notes, recursive-clone instructions, source provenance, test matrix and artifacts; create no new annotated tag or GitHub release before approval.
 
-## P1 — CI, website and release
+## Documentation qualification
 
-- [ ] Confirm GitHub Actions `ci.yml` passes clean SBCL/CLPM FiveAM, generated API docs and Workbench PTY. Add neon PTY, packaging smoke and platform matrix after bootstrap is proven.
-- [ ] Confirm `pages.yml` builds with strict MkDocs and deploys from reviewed `main`. Protect `github-pages` environment and test content in a PR.
-- [ ] Check DNS for `elmtui.fkr.dev`, set CNAME to the actual GitHub Pages hostname, configure the GitHub Pages custom domain and verify live HTTPS/TLS, not just DNS.
-- [ ] Create visual assets: `website/assets/workbench-hero.webp` (dominant, wide image with completion/inspector); `website/assets/terminal-slider.gif` (small tasteful loop); screenshot gallery of Neon Pong/Tetris, widgets, editor.
-- [ ] Produce release evidence: commits, dependency hashes, tests/skips, reference-generation results, screenshots privacy checks, license decision, artifact hashes, release notes, tested install instructions. Annotated tag only after sign-off.
+- [x] Three longform chapters exist, use `:text :content` in live view examples, and distinguish `deftea-app` direct replacement from default transactional `defapplication`. Runnable declarations and selected test/effect forms were checked against the current exports.
+- [ ] Re-run the complete docs smoke against the frozen release revision with unchanged dependencies, including illustrative examples that require adapters/fixtures, plus a real terminal smoke. Explanatory `...` source excerpts and intentionally bad patterns are **not** standalone executable programs.
+- [ ] Grow docstring coverage beyond the current 65.0% ratchet and regenerate the public API reference (`scripts/build-api-docs.sh`); review exported widget contracts, focus/keymap behavior and edge cases. Concurrent documentation agents may change this baseline.
+- [ ] Validate website, Workbench screenshots and PDF-independent MkDocs output in the actual publish environment.
 
-## Evidence behind this plan
+## Reproduction
 
-- Main HEAD initially: `edd02121922712335c9bed78892bc19d99fa7119`; local `v0.2.0` tag; initially no Git remote.
-- `docs/workbench-stress-findings.md` reports **4473 pass, 6 intentional skips** in the root suite, but the **Workbench real terminal startup independently FAILED**. These are different evidence classes.
-- `docs/workbench-user-guide.md` accurately warns of prototype limitations; `docs/repl-workbench-architecture.md` is a design baseline, not a verified feature record.
-- `docs/longform/01…03` are the current long-form foundation; `examples/README.md` catalogues many example apps; generated API docs may be stale until built at a release commit.
-- `website/` stages only curated public chapters and provides screenshot/GIF slots. Workbench imagery cannot substitute for passing independent PTY qualification.
-
-## Verification commands
-
-    python3 scripts/prepare-site.py
-    python3 -m mkdocs build --strict
     clpm bundle install
     clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
+    scripts/test-subsystems.sh
+    scripts/check-docstrings.sh
+    scripts/build-api-docs.sh
+    python3 scripts/prepare-site.py
+    python3 -m mkdocs build --strict
     python3 tests/workbench/pty-workbench.py
     python3 -m unittest discover -s tests/workbench/independent -p 'test_*.py' -v
-    scripts/build-api-docs.sh
-    scripts/check-docstrings.sh
 
-The release is blocked if any mandatory gate fails. No tag or GitHub Release is authorized by this checklist.
+**Do not equate a clean local unit suite with public release readiness.** Keep evidence tied to the exact eventual release commit and submodule SHAs.

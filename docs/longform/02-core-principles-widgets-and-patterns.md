@@ -12,7 +12,7 @@ Keeping those categories distinct produces applications that remain understandab
 
 Prefer messages that can be printed, inspected, logged, stored, and synthesized in tests:
 
-```lisp
+```text
 :increment
 '(:set-filter "common lisp")
 '(:search-started :request-id 17 :query "terminal ui")
@@ -40,9 +40,9 @@ update(message, model) -> next-model + commands
 
 A command is a description of work to execute after the decision. It should be possible to test update by asserting command data without actually doing network, file, or terminal I/O.
 
-Bad boundary:
+Intentionally incorrect (anti-pattern, **not** code to load):
 
-```lisp
+```text
 (defun update (message model)
   (when (eq message :refresh)
     (http-request "https://example.invalid")) ; effect hidden inside update
@@ -223,7 +223,8 @@ A subscription should deliver a message. It should not modify the model from a w
 
 ElmTUI has a runtime effect layer plus async helpers. A command processor is the seam for application-specific effects that the core does not know about.
 
-A testable pattern is dependency injection:
+A testable pattern is dependency injection (the injected `perform-lookup-async`
+function must be supplied by the application before this schematic adapter runs):
 
 ```lisp
 (defun process-command (command queue model config)
@@ -238,6 +239,16 @@ A testable pattern is dependency injection:
 Tests can replace `perform-lookup-async` with a fake transport.
 
 ### 2.7 Runtime declaration
+
+The code from §§2.1–2.4 forms a loadable minimal application with:
+
+```lisp
+(deftea-app counter
+  :init #'init-counter
+  :transition #'update-counter
+  :view #'view-counter
+  :root-viewport-id :counter-root)
+```
 
 For this deliberately minimal path, `deftea-app` ties the parts together using
 canonical `:transition` semantics. Keep the declaration declarative and move
@@ -285,7 +296,7 @@ view-listbox
 
 `update-listbox` begins with:
 
-```lisp
+```text
 (let ((new-model (copy-structure model))
       (commands nil)
       ...)
@@ -373,15 +384,16 @@ Its important messages include:
 
 On click, it emits the configured command/message rather than performing arbitrary work in the view.
 
-Example component construction from the source contract:
+Use the component DSL rather than passing local-state properties to `make-instance` (the latter fails for this class):
 
 ```lisp
-(make-instance 'elmtui.ui.widgets.button:button
-               :id :save
-               :label "Save"
-               :on-click-msg '(:save-document)
-               :disabled nil)
+'(:button :id :save
+          :label "Save"
+          :on-click-msg (:save-document)
+          :disabled nil)
 ```
+
+The DSL initializer supplies the props to `defcomponent`; `:on-click-msg` is a message value, not a direct callback.
 
 ### Text input
 
@@ -462,6 +474,13 @@ UX guidance:
 - avoid layouts whose only readable state depends on a precise initial terminal size.
 
 ### Scrollable container / scroll panel
+
+Root viewports may reserve normal-screen rows below the cursor by emitting scroll
+commands; the driver processes the resulting synchronous scroll-ack messages
+through update **before** rendering the corresponding frame. Keep local widget
+scroll offsets separate from physical terminal scrolling, and verify scrollback
+preservation on exit. Alternate-screen mode is not part of the supported
+normal-screen integration contract.
 
 Purpose:
 
@@ -679,7 +698,7 @@ This has three useful properties:
 
 Do not write another local loop like:
 
-```lisp
+```text
 (loop
   (when (ready-p) (return ...))
   (when (> (get-internal-real-time) deadline) (return nil))
@@ -708,8 +727,8 @@ A widget/application should be testable at several levels.
 ```lisp
 (multiple-value-bind (next commands)
     (update-counter :increment '(:count 4))
-  (is (= 5 (getf next :count)))
-  (is (null commands)))
+  (assert (= 5 (getf next :count)))
+  (assert (null commands)))
 ```
 
 ### Model non-mutation test
@@ -719,9 +738,9 @@ A widget/application should be testable at several levels.
   (multiple-value-bind (next commands)
       (update-counter :increment before)
     (declare (ignore commands))
-    (is (= 4 (getf before :count)))
-    (is (= 5 (getf next :count)))
-    (is-false (eq before next))))
+    (assert (= 4 (getf before :count)))
+    (assert (= 5 (getf next :count)))
+    (assert (not (eq before next)))))
 ```
 
 ### View test
@@ -746,7 +765,9 @@ The current repository should continue converging around these decisions:
 
 ```text
 Recommended application state semantics?
-  -> pure model replacement, with transactional state explicitly opt-in
+  -> transactional patches by default in DEFAPPLICATION;
+     :strict-elm replacement snapshots are opt-in;
+     DEFTEA-APP accepts a directly returned replacement model
 
 Stable API boundary?
   -> small elmtui facade + subsystem .api packages

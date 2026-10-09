@@ -1,6 +1,6 @@
 # Subsystem Integration Review: `cl-inputs`, `cl-state`, `cl-events`, `cl-styles`
 
-Date: 2026-03-07
+Original review: 2026-03-07. Verified integration update: 2026-10-09.
 Scope: integration boundaries between standalone `cl-*` subsystems and `elmtui` runtime/platform, with focus on replacement/extraction opportunities, architecture debt, and test/feature gaps.
 
 ## Executive Summary
@@ -118,16 +118,16 @@ Impact:
 Resolution implemented:
 - replaced with `typep` against `cl-styles.sheet:stylesheet`.
 
-### P2-2: Message/schema validation overlap remains
+### P2-2: Message/schema validation overlap (resolved in R2)
 
 Evidence:
 - schema validation logic exists in `src/core/events.lisp`, while contracts use boundary delegation (`src/state/message-normalization.lisp`).
 
 Impact:
-- dual validation paths can drift.
+- historically dual validation paths could drift.
 
-Recommendation:
-- unify message validation authority behind one boundary module; keep one canonical implementation source.
+Resolution:
+- R2 now delegates both `src/contracts.lisp` and `src/core/events.lisp` validation to `src/state/message-normalization.lisp:validate-message-instance` (see implemented-change item 11). Keep parity tests when contracts change.
 
 ## Replacement / Extraction Opportunities
 
@@ -291,6 +291,41 @@ Additional parity tests:
   - `runtime-e2e-shutdown-clears-subscriptions-and-skips-render` verifies shutdown semantics:
     subscription teardown/cancel invocation and render suppression after shutdown request.
 - Wired into `elmtui-tests.asd`.
+
+## Normal-screen scroll integration (2026-10-09)
+
+Current integration decision: ElmTUI preserves terminal scrollback by keeping
+inline/below-cursor rendering in the normal screen; alternate-screen switching
+is not required or an acceptable fallback for these applications.
+
+- `src/ui/widgets/root-viewport.lisp` computes terminal-overflow scroll effects,
+  tracks issued and acknowledged scroll deltas (`:issued-scroll-net`,
+  `:scrolled-net`, `:pending-scroll-ops`), and adjusts fresh cursor probes by
+  already acknowledged displacement. If a scroll effect fails, overflow may
+  degrade to truncation rather than claiming a successful reservation.
+- `src/platform/driver.lisp` synchronously executes render scroll commands,
+  collects resulting acknowledgement messages, runs them through the active
+  update function, and installs the acknowledged model **before** invoking the
+  next view/render pass. This prevents frame geometry from lagging one event.
+- `tests/viewport-scroll-integration-tests.lisp` exercises ordered scroll
+  notifications, net tracking, below-cursor startup/shutdown, and viewport
+  isolation. Live tmux/PTY scrollback preservation remains a separate gate;
+  deterministic unit/integration coverage is not proof of all terminal setups.
+
+This is application/terminal orchestration, not a reason to move
+root-viewport policy into `cl-events` or `cl-inputs`.
+
+## Current verification snapshot (2026-10-09)
+
+- Core test suite: **4,743 pass, 6 live-tmux skips, 0 fail** under
+  `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp`
+  in a shared working tree; this is not a clean-clone/PTY qualification.
+- `scripts/check-docstrings.sh`: pass (65.0% coverage; 637 / 1,819 missing).
+- `python3 -m mkdocs build --strict`: not run successfully because the
+  `mkdocs` Python module is unavailable in the current environment.
+- Historic P0/P1 fixes recorded above describe integration code, not independent
+  proof of every release gate. R4 policy hardening and public website/PTY gates
+  remain outstanding until independently verified.
 
 ## Remaining TODOs (Prioritized)
 
