@@ -418,3 +418,162 @@ cd" . nil))))
     (is (char= #\Space
                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at buffer 0 2))))))
+
+(test styled-prefill-visible-tail-80x24
+  "Old scrollback must not displace the visible viewport or its SGR state."
+  (let* ((width 80)
+         (height 24)
+         (content
+           (with-output-to-string (out)
+             (dotimes (i 70)
+               (format out "HISTORY-~2,'0D~%" i))
+             (format out "~C[31;44;1;4m" #\Escape)
+             (dotimes (i height)
+               (when (= i (1- height))
+                 (format out "~C[0m" #\Escape))
+               (format out "VISIBLE-~2,'0D" i)
+               (unless (= i (1- height))
+                 (terpri out)))))
+         (buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
+                  width height))
+         (output
+           (with-output-to-string (out)
+             (let ((*standard-output* out)
+                   (*terminal-io* out))
+               (elmtui.platform.tmux:prefill-buffer-from-styled-content
+                buffer (parse-ansi-string content) width height)))))
+    (flet ((cell (row col)
+             (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+              buffer row col)))
+      (is (string= "" output))
+      (is (char= #\V
+                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                  (cell 0 0))))
+      (is (char= #\V
+                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                  (cell 23 0))))
+      (let* ((style
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style
+                (cell 22 0)))
+             (ansi 'elmtui.platform.backend.common.ansi-styling:terminal-style))
+        (declare (ignore ansi))
+        (is (eql :red
+                 (elmtui.platform.backend.common.ansi-styling:terminal-color-simple
+                  (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color
+                   style))))
+        (is (eql :blue
+                 (elmtui.platform.backend.common.ansi-styling:terminal-color-simple
+                  (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color
+                   style))))
+        (is (elmtui.platform.backend.common.ansi-styling:terminal-style-bold style))
+        (is (elmtui.platform.backend.common.ansi-styling:terminal-style-underline style)))
+      (is (null
+           (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style
+            (cell 23 0)))))))
+
+(test styled-prefill-visible-tail-120x40-rgb
+  "RGB, 256-color background and line-break style continuity survive long history."
+  (let* ((width 120)
+         (height 40)
+         (content
+           (with-output-to-string (out)
+             (dotimes (i 110)
+               (format out "EARLY-~3,'0D~%" i))
+             (format out "~C[38;2;10;20;30;48;5;42;1;4m" #\Escape)
+             (dotimes (i height)
+               (when (= i (1- height))
+                 (format out "~C[0m" #\Escape))
+               (if (= i (1- height))
+                   (format out "FOOT~CLAST" #\Return)
+                   (format out "RECENT-~2,'0D" i))
+               (unless (= i (1- height))
+                 (terpri out)))))
+         (buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
+                  width height)))
+    (elmtui.platform.tmux:prefill-buffer-from-styled-content
+     buffer (parse-ansi-string content) width height)
+    (flet ((cell (row col)
+             (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+              buffer row col)))
+      (is (char= #\R
+                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                  (cell 0 0))))
+      (is (char= #\L
+                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                  (cell 39 0))))
+      (let* ((style
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style
+                (cell 38 0)))
+             (fg
+               (elmtui.platform.backend.common.ansi-styling:terminal-style-fg-color
+                style))
+             (bg
+               (elmtui.platform.backend.common.ansi-styling:terminal-style-bg-color
+                style)))
+        (is (= 10 (elmtui.platform.backend.common.ansi-styling::terminal-color-red fg)))
+        (is (= 20 (elmtui.platform.backend.common.ansi-styling::terminal-color-green fg)))
+        (is (= 30 (elmtui.platform.backend.common.ansi-styling::terminal-color-blue fg)))
+        (is (= 42 (elmtui.platform.backend.common.ansi-styling::terminal-color-color-256 bg)))
+        (is (elmtui.platform.backend.common.ansi-styling:terminal-style-bold style))
+        (is (elmtui.platform.backend.common.ansi-styling:terminal-style-underline style)))
+      (is (null
+           (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style
+            (cell 39 0)))))))
+
+(test styled-prefill-wrap-return-and-unicode
+  "CJK double-cell positioning, physical wrapping and CR overwrite are safe."
+  (let ((buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 6 2)))
+    (elmtui.platform.tmux:prefill-buffer-from-styled-content
+     buffer (list (cons (format nil "SCROLL~%AB界CD~%FINAL") nil)) 6 2)
+    (flet ((char-at (row col)
+             (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+              (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+               buffer row col))))
+      (is (char= #\A (char-at 0 0)))
+      (is (char= #\B (char-at 0 1)))
+      (is (char= #\界 (char-at 0 2)))
+      (is (char= #\Space (char-at 0 3)))
+      (is (char= #\C (char-at 0 4)))
+      (is (char= #\D (char-at 0 5)))
+      (is (char= #\F (char-at 1 0)))))
+  (let ((buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 4 2)))
+    (elmtui.platform.tmux:prefill-buffer-from-styled-content
+     buffer (list (cons "ABCDEFGH" nil)) 4 2)
+    (is (char= #\E
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                 buffer 1 0)))))
+  (let ((buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 5 1)))
+    (elmtui.platform.tmux:prefill-buffer-from-styled-content
+     buffer (list (cons (format nil "abc~CZ" #\Return) nil)) 5 1)
+    (is (char= #\Z
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                 buffer 0 0))))
+    (is (char= #\b
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                 buffer 0 1))))))
+
+(test styled-capture-ignores-non-sgr-and-combined-reset
+  "CSI cursor/clear sequences cannot affect underlay; SGR reset+BG clears FG."
+  (let* ((content (format nil "~C[31mRED~C[2JCONT~C[0;44mBLUE"
+                          #\Escape #\Escape #\Escape))
+         (runs (parse-ansi-string content))
+         (buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer
+                  20 1)))
+    (is (= 3 (length runs)))
+    (is (eq :red (getf (cdr (first runs)) :fg)))
+    (is (eq :red (getf (cdr (second runs)) :fg)))
+    (is (null (getf (cdr (third runs)) :fg)))
+    (is (eq :blue (getf (cdr (third runs)) :bg)))
+    (elmtui.platform.tmux:prefill-buffer-from-styled-content
+     buffer runs 20 1)
+    (is (char= #\R
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                 buffer 0 0))))
+    (is (char= #\B
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                 buffer 0 7))))))
