@@ -581,6 +581,19 @@
           (list (list '(:revision)
                       (1+ (state-ref app-state :revision 0)))))
         :handled t))
+      ((and (consp message) (eq (car message) :paste))
+       (let ((content (getf (cdr message) :content)))
+         (if (and (stringp content) (eq (workbench-focus wb) :editor))
+             (progn
+               (elmtui.workbench.editor:editor-insert-text
+                (workbench-editor wb) content)
+               (%clear-completion wb)
+               (incf (workbench-generation wb))
+               (make-update-result
+                :patches (list (list '(:revision)
+                                     (1+ (state-ref app-state :revision 0))))
+                :handled t))
+             (make-update-result :handled t))))
       ((or (typep message 'elmtui.core.event-types:key-event)
            (and (consp message)
                 (member (car message) '(:keyevent :key-event))))
@@ -650,8 +663,17 @@
        :style-map style-map))))
 
 (defun workbench-subscriptions (state)
-  (declare (ignore state))
-  '((:timer :interval 0.075 :message (:wb-tick))))
+  "Poll only when evaluation, docs or live inspector watches need updates."
+  (let ((wb (state-ref state :workbench)))
+    (when (and wb
+               (or (workbench-active-request wb)
+                   (elmtui.workbench.completion:documentation-dwell-state-generation
+                    (workbench-dwell wb))
+                   (and (workbench-show-inspector wb)
+                        (eq (workbench-inspector-section wb) :watches)
+                        (elmtui.workbench.inspector:watched-variables
+                         (workbench-inspector wb)))))
+      '((:timer :interval 0.075 :message (:wb-tick))))))
 
 (elmtui.app:defapplication workbench
   :root-viewport-id :workbench-root
