@@ -722,3 +722,28 @@
                             (string= "SB-" (package-name home) :end2 3)))
                   (format nil "~A exports implementation symbol ~A from ~A"
                           name symbol (package-name home))))))))))
+
+(test no-unreviewed-non-framework-reexports
+  "Only CL:USE-VALUE, the historical restart-name alias, may be exported from outside the framework."
+  (let ((exceptions '(("ELMTUI" "COMMON-LISP" "USE-VALUE")
+                      ("ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER" "COMMON-LISP" "USE-VALUE")))
+        (found nil)
+        (prefixes '("ELMTUI" "CL-EVENTS" "CL-STATE" "CL-INPUTS" "CL-STYLES")))
+    (flet ((framework-p (name)
+             (some (lambda (prefix)
+                     (and (<= (length prefix) (length name))
+                          (string= prefix name :end2 (length prefix))))
+                   prefixes)))
+      (dolist (package (list-all-packages))
+        (when (framework-p (package-name package))
+          (do-external-symbols (sym package)
+            (let ((home (symbol-package sym)))
+              (when (and home (not (framework-p (package-name home))))
+                (push (list (package-name package)
+                            (package-name home)
+                            (symbol-name sym))
+                      found)))))))
+    (dolist (entry found)
+      (is (member entry exceptions :test #'equal)
+          (format nil "Unreviewed foreign re-export: ~S" entry)))
+    (is (= 2 (length found)))))
