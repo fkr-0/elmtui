@@ -246,7 +246,9 @@ This keeps compatibility with older examples that pass app instances."
 ;;; == Backend Initialization Utilities ==
 ;;; ---------------------------------------------------------------------------
 
-(defun initialize-backend-with-publish-fn (BACKEND-TYPE TTY-PATH PUBLISH-FN &key (initial-clear t) (device nil))
+(defun initialize-backend-with-publish-fn (BACKEND-TYPE TTY-PATH PUBLISH-FN
+                                           &key (initial-clear t) (device nil)
+                                                (signal-keys-as-input nil))
   "Initialize the backend with a publish function.
   Arguments:
     BACKEND-TYPE (keyword): The backend type, e.g., :terminal.
@@ -262,7 +264,8 @@ This keeps compatibility with older examples that pass app instances."
   (declare (type keyword backend-type)
     (type (or string null) tty-path)
     (type function publish-fn))
-  (elmtui.platform.api:initialize-backend backend-type :publish-fn publish-fn :tty-path tty-path :initial-clear initial-clear :device device))
+  (elmtui.platform.api:initialize-backend backend-type :publish-fn publish-fn :tty-path tty-path :initial-clear initial-clear :device device
+                                           :signal-keys-as-input signal-keys-as-input))
 
 ;;; ---------------------------------------------------------------------------
 ;;; == Application State Bootstrap ==
@@ -892,7 +895,9 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
                               tty-path
                               (lambda (ev) (publish ev))
                               :initial-clear nil
-                              :device device))
+                              :device device
+                              :signal-keys-as-input
+                              (getf platform-options :signal-keys-as-input nil)))
             (error (e)
               (log-error "DRIVER: Backend initialization failed: ~A" e)
               (error "Failed to initialize backend ~A: ~A" backend-type e)))
