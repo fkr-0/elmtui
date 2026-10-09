@@ -314,13 +314,13 @@ class FullTerminalApps(unittest.TestCase):
 
     def test_game_of_life_pause_reset_resume(self):
         app = self.app('life', '(elmtui.examples.game-of-life:run-game-of-life-app :platform :terminal)')
-        app.expect('Running')
+        app.expect('● RUNNING')
         app.key('Space', 'space')
-        app.expect('Paused')
+        app.expect('Ⅱ PAUSED')
         app.key('r', 'r', literal=True)
-        app.expect('Gen: 0 | Paused')
+        app.expect('GEN 000 Ⅱ PAUSED')
         app.key('Space', 'space')
-        app.expect('Running')
+        app.expect('● RUNNING')
         app.finish('q', 'q')
 
 
