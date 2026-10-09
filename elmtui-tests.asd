@@ -5,7 +5,7 @@
   :author "ElmTUI contributors"
   :version "0.2.0"
   :depends-on (#:elmtui #:elmtui-widgets-enhanced #:elmtui-packager #:elmtui-examples-cli #:fiveam)
-:license "GPL-3.0-only"
+:license "MIT"
   :serial t
   :components ((:module "tests"
                  :serial t

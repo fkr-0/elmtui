@@ -5,7 +5,7 @@
   :description  "Elm-style terminal UI toolkit for Common Lisp"
   :author       "ElmTUI contributors"
   :maintainer   "ElmTUI contributors"
-  :license      "GPL-3.0-only"
+  :license      "MIT"
   :depends-on   (#:alexandria #:sb-posix
                   #:log4cl  ;; #:slynk
                   #:bordeaux-threads

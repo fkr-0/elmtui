@@ -3,7 +3,7 @@
   :version      "0.1.0"
   :description  "Experimental enhanced widgets with contracts and DSL integration"
   :author       "ElmTUI contributors"
-  :license      "GPL-3.0-only"
+  :license      "MIT"
   :depends-on   (:elmtui)
   :pathname "./src/ui/widgets/"
   :components (
@@ -18,7 +18,7 @@
   :version      "0.1.0"
   :description  "Stable enhanced widgets used by elmtui tests"
   :author       "ElmTUI contributors"
-  :license      "GPL-3.0-only"
+  :license      "MIT"
   :depends-on   (:elmtui)
   :pathname "./src/ui/widgets/"
   :components ((:file "viewport-enhanced")))
