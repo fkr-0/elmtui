@@ -135,18 +135,17 @@
                                            "ELMTUI.EXAMPLES.FOCUS-SIMPLE"
                                            "FOCUS-SIMPLE-APP")))
     (is (eq :root-viewport (first view)))
-    (is (search ":BUTTON" (prin1-to-string view) :test #'char-equal))))
+    (is (search "Cancel" (prin1-to-string view) :test #'char-equal))
+    (is (search "OK" (prin1-to-string view) :test #'char-equal))))
 
 (test keymap-app-view-renders-from-initial-state
   (asdf:load-system "elmtui")
-  (%assert-example-loads-and-has-entry "keymap-app")
-  (let* ((app-symbol (intern "KEYMAP-EXAMPLE-APP" "ELMTUI.EXAMPLES.KEYMAP-APP"))
-         (config (gethash app-symbol elmtui.core.globals:*applications*))
-         (view-fn (and config (app-config-view-fn-sym config)))
-         (state (and config (copy-list (elmtui.app.api:app-config-initial-state-plist config))))
-         (view (funcall view-fn state)))
+  (let ((view (%render-initialized-example "keymap-app"
+                                           "ELMTUI.EXAMPLES.KEYMAP-APP"
+                                           "KEYMAP-EXAMPLE-APP")))
     (is (eq :root-viewport (first view)))
-    (is (search ":COUNTER" (prin1-to-string view) :test #'char-equal))))
+    (is (search "COUNTER-A" (prin1-to-string view) :test #'char-equal))
+    (is (search "10" (prin1-to-string view) :test #'char-equal))))
 
 (test mini-rainbow-view-is-visible-and-sized
   (asdf:load-system "elmtui")
@@ -243,3 +242,40 @@
            (is (equal '("one" "two") captured-items))
            (is (string= "pick> " captured-prompt)))
       (setf (symbol-function runner) original))))
+
+(test maintained-examples-render-real-initial-frames
+  "Resolve and paint every maintained example using the application initializer."
+  (asdf:load-system :elmtui-examples)
+  (dolist (entry *maintained-examples*)
+    (destructuring-bind (example-name app-name) entry
+      (let* ((config (%registered-app-config-for-example example-name app-name))
+             (pkg (%example-package example-name))
+             (init (find-symbol (format nil "INITIALIZE-APP-STATE-~A" app-name) pkg))
+             (view (and config (app-config-view-fn-sym config)))
+             (root (and config (app-config-root-component-dsl config)))
+             (root-id (and root (getf (rest root) :id))))
+        (is-true init "Initializer exists for ~A" example-name)
+        (when (and config init root-id view)
+          (multiple-value-bind (state commands) (funcall init)
+            (declare (ignore commands))
+            (let ((root-entry (elmtui.state.api:state-ref
+                                state (list :components root-id))))
+              (is-true root-entry "Canonical viewport exists for ~A" example-name))
+            (dolist (entry '((:terminal-size (100 35)) (:size-known t)
+                              (:pos-known t) (:first-ready-done t)
+                              (:cursor-pos (1 1)) (:width 100)
+                              (:height 30) (:offset-x 0) (:offset-y 0)))
+              (setf (elmtui.state.api:state-ref
+                      state (list :components root-id (first entry)))
+                    (second entry)))
+            (let* ((rect (elmtui.view.geo:make-rectangle
+                           :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+                           :size (elmtui.view.geo:make-size :w 100 :h 35)))
+                   (ctx (elmtui.contracts:make-app-context
+                          :state state :view-fn (symbol-function view)
+                          :viewport-rect rect))
+                   (out (elmtui.pipeline:render-pipeline-0-to-5 ctx)))
+              (is-true (elmtui.contracts:ctx-laid-out-tree out)
+                       "Layout resolves for ~A" example-name)
+              (is-true (elmtui.contracts:ctx-back-buffer out)
+                       "Paint buffer exists for ~A" example-name))))))))

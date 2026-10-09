@@ -74,7 +74,7 @@
          (h (state-ref state :h 18))
          (tick (state-ref state :tick 0)))
     `(:container
-      :id :glider-root
+      :id :glider-content
       :style (:display :flex :flex-direction :column :width 80 :height 22 :padding 1)
       :children
       ((:text :content ,(format nil "glider-real: q/esc quit | pos=(~D,~D) vel=(~D,~D) tick=~D"

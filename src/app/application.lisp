@@ -506,37 +506,29 @@ Example:
            ;;     (elmtui.state.transactions:apply-patches state (ur-patches update-result))
            ;;     (values state (ur-commands update-result))))
            (defun ,proc-fn-sym (msg state)
-             (let* ((cfg (gethash ',name *applications*))
+             (let* ((msg (if (and (consp msg)
+                                  (eq (first msg) :keyevent)
+                                  (typep (getf (rest msg) :event) 'key-event))
+                             (getf (rest msg) :event)
+                             msg))
+                    (cfg (gethash ',name *applications*))
                     (state-semantics (app-config-state-semantics cfg)))
                (cond
                  ;; -------------------------------------------------------------
                  ;; Handle raw key events by dispatching to the keymap system
                  ;; -------------------------------------------------------------
-                 ((typep msg 'key-event)
-                   (flet ((dispatch (new-msg)
-                            (elmtui.core.event-channels:send-event
-                              (app-config-message-queue cfg) new-msg)))
-                     (let ((handled
-                             (let ((*state-mutation-policy*
-                                     (if (eq state-semantics :strict-elm)
-                                         :forbid
-                                         :allow)))
-                               (process-key-event msg
-                                 nil ; focus-manager placeholder
-                                 :app-state state
-                                 :dispatch-fn #'dispatch))))
-                       (if handled
-                         (values state nil) ; Event consumed by keymap system
-                         ;; If not handled, fall through to the component tree
-                         (multiple-value-bind (comp-patches comp-cmds)
-                           (let ((*state-mutation-policy*
-                                   (if (eq state-semantics :strict-elm)
-                                       :forbid
-                                       :allow)))
-                             (dispatch-root-message msg state ',root-vp-id))
-                           (values (%commit-state-patches
-                                    state comp-patches state-semantics)
-                                   comp-cmds))))))
+                 ((and (typep msg 'key-event)
+                       (flet ((dispatch (new-msg)
+                                (elmtui.core.loop:publish
+                                 (if (member new-msg '((:quit) (:cancel)) :test #'equal)
+                                     '(:app-quit-requested)
+                                     new-msg))))
+                         (let ((*state-mutation-policy*
+                                 (if (eq state-semantics :strict-elm) :forbid :allow)))
+                           (process-key-event msg nil
+                             :app-state state
+                             :dispatch-fn #'dispatch))))
+                  (values state nil))
 
                  ;; -------------------------------------------------------------
                  ;; Handle all other messages via the app's update function

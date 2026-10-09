@@ -17,49 +17,43 @@
                   :content ,(format nil "Line ~2,'0D: Scroll panel content" i)
                   :style (:padding-left 1))))
 
-(defun scroll-panel-update (message app-state)
-  (declare (ignore app-state))
-  (labels ((quit () (make-update-result :patches '(((:should-quit) t))))
-           (cmd (payload) (make-update-result :commands (list (list :component-message :main-panel payload)))))
+(defun scroll-panel-update (message state)
+  "Page an 80-line text view without relying on a missing scroll-panel DSL tag."
+  (let* ((key (and (typep message 'key-event) (key-event-key message)))
+         (offset (elmtui.state.api:state-ref state :scroll-offset 0))
+         (last-start (- 80 18)))
     (cond
-      ((typep message 'key-event)
-       (case (key-event-key message)
-         ((:escape #\q #\Q) (quit))
-         ((:arrow-up :up) (cmd '(:scroll-up 1)))
-         ((:arrow-down :down) (cmd '(:scroll-down 1)))
-         ((:page-up :pageup) (cmd '(:page-up)))
-         ((:page-down :pagedown) (cmd '(:page-down)))
-         (:home (cmd '(:scroll-to-top)))
-         (:end (cmd '(:scroll-to-bottom)))
-         (otherwise (make-update-result))))
-      ((and (consp message) (eq (first message) :app-quit-requested)) (quit))
+      ((or (member key '(:escape :esc :q #\q #\Q) :test #'eql)
+           (and (consp message) (eq (first message) :app-quit-requested)))
+       (make-update-result :patches '(((:should-quit) t))))
+      (key
+       (let ((next (case key
+                     ((:arrow-up :up) (1- offset))
+                     ((:arrow-down :down) (1+ offset))
+                     ((:page-up :pageup) (- offset 18))
+                     ((:page-down :pagedown) (+ offset 18))
+                     (:home 0)
+                     (:end last-start)
+                     (otherwise offset))))
+         (make-update-result
+          :patches (list (list '(:scroll-offset)
+                               (max 0 (min last-start next)))))))
       (t (make-update-result)))))
 
-
-(defun scroll-panel-view (_state)
-  (declare (ignore _state))
-  `(:container
-    :id :scroll-demo-root
-    :style (:display :flex :flex-direction :column :width :fill :height :fill)
-    :children
-    ((:scroll-panel
-      :id :main-panel
-      :width 60
-      :height 20
-      :content-height 80
-      :show-scrollbar t
-      :border-style :double
-      :title "Scroll Panel Demo"
-      :children ,(make-initial-content))
-     (:text
-      :id :help
-      :content "Keys: Up/Down, PageUp/PageDown, Home/End, q/Esc to quit"
-      :style (:margin-top 1)))))
+(defun scroll-panel-view (state)
+  (let* ((offset (elmtui.state.api:state-ref state :scroll-offset 0))
+         (lines (subseq (make-initial-content) offset (+ offset 18))))
+    `(:container :id :scroll-demo-content
+       :style (:display :flex :flex-direction :column :width 70 :height 22)
+       :children
+       ((:text :id :heading :content "Scroll panel content")
+        ,@lines
+        (:text :id :help :content "Up/Down | PageUp/PageDown | Home/End | q: quit")))))
 
 (defapplication scroll-panel-demo-app
   :root-viewport-id :scroll-demo-root
-  :root-component-dsl '(:layout :id :scroll-demo-root)
-  :initial-state-plist '(:should-quit nil)
+  :root-component-dsl '(:root-viewport :id :scroll-demo-root :child-dsl-spec (:view nil))
+  :initial-state-plist '(:should-quit nil :scroll-offset 0)
   :update-fn #'scroll-panel-update
   :view-fn #'scroll-panel-view)
 

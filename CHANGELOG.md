@@ -70,6 +70,21 @@ The project follows semantic versioning from the first published release.
 
 ### Fixed
 
+- Restored interactive terminal examples after the renderer and input refactor:
+  typed application state exposes focused component keymaps, normalized
+  `:keyevent` envelopes reach keymap dispatch, and unbound keys reach the
+  application's update function. Semantic keys return through the active
+  runtime mailbox rather than an unconsumed command queue.
+- Normalize raw ASCII control chords (including Ctrl-Q) and route global
+  quit/cancel to the application shutdown protocol. Destructive viewport
+  blanking invalidates the previously presented frame for correct repaint.
+- Fixed focus and keymap demo state conflicting with canonical
+  `:components`, removed duplicate nested viewport IDs from glider, Pong,
+  scroll and tmux hover demos, and replaced obsolete `:scroll-panel` DSL
+  with state-driven paging. Preserve uppercase minimal-demo key display.
+- Added a full 18-example initialization/render regression and typed-focus
+  keymap tests; all nine live PTY example scenarios pass again.
+
 - Fixed root-viewport readiness when terminal geometry is known but an
   initial cursor event or first-ready cleanup transition has not completed.
   Corrected below-cursor overflow accounting and shutdown scroll restoration.
