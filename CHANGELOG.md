@@ -70,6 +70,12 @@ The project follows semantic versioning from the first published release.
 
 ### Fixed
 
+- Prevented the terminal driver from presenting startup frames before the
+  below-cursor viewport scroll reservation. Startup now installs the cursor
+  anchor before dimensions, defers frames through bootstrapping, and commits
+  the first visual frame only after startup effects. Regression tests exercise
+  Tetris at both the terminal top and bottom and verify no ghost drawing
+  survives ordinary Q-key shutdown.
 - Restored interactive terminal examples after the renderer and input refactor:
   typed application state exposes focused component keymaps, normalized
   `:keyevent` envelopes reach keymap dispatch, and unbound keys reach the
