@@ -665,3 +665,60 @@
     (dolist (key expected)
       (is (elmtui.core.errors:diagnostic-context-key-p key)))
     (is-false (elmtui.core.errors:diagnostic-context-key-p :ad-hoc))))
+
+(test framework-severity-hierarchy-includes-non-errors
+  "Informational conditions and warnings share the framework root without becoming errors."
+  (let ((information (make-condition 'elmtui.core.errors:elmtui-information))
+        (warning (make-condition 'elmtui.core.errors:elmtui-warning)))
+    (is (typep information 'elmtui.core.errors:elmtui-condition))
+    (is (typep warning 'elmtui.core.errors:elmtui-condition))
+    (is (not (typep information 'error)))
+    (is (not (typep information 'warning)))
+    (is (typep warning 'warning))
+    (is (not (typep warning 'error)))
+    (is (eq information
+            (handler-case (signal information)
+              (elmtui.core.errors:elmtui-information (seen) seen))))
+    (is (eq warning
+            (handler-case (signal warning)
+              (elmtui.core.errors:elmtui-warning (seen) seen))))))
+
+(test signal-subscriber-report-reads-the-signal-slot
+  "A report must display its signal value, not accidentally invoke CL:SIGNAL."
+  (let* ((condition (make-condition 'elmtui.core.conditions:signal-subscriber-error
+                                    :signal :widget-created :reason :handler-failed))
+         (report (princ-to-string condition)))
+    (is (eq :widget-created
+            (elmtui.core.conditions:signal-subscriber-error-signal condition)))
+    (is (search "WIDGET-CREATED" report))
+    (is (search "HANDLER-FAILED" report))))
+
+(test condition-packages-export-only-owned-prefixed-reader-api
+  "Generic legacy readers are internal, and public core condition exports are owned."
+  (dolist (name '("MESSAGE" "REASON" "STATE" "EVENT" "TASK" "HANDLER"
+                  "CMD" "SIGNAL" "ORIGINAL-ERROR" "SUBSCRIBER-SIGNAL"))
+    (multiple-value-bind (symbol status)
+        (find-symbol name :elmtui.core.conditions)
+      (declare (ignore symbol))
+      (is (not (eq :external status)))))
+  (dolist (package-name '(:elmtui.core.errors :elmtui.core.conditions))
+    (let ((package (find-package package-name)))
+      (do-external-symbols (symbol package)
+        (is (eq package (symbol-package symbol))
+            (format nil "~A must own its exported symbol ~A" package-name symbol))))))
+
+(test no-implementation-private-framework-exports
+  "All loaded ElmTUI and support-library APIs exclude SB-* implementation internals."
+  (dolist (package (list-all-packages))
+    (let ((name (package-name package)))
+      (when (some (lambda (prefix)
+                    (and (<= (length prefix) (length name))
+                         (string= prefix name :end2 (length prefix))))
+                  '("ELMTUI" "CL-EVENTS" "CL-STATE" "CL-INPUTS" "CL-STYLES"))
+        (do-external-symbols (symbol package)
+          (let ((home (symbol-package symbol)))
+            (when home
+              (is (not (and (<= 3 (length (package-name home)))
+                            (string= "SB-" (package-name home) :end2 3)))
+                  (format nil "~A exports implementation symbol ~A from ~A"
+                          name symbol (package-name home))))))))))

@@ -116,7 +116,7 @@
    (reason :initarg :reason :reader reason :reader signal-subscriber-error-reason))
   (:report (lambda (c s)
              (format s "Signal subscriber error: ~A~%Reason: ~A"
-                     (signal c) (reason c)))))
+                     (signal-subscriber-error-signal c) (reason c)))))
 
 (defvar *log-condition* (lambda (c) (log-condition c)))
 
