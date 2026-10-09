@@ -72,7 +72,7 @@
 ;;;--------------------------------------------------------------
 (defun app-update (message app-state)
   "Handles updates to the application state based on messages."
-  (log-info "Rainbow: RECEIVED MESSAGE: ~S" message)
+
   (cond
     ((and (typep message 'key-event)
           (member (elmtui.core.event-types:key-event-key message)

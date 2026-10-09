@@ -129,8 +129,8 @@
 ;;                                  ))
 (defun key-tester-view (app-state &key root-id)
   "Renders the application's UI based on the current state."
-  (log-info "Rendering Key Tester App with state: ~S ~A"
-            app-state root-id)
+  (declare (ignore root-id))
+
   (let ((component
           (state-ref app-state :component)))
     `(:container
