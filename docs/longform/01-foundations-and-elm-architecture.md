@@ -6,7 +6,7 @@ The Common Lisp implementation adds facilities that Elm itself does not have in 
 
 > ElmTUI exposes one TEA transition model with two state-commit implementations: a low-allocation transactional implementation and an opt-in strict replacement implementation. Internal mutation does not by itself violate Elm semantics; the relevant question is whether that mutation is observable through the application contract.
 
-This distinction between **semantic immutability** and **representation mutation** is the foundation for understanding the runtime correctly.
+This distinction between **semantic immutability** and **representation mutation** is the foundation for understanding the runtime correctly. Source excerpts below containing `...`, compiler-like signatures, or undefined application placeholders are explanatory fragments rather than directly loadable programs; the complete counter and async examples in chapter 03 provide runnable code.
 
 ## 1. The TEA loop
 
@@ -73,13 +73,13 @@ Commands describe effects to perform after update; subscriptions describe extern
 
 `src/app/tea-core.lisp` states the familiar transition contract directly:
 
-```lisp
+```text
 UPDATE-FN :: (MSG MODEL) -> (values NEXT-MODEL COMMANDS)
 ```
 
 The driver installs the returned model:
 
-```lisp
+```text
 (multiple-value-bind (next-model commands)
     (funcall update-fn msg *current-app-model*)
   (setf *current-app-model* next-model
@@ -138,7 +138,7 @@ Regular `DEFAPPLICATION` update functions do not normally receive a writable sto
 
 The context owns a draft. That draft is now a deep copy across the supported `cl-state` container graph:
 
-```lisp
+```text
 (defun make-update-context (state &key base-path)
   ...
   (let ((draft (deep-copy-data (application-state-plist state))))
@@ -181,7 +181,7 @@ From the application author's side this is strongly Elm-like even in the fast mo
 
 `DEFAPPLICATION` now accepts:
 
-```lisp
+```text
 :state-semantics :transactional   ; default
 :state-semantics :strict-elm
 ```
@@ -446,7 +446,7 @@ Widgets illustrate why the distinction matters. Some ElmTUI widgets are written 
 
 The listbox's update logic copies its structure first:
 
-```lisp
+```text
 (let ((new-model (copy-structure model))
       ...)
   ...

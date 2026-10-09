@@ -2,7 +2,9 @@
 
 This chapter starts with the smallest useful TEA application and then extends the same state-machine thinking to asynchronous I/O. It intentionally uses the supported minimal `deftea-app` adapter so the transition is visible without the full application configuration surface. For production/new next-major applications, `defapplication` is the normative constructor; the concepts and runtime transition contract taught here are the same.
 
-The first goal is not a visually elaborate terminal. It is to make the application's semantics so obvious that update behavior can be tested before a terminal exists.
+The runnable code paths in this chapter were smoke-loaded under CLPM/SBCL on
+2026-10-09. Ellipses and named transport adapters in illustrative fragments
+are placeholders, not a complete network client. The first goal is not a visually elaborate terminal. It is to make the application's semantics so obvious that update behavior can be tested before a terminal exists.
 
 ## 1. Build the counter as a state machine first
 
@@ -103,7 +105,7 @@ The macro creates:
 RUN-PURE-COUNTER
 ```
 
-The generated runner delegates to the normal ElmTUI application runtime. The default generated platform selector is `:tty`. `:transition` is the canonical spelling; legacy `:update` remains accepted only for compatibility.
+The generated runner delegates to the normal ElmTUI application runtime. The generated runner's default platform selector is `:terminal`. `:transition` is the canonical spelling; legacy `:update` remains accepted only for compatibility.
 
 For application code, keep `INIT-COUNTER`, `UPDATE-COUNTER`, and `VIEW-COUNTER` named and separately testable. The `deftea-app` form should remain a compact wiring declaration for this minimal path; move to `defapplication` when the application needs the production state/component/CLI/keymap surface.
 
@@ -135,6 +137,17 @@ q      -> quit/shutdown message
 The exact placement of those bindings depends on whether the counter is an application action or a focused component action.
 
 ## 6. The first useful tests
+
+The following `test`/`is` forms use FiveAM; load it and import its test DSL
+before evaluating these forms in `examples.pure-counter`:
+
+```lisp
+(asdf:load-system :fiveam)
+(use-package :fiveam :examples.pure-counter)
+```
+
+For one-off checks without a test runner, use ordinary Common Lisp `assert` as
+shown in §2. A passing definition load does not itself execute registered tests.
 
 ### Update semantics
 
@@ -267,8 +280,10 @@ Notice what is absent: no HTTP client call.
 `UPDATE-SEARCH` only emits:
 
 ```lisp
-(:lookup-wikipedia query request-id)
+'(:lookup-wikipedia query request-id)
 ```
+
+The quote is intentional: this is a command **value**, not a direct function call.
 
 That command can be asserted in a unit test.
 
@@ -323,7 +338,7 @@ ElmTUI should not require one HTTP library merely to express the application arc
 
 Production code can bind/install a transport adapter. Tests replace it with a deterministic function:
 
-```lisp
+```text
 (let ((*fetch-summary-fn*
         (lambda (query)
           (format nil "Fake summary for ~A" query))))

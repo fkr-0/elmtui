@@ -3,9 +3,12 @@
 
 * Status
 
-ElmTUI is preparing a public release, with a proposed 0.1.0 milestone.
-Existing system manifests and the historical =v0.2.0= tag currently use 0.2.0;
-release versioning must be reconciled before a new release is tagged.
+ElmTUI's main and examples ASDF systems declare =0.2.0=. The local =v0.2.0=
+tag already exists; it must not be moved to represent new changes. This is a
+0.2.0 documentation/qualification pass, not an announcement of a newly
+published release. The optional Workbench ASDF system still declares =0.1.0=;
+that component version is distinct and requires a packaging decision before
+public tagging. See the release checklist for the remaining gates.
 
 The core runtime, maintained examples, and four reusable support libraries are
 covered by independent ASDF test systems.  The current supported development
@@ -27,7 +30,7 @@ clpm bundle exec --with-client sbcl -- \\
   --noinform --non-interactive --load examples/workbench.lisp
 #+end_src
 
-See [[file:docs/workbench-user-guide.md][Workbench user guide]] and [[file:docs/release-0.1.0-checklist.md][release qualification gates]]. The dominant Workbench screenshot is planned
+See [[file:docs/workbench-user-guide.md][Workbench user guide]] and [[file:docs/release-0.1.0-checklist.md][0.2.0 release qualification gates (legacy filename)]]. The dominant Workbench screenshot is planned
 for =website/assets/workbench-hero.webp=; the animated terminal slider is
 planned for =website/assets/terminal-slider.gif=. They will appear on
 [[https://elmtui.fkr.dev/][the project website]] once deployment and qualification are complete.
@@ -36,7 +39,10 @@ planned for =website/assets/terminal-slider.gif=. They will appear on
 
 - Elm/TEA-style application flow: model, message, update, view, effects.
 - Declarative terminal UI trees and component DSLs.
-- Flex, grid, viewport, focus, keymap, and scrolling behavior.
+- Flex, grid, viewport, focus, keymap, and inline scrolling behavior.
+- Normal-screen/below-cursor terminal ownership; synchronous scroll acknowledgements
+  are processed before presenting the affected frame (no alternate-screen
+  requirement).
 - Diffed virtual-buffer rendering with terminal and fake-terminal backends.
 - Typed terminal input decoding and event routing.
 - Transactional state updates with observers and undo/redo.
@@ -105,19 +111,28 @@ function, and a root viewport.  This reduced example follows the API used by
   (:use :cl)
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.core.event-types
+                #:key-event #:key-event-char #:key-event-key)
   (:export #:run-hello))
 
 (in-package :example.hello)
 
 (defun initial-state ()
-  (list :last-key "-"))
+  (list :should-quit nil :last-key "-"))
 
 (defun update (message state)
   (declare (ignore state))
-  (if (and (consp message) (eq (first message) :keyevent))
-      (make-update-result
-       :patches `(((:last-key) ,(getf (rest message) :key "-"))))
-      (make-update-result)))
+  (cond
+    ((and (consp message) (eq (first message) :keyevent))
+     (make-update-result
+      :patches `(((:last-key) ,(getf (rest message) :key "-")))))
+    ((typep message 'key-event)
+     (make-update-result
+      :patches `(((:last-key) ,(or (key-event-char message)
+                                   (key-event-key message) "-")))))
+    ((and (consp message) (eq (first message) :app-quit-requested))
+     (make-update-result :patches '(((:should-quit) t))))
+    (t (make-update-result))))
 
 (defun view (state)
   `(:container
@@ -140,7 +155,9 @@ function, and a root viewport.  This reduced example follows the API used by
   :view-fn #'view)
 #+end_src
 
-=DEFAPPLICATION= generates the application runner, here =RUN-HELLO=.  It is the
+=DEFAPPLICATION= generates the application runner, here =RUN-HELLO=.
+The example was compiled under CLPM/SBCL on 2026-10-09; it is not a substitute
+for interactive terminal lifecycle/PTY qualification.  It is the
 normative full application constructor selected for ElmTUI's next stable major
 version; production applications should start here.  This example uses the
 transactional commit engine; =:state-semantics :strict-elm= selects the frozen
@@ -162,8 +179,8 @@ python3 -m mkdocs serve
 #+end_src
 
 The pending screenshot and GIF use the filenames specified in
-[[file:website/assets/README.md][website/assets/README.md]]. The release gates, including the licensing and
-Workbench PTY checks, are in [[file:docs/release-0.1.0-checklist.md][the release checklist]].
+[[file:website/assets/README.md][website/assets/README.md]]. The release gates, including the licensing and Workbench PTY checks, are in
+[[file:docs/release-0.1.0-checklist.md][the 0.2.0 release checklist (legacy filename)]].
 
 * Documentation
 
@@ -195,7 +212,9 @@ scripts/check-docstrings.sh
 #+end_src
 
 The default audit is a debt ratchet: it fails if public documentation coverage
-regresses.  To require every supported exported binding to have documentation
+regresses. On 2026-10-09 this gate passed at 65.0% coverage
+(1,819 unique exported bindings; 637 missing docstrings). This is not the
+same as complete API documentation.  To require every supported exported binding to have documentation
 metadata, use the strict target:
 
 #+begin_src sh
