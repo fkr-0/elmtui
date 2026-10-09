@@ -4,7 +4,7 @@
   :version "0.2.0"
   :description "ElmTUI packager: dump fast-boot executable Lisp images"
   :author "ElmTUI contributors"
-  :license "GPL-3.0-only"
+  :license "MIT"
   :depends-on (:elmtui)
   :components ((:module "src/tools"
                 :components ((:file "packager"))))
