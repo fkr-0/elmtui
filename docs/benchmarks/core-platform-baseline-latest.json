@@ -1,0 +1,8 @@
+{
+  "captured_at_iso": "2026-03-06T02:37:03Z",
+  "captured_at_universal": "3981753423",
+  "environment": {"lisp": "SBCL", "lisp_version": "2.5.4.roswell", "machine_instance": "archlinux", "machine_type": "X86-64", "machine_version": "13th Gen Intel(R) Core(TM) i9-13900H", "software_type": "Linux", "software_version": "6.18.6-arch1-1", "cpu_model": "unknown"},
+  "idle": {"duration_s": 3.000961, "cpu_s": 0.032296, "cpu_pct": 1.0762},
+  "throughput": {"event_count": 10000, "published_count": 10000, "processed_count": 10000, "timed_out": false, "timeout_s": 20.000, "elapsed_ms": 1721.977, "events_per_s": 5807.278},
+  "latency": {"p95_ms": 2.000, "avg_ms": 0.992}
+}

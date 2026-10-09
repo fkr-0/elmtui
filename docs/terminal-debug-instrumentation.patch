@@ -1,0 +1,279 @@
+*** Begin Patch
+*** Update File: src/platform/backend/terminal/terminal.lisp
+@@
+-    ;; New generic method implementations are implicitly exported by their generic definitions
+-    #:make-terminal-instance-for-device
++    ;; New generic method implementations are implicitly exported by their generic definitions
++    #:make-terminal-instance-for-device
++    #:*terminal-debug-events*
++    #:*terminal-debug-backtraces*
++    #:*terminal-debug-phase*
++    #:*terminal-debug-owned-region*
++    #:*terminal-debug-frame-id*
++    #:log-terminal-event
++    #:clear-terminal-debug-events
++    #:terminal-debug-events
+     ))
+@@
+ (defparameter *log-terminal-clear-calls* nil
+   "When true, log clear/erase calls with a backtrace for debugging.")
++
++(defparameter *terminal-debug-events* nil
++  "Most recent terminal lifecycle/debug events, newest first.")
++
++(defparameter *terminal-debug-backtraces* nil
++  "When non-nil, include a backtrace string in terminal debug events.")
++
++(defparameter *terminal-debug-phase* :normal
++  "Dynamic phase tag for terminal lifecycle/render debugging.")
++
++(defparameter *terminal-debug-owned-region* nil
++  "Dynamic owned terminal region for debug events.")
++
++(defparameter *terminal-debug-frame-id* nil
++  "Dynamic frame identifier for terminal debug events.")
++
++(defun clear-terminal-debug-events ()
++  "Clear accumulated terminal debug events."
++  (setf *terminal-debug-events* nil))
++
++(defun terminal-debug-events ()
++  "Return terminal debug events oldest first."
++  (nreverse (copy-list *terminal-debug-events*)))
++
++(defun %terminal-debug-backtrace-string ()
++  (with-output-to-string (s)
++    (uiop:print-backtrace :stream s)))
++
++(defun %normalize-terminal-region (region)
++  (cond
++    ((null region) nil)
++    ((and (listp region)
++          (or (null region) (keywordp (first region))))
++     region)
++    (t
++     (ignore-errors
++       (list :row (y region)
++             :col (x region)
++             :width (w region)
++             :height (h region))))))
++
++(defun log-terminal-event (kind &key source details region phase frame-id backtrace)
++  "Record and emit a structured terminal debug event."
++  (let* ((normalized-region (%normalize-terminal-region region))
++         (normalized-owned-region (%normalize-terminal-region *terminal-debug-owned-region*))
++         (event (list :kind kind
++                      :source source
++                      :phase (or phase *terminal-debug-phase*)
++                      :frame-id (or frame-id *terminal-debug-frame-id*)
++                      :region normalized-region
++                      :owned-region normalized-owned-region
++                      :details details
++                      :backtrace (when (or backtrace *terminal-debug-backtraces*)
++                                   (%terminal-debug-backtrace-string)))))
++    (push event *terminal-debug-events*)
++    (log-info "TERMINAL-EVENT ~S" event)
++    event))
+ 
+ (defun %log-terminal-clear (label &optional details)
+   (when *log-terminal-clear-calls*
+-    (let ((bt (with-output-to-string (s)
+-                (uiop:print-backtrace :stream s))))
+-      (log-info "TERMINAL ~A ~A~%~A" label details bt))))
++    (log-terminal-event :legacy-clear-log
++                        :source '%log-terminal-clear
++                        :details (list :label label :payload details)
++                        :backtrace t)))
+@@
+ (defun make-terminal-instance-for-device (&key device publish-fn (initial-clear nil))
+   "Construct a terminal-instance around a cl-inputs DEVICE."
+-  (declare (ignore initial-clear))
++  (declare (ignore initial-clear))
+   (let ((stream (or (and device (device-output-stream device))
+                   (error "cl-inputs device did not provide an output stream."))))
+     (let ((instance (make-terminal-instance
+                       :stream stream
+                       :cl-device device
+                       :input-source (and device (cl-inputs.api:make-ready-input-source :device device))
+                       :publish-fn publish-fn)))
++      (log-terminal-event :backend-init
++                          :source 'make-terminal-instance-for-device
++                          :phase :init
++                          :details (list :has-device (not (null device))
++                                         :has-publish-fn (not (null publish-fn))
++                                         :initial-clear initial-clear))
++      (when (terminal-instance-input-source instance)
++        (log-terminal-event :raw-mode-enable-intent
++                            :source 'make-terminal-instance-for-device
++                            :phase :init
++                            :details (list :input-source-created t)))
+@@
+-      (when device (cl-inputs.terminal.api:hide-cursor device))
++      (when device
++        (log-terminal-event :cursor-visibility
++                            :source 'make-terminal-instance-for-device
++                            :phase :init
++                            :details (list :visible-p nil :reason :backend-init))
++        (cl-inputs.terminal.api:hide-cursor device))
+@@
+ (defun %force-clear-terminal-and-reset-buffers
+   (instance &key (row -1) (buffer t) (cursor (list 1 1)))
+   "Internal helper: Forces a hard clear of the terminal screen and resets internal buffers."
+   (check-type instance terminal-instance)
++  (log-terminal-event :force-reset
++                      :source '%force-clear-terminal-and-reset-buffers
++                      :details (list :row row :buffer buffer :cursor cursor)
++                      :backtrace t)
+@@
+               (get-screen-dimensions instance) ; Use backend's method
++              (log-terminal-event :resize-signal
++                                  :source 'setup-terminal-signal-handlers
++                                  :phase :resize
++                                  :details (list :signal :sigwinch :width w :height h))
+               (log:info "TERMINAL: SIGWINCH detected. Publishing TerminalResized event W:~A H:~A" w h)
+@@
+           (when (not sigint-fired)
+             (setf sigint-fired t)
++            (log-terminal-event :signal-quit
++                                :source 'setup-terminal-signal-handlers
++                                :phase :signal-shutdown
++                                :details (list :signal :sigint :latched t)
++                                :backtrace t)
+             (log:info "TERMINAL: SIGINT detected. Publishing :app-quit-requested (latched)")
+@@
+         (lambda (signal code scp)
+           (declare (ignore signal code scp))
++          (log-terminal-event :signal-quit
++                              :source 'setup-terminal-signal-handlers
++                              :phase :signal-shutdown
++                              :details (list :signal :sigterm)
++                              :backtrace t)
+           (log:info "TERMINAL: SIGTERM detected. Publishing :app-quit-requested")
+           (funcall publish-fn '(:app-quit-requested (:source :sigterm))))))))
+@@
+ (defmethod shutdown-backend ((instance terminal-instance))
++  (log-terminal-event :shutdown-backend
++                      :source 'shutdown-backend
++                      :phase :shutdown
++                      :details (list :has-device (not (null (terminal-instance-cl-device instance)))
++                                     :has-stream (not (null (terminal-instance-stream instance)))
++                                     :has-input-source (not (null (terminal-instance-input-source instance)))))
+   (log-info "TERMINAL: Shutting down backend...")
+@@
+       (let ((source (terminal-instance-input-source instance)))
+         (when source
++          (log-terminal-event :raw-mode-disable-intent
++                              :source 'shutdown-backend
++                              :phase :shutdown
++                              :details (list :via :close-input-source))
+           (ignore-errors (cl-inputs.loop:close-input-source source)) ;; cl-inputs cleans raw/close
+           (setf (terminal-instance-input-source instance) nil)))
+       (let ((device (terminal-instance-cl-device instance)))
+         (when device
++          (log-terminal-event :device-close
++                              :source 'shutdown-backend
++                              :phase :shutdown
++                              :details (list :via :close-device))
+           ;; cl-inputs close-input-source handles restoration; device kept for stream
+           (ignore-errors (cl-inputs.device.api:close-device device))
+           (setf (terminal-instance-cl-device instance) nil)))
+@@
+     (error (e)
++      (log-terminal-event :shutdown-backend
++                          :source 'shutdown-backend
++                          :phase :shutdown
++                          :details (list :status :error :condition (princ-to-string e))
++                          :backtrace t)
+       (log-info "TERMINAL: Shutdown Error: " e )
+       (log:error "TERMINAL: Error during primary shutdown: ~A" e)))
+ 
+-  (handler-case (sb-ext:run-program "/bin/stty" '("sane") :search t :input nil :output nil :error :output)
++  (handler-case
++      (progn
++        (log-terminal-event :stty-sane
++                            :source 'shutdown-backend
++                            :phase :shutdown
++                            :details (list :status :attempt))
++        (sb-ext:run-program "/bin/stty" '("sane") :search t :input nil :output nil :error :output)
++        (log-terminal-event :stty-sane
++                            :source 'shutdown-backend
++                            :phase :shutdown
++                            :details (list :status :ok)))
+     (error (e)
++      (log-terminal-event :stty-sane
++                          :source 'shutdown-backend
++                          :phase :shutdown
++                          :details (list :status :error :condition (princ-to-string e))
++                          :backtrace t)
+       (log-info "TERMINAL: stty sane Error: " e )
+       (log:error "TERMINAL: stty sane failed: ~A" e)))
+@@
+ (defmethod handle-backend-resize ((instance terminal-instance) width height)
++  (log-terminal-event :handle-resize
++                      :source 'handle-backend-resize
++                      :phase :resize
++                      :details (list :width width :height height))
+   (log:info "TERMINAL: Handling backend resize to ~Ax~A" width height)
+@@
+ (defmethod clear-screen ((instance terminal-instance) &optional rect)
++  (log-terminal-event :clear-screen
++                      :source 'clear-screen
++                      :region rect
++                      :details (list :rect-supplied-p (not (null rect)))
++                      :backtrace *log-terminal-clear-calls*)
+   (%log-terminal-clear "clear-screen" rect)
+@@
+ (defmethod set-cursor-visibility ((instance terminal-instance) visible-p)
++  (log-terminal-event :cursor-visibility
++                      :source 'set-cursor-visibility
++                      :details (list :visible-p visible-p))
+   (with-terminal-lock (instance)
+@@
+ (defmethod elmtui.platform.api:clear-below-cursor ((instance terminal-instance))
+   "Clear from cursor position to end of screen using ANSI escape sequence."
++  (multiple-value-bind (row col) (get-cursor-position instance)
++    (log-terminal-event :clear-below-cursor
++                        :source 'elmtui.platform.api:clear-below-cursor
++                        :details (list :cursor-row row :cursor-col col)
++                        :backtrace *log-terminal-clear-calls*))
+   (with-terminal-lock (instance)
+*** Update File: src/platform/tmux-capture.lisp
+@@
+   (:import-from :elmtui.platform.backend.terminal
+     #:terminal-instance
+     #:terminal-instance-front-buffer
+-    #:terminal-instance-back-buffer)
++    #:terminal-instance-back-buffer
++    #:log-terminal-event)
+@@
+ (defun save-tmux-capture (buffer)
+   "Save a copy of BUFFER for later restoration."
++  (log-terminal-event :tmux-save
++                      :source 'save-tmux-capture
++                      :phase :restore
++                      :details (list :bufferp (typep buffer 'virtual-terminal-buffer)
++                                     :width (and (typep buffer 'virtual-terminal-buffer)
++                                                 (buffer-width buffer))
++                                     :height (and (typep buffer 'virtual-terminal-buffer)
++                                                  (buffer-height buffer))))
+   (when (typep buffer 'virtual-terminal-buffer)
+     (setf *saved-tmux-capture* (copy-virtual-buffer buffer))))
+@@
+ (defun clear-saved-tmux-capture ()
+   "Clear the saved tmux capture."
++  (log-terminal-event :tmux-clear-saved
++                      :source 'clear-saved-tmux-capture
++                      :phase :restore
++                      :details (list :had-saved-capture (not (null *saved-tmux-capture*))))
+   (setf *saved-tmux-capture* nil))
+@@
+ (defun restore-to-tmux-capture (buffer)
+   "Restore BUFFER to the saved tmux capture state."
++  (log-terminal-event :tmux-restore
++                      :source 'restore-to-tmux-capture
++                      :phase :restore
++                      :details (list :saved-p (not (null *saved-tmux-capture*))
++                                     :bufferp (typep buffer 'virtual-terminal-buffer)))
+   (when (and *saved-tmux-capture*
+              (typep buffer 'virtual-terminal-buffer))
+*** End Patch

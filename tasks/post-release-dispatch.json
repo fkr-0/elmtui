@@ -1,0 +1,695 @@
+{
+  "version": 1,
+  "generated_at": "2026-07-12",
+  "project": "elmtui",
+  "project_path": "/home/user/code/lisp/elmtui.lisp",
+  "base_ref": "v0.2.0",
+  "base_commit": "2d317acc987a33a663ffe3c2bf33c77d61774b2d",
+  "dispatch_status": "prepared_not_launched",
+  "release_hold": true,
+  "release_hold_reason": "Confirmed post-tag P1/P2 issues exist; the local tag has not been published and must remain unchanged until integration review.",
+  "global_rules": [
+    "Create an isolated Git worktree and branch from v0.2.0; never work directly in the release checkout.",
+    "Do not modify, delete, move, sign, or recreate v0.2.0. Do not configure or push remotes.",
+    "Do not modify generated release artifacts under dist/.",
+    "Do not absorb unrelated untracked files from the release checkout.",
+    "For every Lisp edit, follow CLAUDE.md and the sexp-manipulator structural-editing workflow; validate every edited S-expression file.",
+    "Run focused tests first and scripts/release-check.sh before handoff unless the task is explicitly investigation-only.",
+    "Keep changes limited to the task allow-list; request integrator review before touching shared manifest or release files outside that list.",
+    "Report exact commands, test results, warnings, changed files, and any unresolved design decision in the handoff."
+  ],
+  "waves": [
+    {
+      "wave": 1,
+      "parallel": true,
+      "tasks": [
+        "ELMTUI-POST-001",
+        "ELMTUI-POST-002",
+        "ELMTUI-POST-003",
+        "ELMTUI-POST-004",
+        "ELMTUI-POST-005",
+        "ELMTUI-POST-006",
+        "ELMTUI-POST-007",
+        "ELMTUI-POST-009"
+      ],
+      "note": "Use isolated worktrees. Tasks have disjoint primary ownership; shared docs/manifests must stay within each allow-list."
+    },
+    {
+      "wave": 2,
+      "parallel": false,
+      "tasks": [
+        "ELMTUI-POST-008"
+      ],
+      "depends_on": [
+        "ELMTUI-POST-004",
+        "ELMTUI-POST-007"
+      ],
+      "note": "Example packaging follows the tool-system boundary and orphan-source disposition decisions."
+    },
+    {
+      "wave": 3,
+      "parallel": false,
+      "tasks": [
+        "ELMTUI-POST-INT"
+      ],
+      "depends_on": [
+        "ELMTUI-POST-001",
+        "ELMTUI-POST-002",
+        "ELMTUI-POST-003",
+        "ELMTUI-POST-004",
+        "ELMTUI-POST-005",
+        "ELMTUI-POST-006",
+        "ELMTUI-POST-007",
+        "ELMTUI-POST-008",
+        "ELMTUI-POST-009"
+      ],
+      "note": "Single integrator merges approved branches, verifies cold-tree/archive behavior, and writes the release-version decision."
+    },
+    {
+      "wave": 4,
+      "parallel": false,
+      "tasks": [
+        "ELMTUI-PUB-001"
+      ],
+      "manual_only": true,
+      "note": "Maintainer-only signing, remote configuration, tag decision, push, and publication."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "ELMTUI-POST-001",
+      "title": "Repair experimental enhanced-widget compilation",
+      "priority": "P1",
+      "type": "implementation",
+      "status": "done",
+      "agent_role": "Common Lisp component-system specialist",
+      "branch": "post/experimental-widgets",
+      "worktree_hint": "../elmtui-post-001",
+      "problem": "The experimental enhanced-widget system loads with an undefined STYLE-PROPS variable in label-enhanced and generated unused-variable warnings in button-enhanced. The label warning crosses a lexical scope boundary and can become a runtime failure.",
+      "evidence": [
+        "src/ui/widgets/label-enhanced.lisp:199-217 binds STYLE-PROPS inside a LET that ends before :style uses it at line 228.",
+        "Loading elmtui-widgets-enhanced/experimental reports undefined variable ELMTUI.UI.WIDGETS.LABEL-ENHANCED::STYLE-PROPS.",
+        "src/ui/widgets/button-enhanced.lisp contract expansion reports unused VALUE and HAS-VALUE-P variables for the :ACTION field."
+      ],
+      "result": [
+        "Moved label style computation into the lexical scope that builds the returned DSL, using the shared build-label-style-props helper.",
+        "Preserved the button action field's open value contract with an explicit always-valid validator so generated validation code consumes its bindings instead of emitting style warnings.",
+        "elmtui-widgets-enhanced/experimental now force-compiles without project-originated WARNING or STYLE-WARNING conditions.",
+        "Dedicated enhanced-widget regression tests pass 6/6 checks."
+      ],
+      "scope": {
+        "allow": [
+          "src/ui/widgets/label-enhanced.lisp",
+          "src/ui/widgets/button-enhanced.lisp",
+          "tests/ or a dedicated experimental-widget test system when needed",
+          "elmtui-widgets-enhanced.asd only when required to add a focused warning-clean test operation"
+        ],
+        "deny": [
+          "elmtui.asd",
+          "cl-*/",
+          "clpmfile*",
+          "dev/",
+          "CHANGELOG.md",
+          "dist/"
+        ]
+      },
+      "acceptance": [
+        "elmtui-widgets-enhanced/experimental compiles and loads without project-originated WARNING or STYLE-WARNING conditions.",
+        "The enhanced label view returns DSL whose :style value is the computed style property list.",
+        "The button contract change preserves validation semantics and eliminates generated unused bindings rather than merely muffling warnings.",
+        "Focused regression tests cover the label style path and button action field."
+      ],
+      "commands": [
+        "python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>",
+        "clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(require :asdf)' --eval '(asdf:load-system \"elmtui-widgets-enhanced/experimental\")'",
+        "scripts/release-check.sh"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "Implementation patch",
+        "Focused tests",
+        "Warning-clean load transcript"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-001: Repair experimental enhanced-widget compilation in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/experimental-widgets\nSuggested worktree: ../elmtui-post-001\n\nProblem:\nThe experimental enhanced-widget system loads with an undefined STYLE-PROPS variable in label-enhanced and generated unused-variable warnings in button-enhanced. The label warning crosses a lexical scope boundary and can become a runtime failure.\n\nEvidence:\n- src/ui/widgets/label-enhanced.lisp:199-217 binds STYLE-PROPS inside a LET that ends before :style uses it at line 228.\n- Loading elmtui-widgets-enhanced/experimental reports undefined variable ELMTUI.UI.WIDGETS.LABEL-ENHANCED::STYLE-PROPS.\n- src/ui/widgets/button-enhanced.lisp contract expansion reports unused VALUE and HAS-VALUE-P variables for the :ACTION field.\n\nAllowed paths:\n- src/ui/widgets/label-enhanced.lisp\n- src/ui/widgets/button-enhanced.lisp\n- tests/ or a dedicated experimental-widget test system when needed\n- elmtui-widgets-enhanced.asd only when required to add a focused warning-clean test operation\n\nDo not modify:\n- elmtui.asd\n- cl-*/\n- clpmfile*\n- dev/\n- CHANGELOG.md\n- dist/\n\nAcceptance criteria:\n- elmtui-widgets-enhanced/experimental compiles and loads without project-originated WARNING or STYLE-WARNING conditions.\n- The enhanced label view returns DSL whose :style value is the computed style property list.\n- The button contract change preserves validation semantics and eliminates generated unused bindings rather than merely muffling warnings.\n- Focused regression tests cover the label style path and button action field.\n\nRequired verification:\n- `python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>`\n- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(require :asdf)' --eval '(asdf:load-system \"elmtui-widgets-enhanced/experimental\")'`\n- `scripts/release-check.sh`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-002",
+      "title": "Replace default keymap no-op actions with honest behavior",
+      "priority": "P1",
+      "type": "implementation",
+      "status": "done",
+      "agent_role": "Input and interaction architecture specialist",
+      "branch": "post/keymap-actions",
+      "worktree_hint": "../elmtui-post-002",
+      "problem": "ElmTUI automatically activates default keymaps whose F1, F10, Escape, and Enter action targets only log words. These public bindings appear functional but silently perform no application action.",
+      "evidence": [
+        "src/core/keymaps.lisp:506 labels the section 'Default Keymaps & Actions (stubs)'.",
+        "src/core/keymaps.lisp:517-520 action-cancel/action-confirm/action-help/action-menu only call LOG-INFO.",
+        "src/core/keymaps.lisp:522-530 binds those actions to live default keys.",
+        "src/core/keymaps.lisp:557-566 registers the maps and activates the global context automatically."
+      ],
+      "result": [
+        "Removed the four logging-only action stubs and converted F1, F10, Escape, and dialog Enter/Escape defaults to canonical message dispatch.",
+        "Documented that a matched message binding is consumed even when no dispatch function is configured; the message is logged and dropped in that case.",
+        "Focused keymap verification passes 18/18 checks, including F1/F10/Escape/Enter dispatch, no-dispatch behavior, multi-key bindings, and context precedence."
+      ],
+      "scope": {
+        "allow": [
+          "src/core/keymaps.lisp",
+          "src/core/focus.lisp only if required by the selected dispatch contract",
+          "tests/keymaps-tests.lisp",
+          "additional focused keymap tests under tests/",
+          "documentation describing default key behavior when public behavior changes"
+        ],
+        "deny": [
+          "cl-inputs/",
+          "cl-events/",
+          "src/core/events.lisp",
+          "elmtui.asd",
+          "clpmfile*",
+          "dist/"
+        ]
+      },
+      "acceptance": [
+        "No automatically active default binding targets a function that only logs and returns.",
+        "Choose and document one coherent contract: dispatch canonical messages through *dispatch-fn*, remove misleading defaults, or make actions explicitly user-supplied.",
+        "F1/F10/Escape/Enter behavior is covered by tests including the no-dispatch-function case.",
+        "Existing multi-key and context precedence tests remain green."
+      ],
+      "commands": [
+        "python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>",
+        "clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:load-system :elmtui-tests)' --eval \"(fiveam:run! 'elmtui.keymaps.tests::keymaps-suite)\"",
+        "scripts/release-check.sh"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "Behavior decision note",
+        "Implementation patch",
+        "Keymap regressions"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-002: Replace default keymap no-op actions with honest behavior in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/keymap-actions\nSuggested worktree: ../elmtui-post-002\n\nProblem:\nElmTUI automatically activates default keymaps whose F1, F10, Escape, and Enter action targets only log words. These public bindings appear functional but silently perform no application action.\n\nEvidence:\n- src/core/keymaps.lisp:506 labels the section 'Default Keymaps & Actions (stubs)'.\n- src/core/keymaps.lisp:517-520 action-cancel/action-confirm/action-help/action-menu only call LOG-INFO.\n- src/core/keymaps.lisp:522-530 binds those actions to live default keys.\n- src/core/keymaps.lisp:557-566 registers the maps and activates the global context automatically.\n\nAllowed paths:\n- src/core/keymaps.lisp\n- src/core/focus.lisp only if required by the selected dispatch contract\n- tests/keymaps-tests.lisp\n- additional focused keymap tests under tests/\n- documentation describing default key behavior when public behavior changes\n\nDo not modify:\n- cl-inputs/\n- cl-events/\n- src/core/events.lisp\n- elmtui.asd\n- clpmfile*\n- dist/\n\nAcceptance criteria:\n- No automatically active default binding targets a function that only logs and returns.\n- Choose and document one coherent contract: dispatch canonical messages through *dispatch-fn*, remove misleading defaults, or make actions explicitly user-supplied.\n- F1/F10/Escape/Enter behavior is covered by tests including the no-dispatch-function case.\n- Existing multi-key and context precedence tests remain green.\n\nRequired verification:\n- `python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>`\n- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:load-system :elmtui-tests)' --eval \"(fiveam:run! 'elmtui.keymaps.tests::keymaps-suite)\"`\n- `scripts/release-check.sh`\n\nAdditional guidance:\nPrefer canonical message dispatch over framework-owned application semantics. Do not invent a global help/menu UI inside the keymap layer.\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit.",
+      "additional_guidance": "Prefer canonical message dispatch over framework-owned application semantics. Do not invent a global help/menu UI inside the keymap layer."
+    },
+    {
+      "id": "ELMTUI-POST-003",
+      "title": "Consolidate message contract and priority ownership",
+      "priority": "P2",
+      "type": "implementation",
+      "status": "done",
+      "agent_role": "Event-system architecture specialist",
+      "branch": "post/message-priority-ownership",
+      "worktree_hint": "../elmtui-post-003",
+      "problem": "ElmTUI carries a message-priority registry that register-message-contract writes but no runtime code reads. cl-events already defines the message-priority protocol, leaving two apparent ownership models and one dead source of truth.",
+      "evidence": [
+        "src/core/events.lisp exports *MESSAGE-PRIORITIES* and REGISTER-MESSAGE-CONTRACT.",
+        "src/core/events.lisp:168 calls the priority registry a stub.",
+        "The only active references to *MESSAGE-PRIORITIES* are export, definition, and the macro write; there is no read path.",
+        "cl-events/src/events/protocols.lisp and types.lisp already own MESSAGE-PRIORITY semantics and tests."
+      ],
+      "result": [
+        "Removed the unused ElmTUI message-priority registry and re-exported the cl-events MESSAGE-PRIORITY protocol as the priority authority.",
+        "REGISTER-MESSAGE-CONTRACT accepts its legacy third argument for source compatibility, documents it as deprecated, and no longer creates a separate type-priority record.",
+        "Explicit contract validation remains active; focused contract verification passes 100/100 checks."
+      ],
+      "scope": {
+        "allow": [
+          "src/core/events.lisp",
+          "src/contracts.lisp when necessary to preserve validation ownership",
+          "tests/elmtui-tests.lisp and focused event-contract tests",
+          "compatibility/deprecation documentation when public symbols change"
+        ],
+        "deny": [
+          "cl-events/ unless a separately justified compatibility adapter is required",
+          "src/core/keymaps.lisp",
+          "elmtui.asd",
+          "clpmfile*",
+          "dist/"
+        ]
+      },
+      "acceptance": [
+        "There is one documented source of truth for message priority.",
+        "The dead registry and misleading optional priority argument are removed, deprecated, or wired through the cl-events protocol with tests.",
+        "Explicit message-contract validation continues to work.",
+        "Public compatibility impact is documented and covered by tests."
+      ],
+      "commands": [
+        "python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>",
+        "clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp",
+        "scripts/release-check.sh"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "Ownership decision",
+        "Compatibility patch",
+        "Focused contract/priority tests"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-003: Consolidate message contract and priority ownership in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/message-priority-ownership\nSuggested worktree: ../elmtui-post-003\n\nProblem:\nElmTUI carries a message-priority registry that register-message-contract writes but no runtime code reads. cl-events already defines the message-priority protocol, leaving two apparent ownership models and one dead source of truth.\n\nEvidence:\n- src/core/events.lisp exports *MESSAGE-PRIORITIES* and REGISTER-MESSAGE-CONTRACT.\n- src/core/events.lisp:168 calls the priority registry a stub.\n- The only active references to *MESSAGE-PRIORITIES* are export, definition, and the macro write; there is no read path.\n- cl-events/src/events/protocols.lisp and types.lisp already own MESSAGE-PRIORITY semantics and tests.\n\nAllowed paths:\n- src/core/events.lisp\n- src/contracts.lisp when necessary to preserve validation ownership\n- tests/elmtui-tests.lisp and focused event-contract tests\n- compatibility/deprecation documentation when public symbols change\n\nDo not modify:\n- cl-events/ unless a separately justified compatibility adapter is required\n- src/core/keymaps.lisp\n- elmtui.asd\n- clpmfile*\n- dist/\n\nAcceptance criteria:\n- There is one documented source of truth for message priority.\n- The dead registry and misleading optional priority argument are removed, deprecated, or wired through the cl-events protocol with tests.\n- Explicit message-contract validation continues to work.\n- Public compatibility impact is documented and covered by tests.\n\nRequired verification:\n- `python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>`\n- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp`\n- `scripts/release-check.sh`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-004",
+      "title": "Split command-line tools out of the core ASDF system",
+      "priority": "P2",
+      "type": "implementation",
+      "status": "ready",
+      "agent_role": "ASDF and packaging specialist",
+      "branch": "post/tool-system-boundaries",
+      "worktree_hint": "../elmtui-post-004",
+      "problem": "The core elmtui system loads the packager and example runner even though they are command-line concerns. A separate packager system already exists, and the example runner has no external core references. This increases core load surface and duplicates ownership.",
+      "evidence": [
+        "elmtui.asd:173-174 includes tools/packager and tools/examples-runner in the core system.",
+        "elmtui-packager.asd separately loads src/tools/packager.lisp and depends on elmtui.",
+        "No tracked code outside src/tools/examples-runner.lisp references package elmtui.examples.runner.",
+        "elmtui-packager.asd remains version 0.1.0 while the release family is 0.2.0."
+      ],
+      "scope": {
+        "allow": [
+          "elmtui.asd",
+          "elmtui-packager.asd",
+          "a new dedicated examples CLI ASD when justified",
+          "elmtui-tests.asd",
+          "tests/packager-tests.lisp",
+          "tests/tools-tests.lisp",
+          "bridge.yml and examples.sh only when needed to preserve supported commands",
+          "README.org and docs/USER_GUIDE.md for changed load commands",
+          "clpmfile and clpmfile.lock only when a new local ASD must enter the supported bundle"
+        ],
+        "deny": [
+          "src/core/events.lisp",
+          "src/core/keymaps.lisp",
+          "experimental widget files",
+          "v0.2.0 or dist/"
+        ]
+      },
+      "acceptance": [
+        "Loading elmtui alone does not intern/load ELMTUI.PACKAGER or ELMTUI.EXAMPLES.RUNNER.",
+        "The packager and example CLI remain loadable through dedicated, documented ASDF systems.",
+        "Tool tests load their owning systems explicitly rather than relying on core side effects.",
+        "System versions and CLPM local-ASD entries are internally consistent.",
+        "The release gate remains green and a focused system-load audit demonstrates the boundary."
+      ],
+      "commands": [
+        "python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>",
+        "clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(require :asdf)' --eval '(asdf:load-system \"elmtui\")' --eval '(assert (null (find-package :elmtui.packager)))' --eval '(assert (null (find-package :elmtui.examples.runner)))'",
+        "clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:load-system \"elmtui-packager\")'",
+        "scripts/release-check.sh"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-008",
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "ASDF boundary patch",
+        "Updated tool tests/docs",
+        "System-load transcript"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-004: Split command-line tools out of the core ASDF system in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/tool-system-boundaries\nSuggested worktree: ../elmtui-post-004\n\nProblem:\nThe core elmtui system loads the packager and example runner even though they are command-line concerns. A separate packager system already exists, and the example runner has no external core references. This increases core load surface and duplicates ownership.\n\nEvidence:\n- elmtui.asd:173-174 includes tools/packager and tools/examples-runner in the core system.\n- elmtui-packager.asd separately loads src/tools/packager.lisp and depends on elmtui.\n- No tracked code outside src/tools/examples-runner.lisp references package elmtui.examples.runner.\n- elmtui-packager.asd remains version 0.1.0 while the release family is 0.2.0.\n\nAllowed paths:\n- elmtui.asd\n- elmtui-packager.asd\n- a new dedicated examples CLI ASD when justified\n- elmtui-tests.asd\n- tests/packager-tests.lisp\n- tests/tools-tests.lisp\n- bridge.yml and examples.sh only when needed to preserve supported commands\n- README.org and docs/USER_GUIDE.md for changed load commands\n- clpmfile and clpmfile.lock only when a new local ASD must enter the supported bundle\n\nDo not modify:\n- src/core/events.lisp\n- src/core/keymaps.lisp\n- experimental widget files\n- v0.2.0 or dist/\n\nAcceptance criteria:\n- Loading elmtui alone does not intern/load ELMTUI.PACKAGER or ELMTUI.EXAMPLES.RUNNER.\n- The packager and example CLI remain loadable through dedicated, documented ASDF systems.\n- Tool tests load their owning systems explicitly rather than relying on core side effects.\n- System versions and CLPM local-ASD entries are internally consistent.\n- The release gate remains green and a focused system-load audit demonstrates the boundary.\n\nRequired verification:\n- `python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>`\n- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(require :asdf)' --eval '(asdf:load-system \"elmtui\")' --eval '(assert (null (find-package :elmtui.packager)))' --eval '(assert (null (find-package :elmtui.examples.runner)))'`\n- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:load-system \"elmtui-packager\")'`\n- `scripts/release-check.sh`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-005",
+      "title": "Make the coverage workflow warning-clean and fail-fast",
+      "priority": "P2",
+      "type": "implementation",
+      "status": "blocked",
+      "agent_role": "SBCL tooling and test-infrastructure specialist",
+      "branch": "post/coverage-cleanup",
+      "worktree_hint": "../elmtui-post-005",
+      "problem": "coverage.lisp completes and writes an HTML report, but compiles with a reserved undefined PARSE-FLOAT warning and a DECLAIM/DECLARE style warning. The coverage bridge command accepts those warnings, so the workflow can regress silently.",
+      "evidence": [
+        "coverage.lisp:14 switches into package CL.",
+        "coverage.lisp:23,99,103 uses DECLAIM in ways that trigger 'DECLAIM where DECLARE was probably intended'.",
+        "PARSE-NUMBER calls PARSE-FLOAT before its definition; SBCL reports the reserved function name as undefined/non-portable.",
+        "The command still reports 2179 pass, 6 skip, 0 fail and generates coverage/cover-index.html."
+      ],
+      "scope": {
+        "allow": [
+          "coverage.lisp",
+          "bridge.yml coverage command",
+          "a focused shell verification script under scripts/ when useful",
+          ".gitignore only for generated coverage outputs",
+          "documentation for coverage invocation"
+        ],
+        "deny": [
+          "runtime source under src/",
+          "test semantics under tests/ except a minimal coverage-runner regression",
+          "clpmfile* unless a dependency is proven necessary",
+          "dist/"
+        ]
+      },
+      "acceptance": [
+        "coverage.lisp is package-safe and defines helpers before use with portable names.",
+        "A cold coverage run exits zero, produces coverage/cover-index.html, and emits no project-originated WARNING or STYLE-WARNING.",
+        "The coverage command exits nonzero on test failure, coverage generation failure, or newly introduced warning markers.",
+        "The normal release gate remains unchanged and green."
+      ],
+      "commands": [
+        "python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>",
+        "rm -rf coverage && timeout 180s clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load coverage.lisp",
+        "test -s coverage/cover-index.html",
+        "scripts/release-check.sh"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "Coverage script patch",
+        "Fail-fast warning gate",
+        "Cold-run transcript"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-005: Make the coverage workflow warning-clean and fail-fast in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/coverage-cleanup\nSuggested worktree: ../elmtui-post-005\n\nProblem:\ncoverage.lisp completes and writes an HTML report, but compiles with a reserved undefined PARSE-FLOAT warning and a DECLAIM/DECLARE style warning. The coverage bridge command accepts those warnings, so the workflow can regress silently.\n\nEvidence:\n- coverage.lisp:14 switches into package CL.\n- coverage.lisp:23,99,103 uses DECLAIM in ways that trigger 'DECLAIM where DECLARE was probably intended'.\n- PARSE-NUMBER calls PARSE-FLOAT before its definition; SBCL reports the reserved function name as undefined/non-portable.\n- The command still reports 2179 pass, 6 skip, 0 fail and generates coverage/cover-index.html.\n\nAllowed paths:\n- coverage.lisp\n- bridge.yml coverage command\n- a focused shell verification script under scripts/ when useful\n- .gitignore only for generated coverage outputs\n- documentation for coverage invocation\n\nDo not modify:\n- runtime source under src/\n- test semantics under tests/ except a minimal coverage-runner regression\n- clpmfile* unless a dependency is proven necessary\n- dist/\n\nAcceptance criteria:\n- coverage.lisp is package-safe and defines helpers before use with portable names.\n- A cold coverage run exits zero, produces coverage/cover-index.html, and emits no project-originated WARNING or STYLE-WARNING.\n- The coverage command exits nonzero on test failure, coverage generation failure, or newly introduced warning markers.\n- The normal release gate remains unchanged and green.\n\nRequired verification:\n- `python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>`\n- `rm -rf coverage && timeout 180s clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load coverage.lisp`\n- `test -s coverage/cover-index.html`\n- `scripts/release-check.sh`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-006",
+      "title": "Remove historical duplicate implementations from cl-inputs",
+      "priority": "P3",
+      "type": "implementation",
+      "status": "ready",
+      "agent_role": "Common Lisp library maintenance specialist",
+      "branch": "post/cl-inputs-source-cleanup",
+      "worktree_hint": "../elmtui-post-006",
+      "problem": "Two active cl-inputs implementation files are over half historical commented code, obscuring the production implementation and contradicting the post-release source-cleanliness goal.",
+      "evidence": [
+        "cl-inputs/src/input/loop.lisp: 588 lines, 307 comment lines (52%).",
+        "cl-inputs/src/input/decoder.lisp: 288 lines, 155 comment lines (54%).",
+        "decoder.lisp begins by describing the file as a reference/stub despite containing the loaded production implementation later in the file."
+      ],
+      "scope": {
+        "allow": [
+          "cl-inputs/src/input/loop.lisp",
+          "cl-inputs/src/input/decoder.lisp",
+          "cl-inputs/docs/ or history notes when genuinely useful",
+          "cl-inputs/tests/ only for regressions uncovered during cleanup"
+        ],
+        "deny": [
+          "root src/",
+          "other cl-* libraries",
+          "clpmfile*",
+          "release files and dist/"
+        ]
+      },
+      "acceptance": [
+        "Historical commented implementations are removed or moved into concise design/history documentation.",
+        "Public APIs and runtime behavior are unchanged.",
+        "Both files have accurate top-level documentation describing the active implementation.",
+        "cl-inputs independent tests pass warning-clean."
+      ],
+      "commands": [
+        "python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>",
+        "clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:test-system \"cl-inputs\")'",
+        "scripts/release-check.sh"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "Source cleanup patch",
+        "Behavior-preservation test transcript"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-006: Remove historical duplicate implementations from cl-inputs in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/cl-inputs-source-cleanup\nSuggested worktree: ../elmtui-post-006\n\nProblem:\nTwo active cl-inputs implementation files are over half historical commented code, obscuring the production implementation and contradicting the post-release source-cleanliness goal.\n\nEvidence:\n- cl-inputs/src/input/loop.lisp: 588 lines, 307 comment lines (52%).\n- cl-inputs/src/input/decoder.lisp: 288 lines, 155 comment lines (54%).\n- decoder.lisp begins by describing the file as a reference/stub despite containing the loaded production implementation later in the file.\n\nAllowed paths:\n- cl-inputs/src/input/loop.lisp\n- cl-inputs/src/input/decoder.lisp\n- cl-inputs/docs/ or history notes when genuinely useful\n- cl-inputs/tests/ only for regressions uncovered during cleanup\n\nDo not modify:\n- root src/\n- other cl-* libraries\n- clpmfile*\n- release files and dist/\n\nAcceptance criteria:\n- Historical commented implementations are removed or moved into concise design/history documentation.\n- Public APIs and runtime behavior are unchanged.\n- Both files have accurate top-level documentation describing the active implementation.\n- cl-inputs independent tests pass warning-clean.\n\nRequired verification:\n- `python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>`\n- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:test-system \"cl-inputs\")'`\n- `scripts/release-check.sh`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-007",
+      "title": "Classify tracked source files outside all maintained ASDF systems",
+      "priority": "P2",
+      "type": "investigation",
+      "status": "ready",
+      "agent_role": "Common Lisp architecture reviewer",
+      "branch": "post/orphan-source-audit",
+      "worktree_hint": "../elmtui-post-007",
+      "problem": "Seventeen tracked Lisp source files are not loaded by any maintained ASDF system. Some are likely obsolete, some are developer tools, and some may be unfinished alternate implementations. Blind deletion or inclusion would be unsafe.",
+      "evidence": [
+        "ASDF inventory found 108 loaded source files and 17 tracked src/**/*.lisp files absent from elmtui, examples, packager, and enhanced-widget systems.",
+        "The set includes src/dev/* tools, canvas-renderer, profiler, observers, transaction-controls, diff/layout-debug/named-area/props/view-diff-render.",
+        "Several absent files contain explicit stubs/TODOs, including layout-debug JSON export and event-dashboard metrics."
+      ],
+      "scope": {
+        "allow": [
+          "All 17 orphan source files for read-only analysis",
+          "ASD files for dependency/ownership analysis",
+          "tests and docs for reference search",
+          "docs/plans/orphan-source-classification.md as the primary deliverable"
+        ],
+        "deny": [
+          "No Lisp source edits",
+          "No file deletion, movement, or ASD inclusion",
+          "No clpmfile, tag, remote, or dist changes"
+        ]
+      },
+      "acceptance": [
+        "Every orphan file receives one disposition: delete as obsolete, archive as historical, move into a named optional system, merge into an owner, or retain with explicit rationale.",
+        "Each disposition includes reference evidence, dependency risks, test requirements, and a proposed owner/task ID.",
+        "The report identifies mutually dependent groups and files unsafe for parallel edits.",
+        "No source behavior changes are made."
+      ],
+      "commands": [
+        "git grep and ASDF component inventory commands documented in the report",
+        "scripts/release-check.sh (to prove investigation introduced no runtime change)"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-008",
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "docs/plans/orphan-source-classification.md",
+        "Follow-up task recommendations"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-007: Classify tracked source files outside all maintained ASDF systems in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/orphan-source-audit\nSuggested worktree: ../elmtui-post-007\n\nProblem:\nSeventeen tracked Lisp source files are not loaded by any maintained ASDF system. Some are likely obsolete, some are developer tools, and some may be unfinished alternate implementations. Blind deletion or inclusion would be unsafe.\n\nEvidence:\n- ASDF inventory found 108 loaded source files and 17 tracked src/**/*.lisp files absent from elmtui, examples, packager, and enhanced-widget systems.\n- The set includes src/dev/* tools, canvas-renderer, profiler, observers, transaction-controls, diff/layout-debug/named-area/props/view-diff-render.\n- Several absent files contain explicit stubs/TODOs, including layout-debug JSON export and event-dashboard metrics.\n\nAllowed paths:\n- All 17 orphan source files for read-only analysis\n- ASD files for dependency/ownership analysis\n- tests and docs for reference search\n- docs/plans/orphan-source-classification.md as the primary deliverable\n\nDo not modify:\n- No Lisp source edits\n- No file deletion, movement, or ASD inclusion\n- No clpmfile, tag, remote, or dist changes\n\nAcceptance criteria:\n- Every orphan file receives one disposition: delete as obsolete, archive as historical, move into a named optional system, merge into an owner, or retain with explicit rationale.\n- Each disposition includes reference evidence, dependency risks, test requirements, and a proposed owner/task ID.\n- The report identifies mutually dependent groups and files unsafe for parallel edits.\n- No source behavior changes are made.\n\nRequired verification:\n- `git grep and ASDF component inventory commands documented in the report`\n- `scripts/release-check.sh (to prove investigation introduced no runtime change)`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-008",
+      "title": "Normalize optional and legacy example packaging",
+      "priority": "P2",
+      "type": "implementation",
+      "status": "done",
+      "agent_role": "ASDF examples and developer-experience specialist",
+      "branch": "post/example-packaging",
+      "worktree_hint": "../elmtui-post-008",
+      "problem": "Optional example packaging is inconsistent: elmtui-examples-fzy directly fails with a raw missing-system backtrace when cl-fzy is absent, while the tracked dirlister_poc ASD is undiscoverable through the supported CLPM bundle and contains an incomplete entry-point form.",
+      "evidence": [
+        "elmtui-examples-fzy.asd:7 directly depends on cl-fzy; direct ASDF load in the root bundle fails with a raw CLPM missing-system backtrace.",
+        "The examples runner has a clear cl-fzy error only when loading the file manually, not when loading the optional system.",
+        "examples/dirlister_poc/dirlister_poc.asd is tracked but absent from clpmfile and cannot be discovered in the supported bundle.",
+        "dirlister_poc.asd:12 contains ':entry-point );\"dirlister_poc:start-dirlister-poc\")'."
+      ],
+      "result": [
+        "Retired the invalid duplicate examples/dirlister_poc prototype; maintained dirli.lisp is the supported directory-browser example.",
+        "Moved optional cl-fzy loader support under examples/support so it is not exposed as a runnable example.",
+        "Missing cl-fzy now reports an intentional actionable diagnostic without embedding a machine-specific path.",
+        "Maintained example smoke coverage passes 243/243 checks and the base elmtui-examples system remains independent of cl-fzy."
+      ],
+      "scope": {
+        "allow": [
+          "elmtui-examples-fzy.asd",
+          "examples/dirlister_poc/dirlister_poc.asd and its source",
+          "examples/README.md",
+          "src/tools/examples-runner.lisp or its dedicated system after ELMTUI-POST-004",
+          "clpmfile and lock only for a maintained local example ASD",
+          "focused example smoke tests"
+        ],
+        "deny": [
+          "core runtime implementation unrelated to examples",
+          "experimental widgets",
+          "release tag, remotes, dist/"
+        ]
+      },
+      "acceptance": [
+        "A maintainer-facing decision is implemented and documented for dirlister_poc: maintained and discoverable, or explicitly archived/removed from release-facing systems.",
+        "Any maintained program system has a valid entry point and a smoke-tested load/build path.",
+        "Missing cl-fzy produces a concise, intentional diagnostic in the documented optional workflow without machine-specific paths.",
+        "Base examples remain independent of cl-fzy."
+      ],
+      "commands": [
+        "python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>",
+        "focused ASDF load/build checks for every maintained example system",
+        "clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:load-system \"elmtui-examples\")'",
+        "scripts/release-check.sh"
+      ],
+      "depends_on": [
+        "ELMTUI-POST-004",
+        "ELMTUI-POST-007"
+      ],
+      "conflicts_with": [
+        "ELMTUI-POST-004",
+        "ELMTUI-POST-007",
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "Example-system decision",
+        "ASDF/runner patch",
+        "Example smoke tests and docs"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-008: Normalize optional and legacy example packaging in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/example-packaging\nSuggested worktree: ../elmtui-post-008\n\nProblem:\nOptional example packaging is inconsistent: elmtui-examples-fzy directly fails with a raw missing-system backtrace when cl-fzy is absent, while the tracked dirlister_poc ASD is undiscoverable through the supported CLPM bundle and contains an incomplete entry-point form.\n\nEvidence:\n- elmtui-examples-fzy.asd:7 directly depends on cl-fzy; direct ASDF load in the root bundle fails with a raw CLPM missing-system backtrace.\n- The examples runner has a clear cl-fzy error only when loading the file manually, not when loading the optional system.\n- examples/dirlister_poc/dirlister_poc.asd is tracked but absent from clpmfile and cannot be discovered in the supported bundle.\n- dirlister_poc.asd:12 contains ':entry-point );\"dirlister_poc:start-dirlister-poc\")'.\n\nAllowed paths:\n- elmtui-examples-fzy.asd\n- examples/dirlister_poc/dirlister_poc.asd and its source\n- examples/README.md\n- src/tools/examples-runner.lisp or its dedicated system after ELMTUI-POST-004\n- clpmfile and lock only for a maintained local example ASD\n- focused example smoke tests\n\nDo not modify:\n- core runtime implementation unrelated to examples\n- experimental widgets\n- release tag, remotes, dist/\n\nAcceptance criteria:\n- A maintainer-facing decision is implemented and documented for dirlister_poc: maintained and discoverable, or explicitly archived/removed from release-facing systems.\n- Any maintained program system has a valid entry point and a smoke-tested load/build path.\n- Missing cl-fzy produces a concise, intentional diagnostic in the documented optional workflow without machine-specific paths.\n- Base examples remain independent of cl-fzy.\n\nRequired verification:\n- `python3 /home/user/.codex/skills/sexp-manipulator/scripts/sexp_utils.py validate <edited-lisp-files>`\n- `focused ASDF load/build checks for every maintained example system`\n- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:load-system \"elmtui-examples\")'`\n- `scripts/release-check.sh`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-009",
+      "title": "Inventory and quarantine untracked workspace material",
+      "priority": "P3",
+      "type": "investigation",
+      "status": "ready",
+      "agent_role": "Repository hygiene specialist",
+      "branch": "post/workspace-hygiene-audit",
+      "worktree_hint": "../elmtui-post-009",
+      "problem": "The release checkout contains 113 untracked files, including generated artifacts, debug scripts, old design notes, local editor/agent state, and a nested untracked Git repository. They are excluded from the release but make future automated work and human review hazardous.",
+      "evidence": [
+        "git status -uall reports 113 untracked files.",
+        "The untracked set includes dist/, dozens of debug-*.lisp scripts, local tool directories, old-statelib, prof.lisp, and multiple issue/review files.",
+        "find detects a nested Git repository at actiwat/.git."
+      ],
+      "scope": {
+        "allow": [
+          "Read-only inventory of all untracked paths",
+          ".gitignore for analysis only",
+          "docs/plans/workspace-hygiene-classification.md as the deliverable"
+        ],
+        "deny": [
+          "No deletion, movement, archival, chmod, or Git add",
+          "Do not enter or modify actiwat's Git history",
+          "No runtime source, release ref, remote, or dist content changes"
+        ]
+      },
+      "acceptance": [
+        "Every untracked top-level item is classified into keep local, add to .gitignore, move to separate repository, consider adding, archive, or delete-after-approval.",
+        "Potentially valuable source/debug artifacts are distinguished from generated junk.",
+        "A safe ordered cleanup command plan is provided but not executed.",
+        "Nested repositories and any irreversible action are prominently flagged for maintainer approval."
+      ],
+      "commands": [
+        "git status --porcelain=v1 -uall",
+        "find . -mindepth 2 -maxdepth 4 -type d -name .git -print",
+        "scripts/release-check.sh (no runtime changes expected)"
+      ],
+      "depends_on": [],
+      "conflicts_with": [
+        "ELMTUI-POST-INT"
+      ],
+      "deliverables": [
+        "docs/plans/workspace-hygiene-classification.md",
+        "Approval-gated cleanup plan"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-009: Inventory and quarantine untracked workspace material in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/workspace-hygiene-audit\nSuggested worktree: ../elmtui-post-009\n\nProblem:\nThe release checkout contains 113 untracked files, including generated artifacts, debug scripts, old design notes, local editor/agent state, and a nested untracked Git repository. They are excluded from the release but make future automated work and human review hazardous.\n\nEvidence:\n- git status -uall reports 113 untracked files.\n- The untracked set includes dist/, dozens of debug-*.lisp scripts, local tool directories, old-statelib, prof.lisp, and multiple issue/review files.\n- find detects a nested Git repository at actiwat/.git.\n\nAllowed paths:\n- Read-only inventory of all untracked paths\n- .gitignore for analysis only\n- docs/plans/workspace-hygiene-classification.md as the deliverable\n\nDo not modify:\n- No deletion, movement, archival, chmod, or Git add\n- Do not enter or modify actiwat's Git history\n- No runtime source, release ref, remote, or dist content changes\n\nAcceptance criteria:\n- Every untracked top-level item is classified into keep local, add to .gitignore, move to separate repository, consider adding, archive, or delete-after-approval.\n- Potentially valuable source/debug artifacts are distinguished from generated junk.\n- A safe ordered cleanup command plan is provided but not executed.\n- Nested repositories and any irreversible action are prominently flagged for maintainer approval.\n\nRequired verification:\n- `git status --porcelain=v1 -uall`\n- `find . -mindepth 2 -maxdepth 4 -type d -name .git -print`\n- `scripts/release-check.sh (no runtime changes expected)`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    },
+    {
+      "id": "ELMTUI-POST-INT",
+      "title": "Integrate post-release fixes and decide release versioning",
+      "priority": "P1",
+      "type": "integration",
+      "status": "blocked",
+      "agent_role": "Senior Common Lisp release integrator",
+      "branch": "post/integration",
+      "worktree_hint": "../elmtui-post-int",
+      "problem": "Combine approved implementation branches, reconcile shared manifest edits, rerun cold-tree and archive-level verification, and recommend whether the unpublished local v0.2.0 tag should be replaced or the fixes should ship as v0.2.1.",
+      "evidence": [
+        "The current local v0.2.0 tag is unsigned and no remote exists, so publication has not occurred.",
+        "P1/P2 issues were found after tagging, including an experimental widget undefined variable and live no-op keymap defaults.",
+        "The release commit and tag currently both resolve to 2d317acc987a33a663ffe3c2bf33c77d61774b2d."
+      ],
+      "scope": {
+        "allow": [
+          "Approved task branches and their commits",
+          "ASD/CLPM manifests during conflict resolution",
+          "tests, docs, release scripts, and changelog on a new integration branch",
+          "a release decision report under docs/plans/"
+        ],
+        "deny": [
+          "Do not modify or delete v0.2.0 during integration",
+          "Do not configure/push remotes",
+          "Do not reuse old dist artifacts as evidence",
+          "Do not merge investigation-only recommendations without explicit maintainer approval"
+        ]
+      },
+      "acceptance": [
+        "All approved implementation branches are merged in dependency order with conflicts resolved intentionally.",
+        "Every maintained ASDF system loads in a fresh process; experimental systems have no project warnings.",
+        "scripts/release-check.sh passes from the exact Git index in a detached clean worktree.",
+        "A newly generated source archive passes the subsystem and warning-clean integration gates in a fresh CLPM home.",
+        "The report recommends one release policy: replace unpublished v0.2.0, or preserve it and release v0.2.1; the integrator does not execute the tag decision."
+      ],
+      "commands": [
+        "scripts/release-check.sh",
+        "fresh-process ASDF load audit for every maintained system",
+        "detached-index clean-worktree release check",
+        "fresh-CLPM extracted-archive verification"
+      ],
+      "depends_on": [
+        "ELMTUI-POST-001",
+        "ELMTUI-POST-002",
+        "ELMTUI-POST-003",
+        "ELMTUI-POST-004",
+        "ELMTUI-POST-005",
+        "ELMTUI-POST-006",
+        "ELMTUI-POST-007",
+        "ELMTUI-POST-008",
+        "ELMTUI-POST-009"
+      ],
+      "conflicts_with": [
+        "ELMTUI-POST-001",
+        "ELMTUI-POST-002",
+        "ELMTUI-POST-003",
+        "ELMTUI-POST-004",
+        "ELMTUI-POST-005",
+        "ELMTUI-POST-006",
+        "ELMTUI-POST-007",
+        "ELMTUI-POST-008",
+        "ELMTUI-POST-009"
+      ],
+      "deliverables": [
+        "Integrated branch",
+        "Cold-tree and archive verification logs",
+        "Release versioning decision report"
+      ],
+      "prompt": "You are assigned ELMTUI-POST-INT: Integrate post-release fixes and decide release versioning in the ElmTUI Common Lisp project.\n\nBase ref: v0.2.0\nBase commit: 2d317acc987a33a663ffe3c2bf33c77d61774b2d\nBranch: post/integration\nSuggested worktree: ../elmtui-post-int\n\nProblem:\nCombine approved implementation branches, reconcile shared manifest edits, rerun cold-tree and archive-level verification, and recommend whether the unpublished local v0.2.0 tag should be replaced or the fixes should ship as v0.2.1.\n\nEvidence:\n- The current local v0.2.0 tag is unsigned and no remote exists, so publication has not occurred.\n- P1/P2 issues were found after tagging, including an experimental widget undefined variable and live no-op keymap defaults.\n- The release commit and tag currently both resolve to 2d317acc987a33a663ffe3c2bf33c77d61774b2d.\n\nAllowed paths:\n- Approved task branches and their commits\n- ASD/CLPM manifests during conflict resolution\n- tests, docs, release scripts, and changelog on a new integration branch\n- a release decision report under docs/plans/\n\nDo not modify:\n- Do not modify or delete v0.2.0 during integration\n- Do not configure/push remotes\n- Do not reuse old dist artifacts as evidence\n- Do not merge investigation-only recommendations without explicit maintainer approval\n\nAcceptance criteria:\n- All approved implementation branches are merged in dependency order with conflicts resolved intentionally.\n- Every maintained ASDF system loads in a fresh process; experimental systems have no project warnings.\n- scripts/release-check.sh passes from the exact Git index in a detached clean worktree.\n- A newly generated source archive passes the subsystem and warning-clean integration gates in a fresh CLPM home.\n- The report recommends one release policy: replace unpublished v0.2.0, or preserve it and release v0.2.1; the integrator does not execute the tag decision.\n\nRequired verification:\n- `scripts/release-check.sh`\n- `fresh-process ASDF load audit for every maintained system`\n- `detached-index clean-worktree release check`\n- `fresh-CLPM extracted-archive verification`\n\nFollow AGENTS.md and CLAUDE.md, especially the mandatory structural Lisp editing rules. Do not commit or alter release tags. Return a concise handoff with changed files, design choices, tests, warnings, and the commit hash if you make a commit."
+    }
+  ],
+  "manual_tasks": [
+    {
+      "id": "ELMTUI-PUB-001",
+      "title": "Maintainer publication and signing",
+      "priority": "manual",
+      "type": "maintainer-only",
+      "status": "blocked",
+      "depends_on": [
+        "ELMTUI-POST-INT"
+      ],
+      "blocked_reason": "No remote is configured, the current v0.2.0 tag is unsigned, and post-tag fixes require a maintainer versioning decision.",
+      "actions": [
+        "Review and approve the integrator's v0.2.0 replacement versus v0.2.1 recommendation.",
+        "Configure the intended public remote.",
+        "Create or recreate the selected annotated/signed tag only after approval.",
+        "Regenerate release artifacts from the final tag and verify checksums.",
+        "Push the branch and selected tag, then publish release notes and artifacts."
+      ],
+      "forbidden_for_agents": [
+        "Changing or deleting v0.2.0",
+        "Signing tags with maintainer credentials",
+        "Configuring remotes",
+        "Pushing or publishing releases"
+      ]
+    }
+  ],
+  "recommended_merge_order": [
+    "ELMTUI-POST-001",
+    "ELMTUI-POST-002",
+    "ELMTUI-POST-003",
+    "ELMTUI-POST-005",
+    "ELMTUI-POST-006",
+    "ELMTUI-POST-004",
+    "ELMTUI-POST-008",
+    "ELMTUI-POST-INT"
+  ],
+  "investigation_reports_for_maintainer_review": [
+    "ELMTUI-POST-007",
+    "ELMTUI-POST-009"
+  ]
+}

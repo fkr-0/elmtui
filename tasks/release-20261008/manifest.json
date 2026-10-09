@@ -1,0 +1,32 @@
+[
+  {
+    "name": "cl-events",
+    "task": "CL-EVENTS-RELEASE-20261008",
+    "prompt": "cl-events-release-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/release-20261008/CL-EVENTS-RELEASE-20261008.md"
+  },
+  {
+    "name": "cl-inputs",
+    "task": "CL-INPUTS-RELEASE-20261008",
+    "prompt": "cl-inputs-release-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/release-20261008/CL-INPUTS-RELEASE-20261008.md"
+  },
+  {
+    "name": "cl-state",
+    "task": "CL-STATE-RELEASE-20261008",
+    "prompt": "cl-state-release-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/release-20261008/CL-STATE-RELEASE-20261008.md"
+  },
+  {
+    "name": "cl-styles",
+    "task": "CL-STYLES-RELEASE-20261008",
+    "prompt": "cl-styles-release-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/release-20261008/CL-STYLES-RELEASE-20261008.md"
+  },
+  {
+    "name": "elmtui.lisp",
+    "task": "ELMTUI-RELEASE-20261008",
+    "prompt": "elmtui-release-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/release-20261008/ELMTUI-RELEASE-20261008.md"
+  }
+]

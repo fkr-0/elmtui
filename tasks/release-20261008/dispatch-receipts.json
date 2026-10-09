@@ -1,0 +1,62 @@
+[
+  {
+    "project": "cl-events",
+    "task": "CL-EVENTS-RELEASE-20261008",
+    "ocp_state": "running",
+    "conversation_url": "https://chatgpt.com/c/6ac7f5b8-b9e8-83ed-8ddf-b7045ade3d34",
+    "target_id": "AE8E5C9CB202511353AEBDBF846FE492",
+    "prompt_sha256": "8a56483c3d3dd353dbd8d3fa31716f80b9c4201677e2b586cf026a919a4506ed",
+    "source_refs": [
+      "wsbridge:workspace:ws-cb7a2a3937b624ef7eb781fe9041fd6a",
+      "wsbridge:work-packet:f06e9ed5-8520-4789-bafe-96e2d8cc3a82"
+    ]
+  },
+  {
+    "project": "cl-inputs",
+    "task": "CL-INPUTS-RELEASE-20261008",
+    "ocp_state": "running",
+    "conversation_url": "https://chatgpt.com/c/6ac7f5c2-1ba4-83eb-97a6-732df362d294",
+    "target_id": "C13C5B87DE4843AA548CCD329F45A85D",
+    "prompt_sha256": "aff17ec5f096d84ccc55260190574155c3104177e59c290be30360b262f7cb9b",
+    "source_refs": [
+      "wsbridge:workspace:ws-4a899be86b18caea24b28bb9b9409f27",
+      "wsbridge:work-packet:cdb493df-5039-49b8-b137-9b2cb765f9b7"
+    ]
+  },
+  {
+    "project": "cl-state",
+    "task": "CL-STATE-RELEASE-20261008",
+    "ocp_state": "running",
+    "conversation_url": "https://chatgpt.com/c/6ac7f5cf-6bbc-83eb-8885-5ef6292e8f28",
+    "target_id": "346F2591E58854C676811EB5D347A296",
+    "prompt_sha256": "329f2262687c6343efe6fa6076ea71dec7f93e886054a826d12e06cd26dd27f9",
+    "source_refs": [
+      "wsbridge:workspace:ws-cab479e1448507a0ebc27fe8f3548e0d",
+      "wsbridge:work-packet:020ed5f9-dec9-48e8-b976-5a7a7a69bb03"
+    ]
+  },
+  {
+    "project": "cl-styles",
+    "task": "CL-STYLES-RELEASE-20261008",
+    "ocp_state": "running",
+    "conversation_url": "https://chatgpt.com/c/6ac7f63c-1a2c-83ed-a30d-787301a6516f",
+    "target_id": "0D7C08AF3EDDF4EFF35A4087DC6D69B1",
+    "prompt_sha256": "45c45e0a28abdb514929e69c2e3557ceb13b2d7293a35de579babdff6d728393",
+    "source_refs": [
+      "wsbridge:workspace:ws-28f86f3bf0c2de954ff0c83d1b9bdeeb",
+      "wsbridge:work-packet:0e478515-a6fa-4178-a299-9a2ca836d385"
+    ]
+  },
+  {
+    "project": "elmtui.lisp",
+    "task": "ELMTUI-RELEASE-20261008",
+    "ocp_state": "running",
+    "conversation_url": "https://chatgpt.com/c/6ac7f60a-b938-83eb-8ba2-a71e6cfe48cb",
+    "target_id": "2A91E828495CED3D3F27EBEFC01FEEE5",
+    "prompt_sha256": "1d57552ccabe842f4e29889bfd2745098b7d098ef76bab89d516ba49e030ba64",
+    "source_refs": [
+      "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+      "wsbridge:work-packet:37301c65-5b1a-47b6-afd0-e303dadd8193"
+    ]
+  }
+]

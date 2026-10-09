@@ -1,0 +1,32 @@
+[
+  {
+    "task": "ELMTUI-FOCUS-KEYMAP-20261008",
+    "prompt": "elmtui-focus-keymap-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/remainder-20261008/ELMTUI-FOCUS-KEYMAP-20261008.md",
+    "scope": [
+      "examples/focus-simple.lisp",
+      "examples/keymap-app.lisp"
+    ],
+    "objective": "Repair focus-simple and keymap-app startup and interactive behavior. Both currently exit early with missing root component (:FOCUS-ROOT / :MY-ROOT-VIEWPORT). Trace registration/root DSL/child ownership; repair contracts in these examples without duplicate ids. Verify Tab focus, button activation and normal exit; counter10 -> plus11 -> minus10 -> Enter0 and quit. Existing tests are test_focus_tab_button_activation and test_counter_keymap_increment_decrement_reset in scripts/test-terminal-apps.py. Keep real cursor-relative rendering and lifecycle intact."
+  },
+  {
+    "task": "ELMTUI-OTHER-EXAMPLES-20261008",
+    "prompt": "elmtui-other-examples-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/remainder-20261008/ELMTUI-OTHER-EXAMPLES-20261008.md",
+    "scope": [
+      "examples/game-of-life.lisp",
+      "examples/minimal-app.lisp",
+      "examples/scroll-panel-demo.lisp"
+    ],
+    "objective": "Repair the three remaining full-terminal app failures: game-of-life ignores Space and other canonical key list messages (Running never Paused); minimal accepts letters but its normal Ctrl-Q quit hangs; scroll-panel-demo renders blank and never shows Line01. Trace actual event/DSL paths instead of adding timers. Verify life pause/reset/resume/quit; minimal A/B render and normal quit; scroll PageDown/Home/End reaching Line80 and quit. Existing tests with those names in scripts/test-terminal-apps.py are acceptance gates. Coordinate shared runtime ownership when required and implement independent example adapters now."
+  },
+  {
+    "task": "ELMTUI-WIFI-ROBUSTNESS-20261008",
+    "prompt": "elmtui-wifi-robustness-20261008-v1",
+    "file": "/home/user/code/lisp/elmtui.lisp/tasks/remainder-20261008/ELMTUI-WIFI-ROBUSTNESS-20261008.md",
+    "scope": [
+      "examples/wifi-menu.lisp"
+    ],
+    "objective": "Finish Wi-Fi menu operation robustness. Independent review reproduced %browse-key-update starting another connection command when :busy t: BUSY-ENTER-COMMANDS=1. Guard duplicate Enter/r/d operations while busy, retaining immediate Escape/q abort and navigation as appropriate. Add black-box slow fake-nmcli test showing rapid Enter does not dispatch concurrent connections, abort removes menu promptly while operation pending and restores terminal; bound external command waiting and ensure subprocess cleanup is documented and tested. Do not introduce shell interpolation or expose passwords in argv/logs. Preserve all existing scanning, secure-password masking, quick keys, below-cursor scroll20x1, reverse cleanup, no whole-screen clear and quiet-startup gates. Current async nmcli scan %run-command has no explicit process deadline; investigate/repair only in this example with meaningful timeout/cancellation tests."
+  }
+]
