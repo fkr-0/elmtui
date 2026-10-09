@@ -51,6 +51,16 @@ class DeterministicInspector(unittest.TestCase):
                         (assert (search "[NO-TMUX]" printed))
                         (assert (search "No tmux session" printed)))""")
 
+    def test_visible_pane_rows_exclude_terminator_and_keep_sgr(self):
+        check_lisp(r"""(let* ((raw (format nil "ROW0~%~C[31mROW1~C[0m~%~%"
+                                       #\Escape #\Escape))
+                            (lines (elmtui-examples.cursor-inspector::%visible-pane-lines raw)))
+                           (assert (= 3 (length lines)))
+                           (assert (string= "ROW0" (aref lines 0)))
+                           (assert (search "ROW1" (aref lines 1)))
+                           (assert (find #\Escape (aref lines 1)))
+                           (assert (string= "" (aref lines 2))))""")
+
     def test_overlay_capture_guard(self):
         check_lisp(r"""(progn
           (assert (elmtui-examples.cursor-inspector:%capture-safe-p #("history")))
