@@ -83,7 +83,8 @@
     `(:container :id :fzf-root :style (:display :flex :flex-direction :column :width 64)
       :children
       ((:text :id :input :content ,(format nil "~A~A" prompt input))
-       (:container :id :matches :style (:display :flex :flex-direction :column)
+       (:container :id :matches :style (:display :flex :flex-direction :column
+                              :height 12)
         :children
         ,(loop for item in matches
                for idx from 0
