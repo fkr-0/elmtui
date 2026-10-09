@@ -86,11 +86,12 @@ The docstring ratchet (`scripts/check-docstrings.sh`) on this audit reported **1
 
 ## Verification and constraints
 
-- `tests/condition-system-tests.lisp`: 252 focused checks passed, 0 failed.
-- Required full suite: 4,850 checks; 4,844 passed, 6 opt-in live-tmux checks skipped, 0 failed.
+- `tests/condition-system-tests.lisp`: 3,451 focused checks passed, 0 failed, including an all-framework implementation-private export regression.
+- Required full suite: 8,049 checks; 8,043 passed, 6 opt-in live-tmux checks skipped, 0 failed.
 - `ELMTUI.CORE.CONDITIONS:SIGNAL-SUBSCRIBER-ERROR` report now calls its prefixed reader instead of inadvertently calling `CL:SIGNAL`.
 - `elmtui.asd` now gives `core/conditions` an explicit dependency on `core/errors` to avoid out-of-order package reads on fresh compilation.
 - Pre-existing warnings from LOG4CL method redefinitions and a constant type mismatch in `tests/api-tests.lisp` occur during test loading; no warning originated from the changed condition class/report or focused tests.
+- `ASDF:LOAD-SYSTEM :ELMTUI` followed by `ASDF:COMPILE-SYSTEM :ELMTUI` succeeds; an isolated, cold `COMPILE-SYSTEM` still encounters a separate package-definition ordering failure in `ELMTUI.STATE.UPDATE`. The whole-system compile-only path requires a broader ASDF dependency audit and is not claimed warning/error clean here.
 - Source files belonging to workbench, examples, tmux, or claimed workers have not been edited.
 
 ## Follow-up gates
@@ -98,4 +99,5 @@ The docstring ratchet (`scripts/check-docstrings.sh`) on this audit reported **1
 1. Complete per-binding API documentation / reviewed intentional-undocumented exceptions in the existing docstring-remediation task; strict zero-debt mode remains unqualified.
 2. Independently review facade-level re-export ownership before altering `CL-EVENTS.API`, `CL-STYLES.API`, `ELMTUI.STATE`, or `ELMTUI.STATE.API`.
 3. Migrate `WORKBENCH:EVALUATION-ABORTED` into the framework root only after the workbench owners release that path, with condition handler/restart compatibility tests.
-4. Add the condition export boundary and diagnostic context checks to hosted CI; currently they run through the existing full test suite.
+4. Wire the existing condition export boundary and diagnostic context tests into hosted CI when hosted CI exists; they already run through the local full test suite.
+5. Resolve the cold ASDF compile-only dependency ordering in `ELMTUI.STATE.UPDATE` independently of this condition-focused change.
