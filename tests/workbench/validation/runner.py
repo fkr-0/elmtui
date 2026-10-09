@@ -18,6 +18,7 @@ import time
 import uuid
 
 from live_cases import run_case_oracles
+from dependency_oracle import run_dependency_oracle
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -90,10 +91,11 @@ def main():
             "clpm", "bundle", "exec", "--with-client", "sbcl", "--",
             "--noinform", "--non-interactive", "--eval", "(require :asdf)",
             "--eval", '(asdf:load-system "elmtui")'], out)
+    checks["dependency_oracle"] = run_dependency_oracle(ROOT, out, check)
     launcher = launcher_status()
     dependency = ("W5 launcher absent: " + ", ".join(launcher["missing"])
                   if not launcher["present"] else
-                  "No independently executable oracle implemented for this matrix case")
+                  checks["dependency_oracle"]["details"])
     observed = run_case_oracles(cases, ROOT, out, check) if launcher["present"] else {}
     rows = []
     for case in cases:
