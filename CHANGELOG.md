@@ -70,6 +70,9 @@ The project follows semantic versioning from the first published release.
 
 ### Fixed
 
+- Recognized `:gray` and `:grey` as bright-black ANSI foreground/background
+  colors, preventing workbench and other UIs from losing frames to the
+  previously unrecognized semantic gray color.
 - Repaired the remaining maintained directory, rainbow, keyboard-inspection,
   and tmux demonstrations: native Dirli list rendering/explicit Enter,
   deterministic colored rainbow glyphs and orientation changes, functional

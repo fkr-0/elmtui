@@ -210,7 +210,8 @@
   ;; keyword → index 0-7
   '((:black   . 0) (:red      . 1) (:green  . 2) (:yellow . 3)
     (:blue    . 4) (:magenta  . 5) (:cyan   . 6) (:white  . 7)
-    (:bright-black . 60) (:bright-red . 61) (:bright-green . 62)
+    (:bright-black . 60) (:gray . 60) (:grey . 60)
+    (:bright-red . 61) (:bright-green . 62)
     (:bright-yellow . 63) (:bright-blue . 64) (:bright-magenta . 65)
     (:bright-cyan . 66) (:bright-white . 67)))
 
