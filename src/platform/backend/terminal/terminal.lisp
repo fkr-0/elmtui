@@ -245,15 +245,23 @@
              (col 0)
              (width 80)
              (height 24))
-        ;; Cursor probes can time out on some pseudo terminals; keep sane defaults.
-        (handler-case
-            (multiple-value-bind (r c) (%device-cursor-position (terminal-instance-input-source instance))
-              (when (and (numberp r) (>= r 0))
-                (setf row r))
-              (when (and (numberp c) (>= c 0))
-                (setf col c)))
-          (error (e)
-            (log-warn "TERMINAL: Failed to read initial cursor position; using defaults: ~A" e)))
+        ;; Query through the input router, falling back to tracked device coordinates.
+        (let ((query-succeeded nil))
+          (handler-case
+              (multiple-value-bind (r c)
+                  (%device-cursor-position (terminal-instance-input-source instance))
+                (when (and (integerp r) (>= r 0) (integerp c) (>= c 0))
+                  (setf row r col c query-succeeded t)))
+            (error (condition)
+              (log-debug "TERMINAL: Initial cursor query unavailable: ~A" condition)))
+          (unless query-succeeded
+            (handler-case
+                (multiple-value-bind (r c)
+                    (cl-inputs.terminal.api:get-cursor-position device)
+                  (when (and (integerp r) (>= r 0) (integerp c) (>= c 0))
+                    (setf row r col c)))
+              (error (condition)
+                (log-warn "TERMINAL: No initial cursor coordinates: ~A" condition)))))
         ;; Dimension probes can also fail in non-interactive environments.
         (handler-case
             (multiple-value-bind (w h) (%device-terminal-size device)

@@ -105,6 +105,7 @@
 
 (defun %allowed-runtime-probe-file-p (relative)
   (or (string-prefix-p "src/dev/" relative)
+      (string-prefix-p "src/workbench/" relative)
       (string= relative "src/view/base-elements.lisp")))
 
 (test runtime-probes-confined-to-allowed-files

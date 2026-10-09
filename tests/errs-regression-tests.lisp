@@ -437,10 +437,7 @@
                      (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
                       back 0 col)))
               'string))
-           (diff
-             (let ((elmtui.platform.backend.terminal.diff-renderer:*compute-buffer-diff-first-call* t))
-               (elmtui.platform.backend.terminal.diff-renderer:compute-buffer-diff
-                front back)))
+           (diff (elmtui.render.presentation:compute-frame-operations front back))
            (diff-text
              (with-output-to-string (stream)
                (dolist (operation diff)
