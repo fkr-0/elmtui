@@ -412,9 +412,23 @@ Returns NIL if the sequence is a reset, or a plist with :fg, :bg, :attrs keys."
             (remf result :attrs))))
     (and result result)))
 
+(defun %sgr-suffix-after-reset (sequence)
+  "Return the SGR sequence after its last full reset, and whether it reset.
+A plain ESC[m is also a reset. Other CSI/OSC controls are handled elsewhere."
+  (let* ((params (subseq sequence 2 (1- (length sequence))))
+         (parts (%split-string-keep-empty params #\;))
+         (reset-index (position "0" parts :test #'string= :from-end t)))
+    (if (or (string= params "") reset-index)
+        (values
+         (when (and reset-index (< reset-index (1- (length parts))))
+           (format nil "~C[~{~A~^;~}m"
+                   #\Escape (nthcdr (1+ reset-index) parts)))
+         t)
+        (values sequence nil))))
+
 (defun parse-ansi-string (content)
-  "Parse CONTENT into a list of (substring . style) pairs.
-ANSI escape sequences are extracted and converted to style plists."
+  "Parse safe SGR style runs; non-SGR terminal controls are never replayed.
+A combined reset/set such as ESC[0;31m clears old attributes first."
   (unless content
     (return-from parse-ansi-string '()))
   (let ((segments (split-by-ansi-sequences content))
@@ -422,10 +436,24 @@ ANSI escape sequences are extracted and converted to style plists."
         (current-style nil))
     (dolist (seg segments)
       (if (and (> (length seg) 0) (%esc-p (aref seg 0)))
-          (let ((parsed (parse-ansi-sgr seg)))
-            (if (null parsed)
-                (setf current-style nil)
-                (setf current-style (%merge-ansi-style current-style parsed))))
+          (when (and (>= (length seg) 3)
+                     (char= (aref seg 1) #\[)
+                     (char= (aref seg (1- (length seg))) #\m))
+            (multiple-value-bind (effective reset-p)
+                (%sgr-suffix-after-reset seg)
+              (when reset-p
+                (setf current-style nil))
+              (when effective
+                (let ((parsed (handler-case
+                                  (parse-ansi-sgr effective)
+                                (error (condition)
+                                  (log4cl:log-warn
+                                   "Ignoring malformed tmux SGR style ~S: ~A"
+                                   effective condition)
+                                  nil))))
+                  (when parsed
+                    (setf current-style
+                          (%merge-ansi-style current-style parsed)))))))
           (when (plusp (length seg))
             (push (cons seg current-style) result))))
     (nreverse result)))
@@ -478,65 +506,114 @@ ANSI escape sequences are extracted and converted to style plists."
     (copy-virtual-buffer buffer)))
 
 (defun prefill-backend-from-tmux (backend &key (mode :pane))
-  "Prefill terminal backend buffers from current tmux capture.
-Returns a virtual buffer copy that can be used as the driver's previous frame."
-  (when (and (tmux-available-p)
-             (typep backend 'terminal-instance))
-    (let* ((width (term-w backend))
-           (height (term-h backend))
-           (content (capture-pane-string :mode mode)))
-      (when (and content width height)
-        (let ((front (terminal-instance-front-buffer backend))
-              (back (terminal-instance-back-buffer backend)))
-          (when front
-            (prefill-buffer-from-string front content :width width :height height))
-          (when back
-            (prefill-buffer-from-string back content :width width :height height))
-          (let ((snapshot (make-virtual-buffer width height)))
-            (prefill-buffer-from-string snapshot content :width width :height height)
-            snapshot))))))
+  "Capture the terminal-visible underlay with styles, returning its saved snapshot.
+This is the driver's historical entry point, now style-aware by default."
+  (prefill-backend-from-tmux-styled backend :mode mode))
 
 ;;;----------------------------------------------------------------
 ;;; Styled Buffer Operations
 ;;;----------------------------------------------------------------
 
+(defun %tmux-cell-columns (char)
+  "Approximate terminal column width for reconstructed pane cells.
+Combining marks cannot be represented by the existing cell abstraction."
+  (let ((code (char-code char)))
+    (cond
+      ((or (<= #x0300 code #x036F)
+           (<= #x1AB0 code #x1AFF)
+           (<= #x1DC0 code #x1DFF)
+           (<= #x20D0 code #x20FF)
+           (<= #xFE20 code #xFE2F)
+           (= code #x200D))
+       0)
+      ((or (<= #x1100 code #x115F)
+           (<= #x2329 code #x232A)
+           (<= #x2E80 code #xA4CF)
+           (<= #xAC00 code #xD7A3)
+           (<= #xF900 code #xFAFF)
+           (<= #xFE10 code #xFE19)
+           (<= #xFE30 code #xFE6F)
+           (<= #xFF00 code #xFF60)
+           (<= #xFFE0 code #xFFE6)
+           (<= #x1F300 code #x1FAFF)
+           (<= #x20000 code #x3FFFD))
+       2)
+      (t 1))))
+
+(defun %walk-styled-cells (runs width writer)
+  "Traverse styled RUNS as terminal rows; WRITER may be NIL for counting.
+Only decoded text reaches WRITER, never raw ANSI control sequences."
+  (let ((row 0)
+        (col 0))
+    (when (plusp width)
+      (dolist (run runs)
+        (loop for ch across (car run)
+              do (cond
+                   ((char= ch #\Newline)
+                    (incf row)
+                    (setf col 0))
+                   ((char= ch #\Return)
+                    (setf col 0))
+                   ((char= ch #\Tab)
+                    (loop repeat (- 8 (mod col 8))
+                          do (when (>= col width)
+                               (incf row)
+                               (setf col 0))
+                             (when writer
+                               (funcall writer row col #\Space (cdr run)))
+                             (incf col)))
+                   ((or (< (char-code ch) 32)
+                        (= (char-code ch) 127))
+                    nil)
+                   (t
+                    (let ((columns (min width (%tmux-cell-columns ch))))
+                      (when (plusp columns)
+                        (when (> (+ col columns) width)
+                          (incf row)
+                          (setf col 0))
+                        (when writer
+                          (funcall writer row col ch (cdr run))
+                          (when (= columns 2)
+                            (funcall writer row (1+ col) #\Space (cdr run))))
+                        (incf col columns))))))))
+    row))
+
+(defun %capture-visible-pane-string (&key (mode :pane))
+  "Capture only the visible pane; never allocate the full history for prefill.
+Public CAPTURE-PANE-STRING still permits inspecting the entire scrollback."
+  (case mode
+    (:screen (%run-tmux "capture-pane" "-e" "-J" "-p"))
+    (otherwise (%run-tmux "capture-pane" "-e" "-p"))))
+
 (defun prefill-buffer-from-styled-content (buffer runs width height)
-  "Fill BUFFER (virtual-terminal-buffer) with styled RUNS from parse-ansi-string.
-RUNS is a list of (substring . style) pairs where style is a plist or NIL.
-WIDTH and HEIGHT specify the buffer dimensions for wrapping."
-  (when (and buffer runs)
-    (with-virtual-buffer-lock (buffer)
-      (clear-buffer buffer)
-      (let ((row 0)
-            (col 0))
-        (dolist (run runs)
-          (let* ((text (car run))
-                 (style-plist (cdr run))
-                 (style (when style-plist
-                          (style-to-terminal-style style-plist)))
-                 (text-len (length text)))
-            (loop for i from 0 below text-len
-                  while (< row height)
-                  do (let ((char (aref text i)))
-                       (cond
-                         ((char= char #\Newline)
-                          (setf col 0)
-                          (incf row))
-                         ((char= char #\Return)
-                          nil)
-                         ((< col width)
-                          (set-buffer-cell-at buffer row col char style)
-                          (incf col)
-                          (when (>= col width)
-                            (setf col 0)
-                            (incf row))))))))))
-    buffer))
+  "Fill BUFFER with the terminal-visible tail of styled RUNS, preserving SGR.
+The two bounded passes count terminal rows then render only the last HEIGHT.
+No scrollback-sized intermediate buffer or terminal I/O is required."
+  (when (and buffer runs (plusp width) (plusp height))
+    (let* ((last-row (%walk-styled-cells runs width nil))
+           (start-row (max 0 (- (1+ last-row) height)))
+           (end-row (+ start-row height))
+           (styles (make-hash-table :test #'equal)))
+      (with-virtual-buffer-lock (buffer)
+        (clear-buffer buffer)
+        (%walk-styled-cells
+         runs width
+         (lambda (row col char plist)
+           (when (and (<= start-row row) (< row end-row))
+             (set-buffer-cell-at
+              buffer (- row start-row) col char
+              (when plist
+                (multiple-value-bind (cached present) (gethash plist styles)
+                  (if present
+                      cached
+                      (setf (gethash plist styles)
+                            (style-to-terminal-style plist))))))))))
+      buffer)))
 
 (defun make-buffer-from-tmux-styled (width height &key (mode :pane))
-  "Create a virtual buffer populated from tmux output with ANSI styles parsed.
-Returns NIL if tmux is not available, or the populated buffer otherwise."
+  "Return a styled snapshot of the visible pane without copying scrollback."
   (when (tmux-available-p)
-    (let ((content (capture-pane-string :mode mode)))
+    (let ((content (%capture-visible-pane-string :mode mode)))
       (when content
         (let* ((runs (parse-ansi-string content))
                (buffer (make-virtual-buffer width height)))
@@ -544,14 +621,15 @@ Returns NIL if tmux is not available, or the populated buffer otherwise."
           buffer)))))
 
 (defun prefill-backend-from-tmux-styled (backend &key (mode :pane))
-  "Prefill terminal backend buffers from current tmux capture with ANSI style parsing.
-Returns a virtual buffer snapshot that can be used as the driver's previous frame."
+  "Prefill both backend frames from the styled visible tmux pane.
+The snapshot is independently allocated, suitable for deferred restoration.
+Tmux history is not re-rendered or modified by this function."
   (when (and (tmux-available-p)
              (typep backend 'terminal-instance))
     (let* ((width (term-w backend))
            (height (term-h backend))
-           (content (capture-pane-string :mode mode)))
-      (when (and content width height)
+           (content (%capture-visible-pane-string :mode mode)))
+      (when (and content (plusp width) (plusp height))
         (let* ((runs (parse-ansi-string content))
                (front (terminal-instance-front-buffer backend))
                (back (terminal-instance-back-buffer backend)))
