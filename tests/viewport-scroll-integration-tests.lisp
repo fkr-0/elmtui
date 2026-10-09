@@ -306,9 +306,9 @@
                      (and (consp cmd)
                        (eq (first cmd) :render)
                        (eq (second cmd) :scroll-up)
-                       (= (third cmd) 1)))
+                       (= (third cmd) 2)))
             cmds3)
-        "Shutdown should restore scroll by 1"))))
+        "Shutdown should restore scroll by 2"))))
 
 ;;;---------------------------------------------------------------
 ;;; Test: Below-cursor inline lifecycle with faketerm
