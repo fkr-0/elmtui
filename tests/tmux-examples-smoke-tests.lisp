@@ -135,39 +135,39 @@
         (is (not (char= (buffer-cell-char before) (buffer-cell-char after))))
         (is (=? (buffer-cell-style before) (buffer-cell-style after)))))))
 
-(test tmux-runner-wrappers-delegate-to-generated-app-runners
+(test tmux-runner-wrappers-preserve-legacy-api-and-delegate-inspector
   (load-system :elmtui-examples)
   (let* ((idle-pkg (find-package :elmtui.examples.tmux-idle))
          (hover-pkg (find-package :elmtui-examples.tmux-hover-demo))
+         (inspector-pkg (find-package :elmtui-examples.cursor-inspector))
          (idle-wrapper (%fn :elmtui.examples.tmux-idle "RUN-TMUX-IDLE"))
          (hover-wrapper (%fn :elmtui-examples.tmux-hover-demo "RUN-TMUX-HOVER-DEMO"))
          (idle-runner-sym (find-symbol "RUN-TMUX-IDLE-APP" idle-pkg))
-         (hover-runner-sym (find-symbol "RUN-TMUX-HOVER-APP" hover-pkg))
+         (hover-legacy-runner-sym (find-symbol "RUN-TMUX-HOVER-APP" hover-pkg))
+         (inspector-runner-sym (find-symbol "RUN-CURSOR-INSPECTOR" inspector-pkg))
          (idle-orig (and idle-runner-sym (symbol-function idle-runner-sym)))
-         (hover-orig (and hover-runner-sym (symbol-function hover-runner-sym)))
+         (inspector-orig (and inspector-runner-sym (symbol-function inspector-runner-sym)))
          (idle-captured nil)
-         (hover-captured nil))
-    (is (not (null idle-runner-sym)))
-    (is (not (null hover-runner-sym)))
+         (inspector-captured nil))
+    (is (fboundp idle-runner-sym))
+    (is (fboundp hover-legacy-runner-sym))
+    (is (fboundp inspector-runner-sym))
     (unwind-protect
          (progn
            (setf (symbol-function idle-runner-sym)
                  (lambda (&rest args)
-                   (setf idle-captured args)
-                   :idle-ok))
-           (setf (symbol-function hover-runner-sym)
+                   (setf idle-captured args) :idle-ok))
+           (setf (symbol-function inspector-runner-sym)
                  (lambda (&rest args)
-                   (setf hover-captured args)
-                   :hover-ok))
+                   (setf inspector-captured args) :inspector-ok))
            (is (eq :idle-ok (funcall idle-wrapper :backend-type :terminal :mode :pane)))
-           (is (eq :hover-ok (funcall hover-wrapper :backend-type :terminal :mode :pane)))
+           (is (eq :inspector-ok (funcall hover-wrapper :backend-type :terminal :mode :screen)))
            (is (equal idle-captured
                       '(:platform :terminal
                         :platform-options (:prefill-from-tmux t :tmux-prefill-mode :pane))))
-           (is (equal hover-captured
-                      '(:platform :terminal
-                        :platform-options (:prefill-from-tmux t :tmux-prefill-mode :pane)))))
+           (is (equal inspector-captured
+                      '(:backend-type :terminal :tmux-mode :screen :title "tmux-hover-demo"))))
       (when idle-orig
         (setf (symbol-function idle-runner-sym) idle-orig))
-      (when hover-orig
-        (setf (symbol-function hover-runner-sym) hover-orig)))))
+      (when inspector-orig
+        (setf (symbol-function inspector-runner-sym) inspector-orig)))))
