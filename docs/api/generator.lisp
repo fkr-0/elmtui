@@ -29,51 +29,41 @@
         (documentation symbol 'type))))
 
 (defun public-api-bindings ()
-  "Return de-duplicated metadata for exported ElmTUI and sublibrary bindings.
+  "Return canonical, exported, de-duplicated metadata for the live public API.
 
-Arguments:
-  None.
-
-Returns:
-  A fresh list of plists. Each plist contains :SYMBOL, :PACKAGE, :KINDS, and
-  :DOCUMENTATION. Re-exported symbols occur once, keyed by symbol identity.
-
-Mutation:
-  Allocates result data and an internal hash table; project packages and symbols
-  are not modified.
-
-Conditions:
-  Documentation methods supplied by implementation extensions may signal; such
-  failures are not suppressed except for FIND-CLASS probes used for kind
-  detection.
-
-Example:
-  (remove-if-not (lambda (entry) (getf entry :documentation))
-                 (public-api-bindings))"
+The :PACKAGE is always an actual exporting package, so PACKAGE:SYMBOL resolves
+with the normal single-colon syntax. :HOME-PACKAGE records the defining
+symbol's home when it differs. Re-exports are de-duplicated by identity."
   (let ((seen (make-hash-table :test #'eq))
-        (bindings nil))
-    (dolist (package (remove-if-not #'%interesting-package-p
-                                    (list-all-packages)))
+        (bindings nil)
+        (packages (sort (remove-if-not #'%interesting-package-p
+                                       (list-all-packages))
+                        #'string< :key #'package-name)))
+    (dolist (package packages)
       (do-external-symbols (symbol package)
         (unless (gethash symbol seen)
           (setf (gethash symbol seen) t)
           (let ((kinds (%binding-kinds symbol)))
             (when kinds
-              (let ((home (or (symbol-package symbol) package)))
+              (let* ((home (symbol-package symbol))
+                     (publisher (if (and home (%interesting-package-p home)
+                                         (eq (nth-value 1 (find-symbol
+                                            (symbol-name symbol) home)) :external))
+                                    home package)))
                 (push (list :symbol symbol
-                            :package (package-name home)
+                            :package (package-name publisher)
+                            :home-package (and home (package-name home))
                             :kinds kinds
                             :documentation (%binding-documentation symbol kinds))
                       bindings)))))))
     (sort bindings
           (lambda (left right)
-            (let ((left-package (getf left :package))
-                  (right-package (getf right :package)))
-              (or (string< left-package right-package)
-                  (and (string= left-package right-package)
+            (let ((a (getf left :package))
+                  (b (getf right :package)))
+              (or (string< a b)
+                  (and (string= a b)
                        (string< (symbol-name (getf left :symbol))
                                 (symbol-name (getf right :symbol))))))))))
-
 (defun docstring-audit ()
   "Return current public API documentation coverage.
 
@@ -114,34 +104,29 @@ Example:
                (#\" (write-string "&quot;" stream))
                (t (write-char char stream))))))
 
+(defun %normalized-docstring (doc)
+  "Remove insignificant end-of-line whitespace from rendered docstrings."
+  (format nil "~{~A~^~%~}"
+          (mapcar (lambda (line)
+                    (string-right-trim '(#\Space #\Tab #\Return) line))
+                  (uiop:split-string doc :separator '(#\Newline)))))
+
 (defun build-api-docs (&key
                          (directory
                            (asdf:system-relative-pathname
                             :elmtui-docs "docs/api/generated/")))
-  "Render Markdown and HTML API references from live Common Lisp docstrings.
+  "Write live-symbol Markdown and HTML references with public export paths.
 
-Arguments:
-  DIRECTORY is a pathname designator for generated files. It defaults to
-  docs/api/generated/ inside the ELMTUI-DOCS system.
-
-Returns:
-  Two values: the API Markdown pathname and the API HTML pathname.
-
-Mutation:
-  Creates DIRECTORY as needed and overwrites api.md and api.html. Runtime
-  packages, application state, and source files are not modified.
-
-Conditions:
-  File-system errors and documentation lookup errors propagate normally so CI
-  and interactive debuggers retain the original condition.
-
-Example:
-  (asdf:load-system :elmtui-docs)
-  (elmtui.docs:build-api-docs)"
+Returns two values: API Markdown and HTML paths. The documents explicitly
+report missing metadata, and document text is fenced/escaped as literal text."
   (let* ((directory (uiop:ensure-directory-pathname directory))
          (markdown (merge-pathnames "api.md" directory))
          (html (merge-pathnames "api.html" directory))
-         (bindings (public-api-bindings)))
+         (bindings (public-api-bindings))
+         (last-binding (car (last bindings)))
+         (total (length bindings))
+         (missing (count-if-not (lambda (entry) (getf entry :documentation))
+                                bindings)))
     (ensure-directories-exist markdown)
     (with-open-file (stream markdown
                             :direction :output
@@ -149,26 +134,38 @@ Example:
                             :if-does-not-exist :create)
       (format stream "# ElmTUI API Reference~%~%")
       (format stream "Generated from live Common Lisp DOCUMENTATION metadata.~%~%")
+      (format stream "**Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.~%~%")
+      (format stream "**Coverage:** ~D of ~D bindings documented; ~D have no metadata (~,1F% documented). Missing entries are intentionally shown, not silently omitted.~%~%"
+              (- total missing) total missing
+              (if (zerop total) 100.0 (* 100.0 (/ (- total missing) total))))
       (dolist (entry bindings)
-        (format stream "## ~A::~A~%~%" (getf entry :package)
+        (format stream "## ~A:~A~%~%" (getf entry :package)
                 (symbol-name (getf entry :symbol)))
         (format stream "Kinds: ~{~(~A~)~^, ~}~%~%" (getf entry :kinds))
-        (let ((doc (getf entry :documentation)))
+        (let ((doc (and (getf entry :documentation)
+                               (%normalized-docstring (getf entry :documentation)))))
           (if doc
-              (format stream "~A~%~%" doc)
-              (format stream "_No documentation metadata._~%~%")))))
+              (let ((fence "```"))
+                (loop while (search fence doc)
+                      do (setf fence (concatenate 'string fence "`")))
+                (format stream "~Atext~%~A~%~A~%~@[~%~]"
+                        fence doc fence (not (eq entry last-binding))))
+              (format stream "_No documentation metadata._~%~@[~%~]"
+                      (not (eq entry last-binding)))))))
     (with-open-file (stream html
                             :direction :output
                             :if-exists :supersede
                             :if-does-not-exist :create)
-      (write-string "<!doctype html><html><head><meta charset='utf-8'><title>ElmTUI API</title></head><body>" stream)
-      (write-string "<h1>ElmTUI API Reference</h1><p>Generated from live Common Lisp DOCUMENTATION metadata.</p>" stream)
+      (write-string "<!doctype html><html lang='en'><head><meta charset='utf-8'><title>ElmTUI API</title></head><body>" stream)
+      (format stream "<h1>ElmTUI API Reference</h1><p>~D of ~D bindings documented; ~D missing documentation metadata.</p>"
+              (- total missing) total missing)
       (dolist (entry bindings)
-        (format stream "<section><h2>~A::~A</h2><p>Kinds: ~{~(~A~)~^, ~}</p><pre>~A</pre></section>"
+        (format stream "<section><h2>~A:~A</h2><p>Kinds: ~{~(~A~)~^, ~}</p><pre>~A</pre></section>"
                 (%html-escape (getf entry :package))
                 (%html-escape (symbol-name (getf entry :symbol)))
                 (getf entry :kinds)
-                (%html-escape (or (getf entry :documentation)
+                (%html-escape (or (and (getf entry :documentation)
+                                        (%normalized-docstring (getf entry :documentation)))
                                   "No documentation metadata."))))
       (write-string "</body></html>" stream))
     (values markdown html)))
