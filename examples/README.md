@@ -25,6 +25,48 @@ example; `q`, `Escape`, and `Ctrl-C` are the common choices.
 | `mini-rainbow.lisp` | `elmtui.examples.mini-rainbow:run-mini-rainbow` | Compact styled layout |
 | `scroll-panel-demo.lisp` | `elmtui.examples.scroll-panel-demo:run-scroll-panel-demo` | Scrollable content and viewport behavior |
 | `mini-text-editor.lisp` | `elmtui.examples.mini-text-editor:run-mini-text-editor` | Editable multiline text buffer, cursor navigation and async file saving |
+| `neon-pong.lisp` | `elmtui.examples.neon-pong:run-neon-pong` | Neon Circuit: two-player Pong with live match telemetry |
+| `neon-tetris.lisp` | `elmtui.examples.neon-tetris:run-neon-tetris` | Stack Lab: falling blocks, ghost piece, lines and side panel |
+| `neon-nano.lisp` | `elmtui.examples.neon-nano:run-neon-nano` | Midnight Editor: styled Nano-style editor with safe file saving |
+| `neon-less.lisp` | `elmtui.examples.neon-less:run-neon-less` | Deep File Viewer: numbered, read-only pager |
+
+## NILMSP-inspired Neon Quartet
+
+These four ElmTUI-native ports reproduce the presentation and main interactions
+of `/home/user/code/nilmsp/release/nilmsp-tea/poc-apps/{pong,tetris,nano,less}.nl`.
+They use ElmTUI's normal DSL and terminal diff presenter, not embedded ANSI
+escapes or independent renderers. Each app has a cyan/violet midnight palette,
+telemetry or line-number panels, a footer help strip, and stable row IDs.
+
+```sh
+./examples.sh run neon-pong       # W/S left paddle, I/K right, Space serve, Q exit
+./examples.sh run neon-tetris     # A/D move, W rotate, S drop, R reset, Q exit
+./examples.sh run neon-nano       # arrows edit, Ctrl+O save, Ctrl+X exit
+./examples.sh run neon-less       # J/K scroll, F/Space forward, B back, g/G ends, Q
+```
+
+For file-backed tools, set `ELMTUI_NANO_FILE=/path/to/notes.txt` or
+`ELMTUI_LESS_FILE=/path/to/document.txt` before launch. Alternatively, load
+`elmtui-examples` and invoke the exported runner with `:path`. Less uses a
+demonstration document when no filename is provided; Nano opens a scratch
+buffer. Nano reuses the mature Mini Text Editor state machine and therefore
+adds Unicode editing, save-as, overwrite confirmation and unsaved-change
+dialogues beyond the ASCII-only NILMSP prototype.
+
+Only Pong and Tetris subscribe to game ticks. Nano and Less are event-driven;
+unchanged updates produce no state patches. The UI is designed for a terminal
+of at least 74 columns and 24 rows. Rendering uses a Unicode-capable font.
+
+Run the isolated suite with `projmgrauth` command `test-neon` or directly:
+
+```sh
+clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+  --eval '(require :asdf)' \
+  --eval '(asdf:test-system "elmtui-neon-tests")'
+```
+
+For black-box terminal startup, controls, clean exit and idle-write checks,
+run the bridge command `test-neon-pty` (or `python3 tests/neon-pty.py`).
 
 ## Mini text editor
 
