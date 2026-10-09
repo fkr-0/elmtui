@@ -27,7 +27,7 @@
                 (:file "contracts")
                 (:file "core/logging")
                 (:file "core/defaults")
-                (:file "core/conditions")
+                (:file "core/conditions" :depends-on ("core/errors"))
                 (:file "core/condition-docs" :depends-on ("core/conditions" "core/errors"))
                 (:file "core/globals")
                 (:file "core/system-events")
