@@ -34,6 +34,10 @@ This boundary intentionally avoids app-level policy rewrites."
 (defun cl-inputs-token->event (token)
   "Convert a cl-inputs token to an elmtui event structure. Returns NIL when unsupported."
   (let ((normalized (token->normalized-event token)))
+    ;; A bracketed paste is one literal input message; never synthesize Enter.
+    (when (eq :paste (input-token-kind token))
+      (let ((content (getf (input-token-data token) :content)))
+        (return-from cl-inputs-token->event (and (stringp content) (list :paste :content content)))))
     (case (getf normalized :type)
       (:key-event
        (let* ((code (getf normalized :code))
