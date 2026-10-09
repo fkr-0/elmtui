@@ -1,0 +1,54 @@
+site_name: ElmTUI
+site_url: https://elmtui.fkr.dev/
+site_description: Declarative terminal UIs in Common Lisp, built around The Elm Architecture.
+repo_url: https://github.com/fkr-0/elmtui
+repo_name: fkr-0/elmtui
+docs_dir: website
+site_dir: dist/site
+strict: true
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: custom
+    accent: custom
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+    - search.highlight
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tabbed
+  - tables
+extra_css:
+  - assets/theme.css
+extra_javascript:
+  - assets/preview.js
+nav:
+  - Home: index.md
+  - Start:
+      - Quickstart: quickstart.md
+      - Architecture and TEA: guide/foundations.md
+      - Counter and async tutorial: guide/tutorial.md
+  - Workbench: workbench.md
+  - Widgets:
+      - Library inventory: widget-inventory.md
+      - Widgets and patterns: guide/widgets.md
+      - Examples gallery: examples.md
+      - Full example catalog: guide/examples-catalog.md
+  - Reference:
+      - API and documentation: reference.md
+      - Workbench technical guide: guide/workbench-user-guide.md
+      - Release status: release.md

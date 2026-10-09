@@ -1,0 +1,62 @@
+name: Documentation and GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'docs/longform/**'
+      - 'docs/workbench-user-guide.md'
+      - 'examples/README.md'
+      - 'mkdocs.yml'
+      - 'scripts/prepare-site.py'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'docs/longform/**'
+      - 'docs/workbench-user-guide.md'
+      - 'examples/README.md'
+      - 'mkdocs.yml'
+      - 'scripts/prepare-site.py'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install site dependencies
+        run: python -m pip install 'mkdocs-material>=9.5,<10'
+      - name: Stage curated documentation
+        run: python scripts/prepare-site.py
+      - name: Build and validate site
+        run: python -m mkdocs build --strict
+      - name: Configure Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+      - name: Upload site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/site
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
