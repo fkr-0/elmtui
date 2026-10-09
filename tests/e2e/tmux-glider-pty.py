@@ -158,6 +158,21 @@ class GliderTerminalPTY(unittest.TestCase):
             self.assertNotIn(destructive_escape, raw,
                              "Tmux glider must never clear or switch the pane")
 
+    def test_actual_run_glider_script_inside_tmux(self):
+        import sys
+        driver_dir = str(ROOT / "tests/workbench/independent")
+        if driver_dir not in sys.path:
+            sys.path.insert(0, driver_dir)
+        from pty_driver import PrivateTmuxPTY
+        with PrivateTmuxPTY(["./run-glider.sh"], cols=100, rows=35,
+                            timeout=20) as terminal:
+            first = terminal.wait_for("█", timeout=17)
+            self.assertEqual(first.count("█"), 5)
+            terminal.send_text("q")
+            code, restored = terminal.wait_for_exit(timeout=10)
+            self.assertEqual(code, 0)
+            self.assertTrue(restored)
+
     def test_fails_closed_without_tmux(self):
         env = dict(os.environ)
         env.pop("TMUX", None)
