@@ -608,7 +608,9 @@ If no dispatcher is configured, log and drop MSG; the matched key remains consum
                         thereis (and (stringp k)
                                   (> (length k) (length seq-str))
                                   (string-prefix-p prefix k))))
-                (mapcar #'resolve-keymap-reference (keymap-context-keymaps (current-context))))
+                (mapcar #'resolve-keymap-reference
+                        (and (current-context)
+                             (keymap-context-keymaps (current-context)))))
             t
             (progn (%reset-seq) nil)))))))
 
@@ -623,10 +625,19 @@ If no dispatcher is configured, log and drop MSG; the matched key remains consum
     (let ((*dispatch-fn* dispatch-fn))
       (declare (special *dispatch-fn*))
       ;; 1) Focused component keymap (from app-state)
-      (let* ((fm (and (listp app-state) (getf app-state :focus-manager)))
+      (let* ((fm (typecase app-state
+                   (list (getf app-state :focus-manager))
+                   (cl-state.core:application-state
+                    (cl-state.api:state-ref app-state :focus-manager))
+                   (t nil)))
               (focused (and (listp fm) (or (getf fm :current-focus-id)
                                          (getf fm :current-focus))))
-              (component-keymaps (and (listp app-state) (getf app-state :component-keymaps)))
+              (component-keymaps
+                (typecase app-state
+                  (list (getf app-state :component-keymaps))
+                  (cl-state.core:application-state
+                   (cl-state.api:state-ref app-state :component-keymaps))
+                  (t nil)))
               (km (and focused (assoc focused component-keymaps)))
               (ckm (and km (cdr km)))
               (cbind (and (typep ckm 'keymap) (lookup ckm nk))))

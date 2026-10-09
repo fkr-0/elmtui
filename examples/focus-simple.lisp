@@ -21,10 +21,11 @@
   (multiple-value-bind (lb _cmd)
       (init-listbox *listbox-id* :items '("a" "b" "c") :height 5 :selected-index 0 :on-select '(:lb-selected))
     (declare (ignore _cmd))
-    (list :components
+    (list :demo-components
           (list (cons *listbox-id* lb)
                 (cons *ok-id*     '(:type :button :label "OK"))
                 (cons *cancel-id* '(:type :button :label "Cancel")))
+          :choices lb
           :focus-manager (list :current-focus-id *listbox-id* :focusable-elements (list *listbox-id* *ok-id* *cancel-id*))
           :component-keymaps (list
                               (cons *listbox-id*
@@ -52,7 +53,7 @@
   "Handle focus-demo semantic messages without mutating application state."
   (let ((patches nil) (commands nil))
     (labels ((ret () (make-update-result :patches (nreverse patches) :commands (nreverse commands)))
-             (components () (state-ref app-state :components))
+             (components () (state-ref app-state :demo-components))
              (focus-manager () (state-ref app-state :focus-manager)))
       (let ((tag (if (consp message) (first message) message)))
         (case tag
@@ -81,7 +82,8 @@
                       (let* ((new-components (copy-alist (components)))
                              (entry (assoc *listbox-id* new-components)))
                         (setf (cdr entry) new-lb)
-                        (push (list :components new-components) patches)))))))))
+                        (push (list '(:demo-components) new-components) patches)
+                        (push (list '(:choices) new-lb) patches)))))))))
           (:focus-next
            (let* ((fm (copy-list (focus-manager)))
                   (ids (getf fm :focusable-elements))
@@ -102,14 +104,24 @@
 
 
 (defun app-view (app-state)
-  `(:container :id :root
-               :style (:display :flex :flex-direction :column :width :fill :height :fill)
-               :children ((:container :style (:display :flex :flex-direction :row)
-                                      :children ((:container :style (:width :fill :height :fill)
-                                                             :children ((,(view-listbox app-state :widget-id *listbox-id*))))
-                                                 (:container :style (:display :flex :flex-direction :column :width 10)
-                                                             :children ((:button :id ,*ok-id* :label "OK")
-                                                                        (:button :id ,*cancel-id* :label "Cancel"))))))))
+  "Render focus/listbox choices through the canonical terminal DSL."
+  (let* ((model (state-ref app-state :choices))
+         (selected (and model (listbox-model-selected-index model)))
+         (items (and model (listbox-model-items model)))
+         (focus (getf (state-ref app-state :focus-manager) :current-focus-id)))
+    `(:container :id :root
+       :style (:display :flex :flex-direction :column :width 42 :height 9)
+       :children
+       ((:text :id :instructions :content "Tab: change focus | Enter: select | Ctrl-Q: exit")
+        ,@(loop for item in items for index from 0
+                collect `(:text
+                          :id ,(intern (format nil "CHOICE-~D" index) :keyword)
+                          :content ,(format nil "~A ~A"
+                                                (if (eql index selected) ">" " ") item)))
+        (:text :id :btn-ok
+               :content ,(if (eq focus *ok-id*) "> OK" "  OK"))
+        (:text :id :btn-cancel
+               :content ,(if (eq focus *cancel-id*) "> Cancel" "  Cancel"))))))
 
 (defapplication focus-simple-app
   :root-viewport-id :focus-root

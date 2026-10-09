@@ -447,7 +447,11 @@ This keeps compatibility with older examples that pass app instances."
                 ((fboundp 'elmtui.platform.api:clear-area)
                   (elmtui.platform.api:clear-area backend nil oy ox h w))
                 (t
-                  (log-warn "blank-viewport not implemented for backend ~S" backend))))))
+                  (log-warn "blank-viewport not implemented for backend ~S" backend)))
+              ;; Physical erasure invalidates any previously presented virtual
+              ;; front frame. The next pass must repaint all visible cells.
+              (setf *previous-frame-buffer* nil
+                    *initial-render-done* nil))))
         (:scroll
           (elmtui.platform.api:scroll backend (or arg1 -1)))
         (:scroll-down

@@ -27,12 +27,13 @@
       (let ((ch (getf (cdr msg) :key "whoops")))
         (log-info "minimal:> car-msg-Key event received: ~S" ch)
         
-        (make-update-result :patches `(((:last-key) ,ch)))))
+        (make-update-result :patches
+          `(((:last-key) ,(if (characterp ch) (char-upcase ch) ch))))))
     ((typep msg 'key-event)
       (let* ((ch (or (elmtui.core.event-types:key-event-char msg)
                    (elmtui.core.event-types:key-event-key msg))))
         (log-info "minimal:> Key event received: ~S" ch)
-        (make-update-result :patches `(((:last-key) ,ch)))))
+        (make-update-result :patches `(((:last-key) ,(if (characterp ch) (char-upcase ch) ch))))))
     ((and (listp msg) (eq (first msg) :app-quit-requested))
       (progn
         (log-info "minimal:> Quit requested")

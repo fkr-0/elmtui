@@ -28,7 +28,7 @@
 
 (defun app-init ()
   "Initializes the application model."
-  `(:components ((,*info-label-id* (:type label
+  `(:demo-components ((,*info-label-id* (:type label
                                     :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit."
                                     :id ,*info-label-id*))
                  (,*counter-a-id* (:type counter
@@ -60,61 +60,49 @@
     (list (cons *counter-a-id* km))))
 
 
-(defun app-update (message app-state) ; Flipped order to convention: message, app-state
-  "Main application update function."
-  (declare (ignorable message))
-  (let ((patches nil)
-        (commands nil)
-        (msg-type (if (listp message) (first message) message)))
-    (case msg-type
-      (:dispatch-to-component
-       (let* ((target-component-id (second message))
-              (component-action (cddr message))
-              (component-instance (elmtui.app.api:get-component-instance  target-component-id app-state))
-              (component-state-path (list :components target-component-id))
-              (component-state (state-ref app-state component-state-path)))
-         (if (and component-instance component-state)
-             (multiple-value-bind (comp-patches comp-commands)
-                 ;; Pass the action directly, not as a list if it's already the action keyword
-                 (update component-instance (if (consp component-action) (first component-action) component-action) app-state :id-path component-state-path)
-               (when comp-patches
-                 (push `(,component-state-path ,comp-patches) patches))
-               (setf commands (append comp-commands commands)))
-             (log-warn "KEYMAP-APP: No component or state found for ID ~S to dispatch message ~S"
-                       target-component-id component-action))))
-      (:app-quit-requested
-       (push '(:should-quit t) patches)
-       (log-info "KEYMAP-APP: Quit requested by message: ~S" message))
-      (:key-event ; This case should ideally not be hit if keymaps are comprehensive
-       (log-debug "KEYMAP-APP: Unhandled raw key event (should be caught by keymaps): ~S" message))
-      (otherwise
-       (log-debug "KEYMAP-APP: Unhandled message: ~S" message)))
-    (make-update-result :patches (nreverse patches) :commands commands)))
+(defun app-update (message app-state)
+  "Apply counter commands to demo state, leaving framework :components alone."
+  (let ((tag (and (consp message) (first message))))
+    (cond
+      ((and (eq tag :dispatch-to-component)
+            (eq (second message) *counter-a-id*))
+       (let* ((entries (state-ref app-state :demo-components))
+              (next (copy-tree entries))
+              (counter (second (assoc *counter-a-id* next)))
+              (action (third message))
+              (value (getf counter :value 10)))
+         (setf (getf counter :value)
+               (case action
+                 (:increment (1+ value))
+                 (:decrement (1- value))
+                 (:reset 0)
+                 (otherwise value)))
+         (make-update-result :patches (list (list '(:demo-components) next)))))
+      ((eq tag :app-quit-requested)
+       (make-update-result :patches '(((:should-quit) t))))
+      (t (make-update-result)))))
 
 (defun component-state (app-state component-id)
   "Return COMPONENT-ID state from this example's alist-backed :components model."
-  (second (assoc component-id (getf app-state :components))))
+  (second (assoc component-id (state-ref app-state :demo-components))))
 
 (defun app-view (app-state)
-  "Main application view function using current keyword-headed DSL nodes."
-  (let ((info-st (component-state app-state *info-label-id*))
-        (counter-st (component-state app-state *counter-a-id*)))
-    `(:layout :style (:display :flex :flex-direction :row :spacing 1)
-      :children
-      ((:label :id ,*info-label-id*
-               :text ,(getf info-st :text))
-       (:counter :id ,*counter-a-id*
-                 :value ,(getf counter-st :value))))))
+  "Present a counter as ordinary visible terminal text."
+  (let* ((info (component-state app-state *info-label-id*))
+         (counter (component-state app-state *counter-a-id*)))
+    `(:container :id :keymap-content
+       :style (:display :flex :flex-direction :column :width 78 :height 4)
+       :children
+       ((:text :id :help :content ,(getf info :text))
+        (:text :id :counter-value
+               :content ,(format nil "Counter [COUNTER-A]: ~D"
+                                 (getf counter :value 0)))))))
 
 (defapplication keymap-example-app
   :root-viewport-id :my-root-viewport
   :root-component-dsl
-  '(:layout :id :keymap-root-layout
-    :style (:display :flex :flex-direction :column :spacing 1)
-    :children
-    ((:label :id :info-label
-             :text "Keymap Demo App. Focus counter and press + or - or Enter. C-q to quit.")
-     (:counter :id :counter-a :value 10)))
+  '(:root-viewport :id :my-root-viewport
+    :anchor :below-cursor :child-dsl-spec (:view nil))
   :initial-state-fn #'app-init
   :update-fn #'app-update
   :view-fn #'app-view

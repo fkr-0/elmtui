@@ -99,7 +99,7 @@
 (defun pong-view (state)
   (let ((score (state-ref state :score 0)))
     `(:container
-       :id :pong-root
+       :id :pong-content
        :style (:display :flex :flex-direction :column :width 60 :height 12 :padding 0)
        :children
        ((:text :content ,(format nil "pong | score: ~D" score))

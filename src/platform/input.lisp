@@ -36,12 +36,22 @@ This boundary intentionally avoids app-level policy rewrites."
   (let ((normalized (token->normalized-event token)))
     (case (getf normalized :type)
       (:key-event
-       (make-key-event
-        :key (getf normalized :key)
-        :char (getf normalized :char)
-        :modifiers (copy-list (getf normalized :modifiers))
-        :type (getf normalized :event-type)
-        :code (getf normalized :code)))
+       (let* ((code (getf normalized :code))
+              (control-char-p
+                (and (integerp code) (<= 1 code 26)
+                     (not (member code '(8 9 10 13)))))
+              (modifiers (copy-list (getf normalized :modifiers))))
+         ;; A raw ASCII control byte (e.g. ^Q = 17) has no CSI
+         ;; modifier field; synthesize the keymap-visible Ctrl chord.
+         (when control-char-p
+           (pushnew :ctrl modifiers))
+         (make-key-event
+          :key (if control-char-p (code-char (+ 96 code))
+                   (getf normalized :key))
+          :char (unless control-char-p (getf normalized :char))
+          :modifiers modifiers
+          :type (getf normalized :event-type)
+          :code code)))
       (:mouse-event
        (make-mouse-event
         :type (getf normalized :event-type)
