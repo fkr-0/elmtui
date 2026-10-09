@@ -5,6 +5,7 @@ on:
     paths:
       - 'website/**'
       - 'docs/longform/**'
+      - 'docs/api/generated/api.md'
       - 'docs/workbench-user-guide.md'
       - 'examples/README.md'
       - 'mkdocs.yml'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'website/**'
       - 'docs/longform/**'
+      - 'docs/api/generated/api.md'
       - 'docs/workbench-user-guide.md'
       - 'examples/README.md'
       - 'mkdocs.yml'

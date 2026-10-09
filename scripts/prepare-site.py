@@ -30,8 +30,12 @@ def main() -> int:
         shutil.copyfile(source, target)
         print(f"Staged {source_name}")
     generated = ROOT / "docs/api/generated/api.md"
-    if generated.is_file():
-        shutil.copyfile(generated, ROOT / "website/guide/generated-api.md")
+    if not generated.is_file():
+        print("ERROR: checked-in API reference is missing; run scripts/build-api-docs.sh",
+              file=sys.stderr)
+        return 1
+    shutil.copyfile(generated, ROOT / "website/guide/generated-api.md")
+    print("Staged docs/api/generated/api.md")
     return 0
 
 
