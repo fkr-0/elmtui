@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1459 of 1822 bindings documented; 363 have no metadata (80.1% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1561 of 1822 bindings documented; 261 have no metadata (85.7% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -2095,25 +2095,33 @@ absolute deadline and may remain :PENDING if this call returns earlier.
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Default ambiguity timeout in seconds for a standalone ESC byte, currently 0.025 seconds.
+```
 
 ## CL-INPUTS.PROTOCOL:+DEFAULT-MAX-BUFFER-BYTES+
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Default maximum aggregate retained bytes in the incremental protocol parser.
+```
 
 ## CL-INPUTS.PROTOCOL:+DEFAULT-MAX-PASTE-BYTES+
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Default maximum accumulated bracketed-paste payload bytes, currently one mebibyte.
+```
 
 ## CL-INPUTS.PROTOCOL:+DEFAULT-MAX-SEQUENCE-BYTES+
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Default maximum recognized escape sequence length, currently 128 bytes.
+```
 
 ## CL-INPUTS.PROTOCOL:DECODE-UTF-8-OCTETS
 
@@ -2148,49 +2156,65 @@ state are constrained by explicit hard limits.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the total buffered undecoded byte count currently held by a protocol parser.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-EVENT
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Recognized terminal protocol event record containing category, payload, raw bytes, reason and metadata.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-EVENT-CATEGORY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the classification category of a recognized terminal protocol event.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-EVENT-METADATA
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return extra parser metadata associated with a recognized terminal protocol event.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-EVENT-PAYLOAD
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return decoded terminal input payload such as a key or pasted text.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-EVENT-RAW
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the raw octets associated with a recognized terminal input event.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-EVENT-REASON
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the reason or parsing diagnostic associated with a protocol event.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-NEXT-DEADLINE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the next monotonic deadline for resolving pending ESC ambiguity, or NIL when none is pending.
+```
 
 ## CL-INPUTS.PROTOCOL:PROTOCOL-PARSER-STATE
 
@@ -3086,13 +3110,17 @@ True while a CL-STATE transaction boundary is active.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Managed application state containing backing data, backend, synchronization, history, version, revision and observer state.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-BACKEND
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the physical storage backend; use SET-APPLICATION-STATE-BACKEND for safe conversion.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-DATA
 
@@ -3112,31 +3140,41 @@ locking, versioning, observers, history, and strict snapshot guarantees.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the state history records used by undo and redo logic.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-LOCK
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the mutex guarding a managed application state.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-LOG
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the mutation log maintained by supported state writes.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-OBSERVERS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return registered state observers; use the supported observer API for changes.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true if the value is an APPLICATION-STATE object.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-PLIST
 
@@ -3150,19 +3188,25 @@ Return an owned plist representation of STATE's logical model.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the logical commit revision used for optimistic write preconditions.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-UNDONE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return entries from the undo history staged for redo.
+```
 
 ## CL-STATE.CORE:APPLICATION-STATE-VERSION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the state version updated as logical mutations occur.
+```
 
 ## CL-STATE.CORE:ASSERT-STATE-MUTATION-ALLOWED
 
@@ -3262,13 +3306,17 @@ Signaled when a CL-STATE operation receives an invalid logical path.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the malformed state path retained by an INVALID-STATE-PATH condition.
+```
 
 ## CL-STATE.CORE:MAKE-APPLICATION-STATE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct raw managed state slots; prefer MAKE-STATE for validated copied initial values.
+```
 
 ## CL-STATE.CORE:MAKE-STATE
 
@@ -3332,13 +3380,17 @@ Base condition for optimistic/concurrent managed-state access conflicts.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the operation associated with a managed state conflict.
+```
 
 ## CL-STATE.CORE:STATE-CONFLICT-STATE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the managed state object associated with a conflict.
+```
 
 ## CL-STATE.CORE:STATE-FROZEN-P
 
@@ -3412,13 +3464,17 @@ Signaled before mutation when an optimistic revision precondition is stale.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the revision found in state when a conditional write was rejected.
+```
 
 ## CL-STATE.CORE:STATE-REVISION-CONFLICT-EXPECTED-REVISION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the requested revision that failed an optimistic-write precondition.
+```
 
 ## CL-STATE.CORE:STATE-SET
 
@@ -3654,55 +3710,73 @@ Return shorthand patches whose sequential application transforms OLD into NEW.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Validation condition for an unsupported patch input format.
+```
 
 ## CL-STATE.PATCH:INVALID-PATCH-OPERATION
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Validation condition for an operation outside :SET :REMOVE :MERGE and :UPDATE.
+```
 
 ## CL-STATE.PATCH:INVALID-PATCH-OPERATION-OPERATION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the rejected patch operation retained by the validation condition.
+```
 
 ## CL-STATE.PATCH:INVALID-PATCH-PATH
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Validation condition for invalid paths; a path is a symbol or a nonempty proper list of symbols.
+```
 
 ## CL-STATE.PATCH:INVALID-PATCH-PATH-PATH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the invalid logical state path recorded by a patch condition.
+```
 
 ## CL-STATE.PATCH:INVALID-PATCH-VALUE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Validation condition when a patch value is incompatible with the selected operation.
+```
 
 ## CL-STATE.PATCH:INVALID-PATCH-VALUE-OPERATION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the operation associated with the rejected patch value.
+```
 
 ## CL-STATE.PATCH:INVALID-PATCH-VALUE-VALUE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the value rejected by operation-specific patch validation.
+```
 
 ## CL-STATE.PATCH:MAKE-PATCH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Create a validated patch from :PATH :OP and :VALUE; malformed inputs signal typed validation conditions.
+```
 
 ## CL-STATE.PATCH:MERGE-PATCH
 
@@ -3725,55 +3799,73 @@ Returns the modified STATE (functional API).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return validated patch records for each record or two-element shorthand in PATCHES, preserving order.
+```
 
 ## CL-STATE.PATCH:PATCH
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Structured logical state mutation with path, operation, and value slots.
+```
 
 ## CL-STATE.PATCH:PATCH-OP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the validated operation keyword of a state patch, such as :SET, :REMOVE, :MERGE or :UPDATE.
+```
 
 ## CL-STATE.PATCH:PATCH-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true if the value is a CL-STATE PATCH record.
+```
 
 ## CL-STATE.PATCH:PATCH-PATH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the logical state path selected for mutation.
+```
 
 ## CL-STATE.PATCH:PATCH-VALIDATION-ERROR
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Base condition retaining rejected patch input and the validation reason.
+```
 
 ## CL-STATE.PATCH:PATCH-VALIDATION-ERROR-INPUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the original invalid patch form received by the validator.
+```
 
 ## CL-STATE.PATCH:PATCH-VALIDATION-ERROR-REASON
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the reason keyword describing why the supplied state patch failed validation.
+```
 
 ## CL-STATE.PATCH:PATCH-VALUE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the operand for a patch; :UPDATE patches use a function designator.
+```
 
 ## CL-STATE.SCHEMA:DEFINE-TYPE-PREDICATE
 
@@ -4145,7 +4237,9 @@ only needs a small alias-aware projection.
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Current identifier for the ordered style cascade semantics; recorded in computed style revisions.
+```
 
 ## CL-STYLES.ENGINE:APPLY-STYLESHEET
 
@@ -4210,91 +4304,121 @@ Return a first-class computed style result with an explicit cascade revision.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Computed cascade result containing resolved style, revision, optional declaration trace and diagnostics.
+```
 
 ## CL-STYLES.ENGINE:COMPUTED-STYLE-RESULT-DIAGNOSTICS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return variable-resolution diagnostics recorded while tracing a computed style.
+```
 
 ## CL-STYLES.ENGINE:COMPUTED-STYLE-RESULT-REVISION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the style revision combining cascade semantics and stylesheet revision identifiers.
+```
 
 ## CL-STYLES.ENGINE:COMPUTED-STYLE-RESULT-STYLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the computed style property list for the styled element.
+```
 
 ## CL-STYLES.ENGINE:COMPUTED-STYLE-RESULT-TRACE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the ordered declaration trace, when computation requested tracing.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Record of one candidate declaration's property, value, origin, selector, specificity and winning status.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-ORIGIN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the source origin of the declaration, such as :DEFAULT, :INHERITED, :RULE or :INLINE.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-PROPERTY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the style property key associated with a declaration trace entry.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-SELECTOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the rule selector associated with a traced declaration, or NIL for non-rule sources.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-SOURCE-DECLARATIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the original property declarations before variable normalization and expansion.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-SOURCE-ORDER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the stylesheet order index recorded for the candidate declaration.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-SPECIFICITY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the CSS-like specificity triple or :INLINE marker associated with the declaration.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-STATUS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the trace status :WINNER or :OVERRIDDEN after later declarations have been applied.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-VALUE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the normalized property value recorded for a declaration trace entry.
+```
 
 ## CL-STYLES.ENGINE:DECLARATION-TRACE-VARIABLE-EXPANSIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return variable expansion metadata captured while resolving this declaration.
+```
 
 ## CL-STYLES.ENGINE:EXPLAIN-STYLE
 
@@ -4310,49 +4434,65 @@ specificity, source order, source declarations, and variable expansion.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Compatibility stub: currently ignores PARENT and CHILD and returns NIL; not a supported inheritance engine.
+```
 
 ## CL-STYLES.ENGINE:MATCH-RULES
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return matched stylesheet rules paired with CSS-like specificity triples in stylesheet traversal order.
+```
 
 ## CL-STYLES.ENGINE:STYLE-PATCH
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Immutable-shaped style application record carrying target PATH and COMPUTED style; structure slots remain assignable.
+```
 
 ## CL-STYLES.ENGINE:STYLE-PATCH-COMPUTED
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the computed style property list contained in a style application patch.
+```
 
 ## CL-STYLES.ENGINE:STYLE-PATCH-PATH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the node key path targeted by an applied stylesheet patch.
+```
 
 ## CL-STYLES.ENGINE:STYLE-REVISION
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Version record containing cascade semantics revision and originating stylesheet revision.
+```
 
 ## CL-STYLES.ENGINE:STYLE-REVISION-CASCADE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the cascade semantics revision used to compute the style.
+```
 
 ## CL-STYLES.ENGINE:STYLE-REVISION-STYLESHEET
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the source stylesheet revision, or NIL if no stylesheet was provided.
+```
 
 ## CL-STYLES.PROPERTIES:DEFINE-GROUP
 
@@ -4711,19 +4851,25 @@ Validate a constructed rule and return it.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an attribute selector keyed by KEY, with optional VALUE; when VALUE is omitted, match truthy attribute presence.
+```
 
 ## CL-STYLES.SELECTOR:CHILD>
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a direct-child relationship selector combining parent and child match criteria.
+```
 
 ## CL-STYLES.SELECTOR:CLS>
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a class selector requiring every supplied class name.
+```
 
 ## CL-STYLES.SELECTOR:COMPILE-SELECTOR
 
@@ -4737,85 +4883,113 @@ Validate and return the selector S-expression used by the matcher.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an ancestor-descendant relationship selector for any matching ancestor.
+```
 
 ## CL-STYLES.SELECTOR:FIRST-CHILD
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a selector for a node with a parent and zero-based index zero.
+```
 
 ## CL-STYLES.SELECTOR:HAS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a selector matching nodes with at least one descendant satisfying another selector.
+```
 
 ## CL-STYLES.SELECTOR:ID>
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a selector for a given stylable identifier.
+```
 
 ## CL-STYLES.SELECTOR:INVALID-SELECTOR
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Condition raised when selector validation finds an unsupported operator or structurally invalid argument.
+```
 
 ## CL-STYLES.SELECTOR:INVALID-SELECTOR-PATH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the index path locating the invalid nested selector.
+```
 
 ## CL-STYLES.SELECTOR:INVALID-SELECTOR-REASON
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a failure reason keyword from a selector validation condition.
+```
 
 ## CL-STYLES.SELECTOR:INVALID-SELECTOR-SELECTOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the rejected selector stored by the validation condition.
+```
 
 ## CL-STYLES.SELECTOR:LAST-CHILD
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a selector for the final child in its parent's ordered children.
+```
 
 ## CL-STYLES.SELECTOR:MATCH-SELECTOR-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return whether SEL matches OBJ under element, class, state, parentage, and descendant rules.
+```
 
 ## CL-STYLES.SELECTOR:NTH-CHILD
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a selector for zero-based child index N; validation rejects negative and noninteger values.
+```
 
 ## CL-STYLES.SELECTOR:SEL-AND
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an intersection selector whose members must all match.
+```
 
 ## CL-STYLES.SELECTOR:SEL-NOT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a selector matching when the supplied nested selector does not match.
+```
 
 ## CL-STYLES.SELECTOR:SEL-OR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a union selector that succeeds if at least one member matches.
+```
 
 ## CL-STYLES.SELECTOR:SELECTOR-SPECIFICITY
 
@@ -4829,13 +5003,17 @@ Return the deterministic CSS-like specificity triple (ID CLASS TYPE) for SEL.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a state selector requiring all supplied flags.
+```
 
 ## CL-STYLES.SELECTOR:TYPE>
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a selector comparing the node's stylable type.
+```
 
 ## CL-STYLES.SELECTOR:VALIDATE-SELECTOR
 
@@ -5282,61 +5460,81 @@ Sugar: add a :message binding that emits MSG list.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Structured declared application configuration, including callbacks, state semantics, message queue and CLI options.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-BINARY-OPTIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the optional binary execution options recorded in an application configuration.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-CLI-OPTIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the application command-line option definitions.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-COMMAND-PROCESSOR-FN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the optional application-specific command processor function designator.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-CONFIGURE-FN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the optional application configuration callback designator.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-INITIAL-STATE-PLIST
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the application's initial state property list.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-MESSAGE-QUEUE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the event channel required for application message queue processing.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the symbolic name identifying a declared application.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-RENDERER-FN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the optional renderer callback designator stored in the application configuration.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-ROOT-COMPONENT-DSL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the declared root component DSL used to build an application view.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-STATE-SEMANTICS
 
@@ -5350,19 +5548,25 @@ Return the application's state commit semantics, either :TRANSACTIONAL or :STRIC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the stored symbol or form designating the application's subscriptions callback.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-UPDATE-FN-SYM
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the update callback symbol, function, or form used for application state transitions.
+```
 
 ## ELMTUI.APP.API:APP-CONFIG-VIEW-FN-SYM
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the view callback symbol, function, or form used to produce the declarative UI.
+```
 
 ## ELMTUI.APP.API:GET-CLI-ARG
 
