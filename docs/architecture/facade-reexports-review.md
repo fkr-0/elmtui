@@ -37,10 +37,12 @@ review happens.
 | `ELMTUI.APP` | `ELMTUI.APP.API` | `MAKE-APP-CONFIG` | Imported constructor exposed by app facade despite being internal in source API. Existing client name remains supported; app API owner should publish at origin or document intentional facade-only status. |
 | `ELMTUI.CORE.GLOBALS` | `ELMTUI.STATE.MSG` | `*MESSAGE-SCHEMAS*` | Shared mutable message schema registry deliberately imported into globals. Do not duplicate registry or silently change symbol identity; assess whether public mutation should be supported. |
 | `ELMTUI.VIEW.LAYOUT` | `ELMTUI.VIEW.API` | `LAYOUT-NODE` | Generic layout protocol imported and exposed by layout facade; validate its public call contract before changing its origin visibility. |
-| `ELMTUI.VIEW.STYLED` | `CL-STYLES.API` | `STYLES` | Support styling accessor imported by styled-view adapter; public alias must remain compatible, but cl-styles owner should decide whether direct public exposure is desirable. |
+| `ELMTUI.VIEW.STYLED` | `CL-STYLES.API` | `STYLES` | **Highest-priority exception:** runtime exposes this symbol, but it currently has **no function, macro, variable or class binding** in a freshly loaded system. Do not claim it is a callable accessor. Determine intended contract with cl-styles owner, then either implement a supported accessor with behavioral tests or deprecate this phantom alias in the next permitted API-breaking release. |
 | `ELMTUI.VIEW.STYLED` | `ELMTUI.VIEW.API` | `STYLED-UI-NODE` | UI node representation imported for typed style application; avoid deleting client-visible alias. |
 | `ELMTUI.VIEW.STYLED` | `ELMTUI.VIEW.API` | `UI-NODE-CHILDREN` | View tree reader forwarded from origin; owner should verify mutability/structure contract. |
 | `ELMTUI.VIEW.STYLED` | `ELMTUI.VIEW.API` | `UI-NODE-PROPS` | Property reader forwarded from origin; owner should document mutation and ownership semantics. |
+
+Runtime binding qualification of the seven exceptions found six meaningful bindings: `MAKE-APP-CONFIG`, `LAYOUT-NODE`, `UI-NODE-CHILDREN`, and `UI-NODE-PROPS` are functions; `*MESSAGE-SCHEMAS*` is a bound variable; `STYLED-UI-NODE` names a class. The seventh, `STYLES`, is **unbound** and has been escalated as a compatibility/design defect. No alias was deleted or rebound.
 
 These are **compatibility exceptions**, not automatic permissions to increase
 the set of public-internal symbol exposures. Each requires an explicit
