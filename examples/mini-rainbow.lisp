@@ -121,70 +121,43 @@
         (t
          (make-update-result))))))
 
-(defun view (app-state)
-  (labels ((rand-color ()
-             (list (random 256) (random 256) (random 256)))
-           (cell-id (row col)
-             (intern (format nil "CELL-~D-~D" row col) :keyword))
-           (cell-node (row col &key (flex-dir :column))
-             `(:text
-                :id ,(cell-id row col)
-                :style (:width 1 :height 1
-                         :min-width 1 :min-height 1
-                         :display :flex :flex-direction ,flex-dir
-                         :fg-color ,(rand-color)
-                         :bg-color ,(rand-color))
-                :content "#"))
-           (row-node (row)
-             `(:container
-                 :id ,(intern (format nil "ROW-~D" row) :keyword)
-                 :style (:box :ascii
-                          :height 3 :min-height 3
-                          :width 9 :min-width 9
-                          :border-style :ascii :border-width 1
-                          :display :flex :flex-direction :row
-                          :bg-color ,(rand-color)
-                          :fg-color ,(rand-color))
-                 :children ,(loop for col from 0 below 7
-                                  collect (cell-node row col :flex-dir :column))))
-           (column-node (col)
-             `(:container
-                 :id ,(intern (format nil "COL-~D" col) :keyword)
-                 :style (:box :ascii
-                          :width 3 :min-width 3
-                          :height 9 :min-height 9
-                          :border-style :ascii :border-width 1
-                          :display :flex :flex-direction :column
-                          :bg-color ,(rand-color)
-                          :fg-color ,(rand-color))
-                 :children ,(loop for row from 0 below 7
-                                  collect (cell-node row col :flex-dir :row)))))
-    (let* ((orientation (state-ref app-state :orientation :row))
-           (row-major (eq orientation :row))
-           (rows (loop for i from 0 below 7 collect (row-node i)))
-           (columns (loop for j from 0 below 7 collect (column-node j))))
-      `(:container
-          :id :main
-          :style (:box :ascii
-                   :width ,(if row-major 11 23)
-                   :height ,(if row-major 23 11)
-                   :display :flex
-                   :flex-direction ,(if row-major :column :row)
-                   :padding 0 :margin 0 :spacing 0 :gap 0
-                   :border-style :double :border-width 1
-                   :fg-color ,(rand-color))
-          :children ,(if row-major rows columns)))))
+(defun view (state)
+  "Small deterministic rainbow with individually colored visible text runs."
+  (let ((orientation (state-ref state :orientation :row))
+        (palette '((:rgb 255 75 94) (:rgb 255 160 79) (:rgb 255 225 99)
+                   (:rgb 88 220 150) (:rgb 65 175 255) (:rgb 135 118 255)
+                   (:rgb 221 111 232))))
+    `(:container :id :mini-rainbow-content
+       :style (:display :flex :flex-direction :column :width 54 :height 12)
+       :children
+       ((:text :id :mini-rainbow-title
+               :content "RAINBOW / mini   Space: rotate  |  q: quit"
+               :style (:fg-color :cyan :bold t))
+        (:text :id :mini-rainbow-direction
+               :content ,(format nil "Direction: ~A" orientation))
+        (:container :id :mini-rainbow-palette
+           :style (:display :flex
+                   :flex-direction ,(if (eq orientation :row) :row :column)
+                   :width 49 :height 8)
+           :children
+           ,(loop for color in palette for index from 0
+                  collect `(:text
+                             :id ,(intern (format nil "MINI-STRIPE-~D" index) :keyword)
+                             :content ,(if (eq orientation :row) "#######"
+                                           (make-string 48 :initial-element #\#))
+                             :style (:fg-color ,color
+                                     :height 1
+                                     :width ,(if (eq orientation :row) 7 48)))))))))
 
 (defun %mini-rainbow-initial-state ()
-  (list :current-stylesheet rainbow-stylesheet
+  (list :current-stylesheet nil
         :should-quit nil
         :orientation :row
         :switch-count 0))
 
 (defapplication mini-rainbow
   :root-component-dsl
-  `(:root-viewport
-     :id :root)
+  '(:root-viewport :id :root :anchor :below-cursor :width 54 :height 12 :blank-on-exit t :child-dsl-spec (:view nil))
   :update-fn 'app-update
   ;; :stylesheet rainbow-stylesheet
   :view-fn #'view
