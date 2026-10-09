@@ -54,10 +54,11 @@
 (defun %merge-computed-into-inline (inline computed)
   (labels ((plist-keys (pl) (loop for (k v) on pl by #'cddr collect k))
            (remove-keys (pl keys)
-             (loop with out = nil for (k v) on pl by #'cddr
-                   unless (member k keys)
-                     do (setf out (list* k v out))
-                   finally (return (nreverse out)))))
+             ;; Preserve property/value adjacency and declaration order.
+             ;; NREVERSE on a flat plist reverses atoms, not pairs.
+             (loop for (k v) on pl by #'cddr
+                   unless (member k keys :test #'eql)
+                     append (list k v))))
     (let* ((ckeys (plist-keys computed))
            (base (or inline nil))
            (stripped (remove-keys base ckeys)))
