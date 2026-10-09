@@ -253,7 +253,13 @@
 
   node)
 
-(defgeneric dispatch-layout (display node available-rect parent-styles))
+(defgeneric dispatch-layout (display node available-rect parent-styles) (:documentation "Dispatches to the appropriate layout algorithm based on display type.
+
+  DISPLAY is a keyword (e.g., :grid, :flex) or NIL for block fallback.
+  NODE is the element to layout.
+  AVAILABLE-RECT is the rectangle available for NODE.
+  PARENT-STYLES is the style plist of the parent element, if needed for layout
+  algorithms."))
 
 (defmethod dispatch-layout (display node available-rect parent-styles)
   "Block fallback: honor available-rect for NODE."

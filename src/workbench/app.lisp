@@ -678,7 +678,7 @@
 (elmtui.app:defapplication workbench
   :root-viewport-id :workbench-root
   :root-component-dsl
-  '(:root-viewport :id :workbench-root :anchor :top-left
+  '(:root-viewport :id :workbench-root :anchor :below-cursor
     :child-dsl-spec (:view nil) :overflow-policy :scroll
     :blank-on-exit t)
   :initial-state-fn #'%workbench-initial

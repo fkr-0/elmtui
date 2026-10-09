@@ -4,7 +4,7 @@ Optional local REPL application. Load with:
 
     clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load examples/workbench.lisp
 
-This loads the separately defined `elmtui-workbench.asd` system; `elmtui.asd` and Slynk remain unchanged. Local evaluation is in-process, **trusted Lisp** (not a security sandbox). No remote server is started. The workbench uses the terminal's alternate screen and a top-left, full-height viewport, restoring the previous shell screen after exit.
+This loads the separately defined `elmtui-workbench.asd` system; `elmtui.asd` and Slynk remain unchanged. Local evaluation is in-process, **trusted Lisp** (not a security sandbox). No remote server is started. The launcher uses the **normal terminal screen**, not the alternate screen. Its viewport is anchored below the current cursor, allowing existing shell output to remain in scrollback. The Workbench blanks its own viewport on exit; it does not restore the previous screen by swapping terminal buffers.
 
 ## Keyboard and layout
 
@@ -24,8 +24,8 @@ Run PTY smoke:
 
     python3 tests/workbench/pty-workbench.py
 
-The smoke verifies the visible transcript, editor prompt and status, the image inspector at 120+ columns, evaluation of `(+ 1 2)` to `3`, completion, and clean Ctrl+D/alternate-screen/termios restoration. It is not by itself a complete golden/Unicode/keymap conformance matrix. Qualification and review require explicit independent verdict and 80x24 / 120x40 / 160x50 trace inspection. In particular, Ctrl+Enter and Ctrl+Space terminal support depends on key protocol negotiation; fallback Enter submits balanced forms.
+The smoke verifies the visible transcript, editor prompt and status, the image inspector at 120+ columns, evaluation of `(+ 1 2)` to `3`, completion, and clean Ctrl+D/normal-screen/termios restoration. It is not by itself a complete golden/Unicode/keymap conformance matrix. Qualification and review require explicit independent verdict and 80x24 / 120x40 / 160x50 trace inspection. In particular, Ctrl+Enter and Ctrl+Space terminal support depends on key protocol negotiation; fallback Enter submits balanced forms.
 
 ## Important limitations
 
-Initial shell uses fixed-width row composition. While nested inline-style flex rows are being corrected in the framework, the workbench presents each complete row in a stable text node with row-level styling; per-token/segment styling is temporarily reduced. Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and alternate-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.
+Initial shell uses fixed-width row composition. While nested inline-style flex rows are being corrected in the framework, the workbench presents each complete row in a stable text node with row-level styling; per-token/segment styling is temporarily reduced. Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and normal-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.

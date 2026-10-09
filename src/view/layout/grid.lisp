@@ -217,6 +217,10 @@
 ;;     new))
 
 (defun perform-track-sizing-iteration (col-tracks row-tracks grid-items available-width available-height col-gap row-gap)
+  "Perform one iteration of track sizing for the grid layout algorithm.
+  Returns T if no further changes are needed, NIL if another iteration is required.
+  This function updates the min/max contributions of each track based on the items that occupy them,
+  and then resolves content-based and minmax track sizes, distributing flexible space as needed."
   (dolist (track col-tracks) (setf (grid-track-min-contribution track) 0.0 (grid-track-max-contribution track) 0.0 (grid-track-items track) nil))
   (dolist (track row-tracks) (setf (grid-track-min-contribution track) 0.0 (grid-track-max-contribution track) 0.0 (grid-track-items track) nil))
   (dolist (item grid-items)
@@ -295,6 +299,9 @@
   tracks)
 
 (defun distribute-flexible-space (tracks available-space total-gap-size)
+  "Distribute available space among flexible tracks based on their fr-units and auto definitions.
+  This function updates the base sizes of flexible tracks and marks them as non-flexible once their growth limits are reached."
+  
   (let* ((num-flexible-auto (loop for track in tracks count (and (grid-track-is-flexible track) (eq (grid-track-definition track) :auto))))
          (total-fr-units (loop for track in tracks when (and (grid-track-is-flexible track) (> (grid-track-fr-units track) 0)) sum (grid-track-fr-units track)))
          (fixed-size (loop for track in tracks unless (grid-track-is-flexible track) sum (grid-track-base-size track)))
@@ -513,5 +520,6 @@
                                     :size (make-size :w
                                                      (floor cw) :h (floor ch))))
               new)))))))
+
 (defmethod compute-layout ((style (eql :grid)) node rect &key &allow-other-keys)
   (compute-grid-layout node rect))
