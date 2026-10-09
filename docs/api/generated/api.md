@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1378 of 1822 bindings documented; 444 have no metadata (75.6% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1459 of 1822 bindings documented; 363 have no metadata (80.1% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -10951,7 +10951,9 @@ Signals INVALID-BUFFER-COORDINATES-ERROR if out of bounds.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the single character stored in a virtual terminal cell.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL-EQUAL-P
 
@@ -10965,7 +10967,9 @@ Compares two BUFFER-CELL instances for equality (char and style).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the terminal style attached to a virtual terminal cell, or NIL.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELLS
 
@@ -10980,13 +10984,17 @@ Returns the raw 2D array of BUFFER-CELL objects.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the character at ROW and COL of a virtual terminal buffer; getter delegates to bounded cell access.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-ERROR
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Base condition for virtual terminal buffer operations that fail.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-HEIGHT
 
@@ -11008,7 +11016,9 @@ Returns the recursive lock associated with the BUFFER.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set a buffer cell's terminal style by ROW and COL; setter accepts a terminal style, style plist, or NIL.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-WIDTH
 
@@ -11071,31 +11081,41 @@ Returns the modified BUFFER.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Condition representing out-of-range row or column operations on a virtual terminal buffer.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:INVALID-BUFFER-COORDINATES-ERROR-BUFFER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the virtual terminal buffer associated with a coordinate error.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:INVALID-BUFFER-COORDINATES-ERROR-COL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the invalid column recorded when a buffer coordinate operation failed.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:INVALID-BUFFER-COORDINATES-ERROR-ROW
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the invalid row recorded when a buffer coordinate operation failed.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:MAKE-BUFFER-CELL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a new virtual terminal cell with optional :CHAR and :STYLE; supplied style plists are converted or copied.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:MAKE-VIRTUAL-BUFFER
 
@@ -11157,25 +11177,33 @@ Represents a 2D grid of styled characters for the terminal screen.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the underlying two-dimensional BUFFER-CELL array; direct mutation bypasses the safe accessor and locking APIs.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:VIRTUAL-TERMINAL-BUFFER-HEIGHT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the number of rows in a virtual terminal buffer, fixed when the buffer was created.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:VIRTUAL-TERMINAL-BUFFER-LOCK
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the recursive mutex guarding access to a virtual terminal buffer's cells.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:VIRTUAL-TERMINAL-BUFFER-WIDTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the number of columns in a virtual terminal buffer, fixed when the buffer was created.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:WITH-VIRTUAL-BUFFER-LOCK
 
@@ -11580,7 +11608,9 @@ The -e flag ensures escape sequences are included for style preservation.
 Kinds: function
 
 ```text
-Return ANSI-styled tmux pane content including scrollback via CAPTURE-PANE-STRING with MODE :SCREEN. Read-only; potentially larger than the visible pane.
+Return ANSI-styled tmux pane content including scrollback via
+CAPTURE-PANE-STRING with MODE :SCREEN. Read-only; potentially larger than the
+visible pane.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:CLEAR-SAVED-TMUX-CAPTURE
@@ -11612,7 +11642,8 @@ Create a virtual buffer populated from tmux output.
 Kinds: function
 
 ```text
-Return a new WIDTH-by-HEIGHT styled visible-pane cell grid, or NIL outside tmux. Captures only; does not repaint cells or restore history.
+Return a new WIDTH-by-HEIGHT styled visible-pane cell grid, or NIL outside tmux.
+Captures only; does not repaint cells or restore history.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:PARSE-ANSI-SGR
@@ -11638,7 +11669,8 @@ A combined reset/set such as ESC[0;31m clears old attributes first.
 Kinds: function
 
 ```text
-Prefill BACKEND from styled visible tmux cells and return an independent cell snapshot. No full history is saved, so this does not guarantee resize-safe quit.
+Prefill BACKEND from styled visible tmux cells and return an independent cell
+snapshot. No full history is saved, so this does not guarantee resize-safe quit.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:PREFILL-BACKEND-FROM-TMUX-STYLED
@@ -11646,7 +11678,9 @@ Prefill BACKEND from styled visible tmux cells and return an independent cell sn
 Kinds: function
 
 ```text
-Fill terminal backend front/back buffers from visible pane SGR cells and return a separate styled snapshot. No scrollback history is replayed or protected from shrink.
+Fill terminal backend front/back buffers from visible pane SGR cells and return
+a separate styled snapshot. No scrollback history is replayed or protected from
+shrink.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:PREFILL-BUFFER-FROM-STRING
@@ -11672,7 +11706,8 @@ No scrollback-sized intermediate buffer or terminal I/O is required.
 Kinds: function
 
 ```text
-Copy saved cell characters and styles into virtual BUFFER, returning BUFFER. No physical repaint, cursor restoration, or tmux scrollback recovery occurs here.
+Copy saved cell characters and styles into virtual BUFFER, returning BUFFER. No
+physical repaint, cursor restoration, or tmux scrollback recovery occurs here.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:SAVE-TMUX-CAPTURE
@@ -11680,7 +11715,9 @@ Copy saved cell characters and styles into virtual BUFFER, returning BUFFER. No 
 Kinds: function
 
 ```text
-Copy a bounded visible-pane cell BUFFER into the saved slot. This does not snapshot tmux scrollback or protect history from later resize-induced displacement.
+Copy a bounded visible-pane cell BUFFER into the saved slot. This does not
+snapshot tmux scrollback or protect history from later resize-induced
+displacement.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:SPLIT-BY-ANSI-SEQUENCES
@@ -11866,7 +11903,9 @@ Invalidate CONTEXT so late async work can detect that its owning runtime has end
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a per-application runtime context. Defaults to phase :BOOTING, active true, shutdown false and a fresh generation token; other slots accept keyword initialization.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT
 
@@ -11880,91 +11919,121 @@ Per-application runtime ownership boundary. Compatibility globals may mirror the
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set whether this runtime context accepts work; INVALIDATE-RUNTIME-CONTEXT clears this flag.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-APP-SENDER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or replace the callback used to send messages into this application runtime.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-APP-SPEC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the application specification owned by this runtime context.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-BACKEND
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the platform backend instance attached to this application runtime.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-FOCUS-MANAGER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the focus manager associated with this runtime context.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-GENERATION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the unique generation token used to reject late asynchronous completions.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-INPUT-CONTEXT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace runtime-owned input context state used by input dispatch.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-LAST-CONTEXT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the last context snapshot stored for this application runtime.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-MESSAGE-PROCESSOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the application's message processing callback.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-MODEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the application model held by this runtime context.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-PHASE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the runtime lifecycle phase; the constructor starts at :BOOTING and invalidation sets :STOPPED.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-PREVIOUS-FRAME-BUFFER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the prior rendered frame buffer retained for subsequent presentation.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-ROOT-VIEWPORT-ID-PATH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the root viewport identifier path for this application context.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-SHUTDOWN-REQUESTED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the shutdown request flag; invalidating a runtime sets it true.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-SUBSCRIPTIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the runtime's subscription registry, by default an EQUAL hash table.
+```
 
 ## ELMTUI.RUNTIME.CONTEXT:RUNTIME-CONTEXT-VALID-GENERATION-P
 
@@ -12253,7 +12322,9 @@ Safely accesses NAME from FORM-STATE state
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Generated state-schema metadata describing the FORM-STATE model, its declared slots, validation and lifecycle configuration.
+```
 
 ## ELMTUI.STATE.MODEL:FORM-STATE-SUBJECT
 
@@ -12307,13 +12378,17 @@ Creates a new FORM-STATE instance with validation and proper defaults
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a state patch record, including a path, value, operation, validator, timestamp, source and metadata.
+```
 
 ## ELMTUI.STATE.MODEL:MAKE-TRANSACTION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a state transaction record holding identifier, patches, hooks, rollback data, status and description.
+```
 
 ## ELMTUI.STATE.MODEL:MERGE-STATE-UPDATES
 
@@ -12359,7 +12434,9 @@ Represents a single atomic state change
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true if the supplied value is a STATE-PATCH structure, otherwise false.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION
 
@@ -12373,55 +12450,73 @@ Represents a group of state patches applied atomically
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the human-readable description of a state transaction.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-ID
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the transaction identifier used for tracing and audit purposes.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true if the supplied value is a TRANSACTION structure, otherwise false.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-PATCHES
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the ordered list of state patches grouped by a transaction.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-POST-HOOKS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the callbacks invoked after a transaction applies successfully.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-PRE-HOOKS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the callbacks evaluated before a transaction applies its patches.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-ROLLBACK
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the original-state snapshot or rollback metadata retained by a transaction.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-STATUS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set a transaction's lifecycle status, such as :PENDING, :COMMITTED, :ROLLED-BACK or :FAILED.
+```
 
 ## ELMTUI.STATE.MODEL:TRANSACTION-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the timestamp recorded for a state transaction.
+```
 
 ## ELMTUI.STATE.MODEL:UPDATE-FORM-STATE
 
@@ -13607,25 +13702,33 @@ Initializes a new scrollable container model.
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message tag :SCROLL-CONTAINER-KEY-PRESS; a :KEY field handles arrows, page movement, Home and End.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:MSG-SCROLL-CONTAINER-SCROLL
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message tag :SCROLL-CONTAINER-SCROLL; :DELTA-X and :DELTA-Y adjust scroll offsets before clamping.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:MSG-SCROLL-CONTAINER-SET-SCROLL
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message tag :SCROLL-CONTAINER-SET-SCROLL; optional :X and :Y replace horizontal and vertical offsets.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:MSG-SCROLL-CONTAINER-UPDATE-DIMENSIONS
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Message tag :SCROLL-CONTAINER-UPDATE-DIMENSIONS; new viewport and content dimensions recompute legal scroll ranges.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL
 
@@ -13650,67 +13753,89 @@ Model for a scrollable container widget.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the total vertical extent of content within a scrollable container.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-CONTENT-WIDTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the total horizontal extent of content within a scrollable container.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-DISABLED
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set whether update requests are ignored by the scrollable container model.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-ID
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the identity associated with this scrollable container widget.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-ON-SCROLL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or replace the message template emitted when the scroll offset changes.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-SCROLL-LEFT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the zero-based horizontal offset, clamped against content and viewport width during updates.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-SCROLL-TOP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the zero-based vertical offset, clamped against content and viewport height during updates.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-SHOW-SCROLLBAR-X
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set horizontal scrollbar policy, commonly :AUTO, :ALWAYS or :NEVER.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-SHOW-SCROLLBAR-Y
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set vertical scrollbar policy, commonly :AUTO, :ALWAYS or :NEVER.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-VIEWPORT-HEIGHT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the number of visible rows inside the scrollable container viewport.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:SCROLLABLE-CONTAINER-MODEL-VIEWPORT-WIDTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the number of visible columns inside the scrollable container viewport.
+```
 
 ## ELMTUI.UI.WIDGETS.SCROLLABLE-CONTAINER:UPDATE-SCROLLABLE-CONTAINER
 
@@ -14669,67 +14794,89 @@ Resolve DSL to a tree. Only recurse into *children*. Prop values are opaque data
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace children of a BASE-ELEMENT via the element protocol.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/CONTENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the text/content slot exposed by an element; for text elements this is the text-content slot.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/DISPLAY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the element's :DISPLAY style property or :BLOCK when no explicit display style is set.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/ID
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the application-defined identity associated with an element instance.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/LAYOUT-RECT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the assigned layout rectangle or NIL before layout; NIL must not be confused with a zero-sized rectangle.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/PROPS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a plist of bound declarative slot values, excluding internal children, layout and content bookkeeping.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/SIZE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or assign the element's intrinsic sizing record; a two-element list is accepted by the setter.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/STYLES
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or replace the style plist of an element instance.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/STYLES-OF
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Look up one named style property in an element's style plist or a raw plist; return DEFAULT if absent.
+```
 
 ## ELMTUI.VIEW.ELEMENT:EL/TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the declarative element type associated with an element object.
+```
 
 ## ELMTUI.VIEW.ELEMENT:ELEMENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true for instances of BASE-ELEMENT and false for arbitrary non-element values.
+```
 
 ## ELMTUI.VIEW.ELEMENT:ENSURE-ELEMENT
 
@@ -15334,13 +15481,17 @@ Execute BODY with memoization enabled
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a distinct copy of an element grid coordinate structure, preserving row, column and spans.
+```
 
 ## ELMTUI.VIEW.POSITION:COPY-ELEMENT-POSITION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a distinct copy of an element's absolute position and dimensions.
+```
 
 ## ELMTUI.VIEW.POSITION:DIRECTION-TO-POSITION
 
@@ -15364,25 +15515,33 @@ Returns an element-grid-coordinates struct or nil if grid position is not availa
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the starting zero-based grid column in an element grid coordinate record.
+```
 
 ## ELMTUI.VIEW.POSITION:ELEMENT-GRID-COORDINATES-COL-SPAN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the number of grid columns occupied by an element; defaults to one.
+```
 
 ## ELMTUI.VIEW.POSITION:ELEMENT-GRID-COORDINATES-ROW
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the starting zero-based grid row in an element grid coordinate record.
+```
 
 ## ELMTUI.VIEW.POSITION:ELEMENT-GRID-COORDINATES-ROW-SPAN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the number of grid rows occupied by an element; defaults to one.
+```
 
 ## ELMTUI.VIEW.POSITION:ELEMENT-POSITION
 
@@ -15421,7 +15580,9 @@ Get the vertical center coordinate of the element position.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set an element's height in its absolute rectangle, in terminal-cell coordinates.
+```
 
 ## ELMTUI.VIEW.POSITION:ELEMENT-POSITION-RIGHT
 
@@ -15435,19 +15596,25 @@ Get the right edge x-coordinate of the element position.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set an element's width in its absolute rectangle, in terminal-cell coordinates.
+```
 
 ## ELMTUI.VIEW.POSITION:ELEMENT-POSITION-X
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set an element rectangle's leftmost x coordinate, in terminal-cell units.
+```
 
 ## ELMTUI.VIEW.POSITION:ELEMENT-POSITION-Y
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set an element rectangle's topmost y coordinate, in terminal-cell units.
+```
 
 ## ELMTUI.VIEW.POSITION:FIND-NEAREST-IN-DIRECTION
 
@@ -15465,13 +15632,17 @@ Returns: The nearest element in that direction or nil if none found
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Create an element grid coordinate record with :ROW, :COL, :ROW-SPAN and :COL-SPAN; defaults are 0, 0, 1, 1.
+```
 
 ## ELMTUI.VIEW.POSITION:MAKE-ELEMENT-POSITION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Create an absolute element rectangle from optional :X, :Y, :WIDTH and :HEIGHT integer fields, defaulting to zero.
+```
 
 ## ELMTUI.VIEW.POSITION:POSITION-CONTAINS-P
 
