@@ -272,6 +272,64 @@ class BoundedStress(unittest.TestCase):
                          f"seed={SEED} rounds={ROUNDS}\n{result.stdout[-3000:]}\n{result.stderr[-6000:]}")
         self.assertIn("WB08-PASS", result.stdout, result.stdout[-3000:])
 
+    def test_core_keyevent_accepts_character_keys(self):
+        # Raw Ctrl+C must remain a character key, not silently kill the consumer.
+        form = r'''(let ((control (elmtui.state.msg:make-keyevent-appmsg
+                                   :event nil :key #\c
+                                   :char (code-char 3) :modifiers '(:ctrl)))
+                          (named (elmtui.state.msg:make-keyevent-appmsg
+                                  :event nil :key :enter
+                                  :char nil :modifiers nil)))
+                     (unless (and (eq :keyevent (first control))
+                                  (char= #\c (getf (rest control) :key))
+                                  (equal '(:ctrl) (getf (rest control) :modifiers))
+                                  (eq :enter (getf (rest named) :key)))
+                       (error "KeyEvent constructor lost character/symbol compatibility")))'''
+        cmd = ["clpm", "bundle", "exec", "--with-client", "sbcl", "--",
+               "--noinform", "--non-interactive", "--no-sysinit", "--no-userinit",
+               "--eval", "(require :asdf)",
+               "--eval", "(asdf:load-system :elmtui)",
+               "--eval", form]
+        try:
+            result = subprocess.run(cmd, cwd=ROOT, capture_output=True,
+                                    text=True, check=False, timeout=TIMEOUT)
+        except subprocess.TimeoutExpired as exc:
+            self.fail(f"Core KeyEvent constructor regression timed out: {exc}")
+        self.assertEqual(result.returncode, 0,
+                         f"Character key constructor failed:\n{result.stderr[-3500:]}")
+
+    def test_w5_idle_subscription_state_machine(self):
+        # Unlike process-wide scheduler ticks, this probes *workbench* work.
+        form = r'''(let* ((initial (elmtui.workbench.app::%workbench-initial))
+                         (model (elmtui.state.api:plist-to-application-state initial))
+                         (wb (getf initial :workbench))
+                         (editor (elmtui.workbench.app::workbench-dwell wb)))
+                    (unwind-protect
+                        (progn
+                          (when (elmtui.workbench.app::workbench-subscriptions model)
+                            (error "Startup/idle application installs an unnecessary timer"))
+                          (setf (elmtui.workbench.app::workbench-active-request wb) 3)
+                          (unless (elmtui.workbench.app::workbench-subscriptions model)
+                            (error "Async EVAL has no wakeup timer"))
+                          (setf (elmtui.workbench.app::workbench-active-request wb) nil)
+                          (elmtui.workbench.completion:schedule-documentation-dwell
+                           editor "candidate" 17 :now 0)
+                          (unless (elmtui.workbench.app::workbench-subscriptions model)
+                            (error "Delayed docs have no wakeup timer"))
+                          (elmtui.workbench.completion:cancel-documentation-dwell editor)
+                          (when (elmtui.workbench.app::workbench-subscriptions model)
+                            (error "Cancelled docs left idle timer installed")))
+                      (elmtui.workbench.eval:close-repl-session
+                       (elmtui.workbench.app::workbench-repl wb))))'''
+        cmd = ["clpm", "bundle", "exec", "--with-client", "sbcl", "--",
+               "--noinform", "--non-interactive", "--no-sysinit", "--no-userinit",
+               "--eval", "(require :asdf)",
+               "--eval", "(asdf:load-system :elmtui-workbench)", "--eval", form]
+        result = subprocess.run(cmd, cwd=ROOT, capture_output=True,
+                                text=True, check=False, timeout=TIMEOUT)
+        self.assertEqual(result.returncode, 0,
+                         f"W5 idle subscription invariant:\n{result.stderr[-3500:]}")
+
     def test_w1_seeded_graphemes_undo_redo_resize(self):
         self.assert_probe(("editor",), editor_probe(SEED, ROUNDS))
 
@@ -333,7 +391,15 @@ class WorkbenchApplicationStress(unittest.TestCase):
             idle_bytes = term.drain(0.55)
             after = term.cpu_ticks(pid)
             self.assertEqual(idle_bytes, b"", "Idle W5 issued raw terminal writes")
-            self.assertEqual(before, after, "Idle W5 consumed SBCL CPU ticks")
+            # Process CPU includes the Lisp runtime, input reader and all threads.
+            # It is not a valid zero-CPU oracle for the *UI* component.
+            ticks = after - before
+            clock_ticks = os.sysconf("SC_CLK_TCK")
+            self.assertGreaterEqual(ticks, 0, "Invalid process CPU accounting")
+            self.assertLessEqual(ticks, max(3, round(clock_ticks * 0.55 * 0.06)),
+                                 f"Excessive total idle SBCL CPU: {ticks} ticks/0.55s")
+            print(f"WB08_IDLE_SBCL_CPU_TICKS={ticks} over 0.55s "
+                  "(process-wide measurement; UI idle timer checked separately)")
             term.send(b"x")
             self.assertTrue(term.drain(0.5), "Edited frame produced no terminal writes")
             self.assertEqual(term.drain(0.55), b"",
@@ -347,6 +413,26 @@ class WorkbenchApplicationStress(unittest.TestCase):
                 term.drain(0.05)
             self.assertEqual(term.process.poll(), 0, "Ctrl+D did not quit W5")
             self.assertTrue(term.terminal_restored(), "W5 failed to restore termios")
+
+    def test_early_terminal_signal_mode_and_restore(self):
+        # Catch the former 75ms SIGINT window before the first UI frame.
+        import termios
+        from pty_probe import RealPTY
+        with RealPTY(shlex.split(_REAL_CMD), ROOT) as term:
+            term.wait_for(r"\x1b\[6n", 12)  # startup cursor query
+            self.assertFalse(termios.tcgetattr(term.slave)[3] & termios.ISIG,
+                             "Ctrl+C must be a key before initial cursor query")
+            term.wait_for(os.environ.get("ELMTUI_WORKBENCH_READY_PATTERN",
+                                         r"CL-USER|Lisp Workbench"), 12)
+            term.send(b"\x03")
+            term.wait_for(r"cancel|abort|interrupt", 2.0)
+            term.send(b"\x04")
+            deadline = __import__("time").monotonic() + 8
+            while term.process.poll() is None and __import__("time").monotonic() < deadline:
+                term.drain(0.05)
+            self.assertEqual(term.process.poll(), 0)
+            self.assertTrue(term.terminal_restored(),
+                            "Terminal signal policy leaked beyond W5 lifecycle")
 
     def test_real_ctrl_c_cancel_responsiveness(self):
         from pty_probe import RealPTY
