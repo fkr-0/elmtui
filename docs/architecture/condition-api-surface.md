@@ -91,7 +91,7 @@ The docstring ratchet (`scripts/check-docstrings.sh`) on this audit reported **1
 - `ELMTUI.CORE.CONDITIONS:SIGNAL-SUBSCRIBER-ERROR` report now calls its prefixed reader instead of inadvertently calling `CL:SIGNAL`.
 - `elmtui.asd` now gives `core/conditions` an explicit dependency on `core/errors` to avoid out-of-order package reads on fresh compilation.
 - Pre-existing warnings from LOG4CL method redefinitions and a constant type mismatch in `tests/api-tests.lisp` occur during test loading; no warning originated from the changed condition class/report or focused tests.
-- `ASDF:LOAD-SYSTEM :ELMTUI` followed by `ASDF:COMPILE-SYSTEM :ELMTUI` succeeds; an isolated, cold `COMPILE-SYSTEM` still encounters a separate package-definition ordering failure in `ELMTUI.STATE.UPDATE`. The whole-system compile-only path requires a broader ASDF dependency audit and is not claimed warning/error clean here.
+- A clean SBCL invocation of `ASDF:COMPILE-SYSTEM :ELMTUI` and a fresh `ASDF:COMPILE-SYSTEM :ELMTUI :FORCE T` both succeed after explicit ordering was added: `CORE/ASYNC` depends on `CORE/GLOBALS` and `CORE/CONDITIONS`, and the `STATE` module depends on `STATE/PATH-CONTEXT` and `CORE/ASYNC`. No new compilation warnings were emitted; SBCL reports 13 non-warning compiler notes in the forced compilation. The cold compile is now enforced independently by the hosted CI workflow and the release-check script.
 - Source files belonging to workbench, examples, tmux, or claimed workers have not been edited.
 
 ## Follow-up gates
@@ -100,4 +100,4 @@ The docstring ratchet (`scripts/check-docstrings.sh`) on this audit reported **1
 2. Independently review facade-level re-export ownership before altering `CL-EVENTS.API`, `CL-STYLES.API`, `ELMTUI.STATE`, or `ELMTUI.STATE.API`.
 3. Migrate `WORKBENCH:EVALUATION-ABORTED` into the framework root only after the workbench owners release that path, with condition handler/restart compatibility tests.
 4. Wire the existing condition export boundary and diagnostic context tests into hosted CI when hosted CI exists; they already run through the local full test suite.
-5. Resolve the cold ASDF compile-only dependency ordering in `ELMTUI.STATE.UPDATE` independently of this condition-focused change.
+5. Preserve the now-working cold ASDF compile-only prerequisite test in hosted CI and the release checklist; any further cross-module imports must declare explicit prerequisites instead of relying on a prior `LOAD-SYSTEM`.

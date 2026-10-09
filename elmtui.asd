@@ -36,9 +36,10 @@
                 ;; ----------------------------------------------------------------
                 ;; 1) State subsystem
                 ;; ----------------------------------------------------------------
-                (:file "core/async")
+                (:file "core/async" :depends-on ("core/globals" "core/conditions"))
                 (:module "state"
                   :pathname "state/"
+                  :depends-on ("state/path-context" "core/async")
                   :serial t
                   :components (
                                 (:file "update")
