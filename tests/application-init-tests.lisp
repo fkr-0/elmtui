@@ -102,6 +102,16 @@
 
 (in-suite application-init-tests)
 
+(test root-viewport-wrapper-emits-singleton-child-list
+  "Application wrappers must use a proper list of DSL children."
+  (let* ((child '(:text :id :sample-child :content "Hello"))
+         (wrapped (elmtui.app::maybe-wrap-with-root-viewport
+                   child :root-id :sample-root)))
+    (is (eq :root-viewport (first wrapped)))
+    (is (eq :sample-root (getf (rest wrapped) :id)))
+    (is (equal (list child) (getf (rest wrapped) :children)))))
+
+
 ;; Basic smoke test
 (test app-config-creation
   "Test that app-config can be created"

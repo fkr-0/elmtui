@@ -23,6 +23,28 @@
 
 (in-suite style-test-suite)
 
+(test computed-style-merge-preserves-flat-plist-pairs
+  "Computed styles may override keys, but must never exchange property values."
+  (let* ((node (elmtui.view.base-elements:dsl->objects
+                '(:text :id :style-merge-regression :content "Wi-Fi"
+                  :style (:bold t :fg-color :cyan))))
+         (sheet (cl-styles.sheet:make-stylesheet :rules nil :variables nil
+                                               :namespace nil)))
+    (cl-styles.engine:apply-stylesheet-to-tree node sheet :return :objects)
+    (let ((style (elmtui.view.element:el/styles node)))
+      (is (evenp (length style)))
+      (is (every #'keywordp
+                 (loop for (key value) on style by #'cddr collect key)))
+      (is (eql :cyan (getf style :fg-color)))
+      (is (eql :cyan (getf style :color)))
+      (is (eq t (getf style :bold)))
+      (is (member :bold (getf style :attributes)))
+      (is (not (eq :attributes (getf style :fg-color)))))
+    ;; A second style computation must not corrupt previously merged pairs.
+    (cl-styles.engine:apply-stylesheet-to-tree node sheet :return :objects)
+    (is (eq :cyan (getf (elmtui.view.element:el/styles node) :color)))))
+
+
 ;; Test class that implements stylable protocols (based on cl-styles test node)
 (defclass test-node ()
   ((id :initarg :id :accessor id)

@@ -819,7 +819,10 @@ This method should be implemented by subclasses of low-level-terminal."
   (write-output (concatenate 'string (string #\Esc) "[0m") stream))
 
 (defmethod apply-style-diff ((instance terminal-instance) new-style)
-  ;; (log:info "APPLY-STYLE-DIFF CALLED. Current: ~S, New: ~S" (term-style instance) new-style)
+  ;; A frame may already hold the terminal's recursive lock.  Keep style
+  ;; mutation and output in the same transaction without taking a second,
+  ;; non-recursive lock through EXEC-SEQUENCE.
+  (with-terminal-lock (instance)
   (let* ((current-style (term-style instance))
           (stream (term-stream instance))
           ;; If new-style is already a terminal-style, use it directly
@@ -841,12 +844,12 @@ This method should be implemented by subclasses of low-level-terminal."
           (let ((seqs (elmtui.platform.backend.common.ansi-styling:ansi-seqs current-style attr)))
             (dolist (seq seqs)
               ;; (log:debug "APPLY-STYLE-DIFF: Writing ANSI sequence for ~S: ~S" attr seq)
-              (exec-sequence (terminal-instance-lock instance)
-                (terminal-instance-stream instance)
-                seq)))))
+              ;; The caller holds WITH-TERMINAL-LOCK; EXEC-SEQUENCE would
+              ;; attempt to lock this same LOCKABLE a second time.
+              (write-output seq (terminal-instance-stream instance))))))
       ;; current-style is mutated in-place by update-style!
       (setf (term-style instance) current-style)) ; Update instance's current style
-    (finish-output stream) t))
+    (finish-output stream) t)))
 
 (defmethod make-color ((instance terminal-instance) r-or-name &optional g b)
   (if g (list :rgb r-or-name g b) r-or-name))
