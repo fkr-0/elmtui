@@ -518,9 +518,12 @@ Example:
                  ;; Handle raw key events by dispatching to the keymap system
                  ;; -------------------------------------------------------------
                  ((and (typep msg 'key-event)
+                       ;; Escape is application-scoped: modal cancellation and
+                       ;; dismissal must reach UPDATE rather than global quit.
+                       (not (member (key-event-key msg) '(:escape :esc) :test #'eq))
                        (flet ((dispatch (new-msg)
                                 (elmtui.core.loop:publish
-                                 (if (member new-msg '((:quit) (:cancel)) :test #'equal)
+                                 (if (equal new-msg '(:quit))
                                      '(:app-quit-requested)
                                      new-msg))))
                          (let ((*state-mutation-policy*
