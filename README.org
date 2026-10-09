@@ -3,13 +3,34 @@
 
 * Status
 
-ElmTUI is preparing its first public release as version 0.2.0.
+ElmTUI is preparing a public release, with a proposed 0.1.0 milestone.
+Existing system manifests and the historical =v0.2.0= tag currently use 0.2.0;
+release versioning must be reconciled before a new release is tagged.
 
 The core runtime, maintained examples, and four reusable support libraries are
 covered by independent ASDF test systems.  The current supported development
 platform is SBCL on a POSIX terminal environment.  Other Common Lisp
 implementations have not yet been qualified because parts of the toolkit use
 SBCL facilities such as SB-POSIX and SB-MOP.
+
+* ElmTUI Workbench — flagship release example
+
+The separately loadable Workbench brings an interactive Common Lisp REPL,
+multiline editor, completion menu, selected-symbol documentation, and an
+image/package inspector into a terminal UI. It exercises the framework's
+message-driven state, asynchronous effects, incremental renderer and terminal
+lifecycle. Workbench evaluation is trusted, in-process Common Lisp — not a
+sandbox — and Slynk is optional rather than a core runtime requirement.
+
+#+begin_src sh
+clpm bundle exec --with-client sbcl -- \\
+  --noinform --non-interactive --load examples/workbench.lisp
+#+end_src
+
+See [[file:docs/workbench-user-guide.md][Workbench user guide]] and [[file:docs/release-0.1.0-checklist.md][release qualification gates]]. The dominant Workbench screenshot is planned
+for =website/assets/workbench-hero.webp=; the animated terminal slider is
+planned for =website/assets/terminal-slider.gif=. They will appear on
+[[https://elmtui.fkr.dev/][the project website]] once deployment and qualification are complete.
 
 * What ElmTUI provides
 
@@ -33,9 +54,9 @@ policy.
 | =cl-inputs= | Byte decoding, keymaps, input tokens, device and sink ports | MIT |
 | =cl-state= | Paths, containers, patches, transactions, observers, validation | MIT |
 | =cl-styles= | Selectors, rules, cascade, variables, property normalization | MIT |
-| =elmtui= | Components, UI DSL, runtime policy, rendering, terminal integration | GPL-3.0-only |
-| =elmtui-examples= | Maintained example applications | GPL-3.0-only |
-| =elmtui-packager= | Standalone executable/image packaging | GPL-3.0-only |
+| =elmtui= | Components, UI DSL, runtime policy, rendering, terminal integration | MIT |
+| =elmtui-examples= | Maintained example applications | MIT |
+| =elmtui-packager= | Standalone executable/image packaging | MIT |
 
 The complete ownership rules are documented in
 [[file:docs/architecture/library-boundaries.md][docs/architecture/library-boundaries.md]].
@@ -127,6 +148,22 @@ replacement-snapshot engine without changing the update/patch contract.
 =DEFTEA-APP= remains supported as the smaller direct-transition teaching/small-app
 adapter and lowers to the same runtime transition vocabulary.  The foundations
 chapter below specifies that compatibility boundary precisely.
+
+* Documentation website
+
+The documentation site at [[https://elmtui.fkr.dev/][elmtui.fkr.dev]] is built with MkDocs Material from a curated set of
+public sources; publishing is managed by =.github/workflows/pages.yml=. For
+local preview (after installing MkDocs Material in your environment):
+
+#+begin_src sh
+python3 scripts/prepare-site.py
+python3 -m mkdocs build --strict
+python3 -m mkdocs serve
+#+end_src
+
+The pending screenshot and GIF use the filenames specified in
+[[file:website/assets/README.md][website/assets/README.md]]. The release gates, including the licensing and
+Workbench PTY checks, are in [[file:docs/release-0.1.0-checklist.md][the release checklist]].
 
 * Documentation
 
@@ -261,11 +298,13 @@ checkout with =git submodule update --init --recursive=.
 
 - [[file:CHANGELOG.md][CHANGELOG.md]] records release-visible changes.
 - [[file:docs/release-checklist.md][docs/release-checklist.md]] defines the first-release gate.
-- The repository currently has no configured Git remote.  Distribution URLs and
-  release signing details must be supplied by the maintainer before publishing.
+- Upstream source: [[https://github.com/fkr-0/elmtui][github.com/fkr-0/elmtui]].  The four reusable libraries
+  are published independently under the same GitHub account.  A new ElmTUI
+  release and signing policy still require qualification and approval.
 
 * License
 
-ElmTUI itself is licensed under GPL-3.0-only; see =LICENSE=.  The reusable
-=cl-events=, =cl-inputs=, =cl-state=, and =cl-styles= directories are licensed
-under MIT and each carries its own =LICENSE= file.
+ElmTUI and its reusable =cl-events=, =cl-inputs=, =cl-state=, and
+=cl-styles= libraries are licensed under MIT.  See the root =LICENSE= and
+each library’s own =LICENSE= file. Earlier ElmTUI GPL-3.0-only revisions
+remain available under their original license; this change is not retroactive.

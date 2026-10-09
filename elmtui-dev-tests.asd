@@ -1,0 +1,1 @@
+(asdf:defsystem "elmtui-dev-tests" :version "0.2.0" :description "Tests for optional ElmTUI developer tooling" :author "ElmTUI contributors" :license "MIT" :depends-on (#:elmtui-dev #:fiveam) :pathname "./src/dev/" :serial t :components ((:file "benchmark-tests")) :perform (test-op (op c) (declare (ignore op c)) (symbol-call :elmtui.dev.benchmark.tests :run-benchmark-tests)))

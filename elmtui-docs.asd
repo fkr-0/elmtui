@@ -1,6 +1,6 @@
 (asdf:defsystem "elmtui-docs"
   :description "Generated API and long-form documentation for ElmTUI."
-  :license "GPL-3.0-only"
+  :license "MIT"
   :depends-on ("elmtui")
   :serial t
   :components ((:file "docs/api/package")

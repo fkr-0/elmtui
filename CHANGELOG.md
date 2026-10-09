@@ -6,6 +6,14 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Licensing
+
+- License new ElmTUI sources and distributions under MIT, consistent with its
+  four MIT-licensed supporting libraries. Historic GPL-3.0-only revisions
+  retain their pre-existing grants; the project predecessor uncharming-tui
+  was authored by the ElmTUI maintainer, not a runtime dependency.
+
+
 ### Added
 
 - Added `elmtui.render.diff`, a terminal-independent virtual-frame differ with
