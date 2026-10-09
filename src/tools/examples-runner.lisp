@@ -31,12 +31,18 @@
           :test #'string=))
 
 (defun %configure-cli-logging ()
-  "Reduce log chatter for normal example usage.
-Set ELMTUI_VERBOSE_LOGS=1 to keep info/debug output."
-  (unless (%truthy-env-p "ELMTUI_VERBOSE_LOGS")
-    (handler-case
-        (log4cl:log-config :warn :clear)
-      (error () nil))))
+  "Keep diagnostic logs away from the interactive terminal.
+Without ELMTUI_LOG_FILE suppress Log4CL output entirely. With a filename,
+route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
+  (log4cl:remove-all-appenders log4cl:*root-logger*)
+  (let ((file (uiop:getenv "ELMTUI_LOG_FILE")))
+    (when (and file (plusp (length file)))
+      (log4cl:add-appender
+       log4cl:*root-logger*
+       (make-instance 'log4cl:file-appender :file file))
+      (log4cl:set-log-level
+       log4cl:*root-logger*
+       (if (%truthy-env-p "ELMTUI_VERBOSE_LOGS") :debug :warn)))))
 
 (defun %binary-log-path ()
   "Return <binary-name>.log for the currently running executable."
