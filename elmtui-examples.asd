@@ -3,7 +3,7 @@
   :version "0.2.0"
   :description "ElmTUI maintained example applications"
   :author "ElmTUI contributors"
-  :license "GPL-3.0-only"
+  :license "MIT"
   :depends-on (:elmtui)
   :pathname "./examples/"
   :components ((:file "rainbow-app")
