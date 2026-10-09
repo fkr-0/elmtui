@@ -66,5 +66,70 @@ class QualifierRegression(unittest.TestCase):
             MODULE.markdown_entries(markdown)
 
 
+    def test_documented_entry_rejects_html_doc_drift(self):
+        markdown, html = fake_reference(doc="Expected behavior")
+        html = html.replace("<pre>Expected behavior</pre>", "<pre>Different behavior</pre>")
+        with tempfile.TemporaryDirectory() as root:
+            md, page = Path(root) / "api.md", Path(root) / "api.html"
+            md.write_text(markdown)
+            page.write_text(html)
+            live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", True)
+            with patch.object(MODULE, "live_entries", return_value=[live]):
+                with self.assertRaisesRegex(AssertionError, "documentation mismatch"):
+                    MODULE.qualify(markdown=md, html=page, strict_coverage=False)
+
+    def test_missing_entry_rejects_fake_html_documentation(self):
+        markdown, html = fake_reference(doc="Forms")
+        markdown = markdown.replace(
+            "**Coverage:** 1 of 1 bindings documented; 0 have no metadata",
+            "**Coverage:** 0 of 1 bindings documented; 1 have no metadata",
+)
+        markdown = markdown.replace(
+            chr(96) * 3 + "text\nForms\n" + chr(96) * 3,
+            "_No documentation metadata._",
+        )
+        with tempfile.TemporaryDirectory() as root:
+            md, page = Path(root) / "api.md", Path(root) / "api.html"
+            md.write_text(markdown)
+            page.write_text(html)
+            live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", False)
+            with patch.object(MODULE, "live_entries", return_value=[live]):
+                with self.assertRaisesRegex(AssertionError, "missing-documentation marker"):
+                    MODULE.qualify(markdown=md, html=page, strict_coverage=False)
+
+    def test_documentation_html_escape_roundtrips(self):
+        markdown, html = fake_reference(doc="Literal <em>tag</em> & escaped")
+        html = html.replace(
+            "<pre>Literal <em>tag</em> & escaped</pre>",
+            "<pre>Literal &lt;em&gt;tag&lt;/em&gt; &amp; escaped</pre>",
+        )
+        with tempfile.TemporaryDirectory() as root:
+            md, page = Path(root) / "api.md", Path(root) / "api.html"
+            md.write_text(markdown)
+            page.write_text(html)
+            live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", True)
+            with patch.object(MODULE, "live_entries", return_value=[live]):
+                MODULE.qualify(markdown=md, html=page, strict_coverage=False)
+
+    def test_strict_coverage_rejects_missing_metadata(self):
+        markdown, html = fake_reference(doc="Forms")
+        markdown = markdown.replace(
+            "**Coverage:** 1 of 1 bindings documented; 0 have no metadata",
+            "**Coverage:** 0 of 1 bindings documented; 1 have no metadata",
+        ).replace(
+            chr(96) * 3 + "text\nForms\n" + chr(96) * 3,
+            "_No documentation metadata._",
+        )
+        html = html.replace("<pre>Forms</pre>", "<pre>No documentation metadata.</pre>")
+        with tempfile.TemporaryDirectory() as root:
+            md, page = Path(root) / "api.md", Path(root) / "api.html"
+            md.write_text(markdown)
+            page.write_text(html)
+            live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", False)
+            with patch.object(MODULE, "live_entries", return_value=[live]):
+                MODULE.qualify(markdown=md, html=page, strict_coverage=False)
+                with self.assertRaisesRegex(AssertionError, "REFERENCE-DOCSTRING-DEBT"):
+                    MODULE.qualify(markdown=md, html=page, strict_coverage=True)
+
 if __name__ == "__main__":
     unittest.main()

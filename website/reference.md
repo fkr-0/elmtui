@@ -9,10 +9,14 @@ live public binding in ElmTUI and the four supporting libraries. Qualified names
 use a public, single-colon package export, with missing documentation explicitly
 marked rather than silently omitted.
 
-**Current audited coverage: 952/1,822 (52.3%).** The reference has passed the
-structural live-export and Markdown/HTML equivalence checks; the release-grade
-docstring coverage gate still fails (870 public bindings lack documentation,
-versus the existing allowed debt of 782).
+**Generated reference (2026-10-09): 1,235/1,822 documented (67.8%).**
+At the 2026-10-09 checkpoint the independent docstring audit counted
+**1,819 unique bindings, 587 missing (67.7%)**. The current ratchet threshold
+is set in `scripts/check-docstrings.sh`, and subsequent documentation passes
+may further reduce the debt. Passing this gate does not mean the API is fully
+documented.
+For source-verified contracts and audit interpretation, consult
+`docs/api/README.md` in the source repository.
 
 ## Generate and qualify the reference from the source tree
 
@@ -28,4 +32,8 @@ The generator writes `docs/api/generated/api.md` and `docs/api/generated/api.htm
 For conceptual usage see [TEA foundations](guide/foundations.md), [widgets and patterns](guide/widgets.md) and the [application tutorial](guide/tutorial.md). For implementation-specific symbols, the most authoritative source is the checked-in code and its exported public packages.
 
 !!! note "Documentation debt"
-    The reference is structurally qualified but not coverage-qualified. The existing docstring ratchet rejects 870 missing descriptions against a limit of 782; do not relax or bypass this gate merely to publish. The fully strict verifier (without --structure-only) also fails until all public bindings have documentation.
+    The reference is structurally qualified, but not fully documented. The
+    debt ratchet passes at the documented checkpoint; check the audit's current
+    output and configured threshold after further remediation.
+    The strict verifier (without --structure-only) still fails until all
+    public bindings have documentation metadata.
