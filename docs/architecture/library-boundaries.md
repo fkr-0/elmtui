@@ -22,9 +22,14 @@ cl-events cl-inputs cl-state cl-styles
 The dependency direction is one way: ElmTUI may depend on the reusable
 libraries; the reusable libraries must never depend on ElmTUI.
 
-All four reusable systems are ordinary tracked directories in this repository,
-not Git submodules. A tagged source archive must therefore be self-contained
-and buildable without fetching a second repository.
+All four reusable systems are pinned **Git submodules** (mode `160000`),
+configured via `.gitmodules` to their separate sibling repositories. A normal
+checkout must use `git clone --recurse-submodules` or, after cloning,
+`git submodule update --init --recursive`. GitHub's automatically generated
+source archives omit submodule contents; those archives are **not** standalone
+ElmTUI distributions. Any separately published source bundle must explicitly
+vendor the pinned sources and qualify them, rather than claiming that a bare
+GitHub archive is self-contained.
 
 ## Ownership matrix
 
@@ -112,9 +117,10 @@ Files not referenced by an ASDF system must be one of:
 - archived outside `src`.
 
 Unreferenced compatibility implementations are not allowed in `src` because
-they make ownership ambiguous. Nested Git repositories and self-referential
-submodule URLs are likewise forbidden because they make release archives
-incomplete and fresh clones non-reproducible.
+they make ownership ambiguous. The four declared submodules are intentional;
+additional undocumented nested repositories and circular/self-referential
+submodule URLs are forbidden. Fresh-clone qualification must fetch the exact
+committed gitlink revisions.
 
 ## Dependency tests
 

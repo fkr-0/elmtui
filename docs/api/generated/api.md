@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1183 of 1822 bindings documented; 639 have no metadata (64.9% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1184 of 1822 bindings documented; 638 have no metadata (65.0% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -14736,7 +14736,15 @@ Get the y2 coordinate (y + height) of the rectangle.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Dispatches to the appropriate layout algorithm based on display type.
+
+  DISPLAY is a keyword (e.g., :grid, :flex) or NIL for block fallback.
+  NODE is the element to layout.
+  AVAILABLE-RECT is the rectangle available for NODE.
+  PARENT-STYLES is the style plist of the parent element, if needed for layout
+  algorithms.
+```
 
 ## ELMTUI.VIEW.LAYOUT:LAYOUT-NODE
 
