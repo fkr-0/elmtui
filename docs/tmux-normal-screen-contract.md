@@ -57,8 +57,9 @@ style. Standard, 256-color and RGB styles are all valid.
 
 **Current limitation:** B1 is embedded in the bottom-left inspector panel.
 The specimen now reproduces captured RGB and 256-palette foreground/
-background and selected SGR attributes; the strict private-tmux color test
-passes. Fixed/follow anchoring is not yet available.
+background and selected SGR attributes; the strict private-tmux color test passes. A separate real-PTY test for a
+combined bold+underline+RGB/palette SGR cell remains RED: B1 border and
+metadata rows can disappear or shift. Fixed/follow anchoring is also missing.
 
 ## Capture API versus restoration API
 

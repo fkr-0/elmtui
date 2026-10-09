@@ -252,6 +252,33 @@ class HoverDefectsPTY(unittest.TestCase):
         self.clean_exit(app)
         self.exact_history(baseline,self.capture(app))
 
+    def test_b1_specimen_combined_bold_underline_sgr_remains_legible(self):
+        """Even a valid bold+underline color may not corrupt the B1 panel."""
+        gate=Options.output/"rgb-attrs.start"
+        prelude=(
+            'for n in $(seq 1 70); do printf "HISTORY-MARKER-%02d\n" "$n"; done\n'
+            'for n in $(seq 1 24); do '
+            'printf "\033[1;4;38;2;12;34;56;48;5;77mABC-COLOR-%02d\033[0m\n" "$n"; done\n'
+            f'until test -e "{gate}"; do sleep .05; done')
+        app=self.start_gated("rgb-attrs",gate,lambda _:prelude,(80,24))
+        app.expect("ABC-COLOR")
+        baseline=self.capture(app)
+        gate.touch()
+        screen=app.expect("B1 / GLYPH + STYLE")
+        self.assertIn("Attrs: (:BOLD :UNDERLINE)",screen,
+                      "B1 must report both valid captured SGR attributes")
+        styled=self.capture(app,styled=True,history=False)
+        specimen=next((line for line in styled.splitlines()
+                       if "Specimen: Aa Bb" in line),None)
+        self.assertIsNotNone(specimen)
+        prefix=specimen.split("Specimen:",1)[0]
+        codes=";".join(re.findall(r"\x1b\[([0-9;:]*)m",prefix)).replace(":",";").split(";")
+        self.assertIn("1",codes,"Bold must survive specimen presentation")
+        self.assertIn("4",codes,"Underline must survive specimen presentation")
+        app.key("q",literal=True)
+        self.clean_exit(app)
+        self.exact_history(baseline,self.capture(app))
+
     def test_b2_bottom_edge_clips_without_scrolling_original_rows(self):
         """A focus box at last physical pane row clips rather than adding rows."""
         gate=Options.output/"bottom-edge.start"
