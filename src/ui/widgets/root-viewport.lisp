@@ -138,7 +138,7 @@ geometry.  NIL means the value should remain unchanged."
         anchor
         (:below-cursor
           (let*
-            ((rows-remaining (max 0 (- rows cursor-row)))
+            ((rows-remaining (max 0 (- rows cursor-row 1)))
               (needed (max 0 (- height rows-remaining))))
             (case
               overflow-policy
