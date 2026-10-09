@@ -90,3 +90,5 @@ tramp
 
 # cask packages
 .cask/
+# Generated Workbench live PTY evidence (preserve locally, never publish)
+/tests/workbench/validation/artifacts/
