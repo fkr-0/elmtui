@@ -242,3 +242,39 @@ python3 tests/e2e/neon-life-glider-pty.py -v
 
 The PTY suite checks timer advancement, frozen frames while paused, exact
 single-step, reset, Q exit and restoration of terminal attributes.
+
+## Tmux scrollback glider — real Conway cells over existing terminal text
+
+From inside a tmux pane, run:
+
+```sh
+./run-glider.sh
+```
+
+This is **not** the separate `neon-glider` bouncing-particle demo or the
+full-grid `game-of-life` dashboard. The scrollback glider is the classic
+five-cell Conway B3/S23 shape. Every four generations it translates diagonally
+up-left across the current tmux pane. It mirrors its shape when it reaches a
+horizontal border, then resumes traveling in the opposite horizontal direction;
+at the top it can leave the visible screen.
+
+It snapshots the original pane's characters **and SGR colors/attributes** before
+starting. Each animation frame overwrites only the few live cells. When a
+cell is vacated, its original character and style are restored in place. The
+normal tmux history is never rewritten or cleared, no alternate screen is used,
+and the terminal cursor and input mode are restored on exit. The real terminal
+content remains in place rather than being replaced with a full-screen TUI.
+The current glider animates within the *visible pane*; earlier, offscreen tmux
+history remains intact and can still be inspected after the animation.
+
+Controls: **Space/P** pause or resume, **N** single-step while paused,
+**R** restart, **Q** quit. Natural movement ends when the glider leaves the
+top. Without tmux the command fails safely without changing the terminal.
+
+```sh
+python3 tests/e2e/tmux-glider-pty.py -v
+```
+
+The private-tmux suite checks actual moving five-cell frames, 4-generation
+Conway translation, horizontal reflection, pause/step, SGR restoration,
+non-destructive terminal output, preserved history, and termios restoration.
