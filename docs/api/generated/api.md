@@ -4,91 +4,119 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 952 of 1822 bindings documented; 870 have no metadata (52.3% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1183 of 1822 bindings documented; 639 have no metadata (64.9% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Create a composite asynchronous operation that waits for all supplied promises.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-EXEC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Execute work asynchronously and return a handle to its completion.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-RUN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Run asynchronous work using the asynchronous task machinery.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-TASK
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public async task type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-TASK-ERROR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the error recorded in the async task representation.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-TASK-FINISHED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the async task finished type predicate.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-TASK-PROMISE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the promise recorded in the async task representation.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-TASK-RESULT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the result recorded in the async task representation.
+```
 
 ## CL-EVENTS.ASYNC:ASYNC-TASK-STATUS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the status recorded in the async task representation.
+```
 
 ## CL-EVENTS.ASYNC:AWAIT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Wait for the supplied asynchronous promise and obtain its completed outcome.
+```
 
 ## CL-EVENTS.ASYNC:CANCEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Request cancellation of asynchronous work through its supported cancellation protocol.
+```
 
 ## CL-EVENTS.ASYNC:CHAIN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Sequence asynchronous computations so the next operation receives the prior outcome.
+```
 
 ## CL-EVENTS.ASYNC:FUTURE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Schedule computation and obtain a future handle for its eventual outcome.
+```
 
 ## CL-EVENTS.ASYNC:MAKE-PROMISE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Allocate a pending promise for a value or condition delivered later.
+```
 
 ## CL-EVENTS.ASYNC:MAKE-TASK-SCOPE
 
@@ -102,85 +130,113 @@ Create an OPEN structured task scope, optionally owned by PARENT.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Allocate a task record for asynchronous work before scheduling it.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public promise type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE-CANCEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Request cancellation of the given asynchronous promise.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE-CANCELLED
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the cancelled recorded in the promise representation.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE-CANCELLED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the promise cancelled type predicate.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE-ERROR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the error recorded in the promise representation.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE-RESOLVED
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the resolved recorded in the promise representation.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE-STATE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the state recorded in the promise representation.
+```
 
 ## CL-EVENTS.ASYNC:PROMISE-VALUE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the value recorded in the promise representation.
+```
 
 ## CL-EVENTS.ASYNC:RACE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Create a composite asynchronous operation resolved by the first completed child.
+```
 
 ## CL-EVENTS.ASYNC:REJECT-PROMISE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Mark a pending promise rejected with the supplied error outcome.
+```
 
 ## CL-EVENTS.ASYNC:RESOLVE-PROMISE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Mark a pending promise resolved with the supplied successful value.
+```
 
 ## CL-EVENTS.ASYNC:SCHEDULE-AFTER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Schedule a callback to execute after the requested delay.
+```
 
 ## CL-EVENTS.ASYNC:SCHEDULE-EVERY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Schedule a recurring callback at the requested interval.
+```
 
 ## CL-EVENTS.ASYNC:SCOPE-CANCEL
 
@@ -226,25 +282,33 @@ Register and start one ASYNC-TASK owned by SCOPE.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Start a task with the asynchronous executor and return its task handle.
+```
 
 ## CL-EVENTS.ASYNC:TASK-SCOPE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public task scope type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.ASYNC:TASK-SCOPE-ERROR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the error recorded in the task scope representation.
+```
 
 ## CL-EVENTS.ASYNC:TASK-SCOPE-STATE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the state recorded in the task scope representation.
+```
 
 ## CL-EVENTS.BUS:EVENT-BUS
 
@@ -943,19 +1007,25 @@ Construct a normalized terminal resize event payload.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public command type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.TYPES:COMMAND-ARGS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the args recorded in the command representation.
+```
 
 ## CL-EVENTS.TYPES:COMMAND-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type recorded in the command representation.
+```
 
 ## CL-EVENTS.TYPES:CONSUME-EVENT
 
@@ -969,7 +1039,9 @@ Mark an event as consumed to prevent further processing.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public event type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.TYPES:EVENT-DATA
 
@@ -999,43 +1071,57 @@ Return the timestamp stored in EVENT.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public focus event type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.TYPES:FOCUS-EVENT-CONSUMED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether this focus event has been marked consumed by an event handler.
+```
 
 ## CL-EVENTS.TYPES:FOCUS-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the focus event type predicate.
+```
 
 ## CL-EVENTS.TYPES:FOCUS-EVENT-SOURCE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the source recorded in the focus event representation.
+```
 
 ## CL-EVENTS.TYPES:FOCUS-EVENT-TARGET
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the target recorded in the focus event representation.
+```
 
 ## CL-EVENTS.TYPES:FOCUS-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the timestamp recorded in the focus event representation.
+```
 
 ## CL-EVENTS.TYPES:FOCUS-EVENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type recorded in the focus event representation.
+```
 
 ## CL-EVENTS.TYPES:HAS-MODIFIER-P
 
@@ -1049,55 +1135,73 @@ Checks if an event has a specific modifier.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public key event type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-CHAR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the char recorded in the key event representation.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-CODE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the code recorded in the key event representation.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-CONSUMED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether this key event has been marked consumed by an event handler.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-KEY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the key recorded in the key event representation.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-MODIFIERS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the modifiers recorded in the key event representation.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the key event type predicate.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the timestamp recorded in the key event representation.
+```
 
 ## CL-EVENTS.TYPES:KEY-EVENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type recorded in the key event representation.
+```
 
 ## CL-EVENTS.TYPES:MAKE-COMMAND
 
@@ -1119,13 +1223,17 @@ Construct an EVENT from TYPE, DATA, and WHEN fields.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a focus event structure from its provided initialization fields.
+```
 
 ## CL-EVENTS.TYPES:MAKE-KEY-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a key event structure from its provided initialization fields.
+```
 
 ## CL-EVENTS.TYPES:MAKE-MESSAGE
 
@@ -1139,19 +1247,25 @@ Construct a MESSAGE carrying TYPE, DATA, STATE, and PRIORITY metadata.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a mouse event structure from its provided initialization fields.
+```
 
 ## CL-EVENTS.TYPES:MAKE-UI-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a ui event structure from its provided initialization fields.
+```
 
 ## CL-EVENTS.TYPES:MESSAGE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public message type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.TYPES:MESSAGE-DATA
 
@@ -1173,73 +1287,97 @@ Return the message type stored in MESSAGE.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public mouse event type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-BUTTON
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the button recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-CLICK-COUNT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the click count recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-CONSUMED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether this mouse event has been marked consumed by an event handler.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-DELTA-X
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the delta x recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-DELTA-Y
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the delta y recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-MODIFIERS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the modifiers recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the mouse event type predicate.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the timestamp recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-X
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the x recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:MOUSE-EVENT-Y
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the y recorded in the mouse event representation.
+```
 
 ## CL-EVENTS.TYPES:PREVENT-DEFAULT
 
@@ -1261,43 +1399,57 @@ Generic function to stop event propagation.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public ui event type used to represent structured terminal events and commands.
+```
 
 ## CL-EVENTS.TYPES:UI-EVENT-CONSUMED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether this ui event has been marked consumed by an event handler.
+```
 
 ## CL-EVENTS.TYPES:UI-EVENT-ORIGINAL-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the original event recorded in the ui event representation.
+```
 
 ## CL-EVENTS.TYPES:UI-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the ui event type predicate.
+```
 
 ## CL-EVENTS.TYPES:UI-EVENT-TARGET
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the target recorded in the ui event representation.
+```
 
 ## CL-EVENTS.TYPES:UI-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the timestamp recorded in the ui event representation.
+```
 
 ## CL-EVENTS.TYPES:UI-EVENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type recorded in the ui event representation.
+```
 
 ## CL-INPUTS.ADAPTERS:TOKEN->NORMALIZED-EVENT
 
@@ -4803,55 +4955,73 @@ Validate rules and variables for SHEET and return it.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a character-cell relative length token for style resolution.
+```
 
 ## CL-STYLES.TOKENS:COLOR-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether the supplied style value is a supported color token.
+```
 
 ## CL-STYLES.TOKENS:EM
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an em-relative length token for style resolution.
+```
 
 ## CL-STYLES.TOKENS:HSL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an HSL color token for the styling engine.
+```
 
 ## CL-STYLES.TOKENS:LEN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a normalized length token from the supplied value and unit.
+```
 
 ## CL-STYLES.TOKENS:LENGTH-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether the supplied value is a normalized length token.
+```
 
 ## CL-STYLES.TOKENS:MISSING-STYLE-VARIABLE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public missing style variable type used to represent structured asynchronous tasks, styles or UI elements.
+```
 
 ## CL-STYLES.TOKENS:PERCENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a percentage length token for relative layout or styling.
+```
 
 ## CL-STYLES.TOKENS:PX
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a pixel or terminal-cell length token used by the styling layer.
+```
 
 ## CL-STYLES.TOKENS:RESOLVE-VARIABLE-VALUE
 
@@ -4876,43 +5046,57 @@ A missing variable or cycle signals a typed condition unless a VAR fallback reco
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an RGB color token from red, green and blue components.
+```
 
 ## CL-STYLES.TOKENS:RGBA
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an RGBA color token including alpha.
+```
 
 ## CL-STYLES.TOKENS:ROOT-EM
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a root-em-relative length token for style resolution.
+```
 
 ## CL-STYLES.TOKENS:STYLE-VARIABLE-CHAIN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the chain recorded in the style variable representation.
+```
 
 ## CL-STYLES.TOKENS:STYLE-VARIABLE-CYCLE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public style variable cycle type used to represent structured asynchronous tasks, styles or UI elements.
+```
 
 ## CL-STYLES.TOKENS:STYLE-VARIABLE-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the name recorded in the style variable representation.
+```
 
 ## CL-STYLES.TOKENS:STYLE-VARIABLE-RESOLUTION-ERROR
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public style variable resolution error type used to represent structured asynchronous tasks, styles or UI elements.
+```
 
 ## CL-STYLES.TOKENS:VALIDATE-VARIABLE-ENVIRONMENT
 
@@ -4934,43 +5118,57 @@ Construct a style variable reference, optionally with a fallback value.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public variable expansion type used to represent structured asynchronous tasks, styles or UI elements.
+```
 
 ## CL-STYLES.TOKENS:VARIABLE-EXPANSION-CHAIN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the chain recorded in the variable expansion representation.
+```
 
 ## CL-STYLES.TOKENS:VARIABLE-EXPANSION-FALLBACK-USED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the variable expansion fallback used type predicate.
+```
 
 ## CL-STYLES.TOKENS:VARIABLE-EXPANSION-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the name recorded in the variable expansion representation.
+```
 
 ## CL-STYLES.TOKENS:VARIABLE-EXPANSION-PROPERTY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the property recorded in the variable expansion representation.
+```
 
 ## CL-STYLES.TOKENS:VARIABLE-EXPANSION-VALUE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the value recorded in the variable expansion representation.
+```
 
 ## CL-STYLES.TOKENS:VARIABLE-REF-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether a style value refers to a stylesheet variable.
+```
 
 ## ELMTUI:DEV-MAIN
 
@@ -7530,37 +7728,49 @@ _No documentation metadata._
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public command event type used to represent structured terminal events and commands.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:COMMAND-EVENT-ARGS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the event args recorded in the command representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:COMMAND-EVENT-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the event name recorded in the command representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:COMMAND-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the command event type predicate.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:COMMAND-EVENT-SOURCE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the event source recorded in the command representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:COMMAND-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the event timestamp recorded in the command representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:CONVERT-LIST-TO-EVENT
 
@@ -8150,25 +8360,33 @@ Key constant generated by DEFINE-KEY-CONSTANTS: Z
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a command event structure from its provided initialization fields.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:MAKE-SYSTEM-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a system event structure from its provided initialization fields.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:MAKE-TIMER-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a timer event structure from its provided initialization fields.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:MAKE-WINDOW-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a window event structure from its provided initialization fields.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:NORMALIZE-FOCUS-EVENT
 
@@ -8201,61 +8419,81 @@ Converts platform-specific mouse event to a standardized mouse-event.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public system event type used to represent structured terminal events and commands.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:SYSTEM-EVENT-DATA
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the data recorded in the system event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:SYSTEM-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the system event type predicate.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:SYSTEM-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the timestamp recorded in the system event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:SYSTEM-EVENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type recorded in the system event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:TIMER-EVENT
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public timer event type used to represent structured terminal events and commands.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:TIMER-EVENT-ID
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the id recorded in the timer event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:TIMER-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the timer event type predicate.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:TIMER-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the timestamp recorded in the timer event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:TIMER-EVENT-USER-DATA
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the user data recorded in the timer event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:VALID-KEY-EVENT-P
 
@@ -8277,37 +8515,49 @@ Returns true if EVENT is a valid mouse-event structure.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public window event type used to represent structured terminal events and commands.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:WINDOW-EVENT-HEIGHT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the height recorded in the window event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:WINDOW-EVENT-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value satisfies the window event type predicate.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:WINDOW-EVENT-TIMESTAMP
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the timestamp recorded in the window event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:WINDOW-EVENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type recorded in the window event representation.
+```
 
 ## ELMTUI.CORE.EVENT-TYPES:WINDOW-EVENT-WIDTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the width recorded in the window event representation.
+```
 
 ## ELMTUI.CORE.EVENTS:*AFTER-SEND-MESSAGE-HOOKS*
 
@@ -9360,19 +9610,25 @@ symbol's home when it differs. Re-exports are de-duplicated by identity.
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the active contexts configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:*CONTEXTS*
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the contexts configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:*DIALOG-KEYMAP*
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the dialog keymap configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:*DISPATCH-FN*
 
@@ -9386,13 +9642,17 @@ Dynamically bound function for dispatching messages from keybindings.
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the editor keymap configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:*FORM-KEYMAP*
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the form keymap configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:*GLOBAL-KEYMAP-CONTEXT*
 
@@ -9406,49 +9666,65 @@ The root keymap context.
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the global navigation keymap configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:*LIST-NAVIGATION-KEYMAP*
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the list navigation keymap configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:*REGISTRY*
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Special variable holding the registry configuration or registry used by the keyboard dispatch subsystem.
+```
 
 ## ELMTUI.KEYMAPS:ACTIVATE-CONTEXT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Activate a named keymap context so its bindings participate in key dispatch.
+```
 
 ## ELMTUI.KEYMAPS:ADD-KEYBINDING
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Register a key specification and its target action or message in a keymap.
+```
 
 ## ELMTUI.KEYMAPS:ADD-KEYMAP-TO-CONTEXT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Associate a keymap with a context for scoped keyboard lookup.
+```
 
 ## ELMTUI.KEYMAPS:CURRENT-CONTEXT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the currently selected keyboard context, if one is active.
+```
 
 ## ELMTUI.KEYMAPS:DEACTIVATE-CONTEXT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Deactivate a named keymap context, removing its bindings from active dispatch.
+```
 
 ## ELMTUI.KEYMAPS:DEFINE-KEYMAP
 
@@ -9509,7 +9785,9 @@ If a keymap name is not found in the registry, an error is raised.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Locate the registered keymap context with the supplied identifier.
+```
 
 ## ELMTUI.KEYMAPS:INITIALISE
 
@@ -9523,7 +9801,9 @@ Call once on application start.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Convert a terminal key event into the normalized key and modifiers used by bindings.
+```
 
 ## ELMTUI.KEYMAPS:KEYMAP!
 
@@ -9562,31 +9842,41 @@ Example:
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the bindings currently registered on the keymap.
+```
 
 ## ELMTUI.KEYMAPS:KEYMAP-CONTEXT
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public keymap context type used to represent structured asynchronous tasks, styles or UI elements.
+```
 
 ## ELMTUI.KEYMAPS:KEYMAP-CONTEXT-KEYMAPS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return keymaps associated with this keymap context.
+```
 
 ## ELMTUI.KEYMAPS:KEYMAP-CONTEXT-NAME
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return this keymap context's name.
+```
 
 ## ELMTUI.KEYMAPS:KEYMAP-CONTEXT-PARENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return its parent context used in contextual key dispatch.
+```
 
 ## ELMTUI.KEYMAPS:LIST-ACTIVE-KEYBINDINGS
 
@@ -9608,7 +9898,9 @@ Return binding for KEY (NORMALIZED-KEY or KEY-SEQUENCE).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Resolve a normalized key against the active keymap contexts in precedence order.
+```
 
 ## ELMTUI.KEYMAPS:LOOKUP-BINDING-IN
 
@@ -9623,31 +9915,41 @@ walk up parent contexts; otherwise only search CONTEXT's keymaps.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a keymap context with name, parent and contained keymaps.
+```
 
 ## ELMTUI.KEYMAPS:NORMALIZED-KEY->STRING
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Format a normalized key as a stable human-readable key specification.
+```
 
 ## ELMTUI.KEYMAPS:NORMALIZED-KEY-KEY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the base key of a normalized keyboard input.
+```
 
 ## ELMTUI.KEYMAPS:NORMALIZED-KEY-MODIFIERS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return modifiers carried by a normalized keyboard input.
+```
 
 ## ELMTUI.KEYMAPS:PARSE-KEY-STRING
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Parse a textual key combination into its normalized key representation.
+```
 
 ## ELMTUI.KEYMAPS:PROCESS-KEY-EVENT
 
@@ -9662,13 +9964,17 @@ Main dispatcher – converts EVT to NORMALIZED-KEY, runs registry lookup.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Remove a previously registered key binding from its keymap.
+```
 
 ## ELMTUI.KEYMAPS:RESOLVE-KEYMAP-REFERENCE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Resolve an identifier or existing keymap reference to its registered keymap.
+```
 
 ## ELMTUI.PIPELINE:*PRESERVE-UNDERLAY*
 
@@ -9724,13 +10030,17 @@ _No documentation metadata._
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Acquire the synchronization lock associated with a lockable backend object.
+```
 
 ## ELMTUI.PLATFORM.API:APPLY-STYLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Apply a style specification through the selected terminal backend.
+```
 
 ## ELMTUI.PLATFORM.API:BACKEND-INPUT-DEVICE
 
@@ -9752,19 +10062,25 @@ Return the cl-inputs input source that the backend created, if any.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the implementation name of the active terminal backend.
+```
 
 ## ELMTUI.PLATFORM.API:BACKEND-VERSION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend implementation version when available.
+```
 
 ## ELMTUI.PLATFORM.API:CLEAR-AREA
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Clear a rectangular screen region using backend-specific operations.
+```
 
 ## ELMTUI.PLATFORM.API:CLEAR-BELOW-CURSOR
 
@@ -9786,91 +10102,121 @@ Initialize the backend for the specified platform. If PUBLISH-FN is provided, it
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend default background color specification.
+```
 
 ## ELMTUI.PLATFORM.API:DEFAULT-FOREGROUND-COLOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend default foreground color specification.
+```
 
 ## ELMTUI.PLATFORM.API:DISABLE-MOUSE-SUPPORT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Disable reporting of mouse events by the selected backend.
+```
 
 ## ELMTUI.PLATFORM.API:DRAW-BOX-OUTLINE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Draw the outline of a rectangle using terminal drawing primitives.
+```
 
 ## ELMTUI.PLATFORM.API:DRAW-CHAR-AT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Draw a single character at the requested terminal cell coordinate.
+```
 
 ## ELMTUI.PLATFORM.API:DRAW-STYLED-BOX
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Draw a rectangular box with the requested backend style.
+```
 
 ## ELMTUI.PLATFORM.API:DRAW-TEXT-AT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Draw text at the requested terminal cell coordinates.
+```
 
 ## ELMTUI.PLATFORM.API:ENABLE-MOUSE-SUPPORT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Enable mouse event reporting when the backend supports it.
+```
 
 ## ELMTUI.PLATFORM.API:FILL-RECTANGLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Fill a rectangular terminal region with the requested cell content.
+```
 
 ## ELMTUI.PLATFORM.API:FLUSH-OUTPUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Flush pending backend terminal writes to its output destination.
+```
 
 ## ELMTUI.PLATFORM.API:GET-CURSOR-POSITION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Query the current terminal cursor row and column, if supported.
+```
 
 ## ELMTUI.PLATFORM.API:GET-NATIVE-HANDLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend's underlying platform handle.
+```
 
 ## ELMTUI.PLATFORM.API:GET-SCREEN-DIMENSIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Query the terminal screen width and height in cells.
+```
 
 ## ELMTUI.PLATFORM.API:HANDLE-BACKEND-RESIZE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Update backend state when terminal geometry changes.
+```
 
 ## ELMTUI.PLATFORM.API:HIDE-CURSOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Request that the terminal cursor become invisible.
+```
 
 ## ELMTUI.PLATFORM.API:INITIALIZE-BACKEND
 
@@ -9884,55 +10230,73 @@ Initialize the backend for the specified platform. If PUBLISH-FN is provided, it
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the lock used to guard this lockable backend object.
+```
 
 ## ELMTUI.PLATFORM.API:LOCKABLE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Protocol type for objects providing a synchronization lock.
+```
 
 ## ELMTUI.PLATFORM.API:MAKE-COLOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a terminal color specification for the backend styling API.
+```
 
 ## ELMTUI.PLATFORM.API:MAKE-STYLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a terminal style from the supplied attributes.
+```
 
 ## ELMTUI.PLATFORM.API:MAX-COLORS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the maximum supported palette size for this backend.
+```
 
 ## ELMTUI.PLATFORM.API:PEEK-INPUT-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Inspect the next backend input event without consuming it.
+```
 
 ## ELMTUI.PLATFORM.API:POLL-INPUT-EVENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Poll the next input event from the selected backend.
+```
 
 ## ELMTUI.PLATFORM.API:QUERY-FEATURE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Query an optional terminal capability by feature identifier.
+```
 
 ## ELMTUI.PLATFORM.API:RELEASE-LOCK
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Release a previously acquired synchronization lock.
+```
 
 ## ELMTUI.PLATFORM.API:SCROLL
 
@@ -9946,13 +10310,17 @@ Scroll the terminal display by N lines. Positive N scrolls down, negative N scro
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Scroll the requested terminal lines via the backend interface.
+```
 
 ## ELMTUI.PLATFORM.API:SET-CELL-STYLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Set styling attributes on a terminal cell through the backend.
+```
 
 ## ELMTUI.PLATFORM.API:SET-CURSOR-POSITION
 
@@ -9966,67 +10334,89 @@ Set the cursor position to (X, Y) on the terminal.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Set cursor visibility using the backend protocol.
+```
 
 ## ELMTUI.PLATFORM.API:SET-INPUT-MODE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Configure the terminal input mode through the backend.
+```
 
 ## ELMTUI.PLATFORM.API:SHOW-CURSOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Request that the terminal cursor become visible.
+```
 
 ## ELMTUI.PLATFORM.API:SHUTDOWN-BACKEND
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Cleanly shut down backend resources and restore terminal state.
+```
 
 ## ELMTUI.PLATFORM.API:SUPPORTS-MOUSE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether this backend can emit mouse input events.
+```
 
 ## ELMTUI.PLATFORM.API:SUPPORTS-TRUECOLOR-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether this backend supports 24-bit color output.
+```
 
 ## ELMTUI.PLATFORM.API:SUPPORTS-UNICODE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether the backend supports Unicode cell rendering.
+```
 
 ## ELMTUI.PLATFORM.API:TERM-H
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend terminal height in cell rows.
+```
 
 ## ELMTUI.PLATFORM.API:TERM-STREAM
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend terminal output stream.
+```
 
 ## ELMTUI.PLATFORM.API:TERM-STYLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend terminal style settings.
+```
 
 ## ELMTUI.PLATFORM.API:TERM-W
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the backend terminal width in cell columns.
+```
 
 ## ELMTUI.PLATFORM.API:WITH-LOCK
 
@@ -13406,13 +13796,17 @@ High-level entry point of the View-pipeline.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Public base dsl error type used to represent structured asynchronous tasks, styles or UI elements.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:BASE-DSL-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether a value is a valid base declarative UI expression.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:BASE-ELEMENT
 
@@ -13428,7 +13822,9 @@ Abstract *stateless* layout element.  Concrete
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether an object is an ElmTUI base UI element.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:COMPUTE-LAYOUT
 
@@ -13451,13 +13847,17 @@ Generic layout container holding *children*.  All
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Create a copy of a UI element, preserving its declared properties.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:DESCRIBE-ELEMENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return descriptive metadata for an element type in the UI DSL.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:DSL->OBJECTS
 
@@ -13477,31 +13877,41 @@ Translate an Elm-TUI style DSL (a plist/tree of keywords) into
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return child DSL forms belonging to the supplied element declaration.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:DSL-ELEMENT-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the element-type keyword encoded in a DSL form.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:DSL-PROPERTIES
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the property list encoded in a DSL element declaration.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:DSL-STATISTICS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Summarize element kinds and counts in a DSL tree.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-CHILDREN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the children recorded in the element representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-CLASS
 
@@ -13515,73 +13925,97 @@ Return the concrete CLOS class that implements TYPE, or NIL.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the content model recorded in the element representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-ID
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the id recorded in the element representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-LAYOUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the layout recorded in the element representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-LAYOUT-RECT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the layout rect recorded in the element representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-SIZE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the size recorded in the element representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-STYLE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the style recorded in the element representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:ELEMENT-TYPE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Report whether the given element has the expected type.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:EXPAND-BASE-DSL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Expand a base DSL declaration into element data for the rendering tree.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:EXPAND-DSL-ELEMENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Expand a single DSL element and its child declarations.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:FIND-ELEMENT-BY-ID
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Find an element with the requested identifier in a descendant tree.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:FIND-ELEMENTS-BY-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Find descendant elements of the requested element type.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:MAKE-DSL-ELEMENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a declarative UI element from its type and properties.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:MAP-DSL-ELEMENTS
 
@@ -13604,7 +14038,9 @@ Apply FN to ELEMENT and recurse into CHILDREN (depth-first).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Normalize a base UI DSL form to its canonical representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:RECT=
 
@@ -13626,19 +14062,25 @@ Visual line used to divide regions.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the orientation recorded in the separator representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:SEPARATOR-THICKNESS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the thickness recorded in the separator representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:SET-ELEMENT-LAYOUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Assign computed layout information to a rendered UI element.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:SPACER-ELEMENT
 
@@ -13652,31 +14094,41 @@ Empty area for fine-grained layout control.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the height recorded in the spacer representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:SPACER-WIDTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the width recorded in the spacer representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:TEXT-ALIGN
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the align recorded in the text representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:TEXT-COLOR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the color recorded in the text representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:TEXT-CONTENT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the content recorded in the text representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:TEXT-ELEMENT
 
@@ -13690,7 +14142,9 @@ Plain text node.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the wrap recorded in the text representation.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:TO-DSL
 
@@ -13706,7 +14160,9 @@ Render ELEMENT back to the canonical DSL plist
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Update a declarative element with the supplied changed properties.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:VALID-PROPERTY-P
 
@@ -13728,13 +14184,17 @@ Validate class-backed base DSL nodes (objects or keyword-form elements).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Validate whether the supplied child elements satisfy their parent model.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:VALIDATE-CONTENT-MODEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Validate an element's allowed content model and constraints.
+```
 
 ## ELMTUI.VIEW.BASE-ELEMENTS:VALIDATE-DSL-ELEMENT
 
@@ -13748,7 +14208,9 @@ Validate one keyword-form DSL element.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Validate structural correctness of a nested declarative UI tree.
+```
 
 ## ELMTUI.VIEW.CORE:APPLY-DIFF
 
