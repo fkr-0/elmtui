@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y curl bzip2 ca-certificates git tar tmux
+          sudo apt-get install -y curl bzip2 ca-certificates git tar tmux ripgrep
           cd "$RUNNER_TEMP"
           curl -fLsS --retry 3 -o sbcl.tar.bz2 \
             https://downloads.sourceforge.net/project/sbcl/sbcl/2.6.2/sbcl-2.6.2-x86-64-linux-binary.tar.bz2
