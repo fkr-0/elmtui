@@ -41,6 +41,14 @@ jobs:
           sudo sh ./install.sh
       - name: Install locked bundle
         run: clpm bundle install
+      - name: Unlock SBCL internal packages for log4cl compatibility
+        run: |
+          mkdir -p "$HOME"
+          cat > "$HOME/.sbclrc" <<'SBCLRC'
+          (dolist (p '(:sb-c :sb-pcl :sb-int :sb-kernel))
+            (let ((pkg (find-package p)))
+              (when pkg (sb-ext:unlock-package pkg))))
+          SBCLRC
       - name: Verify cold ASDF compilation and package prerequisites
         run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(require :asdf)' --eval '(asdf:compile-system :elmtui :force t)'
       - name: Verify exported symbol identities and facade manifest
