@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1561 of 1822 bindings documented; 261 have no metadata (85.7% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1643 of 1822 bindings documented; 179 have no metadata (90.2% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -414,37 +414,49 @@ _No documentation metadata._
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Send ITEM to CH using CHAN-PUT, returning the success flag and status as two values.
+```
 
 ## CL-EVENTS.CHANNEL:<-
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Take the next item from CH using CHAN-TAKE, returning the item and status as two values.
+```
 
 ## CL-EVENTS.CHANNEL:CHAN-CLOSE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Close CH for new sends, preserve pending queue items until drained, and return true plus the channel state.
+```
 
 ## CL-EVENTS.CHANNEL:CHAN-PUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Send ITEM into CH, optionally waiting for capacity with :TIMEOUT and :CANCEL-TOKEN; return success and status.
+```
 
 ## CL-EVENTS.CHANNEL:CHAN-TAKE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Receive one queued item from CH, optionally waiting with :TIMEOUT and :CANCEL-TOKEN; return item and status.
+```
 
 ## CL-EVENTS.CHANNEL:CHANNEL
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Bounded FIFO channel structure with queue, capacity, state, synchronization and select waiters.
+```
 
 ## CL-EVENTS.CHANNEL:CHANNEL-ADD-FILTER
 
@@ -466,91 +478,121 @@ Return the current queue length of CH.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Compatibility wrapper around CHAN-PUT for writing ITEM to CH; returns the underlying success and status.
+```
 
 ## CL-EVENTS.CHANNEL:CHANNEL-REMOVE-FILTER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Remove FILTER by identity from a FILTERED-CHANNEL's filter list, leaving ordinary channels unchanged.
+```
 
 ## CL-EVENTS.CHANNEL:CHANNEL-STATE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the channel lifecycle state :OPEN, :CLOSING or :CLOSED; :CLOSING retains items until drained.
+```
 
 ## CL-EVENTS.CHANNEL:CHANNEL-TAKE!
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Compatibility wrapper around CHAN-TAKE for receiving the next queued value from CH.
+```
 
 ## CL-EVENTS.CHANNEL:FILTERED-CHANNEL
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Wrapper holding an underlying FIFO channel and a list of predicate filters applied to sends.
+```
 
 ## CL-EVENTS.CHANNEL:MAILBOX
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Single-slot synchronized mailbox with latest stored item, occupancy flag and lifecycle state.
+```
 
 ## CL-EVENTS.CHANNEL:MAILBOX-STATE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the mailbox lifecycle state :OPEN, :CLOSING or :CLOSED.
+```
 
 ## CL-EVENTS.CHANNEL:MAKE-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a new bounded FIFO channel with integer :CAPACITY greater than zero, defaulting to 256.
+```
 
 ## CL-EVENTS.CHANNEL:MAKE-FILTERED-CHANNEL
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a channel wrapper using optional :CAPACITY and :FILTERS, copying the supplied filter list.
+```
 
 ## CL-EVENTS.CHANNEL:MAKE-MAILBOX
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an initially empty single-slot mailbox with its own lock and condition variable.
+```
 
 ## CL-EVENTS.CHANNEL:MB-CLOSE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Stop accepting new mailbox writes, permitting a pending slot to be read before final closure.
+```
 
 ## CL-EVENTS.CHANNEL:MB-EMPTY-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true if the mailbox has no occupied slot, checking the state under its lock.
+```
 
 ## CL-EVENTS.CHANNEL:MB-PUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Store ITEM in the mailbox's single slot if open, overwriting any previous unread value; return success and status.
+```
 
 ## CL-EVENTS.CHANNEL:MB-TAKE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Wait for and consume the mailbox slot, or return :TIMEOUT, :CANCELLED or :CLOSED status when applicable.
+```
 
 ## CL-EVENTS.CHANNEL:NO-WAIT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Check immediate send readiness or atomically take an available item when :SEND is false; return value, readiness and status.
+```
 
 ## CL-EVENTS.CHANNEL:SELECT
 
@@ -817,73 +859,97 @@ Request app-loop shutdown without waiting for worker termination.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Extract the underlying message from each envelope in ENVELOPES, preserving input order.
+```
 
 ## CL-EVENTS.MESSAGING:EXPAND-MESSAGE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Wrap MESSAGE in one envelope per propagation phase, in the order returned by MESSAGE-PHASES.
+```
 
 ## CL-EVENTS.MESSAGING:MAKE-MESSAGE-ENVELOPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct a message envelope holding MESSAGE, phase, stop flag, and propagation-mode flags.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE->ENVELOPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Wrap MESSAGE with optional :PHASE and :STOP-P while reading its broadcast, capture and bubble protocol flags.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-ENVELOPE
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Message wrapper holding propagation phase, stop flag, and copied broadcast, capture and bubble capabilities.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-ENVELOPE-BROADCAST-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the broadcast flag stored on a message envelope.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-ENVELOPE-BUBBLE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the bubble phase flag stored on a message envelope.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-ENVELOPE-CAPTURE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the capture phase flag stored on a message envelope.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-ENVELOPE-MESSAGE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or replace the underlying message stored by the envelope.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-ENVELOPE-PHASE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the propagation phase keyword of an envelope, normally :CAPTURE, :TARGET, :BUBBLE or :BROADCAST.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-ENVELOPE-STOP-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the envelope stop-propagation flag, initially false.
+```
 
 ## CL-EVENTS.MESSAGING:MESSAGE-PHASES
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return :BROADCAST alone for a broadcast message; otherwise order enabled :CAPTURE, :TARGET and :BUBBLE phases.
+```
 
 ## CL-EVENTS.PROTOCOLS:APP-UPDATE
 
@@ -1796,61 +1862,81 @@ Return all octets captured in the output queue of DEV.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return how many actual device closures occurred; repeated CLOSE-DEVICE calls are idempotent.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-CLOSED-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return whether the fake terminal device has entered its closed lifecycle state.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-HEIGHT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the fake terminal's screen height in rows.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-NONBLOCKING-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set whether fake-terminal device reads use nonblocking behavior.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-OPEN-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return whether the fake terminal device is currently open.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-P
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return true when the supplied value is a fake terminal device structure.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-RAW-DEPTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the current nested raw-mode activation depth; disabling raw mode decrements to zero.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-READ-COUNT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the number of device-read attempts recorded by the fake terminal.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-WAIT-COUNT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the number of calls to wait-for-readable on this fake terminal.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-DEVICE-WIDTH
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return or set the fake terminal screen width in columns.
+```
 
 ## CL-INPUTS.DEVICE.FAKETERM:FAKETERM-INJECT!
 
@@ -2505,37 +2591,49 @@ A list of ANSI escape sequence introducers. Each entry is a list of:
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Hash table mapping ANSI sequence identifier keywords to sequence objects registered by the DEFSEQ table.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:+ANSI-ESCAPE-SEQUENCES-LOOKUP+
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Hash table mapping printable control-sequence templates to their registered identifier keywords.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:+ANSI-ESCAPE-SEQUENCES-RESET-LOOKUP+
 
 Kinds: variable
 
-_No documentation metadata._
+```text
+Hash table mapping ANSI sequence identifiers to their corresponding reset-sequence identifiers.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:ANSI-ATTR-SEQ
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Render the ANSI SGR sequence enabling ATTR-KEYWORD or disabling it when ACTIVEP is false; return NIL when unregistered.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:ANSI-BG-COLOR-SEQ
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Render the background-color ANSI SGR sequence for NIL, a named color keyword, a palette index, or a three-channel RGB list.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:ANSI-FG-COLOR-SEQ
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Render the foreground-color ANSI SGR sequence for NIL, a named color keyword, a palette index, or a three-channel RGB list.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:ANSI-SEQUENCE
 
@@ -2558,13 +2656,17 @@ Parses a list of character codes (after ESC [) into CSI parameters, intermediate
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the default argument slot of an ANSI-SEQUENCE object, if that slot has been initialized.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:DESCRIPTION
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the human-readable description assigned to an ANSI-SEQUENCE control sequence object.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:GET-RESET-SEQUENCE
 
@@ -2586,61 +2688,81 @@ Return the escape sequence object for IDENTIFIER.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the keyword identifying a registered ANSI control sequence.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Structure describing an ANSI escape introducer, including symbolic name, escape code and printable representations.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-CODE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the integer code slot of an ANSI escape introducer structure.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-DESC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the optional human-readable description of an ANSI escape introducer.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-ESC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the integer ESC prefix code recorded in the introducer.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-ESC-CHAR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the character representation of the introducer suffix.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-ESC-DEC
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the decimal-text representation of an introducer escape code.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-ESC-HEX
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the hexadecimal-text representation of an introducer escape code.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-ESC-OCT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the octal-text representation of an introducer escape code.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-ESC-STR
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the optional printable escape string stored in an ANSI introducer.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:INTRODUCER-KEY
 
@@ -2655,7 +2777,9 @@ Given a byte that follows an ESC (0x1B) character, returns the keyword
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the symbolic introducer identifier, such as :CSI or :SS3.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:IS-CSI-FINAL-BYTE?
 
@@ -2677,19 +2801,25 @@ Lookup the sequence for IDENTIFIER (can be keyword or string rep).
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an ANSI-SEQUENCE instance using :SEQ, :DESCRIPTION, :IDENTIFIER, :RESPONSE-TYPE and :RESET-SEQUENCE.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:MAKE-INTRODUCER
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Construct an ANSI introducer structure with keyword initializers for its descriptor and escape fields.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:NUMBER-OF-ARGUMENTS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Count nonstring placeholder entries in an ANSI-SEQUENCE's parts list; these accept arguments during rendering.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:PARSE-CSI-SEQUENCE
 
@@ -2725,7 +2855,9 @@ Parses a list of SGR numeric parameters and returns a list of style changes.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read or set the optional pre-render callback of an ANSI-SEQUENCE; the renderer composes parts directly.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:READ-ESCAPE-BYTES
 
@@ -2745,25 +2877,33 @@ Reads bytes from STREAM following an ESC and an introducer (like '[', 'O').
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Render an ANSI-SEQUENCE to a string beginning with ESC, inserting supplied arguments into NIL placeholders.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:RESET-SEQUENCE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the configured reset-sequence identifier from an ANSI-SEQUENCE instance.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:RESPONSE-TYPE
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the expected response type for an ANSI-SEQUENCE query, or NIL.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:SEQ
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Read the sequence template parts list from an ANSI-SEQUENCE instance, including literal strings and NIL placeholders.
+```
 
 ## CL-INPUTS.TERMINAL.ANSII:SPLIT-SEQ-IF
 
@@ -4498,19 +4638,25 @@ Return the source stylesheet revision, or NIL if no stylesheet was provided.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Register GROUP with unique property names from PROPS and return the resulting group property list.
+```
 
 ## CL-STYLES.PROPERTIES:DEFPROPERTY
 
 Kinds: macro
 
-_No documentation metadata._
+```text
+Macro registering a style property with type, enum, synonyms, group, default and documentation metadata.
+```
 
 ## CL-STYLES.PROPERTIES:ENSURE-DECLARATIONS
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Normalize declaration keys and values before validating against registered style property contracts.
+```
 
 ## CL-STYLES.PROPERTIES:ENSURE-STATIC-DECLARATIONS
 
@@ -4525,19 +4671,25 @@ Variable references are type-checked after resolution; a literal fallback is che
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the type or constraint expected by a STYLE-CONTRACT-VIOLATION condition.
+```
 
 ## CL-STYLES.PROPERTIES:GOT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the rejected value recorded by a STYLE-CONTRACT-VIOLATION condition.
+```
 
 ## CL-STYLES.PROPERTIES:GROUPS-FOR-LAYOUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Register LAYOUT with a deduplicated list of named style property groups.
+```
 
 ## CL-STYLES.PROPERTIES:NORMALIZE-DECLARATIONS
 
@@ -4570,13 +4722,17 @@ Example:
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return a fresh copy of the properties registered under GROUP, or NIL for an unknown group.
+```
 
 ## CL-STYLES.PROPERTIES:PROPERTIES-FOR-LAYOUT
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return unique properties collected from the groups registered for LAYOUT.
+```
 
 ## CL-STYLES.PROPERTIES:PROPERTY-DEFAULT
 
@@ -4598,13 +4754,17 @@ Return a deterministic plist of explicitly declared property defaults.
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Look up NAME directly in the global property registry, returning its definition plist or NIL.
+```
 
 ## CL-STYLES.PROPERTIES:REGISTER-PROPERTY
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Register a style property definition plist under NAME, replacing any existing registry entry.
+```
 
 ## CL-STYLES.PROPERTIES:REGISTER-PROPERTY-ALIAS
 
@@ -4618,7 +4778,9 @@ Register ALIAS as an alternate spelling for CANONICAL-NAME.
 
 Kinds: type
 
-_No documentation metadata._
+```text
+Condition raised for malformed declarations or values violating registered style property types and enums.
+```
 
 ## CL-STYLES.PROPERTIES:VALIDATE-DECLARATIONS
 
@@ -4642,7 +4804,9 @@ Raises:
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Return the property key or declaration context where a STYLE-CONTRACT-VIOLATION was raised.
+```
 
 ## CL-STYLES.PROTOCOLS:GET-COMPUTED-STYLE
 
@@ -5142,7 +5306,7 @@ Construct a character-cell relative length token for style resolution.
 Kinds: function
 
 ```text
-Report whether the supplied style value is a supported color token.
+Accept normalized CSS colors and the ElmTUI 256-color palette token.
 ```
 
 ## CL-STYLES.TOKENS:EM
