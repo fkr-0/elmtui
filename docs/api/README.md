@@ -33,11 +33,11 @@ a tighter local ratchet. `ELMTUI_DOCSTRING_STRICT=1` requires zero missing entri
 
 At the initial 2026-10-09 documentation checkpoint, the root audit found
 **1,819 unique bindings, 587 missing (67.7% documented)**. After the
-current source-grounded remediation, **1,819 unique bindings have 261 missing
-(85.7% documented)** and the separate generated reference reports **1,822
-entries, 261 missing (85.7% documented)**. These denominators are not directly
+current source-grounded remediation, **1,819 unique bindings have 179 missing
+(90.2% documented)** and the separate generated reference reports **1,822
+entries, 179 missing (90.2% documented)**. These denominators are not directly
 interchangeable. Re-run both audits against the exact intended release commit;
-the 261 remaining missing bindings are genuine debt, not an approved blanket
+the 179 remaining missing bindings are genuine debt, not an approved blanket
 allowlist.
 
 **Scope qualification:** The audit loads `elmtui`, including
@@ -47,11 +47,19 @@ documentation for exports originating in `cl-state`, `cl-events`,
 automatically present when a reusable library is loaded alone. Verified on
 2026-10-09: loading only `cl-state` leaves
 `(documentation 'cl-state.patch:patch-op 'function)` equal to `NIL`.
-Thus **85.7% is a combined ElmTUI load-context metric**, not proof that
-each independent submodule is 85.7% documented. Promote needed documentation
+Thus **90.2% is a combined ElmTUI load-context metric**, not proof that
+each independent submodule is 90.2% documented. Promote needed documentation
 into the respective standalone source-of-truth repositories through their
 separate release owners and qualify independent CLPM loading before
 advertising library-local coverage.
+
+The 90% documentation tranche adds source-grounded contracts for 82 exports in
+`CL-INPUTS.TERMINAL.ANSII`, `CL-EVENTS.CHANNEL`,
+`CL-STYLES.PROPERTIES`, `CL-EVENTS.MESSAGING`, and
+`CL-INPUTS.DEVICE.FAKETERM`. The fixed-symbol regression suite
+`tests/reference/test_docstrings_90pct.py` checks all 82 descriptions against
+live SBCL symbols, verifies ANSI rendering and channel/mailbox lifecycles, and
+checks the standalone `cl-state` limitation above.
 
 ## Source-verified API contracts
 
