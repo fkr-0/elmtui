@@ -78,11 +78,11 @@ class GameOfLifePTY(unittest.TestCase):
             )
             output = bytearray()
             deadline = time.monotonic() + 20
-            while time.monotonic() < deadline and b"GLIDER LAB" not in output:
+            while time.monotonic() < deadline and b"NEON GRID" not in output:
                 output.extend(read_for(master, 0.2))
                 if proc.poll() is not None:
                     break
-            self.assertIn(b"GLIDER LAB", output, bytes(output)[-3000:])
+            self.assertIn(b"NEON GRID", output, bytes(output)[-3000:])
             self.assertFalse(termios.tcgetattr(slave)[3] & termios.ECHO,
                              "Kernel ECHO must be disabled for interactive keys")
             output.extend(read_for(master, 0.75))

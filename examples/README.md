@@ -230,7 +230,11 @@ The original entry points are also available:
 
 `glider-real` preserves `elmtui.examples.glider:run-glider-animation` and
 `glider-animation-app` while delegating rendering and physics to neon-glider.
-The maintained `game-of-life` has its own timed grid implementation.
+The maintained `game-of-life` preserves its original 20×40 glider physics,
+Space/S/R controls, and standalone runner, but now uses a 74-column, square-frame
+neon dashboard with a live generation and population display, the side telemetry
+panel and additional P (pause) / N (step) aliases. Both original and neon
+variants fit an 80×24 terminal without relying on rounded corners.
 
 Run the state-machine suite and PTY lifecycle checks:
 
