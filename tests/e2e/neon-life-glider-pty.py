@@ -79,7 +79,45 @@ class NeonLifeGliderPTY(unittest.TestCase):
             self.assertTrue(restored)
 
     def test_original_game_of_life_launcher(self):
-        self.check_original("game-of-life", "LIFE / GLIDER LAB", "GEN")
+        self.check_original("game-of-life", "LIFE / NEON GRID", "GEN")
+
+    def test_original_life_80x24_pause_step_and_resize(self):
+        with PrivateTmuxPTY(["./examples.sh", "run", "game-of-life"],
+                            cols=80, rows=24, timeout=14) as terminal:
+            terminal.wait_for("LIFE / NEON GRID", timeout=15)
+            initial = terminal.capture()
+            self.assertIn("┌", initial)
+            self.assertIn("40 × 20 MATRIX", initial)
+            self.assertNotIn("╭", initial)
+            self.assertEqual(len(initial.splitlines()), 24)
+            self.assertLessEqual(max(map(len, initial.splitlines())), 80)
+            terminal.send_text("p")
+            terminal.wait_for("PAUSED", timeout=4)
+            time.sleep(.2)
+            frozen = terminal.capture()
+            time.sleep(.4)
+            self.assertEqual(frozen, terminal.capture(),
+                             "paused original Life still repaints")
+            matcher = re.compile(r"GEN\s*(\d+)")
+            generation = matcher.search(frozen)
+            self.assertIsNotNone(generation)
+            expected = int(generation.group(1)) + 1
+            terminal.send_text("n")
+            stepped = terminal.wait_for(
+                lambda text: (bool(matcher.search(text))
+                              and int(matcher.search(text).group(1)) == expected),
+                timeout=4)
+            self.assertIn("PAUSED", stepped)
+            terminal.resize(120, 40)
+            self.assertEqual(terminal.geometry(), (120, 40))
+            after = terminal.capture()
+            self.assertIn("LIFE / NEON GRID", after)
+            self.assertLessEqual(max(map(len, after.splitlines())), 120)
+            terminal.send_text("q")
+            code, restored = terminal.wait_for_exit(timeout=8)
+            self.assertEqual(code, 0)
+            self.assertTrue(restored)
+
 
     def test_original_glider_real_launcher(self):
         self.check_original("glider-real", "NEON FLIGHT CONTROL", "TICK")
