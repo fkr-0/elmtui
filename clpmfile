@@ -19,7 +19,9 @@
  :path "lispci/fiveam"
  :commit "e11dee752a8f59065033ef9d60641d4a2f1e8379")
 
-(:system "log4cl" :source "quicklisp")
+(:github "log4cl"
+ :path "sharplispers/log4cl"
+ :commit "fe3da517147d023029782ced7cd989ba24f1e62d")
 (:system "bordeaux-threads")
 (:system "alexandria" :source "quicklisp")
 ;; API documentation is generated from ANSI CL DOCUMENTATION metadata by
