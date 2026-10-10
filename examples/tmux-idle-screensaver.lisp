@@ -240,7 +240,7 @@ If preferred slice has no mutable points, fallback to top-left slice."
           :style (:display :flex :flex-direction :column :width ,+idle-width+ :height ,+idle-height+)
           :children ,(%overlay-children state))
         `(:container
-          :id :tmux-idle-root
+          :id :tmux-idle-content
           :style (:display :flex :flex-direction :column :padding 1 :width ,+idle-width+ :height ,+idle-height+)
           :children
           ((:text :content "tmux-idle [NO-TMUX]")
