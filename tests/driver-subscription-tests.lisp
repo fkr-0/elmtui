@@ -64,18 +64,31 @@
   (let* ((front (make-virtual-buffer 4 1))
          (back (make-virtual-buffer 4 1))
          (snapshot (make-virtual-buffer 4 1))
+         (painted (make-virtual-buffer 4 1))
          (backend (elmtui.platform.backend.terminal::make-terminal-instance
                    :front-buffer front
                    :back-buffer back))
          (orig-diff (symbol-function 'elmtui.platform.driver::compute-buffer-diff))
          (orig-apply (symbol-function 'elmtui.platform.driver::apply-diff-to-backend))
+         (orig-tmux-p (symbol-function 'elmtui.platform.tmux:tmux-available-p))
+         (orig-make-styled (symbol-function 'elmtui.platform.tmux:make-buffer-from-tmux-styled))
+         (orig-resync (symbol-function 'elmtui.platform.driver::%resynchronize-live-tmux-geometry))
          (diff-called nil)
          (apply-called nil))
     (unwind-protect
          (progn
            (set-buffer-cell-at front 0 0 #\A nil)
+           (set-buffer-cell-at painted 0 0 #\A nil)
            (set-buffer-cell-at snapshot 0 0 #\B nil)
            (save-tmux-capture snapshot)
+           (setf (symbol-function 'elmtui.platform.tmux:tmux-available-p)
+                 (lambda () t))
+           (setf (symbol-function 'elmtui.platform.tmux:make-buffer-from-tmux-styled)
+                 (lambda (_w _h &key mode)
+                   (declare (ignore _w _h mode))
+                   painted))
+           (setf (symbol-function 'elmtui.platform.driver::%resynchronize-live-tmux-geometry)
+                 (lambda (_b) (declare (ignore _b)) nil))
            (setf (symbol-function 'elmtui.platform.driver::compute-buffer-diff)
                  (lambda (_old _new)
                    (declare (ignore _old _new))
@@ -94,7 +107,10 @@
            (is (char= #\A (buffer-cell-char (buffer-cell-at front 0 0)))))
       (clear-saved-tmux-capture)
       (setf (symbol-function 'elmtui.platform.driver::compute-buffer-diff) orig-diff)
-      (setf (symbol-function 'elmtui.platform.driver::apply-diff-to-backend) orig-apply))))
+      (setf (symbol-function 'elmtui.platform.driver::apply-diff-to-backend) orig-apply)
+      (setf (symbol-function 'elmtui.platform.tmux:tmux-available-p) orig-tmux-p)
+      (setf (symbol-function 'elmtui.platform.tmux:make-buffer-from-tmux-styled) orig-make-styled)
+      (setf (symbol-function 'elmtui.platform.driver::%resynchronize-live-tmux-geometry) orig-resync))))
 
 (test terminal-backend-initial-publish-keeps-row-col-order
   "Regression: startup cursor event from terminal backend init must preserve
