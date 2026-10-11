@@ -118,6 +118,7 @@ rather than silently replacing an existing unreadable file.
 | `fzf-finder-real.lisp` | Finder-oriented application flow |
 | `dirli.lisp` | Directory-listing application |
 | `wifi-menu.lisp` | Live NetworkManager Wi-Fi selection driven by `nmcli` |
+| `wifi-inline.lisp` | Inline below-cursor Wi-Fi scanner driven by `nmcli` |
 | `pong-below-cursor.lisp` | Inline animation below the current cursor |
 
 The old nested `examples/dirlister_poc/` prototype has been retired. It had an
@@ -140,6 +141,21 @@ Passwords are masked in the UI and are passed to `nmcli --ask` through standard
 input rather than process arguments. Merely loading or testing the example does
 not connect to or disconnect from a network; those mutations require explicit
 interactive user actions.
+
+## Inline Wi-Fi scanner
+
+`wifi-inline.lisp` is the below-cursor companion to the full-screen menu: it
+anchors a compact scan results panel under the current cursor position, shares
+the `nmcli` integration model above, and restores the captured underlay on
+exit. The `ELMTUI_NMCLI` environment variable overrides the `nmcli`
+executable; the offline test suite exercises the escaped-SSID parser and state
+transitions with a fake binary (see `tests/wifi-inline-tests.lisp` and
+`scripts/test-wifi-inline-e2e.sh`).
+
+```lisp
+(asdf:load-system "elmtui-examples")
+(elmtui.examples.wifi-inline:run-wifi-inline)
+```
 
 ## Optional `cl-fzy` example
 

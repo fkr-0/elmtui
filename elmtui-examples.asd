@@ -31,4 +31,5 @@
                (:file "glider-real")
                (:file "input-selector")
                (:file "dirli")
-               (:file "wifi-menu")))
+               (:file "wifi-menu")
+               (:file "wifi-inline")))
