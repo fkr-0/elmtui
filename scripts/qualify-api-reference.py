@@ -195,8 +195,28 @@ def qualify(*, markdown: Path, html: Path, strict_coverage: bool) -> None:
     if (f"**Coverage:** {documented} of {len(live)} bindings documented; "
             f"{missing} have no metadata" not in md):
         raise AssertionError("Published coverage is inconsistent with live symbols")
-    if not (ROOT / "website/reference.md").is_file():
+    landing_page = ROOT / "website/reference.md"
+    if not landing_page.is_file():
         raise AssertionError("Public API landing page missing")
+    landing = landing_page.read_text()
+    coverage_claims = re.findall(
+        r"\*\*Current audited coverage:\s*([\d,]+)/([\d,]+)\s*"
+        r"\(([\d.]+)%\)\.\*\*",
+        landing,
+    )
+    missing_claims = re.findall(
+        r"([\d,]+)\s+public bindings\s+lack documentation", landing
+    )
+    expected_coverage = (
+        f"{documented:,}", f"{len(live):,}", f"{coverage:.1f}"
+    )
+    if (coverage_claims != [expected_coverage] or not missing_claims
+            or any(int(value.replace(",", "")) != missing
+                   for value in missing_claims)):
+        raise AssertionError(
+            "Public API landing page coverage is inconsistent with live symbols; "
+            f"expected {documented}/{len(live)} documented and {missing} missing"
+        )
     print(f"REFERENCE-STRUCTURE-PASS entries={len(live)} documented={documented}"
           f" missing={missing} coverage={coverage:.1f}% html_sections={parser.sections}")
     if strict_coverage and missing:

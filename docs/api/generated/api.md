@@ -11887,7 +11887,7 @@ Main entry point for running an application on the platform.
     APP-SPEC (list): Application specification plist.
     BACKEND-TYPE (keyword): Backend type, e.g., :terminal.
     TTY-PATH (or string null): Path to TTY device, or NIL.
-    [Other platform options may be passed via &allow-other-keys.]
+    Platform-specific options are supplied in the validated PLATFORM-OPTIONS plist.
   Returns:
     NIL
   Example:

@@ -19,6 +19,8 @@
 
 (in-package :elmtui.examples.runner)
 
+(defparameter *non-runnable-example-files* '("neon-kit" "workbench"))
+
 (defun %project-root ()
   (system-source-directory (find-system "elmtui")))
 
@@ -70,6 +72,7 @@ route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
       (format *error-output* "warning: failed to initialize binary logging: ~A~%" e))))
 
 (defun normalize-example-name (name)
+  "Normalize NAME to its lowercase stem, removing a trailing .lisp suffix."
   (let* ((text (string-downcase (string name)))
          (suffix ".lisp"))
     (if (and (>= (length text) (length suffix))
@@ -81,9 +84,23 @@ route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
         (subseq text 0 (- (length text) (length suffix)))
         text)))
 
+(defun %runnable-example-name-p (name)
+  (not (member (normalize-example-name name)
+               *non-runnable-example-files*
+               :test #'string=)))
+
+(defun %require-runnable-example (name)
+  (unless (%runnable-example-name-p name)
+    (error "Example ~S has no examples CLI runner; see examples/README.md for its classification."
+           name))
+  name)
+
 (defun list-implemented-examples ()
+  "List runnable example stems in order, excluding support-only and standalone sources."
   (sort (loop for file in (directory-files (%examples-dir) "*.lisp")
-              collect (normalize-example-name (pathname-name file)))
+              for name = (normalize-example-name (pathname-name file))
+              when (%runnable-example-name-p name)
+                collect name)
         #'string<))
 
 (defun %resolve-example-file (example-name)
@@ -271,6 +288,7 @@ route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
           :output-path output-path)))
 
 (defun run-example (example-name &key backend-type)
+  (%require-runnable-example example-name)
   (let* ((example-file (%resolve-example-file example-name))
          (_ (%load-example-file example-file))
          (package-designator (%read-example-package-designator example-file)))
@@ -279,6 +297,7 @@ route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
       (%invoke-entry entry :backend-type backend-type))))
 
 (defun build-example-binary (example-name &key output-path backend-type)
+  (%require-runnable-example example-name)
   #+sbcl
   (let* ((example-file (%resolve-example-file example-name))
          (_ (%load-example-file example-file))
@@ -309,7 +328,7 @@ route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
           "Usage: examples.sh <command> [args]~%~%~
 Commands:~%~
   list~%~
-      List implemented examples (without .lisp suffix).~%~
+      List runnable examples (without .lisp suffix); support/direct-launch sources are excluded.~%~
   run <example-name|example-name.lisp>~%~
       Run the selected example. Optional: --backend <keyword>.~%~
   build <example-name|example-name.lisp> [output-path] [--backend <keyword>]~%~

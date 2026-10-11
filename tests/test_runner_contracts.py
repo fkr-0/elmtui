@@ -66,6 +66,29 @@ def test_tmux_integration_tests_are_opt_in_by_default():
     assert "(not *run-tmux-integration-tests*)" in text, "skip macro must skip before probing live tmux"
 
 
+def test_terminal_app_uses_a_short_private_tmux_socket_path() -> None:
+    import importlib.util
+    import os
+    import tempfile
+    from types import SimpleNamespace
+
+    script = ROOT / "scripts" / "test-terminal-apps.py"
+    spec = importlib.util.spec_from_file_location("elmtui_terminal_e2e", script)
+    assert spec is not None and spec.loader is not None
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+
+    with tempfile.TemporaryDirectory(prefix="elmtui-e2e-contract-") as temp_dir:
+        long_output_path = Path(temp_dir) / ("artifacts-" + "x" * 80)
+        runner.OPTIONS = SimpleNamespace(output=long_output_path, terminal="tmux")
+        app = runner.TerminalApp("long-path", "(quote t)")
+        assert len(os.fsencode(app.socket)) < 104, (
+            "The private tmux socket must stay below the Unix-domain socket "
+            "path limit even when artifact paths are long."
+        )
+        assert Path(app.socket).parent == Path(tempfile.gettempdir())
+
+
 def test_widgets_enhanced_asdf_definitions_match_file_stem() -> None:
     path = ROOT / "elmtui-widgets-enhanced.asd"
     source = path.read_text(encoding="utf-8")
@@ -222,12 +245,27 @@ def test_contract_diagnostic_helpers_are_silent_by_default() -> None:
             f"{name} should build and return diagnostic text for explicit callers."
         )
 
+
+def test_run_app_platform_does_not_silently_accept_unknown_keywords() -> None:
+    source = (ROOT / "src" / "platform" / "driver.lisp").read_text(encoding="utf-8")
+    start = source.index("(defun run-app-platform")
+    end = source.index('  "Main entry point', start)
+    signature = source[start:end].lower()
+
+    assert "platform-options" in signature
+    assert "&allow-other-keys" not in signature, (
+        "run-app-platform must reject unrecognized direct keyword arguments; "
+        "supported platform options belong in the validated :platform-options plist."
+    )
+
+
 def main() -> int:
     tests: list[Callable[[], None]] = [
         test_clpm_runner_converts_test_result_to_process_exit_status,
         test_runner_does_not_reference_test_package_at_read_time,
         test_clpm_runner_removes_stdout_log_appenders_before_running_tests,
         test_tmux_integration_tests_are_opt_in_by_default,
+        test_terminal_app_uses_a_short_private_tmux_socket_path,
         test_widgets_enhanced_asdf_definitions_match_file_stem,
         test_focus_keymaps_contract_is_not_skipped_or_example_bound,
         test_focus_keymaps_fixture_suppresses_fixture_stdout,
@@ -239,6 +277,7 @@ def main() -> int:
         test_enhanced_widget_observers_do_not_write_to_stdout,
         test_enhanced_widget_describe_helpers_are_silent_by_default,
         test_contract_diagnostic_helpers_are_silent_by_default,
+        test_run_app_platform_does_not_silently_accept_unknown_keywords,
     ]
     failures = 0
     for test in tests:
@@ -254,4 +293,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

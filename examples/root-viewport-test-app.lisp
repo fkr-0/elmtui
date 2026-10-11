@@ -28,7 +28,10 @@
            (:up (move x (1- y)))
            (:down (move x (1+ y)))
            ((#\q #\Q :escape) (quit))
-           (t (make-update-result))))
+           (t (if (and (characterp (elmtui.core.event-types:key-event-char message))
+                       (char-equal (elmtui.core.event-types:key-event-char message) #\q))
+                  (quit)
+                  (make-update-result)))))
         ((and (listp message) (eq (first message) :app-quit-requested))
          (quit))
         (t

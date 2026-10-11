@@ -58,11 +58,11 @@
     (is-false (search "find-symbol" text))))
 
 (test runtime-protocol-boundary-used-by-driver
-  "Driver should consume runtime protocol boundary instead of app internals."
+  "Driver dispatch uses the runtime protocol; option validation uses the public API."
   (let ((text (%file-text "src/platform/driver.lisp")))
     (is-true (search "elmtui.runtime.protocol" text))
     (is-false (search "elmtui.app::dispatch-to-root" text))
-    (is-false (search "elmtui.app.api" text))))
+    (is-true (search "elmtui.app.api:validate-platform-options" text))))
 
 (test system-events-delegate-to-cl-events
   "System event constructors should delegate through cl-events boundary."

@@ -1,78 +1,92 @@
-# API Organization in ElmTUI
+# Public API ownership and organization
 
-This document explains the organization of API modules in ElmTUI and how dependencies are managed between them.
+ElmTUI's public API is defined by the exported symbols in its packages and the
+runtime behavior behind those symbols. The ASDF definition is the source of
+truth for load order; package source files and focused tests are the source of
+truth for individual contracts. API packages do not all follow a single
+interface/implementation-file pattern, and type declarations or input checks
+are applied where the implementation needs them rather than universally.
 
-## API Design Principles
+## Package responsibilities
 
-1. **Public Interface and Implementation Together**:
-   - Each API file contains both interface declarations and implementation code
-   - Clear section headers separate the interface from implementation
-   - This approach avoids circular dependencies while providing clean API boundaries
+- `elmtui.api` owns the `dsl-type` generic. `elmtui.ui.dsl-resolution` imports
+  that symbol and supplies the default resolution methods; UI packages re-export
+  it for component authors.
+- `elmtui.app.api` defines application configuration and platform-option
+  validation. It depends on application globals, event channels, UI DSL
+  resolution, ElmTUI state helpers, and `cl-state` application-state types.
+- `elmtui.state.api` re-exports the shared `cl-state.api` and ElmTUI update
+  interfaces, then adds component-state and update-result helpers.
+- `elmtui.ui.api` exposes component lifecycle and DSL helpers and depends on
+  state, utility, DSL-resolution, and component-metaclass packages.
+- `elmtui.view.api` defines view/layout contracts. Concrete DSL, layout, and
+  rendering behavior is implemented in the view pipeline.
+- `elmtui.platform.api` exposes backend operations; `elmtui.platform.driver`
+  coordinates input, rendering, lifecycle, and terminal cleanup.
 
-2. **Type Declarations**:
-   - All public functions and generics have explicit type declarations via `declaim ftype`
-   - Required parameter types are declared in generic function definitions
-   - This provides better static analysis and runtime type safety
+Support-library APIs remain owned by `cl-events`, `cl-state`, `cl-inputs`, and
+`cl-styles`; the generated reference identifies the exporting package and does
+not transfer that ownership to ElmTUI.
 
-3. **Error Handling**:
-   - Public APIs include robust error handling with meaningful error messages
-   - Type checks validate inputs (using `check-type` or specialized predicates)
-   - This ensures API stability and easier debugging
+## ASDF load order
 
-## API Module Dependencies
+The current top-level order in `elmtui.asd` is:
 
-The API modules are loaded in the following order in the ASDF system:
+1. Shared utilities, state message/path foundations, core contracts and
+   globals, then `elmtui.api`.
+2. ElmTUI state update/API/model code, followed by view geometry, position, and
+   API contracts.
+3. Core event, keymap, loop, and focus code.
+4. UI component metaclass, DSL resolution, `elmtui.ui.api`, and
+   `elmtui.platform.api`.
+5. View runtime and layout implementation, UI components/widgets, and built-in
+   DSL aliases.
+6. Application API and runtime, style implementation, platform backends, render
+   presentation, pipeline, driver, and development entry points.
 
-1. **elmtui.app.api**: Application definition and lifecycle
-   - Imports from: `elmtui.core.globals`, `elmtui.core.event-channels`
-   - Provides: `defapplication`, component instantiation, app lifecycle wiring
-   
-2. **elmtui.state.api**: State management and transactions
-   - Imports from: `elmtui.core.globals`
-   - Provides: Application state, models, messages, update framework
-   
-3. **elmtui.ui.api**: UI component system
-   - Imports from: `elmtui.state.api`, `elmtui.utils`  
-   - Provides: Component lifecycle (init, update, view), state integration
-   
-4. **elmtui.view.api**: View processing pipeline
-   - Imports from: (only standard CL symbols - pure declarations)
-   - Provides: View transformation, styling, layout, rendering
-   
-5. **elmtui.platform.api**: Platform abstraction
-   - Imports from: `elmtui.utils`, `bordeaux-threads`
-   - Provides: Terminal/backend abstractions, input/output, threading
+Update this summary when the ASDF component sequence or package ownership
+changes; do not infer load order solely from API package names.
 
-## Platform Options Validation
+## Platform options
 
-`elmtui.app.api:validate-platform-options` is an explicit validation helper for platform option plists. It checks even-length key/value structure, recognized keys, and selected values. It is **not currently called automatically** by every runtime entry point; the driver independently rejects alternate-screen mode before initialization. Call the helper when accepting externally supplied options. Valid keys include:
+`elmtui.app.api:validate-platform-options` is called at the start of
+`elmtui.platform.driver:run-app-platform`, before driver state or platform
+resources are initialized. The `:platform-options` property list accepts:
 
-- `:initial-terminal-dimensions`: Terminal size (width, height)
-- `:initial-cursor-position`: Starting cursor position (x, y)
-- `:input-mode`: Input processing mode
-- `:enable-mouse-support`: Whether to enable mouse events
-- `:disable-mouse-support`: Whether to disable mouse events
-- `:timeout`: Operation timeout value
-- `:motion-events-p`: Whether to report motion events
-- `:prefill-from-tmux`: Boolean; capture tmux content before rendering
-- `:tmux-prefill-mode`: Either `:pane` or `:screen`
-- `:signal-keys-as-input`: Boolean; forward signal keys as input events
-- `:use-alternate-screen`: Only `NIL` is supported; a true value is rejected to preserve normal scrollback
+- `:prefill-from-tmux` — boolean; capture the tmux pane before drawing.
+- `:tmux-prefill-mode` — `:pane` or `:screen`.
+- `:use-alternate-screen` — only `NIL` is supported; a true value is rejected
+  to preserve normal scrollback.
+- `:signal-keys-as-input` — boolean; deliver signal keys as input events.
 
-Invalid keys, malformed pairs, unsupported tmux prefill modes, and non-boolean capture/input flags signal conditions rather than being silently accepted.
+The validator also still accepts the legacy option keys
+(`:initial-terminal-dimensions`, `:initial-cursor-position`, `:input-mode`,
+`:enable-mouse-support`, `:disable-mouse-support`, `:timeout`,
+`:motion-events-p`) for compatibility with older callers.
+
+The validator rejects unsupported keys, odd-length or circular option lists,
+non-boolean flags, and unsupported tmux modes. Backend selection
+(`:backend-type`) and the terminal device path (`:tty-path`) are separate
+`run-app-platform` keyword arguments, not members of `:platform-options`.
+Keep this list aligned with options actually consumed by the driver.
 
 ## Component Instance Lookup
 
-`elmtui.app.api:get-component-instance` accepts an ID path as a keyword, symbol, string, or list of path segments. List segments are normalized to keywords consistently with scalar lookups, and the leading `:components` root is optional. The state argument must be a `cl-state.core:application-state`; invalid state objects signal `TYPE-ERROR` rather than recursively redispatching.
+`elmtui.app.api:get-component-instance` accepts an ID path as a keyword,
+symbol, string, or list of path segments. List segments are normalized to
+keywords consistently with scalar lookups, and the leading `:components` root
+is optional. The state argument must be a `cl-state.core:application-state`;
+invalid state objects signal `TYPE-ERROR` rather than recursively
+redispatching.
 
-## Notes for Developers
+## API maintenance
 
-When modifying the API files:
-
-1. Keep interface declarations at the top of the file
-2. Use proper section headers to separate interface from implementation
-3. Ensure all public functions have proper type declarations and documentation
-4. Add new platform options to the validation function if needed
-5. Update this document if you change the dependency structure
-
-API files are the most critical part of the system and should have the highest quality standards for documentation, type safety, and error handling.
+- Add public bindings to their owning package export list and document their
+  supported contract.
+- Add tests for package visibility, accepted inputs, error behavior, and
+  runtime effects at the owning API boundary.
+- Keep errors explicit; do not silently ignore misspelled or unsupported
+  platform options.
+- Regenerate and qualify `docs/api/generated/api.md` and `api.html` after
+  public documentation metadata changes.
+- Update this document when package dependencies or ASDF load order change.
