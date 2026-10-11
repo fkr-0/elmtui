@@ -29,6 +29,12 @@ required_files=(
   LICENSE
   CHANGELOG.md
   README.org
+  scripts/examples.sh
+  scripts/run-glider.sh
+  scripts/run-tests-clpm.lisp
+  scripts/coverage.lisp
+  scripts/run-slynk.lisp
+  scripts/history-purge-paths.txt
   bridge.yml
   clpmfile
   clpmfile.lock
@@ -98,6 +104,9 @@ if grep -Eq '"/|"[A-Za-z]:\\\\' \
     clpmfile clpmfile.lock dev/clpmfile dev/clpmfile.lock >&2
   exit 1
 fi
+
+printf '\n==> checking release root and all rewritten historical paths\n'
+python3 -m unittest discover -s tests -p 'test_release_tree.py' -v
 
 printf '\n==> checking staged and unstaged patch whitespace\n'
 git diff --check

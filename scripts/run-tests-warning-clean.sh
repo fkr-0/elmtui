@@ -14,7 +14,7 @@ STDERR_LOG="${OUT_DIR}/warning-clean-${STAMP}.stderr.log"
 cd "${ROOT_DIR}"
 
 set +e
-clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp \
+clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp \
   >"${STDOUT_LOG}" \
   2>"${STDERR_LOG}"
 rc=$?

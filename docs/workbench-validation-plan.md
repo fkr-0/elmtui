@@ -5,7 +5,7 @@ This plan is a **test specification**, not evidence that the workbench currently
 ## Commands
 
 - Validate test specification: `python3 -m unittest discover -s tests/workbench -p 'test_qualification_matrix.py' -v`
-- Run existing ElmTUI baseline: `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp` (capture warnings, failures and known existing failures separately).
+- Run existing ElmTUI baseline: `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp` (capture warnings, failures and known existing failures separately).
 - After W1–W4 APIs stabilize: run each workbench package's FiveAM suites through CLPM/SBCL; compilation success alone is not a test pass.
 - After W5 launcher exists: run full real PTY workbench scenarios at 80×24, 120×40 and 160×50; use independent `tmux -S` session/PTY and preferably native urxvt/Xvfb cross-check.
 - PTY fixture must capture `stty -g` before/after, stdout/stderr independently, raw ANSI writes, screen captures, cursor coordinates, exit code, wall-clock time and process cleanup.

@@ -39,10 +39,10 @@ escapes or independent renderers. Each app has a cyan/violet midnight palette,
 telemetry or line-number panels, a footer help strip, and stable row IDs.
 
 ```sh
-./examples.sh run neon-pong       # W/S left paddle, I/K right, Space serve, Q exit
-./examples.sh run neon-tetris     # A/D move, W rotate, S drop, R reset, Q exit
-./examples.sh run neon-nano       # arrows edit, Ctrl+O save, Ctrl+X exit
-./examples.sh run neon-less       # J/K scroll, F/Space forward, B back, g/G ends, Q
+./scripts/examples.sh run neon-pong       # W/S left paddle, I/K right, Space serve, Q exit
+./scripts/examples.sh run neon-tetris     # A/D move, W rotate, S drop, R reset, Q exit
+./scripts/examples.sh run neon-nano       # arrows edit, Ctrl+O save, Ctrl+X exit
+./scripts/examples.sh run neon-less       # J/K scroll, F/Space forward, B back, g/G ends, Q
 ```
 
 For file-backed tools, set `ELMTUI_NANO_FILE=/path/to/notes.txt` or
@@ -71,11 +71,11 @@ run the bridge command `test-neon-pty` (or `python3 tests/neon-pty.py`).
 ## Mini text editor
 
 A compact, file-backed editor illustrating ElmTUI's state/update/view lifecycle.
-Start a scratch buffer with `./examples.sh run mini-text-editor`, or edit a
+Start a scratch buffer with `./scripts/examples.sh run mini-text-editor`, or edit a
 UTF-8 text file by setting `ELMTUI_EDITOR_FILE`:
 
 ```sh
-ELMTUI_EDITOR_FILE=/tmp/notes.txt ./examples.sh run mini-text-editor
+ELMTUI_EDITOR_FILE=/tmp/notes.txt ./scripts/examples.sh run mini-text-editor
 ```
 
 From Lisp, load `elmtui-examples` and call
@@ -186,9 +186,9 @@ smoke-tested example set:
 | `neon-kit.lisp` | Shared palette and rendering support for the Neon examples; not an application runner or CLI entry. |
 | `tmux-glider.lisp` | Optional overlay animation; requires a live tmux pane and preserves the captured underlay. |
 | `tmux-slider.lisp` | Optional styled tmux-pane animation; requires a live tmux pane. |
-| `workbench.lisp` | Standalone local developer launcher; loads the separate `elmtui-workbench` system and is not an `examples.sh` entry. See the [workbench guide](../docs/workbench-user-guide.md) for its direct launch command. |
+| `workbench.lisp` | Standalone local developer launcher; loads the separate `elmtui-workbench` system and is not exposed by `scripts/examples.sh`. See the [workbench guide](../docs/workbench-user-guide.md) for its direct launch command. |
 
-Launch the weather dashboard with `./examples.sh run async-weather`. It starts
+Launch the weather dashboard with `./scripts/examples.sh run async-weather`. It starts
 with Berlin; use `/` to enter another city or `LAT,LON`. Lisp callers can pass
 an initial city with
 `(elmtui.examples.async-weather:run-async-weather :city "Tokyo")`. The example
@@ -198,7 +198,7 @@ the private-tmux example suite: they operate on the user's current pane and
 should only be launched intentionally. The `fzy-picker.lisp` loader is
 `examples/support/fzy-loader.lisp`.
 
-`./examples.sh list` includes only files with runnable example entry points;
+`./scripts/examples.sh list` includes only files with runnable example entry points;
 the support-only `neon-kit.lisp` and standalone `workbench.lisp` are excluded.
 
 ## Repaired directory, rainbow and key-inspection examples
@@ -235,7 +235,7 @@ ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
 ```
 
 The live-pane animations can be launched intentionally with
-`./examples.sh run tmux-slider` or `./examples.sh run tmux-glider`.
+`./scripts/examples.sh run tmux-slider` or `./scripts/examples.sh run tmux-glider`.
 
 ## Example contract
 
@@ -258,8 +258,8 @@ Their application sources are `neon-life.lisp` and `neon-glider.lisp`; both use
 the support component in `neon-kit.lisp`.
 
 ```sh
-./examples.sh run neon-life
-./examples.sh run neon-glider
+./scripts/examples.sh run neon-life
+./scripts/examples.sh run neon-glider
 ```
 
 `neon-life` simulates Conway B3/S23 on a toroidal 36x16 grid with two gliders
@@ -274,8 +274,8 @@ to exit. Pausing removes the periodic timer subscription.
 The original entry points are also available:
 
 ```sh
-./examples.sh run game-of-life
-./examples.sh run glider-real
+./scripts/examples.sh run game-of-life
+./scripts/examples.sh run glider-real
 ```
 
 `glider-real` preserves `elmtui.examples.glider:run-glider-animation` and
@@ -325,7 +325,7 @@ single-step, reset, Q exit and restoration of terminal attributes.
 From inside a tmux pane, run:
 
 ```sh
-./run-glider.sh
+./scripts/run-glider.sh
 ```
 
 This is **not** the separate `neon-glider` bouncing-particle demo or the

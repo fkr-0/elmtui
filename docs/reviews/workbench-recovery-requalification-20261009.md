@@ -18,7 +18,7 @@ W1–W4 and W8 have completed their individual workflow reviews. Reuse the same 
 
 - `python3 tests/workbench/validation/runner.py` — exit **0**, 30 distinct required application scenarios **30 PASS / 0 FAIL / 0 NOT RUN**. Evidence: `tests/workbench/validation/artifacts/run-385b6ec7f3/result.json`. Bracketed multiline paste now reaches the editor without implicit evaluation; this was the previously failing case.
 - `python3 tests/workbench/pty-workbench.py` — exit **0**; actual application PTY smoke passed **80×24, 120×40, 160×50**.
-- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp` — exit **0**, **4,700 PASS / 6 intentional opt-in tmux SKIP / 0 FAIL** (4,706 checks).
+- `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp` — exit **0**, **4,700 PASS / 6 intentional opt-in tmux SKIP / 0 FAIL** (4,706 checks).
 - `ELMTUI_WORKBENCH_TEST_CMD='clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load examples/workbench.lisp' python3 -m unittest discover -s tests/workbench/stress -p 'test_*.py' -v` — exit **0**, **10/10 PASS**, including real terminal idle writes, bounded CPU sample, Ctrl+C, startup terminal signal mode and termios restoration.
 - Same `ELMTUI_WORKBENCH_TEST_CMD`, `python3 -m unittest discover -s tests/workbench/independent -p 'test_*.py' -v` — exit **0**, **21/21 PASS**, no opt-in live tests skipped.
 

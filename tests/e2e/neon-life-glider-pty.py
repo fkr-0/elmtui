@@ -15,7 +15,7 @@ from pty_driver import PrivateTmuxPTY
 @unittest.skipUnless(PrivateTmuxPTY.available(), "private tmux and stty not installed")
 class NeonLifeGliderPTY(unittest.TestCase):
     def check_application(self, name, title, token):
-        with PrivateTmuxPTY(["./examples.sh", "run", name],
+        with PrivateTmuxPTY(["./scripts/examples.sh", "run", name],
                             cols=100, rows=35, timeout=14) as terminal:
             terminal.wait_for(title, timeout=15)
             initial = terminal.capture()
@@ -61,7 +61,7 @@ class NeonLifeGliderPTY(unittest.TestCase):
         self.check_application("neon-glider", "NEON FLIGHT CONTROL", "TICK")
 
     def check_original(self, name, title, token):
-        with PrivateTmuxPTY(["./examples.sh", "run", name],
+        with PrivateTmuxPTY(["./scripts/examples.sh", "run", name],
                             cols=100, rows=35, timeout=14) as terminal:
             terminal.wait_for(title, timeout=15)
             expression = re.compile(r"\b" + token + r"\s*(\d+)")
@@ -82,7 +82,7 @@ class NeonLifeGliderPTY(unittest.TestCase):
         self.check_original("game-of-life", "LIFE / NEON GRID", "GEN")
 
     def test_original_life_80x24_pause_step_and_resize(self):
-        with PrivateTmuxPTY(["./examples.sh", "run", "game-of-life"],
+        with PrivateTmuxPTY(["./scripts/examples.sh", "run", "game-of-life"],
                             cols=80, rows=24, timeout=14) as terminal:
             terminal.wait_for("LIFE / NEON GRID", timeout=15)
             initial = terminal.capture()

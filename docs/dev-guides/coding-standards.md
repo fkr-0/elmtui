@@ -94,7 +94,7 @@ This document outlines the coding standards and conventions to be followed when 
 
 *   `scripts/check-docstrings.sh` audits de-duplicated exported bindings across ElmTUI and the four sublibraries and rejects documentation regressions.
 *   `scripts/build-api-docs.sh` renders `docs/api/generated/api.md` and `api.html` from live Common Lisp `DOCUMENTATION` metadata.
-*   `clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp` is the full deterministic verification command.
+*   `clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp` is the full deterministic verification command.
 *   `scripts/run-tests-warning-clean.sh` remains the warning-clean compilation/test gate.
 
 ---

@@ -16,7 +16,7 @@ tracks:
           clpm bundle install
       - name: run-tests
         run: |
-          clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp
+          clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp
 
   clpm-dev:
     description: Run ElmTUI development tools through the optional CLPM bundle
@@ -30,7 +30,7 @@ commands:
   test:
     track: clpm
     run: |
-      clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp
+      clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp
 
   test-neon:
     track: clpm
@@ -62,12 +62,12 @@ commands:
   repl:
     track: clpm
     run: |
-      clpm bundle exec --with-client sbcl -- --noinform --load run_clpm.lisp
+      clpm bundle exec --with-client sbcl -- --noinform --eval '(require :asdf)' --eval '(asdf:load-system :elmtui)'
 
   slynk:
     track: clpm-dev
     run: |
-      clpm bundle -f dev/clpmfile exec --with-client sbcl -- --noinform --load run_clpm_slynk.lisp
+      clpm bundle -f dev/clpmfile exec --with-client sbcl -- --noinform --load scripts/run-slynk.lisp
 
   coverage:
     track: clpm
@@ -75,7 +75,7 @@ commands:
       set -eu
       mkdir -p test-output
       log="test-output/coverage-warning-clean.log"
-      if ! clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load coverage.lisp >"$log" 2>&1; then
+      if ! clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/coverage.lisp >"$log" 2>&1; then
         cat "$log"
         exit 1
       fi

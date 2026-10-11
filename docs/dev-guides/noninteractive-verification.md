@@ -9,7 +9,7 @@ not depend on the current terminal pane, server stdout, or ambient tmux state.
 | Purpose | Command | Expected behavior |
 | --- | --- | --- |
 | Fast runner/static contracts | `python3 tests/test_runner_contracts.py` | Verifies the CLPM runner, stdout/log isolation, tmux opt-in policy, ASDF naming hygiene, and documentation contracts without loading the Lisp system. |
-| Normal default test suite | `clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp` | Runs the default FiveAM suite, exits non-zero on failure, writes log4cl output to `test-output/`, and skips live tmux capture tests unless explicitly opted in. |
+| Normal default test suite | `clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp` | Runs the default FiveAM suite, exits non-zero on failure, writes log4cl output to `test-output/`, and skips live tmux capture tests unless explicitly opted in. |
 | Warning-clean release gate | `scripts/run-tests-warning-clean.sh` | Wraps the declared CLPM runner, captures stdout/stderr logs under `test-output/`, and fails if unexpected compiler/runtime warning markers appear. |
 
 ## Live tmux integration gates
@@ -20,8 +20,8 @@ operator deliberately opts in.
 
 | Purpose | Command | Notes |
 | --- | --- | --- |
-| Run live tmux integration when tmux is available | `ELMTUI_RUN_TMUX_INTEGRATION=1 clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp` | Enables live tmux capture tests, but still skips them if tmux is unavailable. |
-| Require live tmux integration | `ELMTUI_REQUIRE_TMUX=1 clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp` | Enables live tmux tests and treats missing tmux as a test failure. Use only on a host prepared for tmux integration checks. |
+| Run live tmux integration when tmux is available | `ELMTUI_RUN_TMUX_INTEGRATION=1 clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp` | Enables live tmux capture tests, but still skips them if tmux is unavailable. |
+| Require live tmux integration | `ELMTUI_REQUIRE_TMUX=1 clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp` | Enables live tmux tests and treats missing tmux as a test failure. Use only on a host prepared for tmux integration checks. |
 
 ## Faketerm tests
 

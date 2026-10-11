@@ -13,7 +13,7 @@ Run from repository root:
     WB08_SEED=42 WB08_ROUNDS=128 python3 -m unittest discover -s tests/workbench/stress -p 'test_*.py' -v
     WB08_SEED=987654 WB08_ROUNDS=128 python3 -m unittest discover -s tests/workbench/stress -p 'test_*.py' -v
     python3 -m unittest discover -s tests/workbench/independent -p 'test_*.py' -v
-    clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
+    clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp
 
 Each test invokes actual standalone W1–W4 sources using CLPM/SBCL in isolated processes with no mocked module methods. Parameters: WB08_SEED default 20261009; WB08_ROUNDS default 32, permitted 1–128; WB08_TIMEOUT default 18, permitted 3–30 seconds per subprocess. W2 polling is capped at 500 × 4ms, head evaluation sleeps 60ms, and no uncontrolled loop or hostile untrusted EVAL is sent.
 
@@ -175,7 +175,7 @@ reported to its owner and must be independently rechecked before release.
 
 After the independently owned rendering fix landed, reran the root suite:
 
-    clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
+    clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp
 
 Result: 4666 checks, 4660 pass / six intentional opt-in live tmux skips /
 zero failures, exit code 0. The previous src/platform/driver.lisp

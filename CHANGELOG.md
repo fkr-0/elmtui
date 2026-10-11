@@ -6,12 +6,23 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Repository hygiene and developer entry points
+
+- Rebuilt a sanitized Git lineage that removes root-level scratch scripts,
+  obsolete Lisp launchers, non-release agent/plan documents, generated
+  artifacts and transient directories from their first appearance onward.
+  Publication of rewritten commit/tag identities requires coordination.
+- Moved the maintained example CLI, tmux glider runner, test runner, coverage
+  runner and Slynk launcher beneath `scripts/`. Root-level Bash and Lisp
+  launchers (including the legacy `exe` command) are no longer supported;
+  callers should use `scripts/examples.sh`, the release scripts or `bridge.yml`.
+- Added a tracked purge manifest and automatic release/history hygiene tests.
+
 ### Licensing
 
 - License new ElmTUI sources and distributions under MIT, consistent with its
-  four MIT-licensed supporting libraries. Historic GPL-3.0-only revisions
-  retain their pre-existing grants; the project predecessor uncharming-tui
-  was authored by the ElmTUI maintainer, not a runtime dependency.
+  four MIT-licensed supporting libraries. Historical ElmTUI GPL-3.0-only
+  revisions retain their original license terms.
 
 
 ### Added

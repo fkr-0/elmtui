@@ -158,8 +158,8 @@ The maintained examples are in the separate `elmtui-examples` ASDF system:
 (elmtui.examples.minimal:run-minimal)
 ```
 
-Use `./examples.sh list` to discover runnable examples and
-`./examples.sh run NAME` to start one. `./exe examples` opens the same
+Use `./scripts/examples.sh list` to discover runnable examples and
+`./scripts/examples.sh run NAME` to start one. `./scripts/examples.sh list` opens the same
 maintained-example picker. The removed `elmtui/examples-legacy` system is not a
 supported API or migration source.
 

@@ -325,7 +325,7 @@ route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
 
 (defun print-usage (&optional (stream *standard-output*))
   (format stream
-          "Usage: examples.sh <command> [args]~%~%~
+          "Usage: scripts/examples.sh <command> [args]~%~%~
 Commands:~%~
   list~%~
       List runnable examples (without .lisp suffix); support/direct-launch sources are excluded.~%~
@@ -368,6 +368,6 @@ Commands:~%~
             (t
              (error "Unknown command: ~A" cmd)))))
     (error (e)
-      (format *error-output* "examples.sh error: ~A~%" e)
+      (format *error-output* "scripts/examples.sh error: ~A~%" e)
       (print-usage *error-output*)
       (quit 2))))

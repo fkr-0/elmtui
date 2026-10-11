@@ -5,7 +5,7 @@
 ## Verified local checks
 
 - [x] Main `elmtui.asd` and `elmtui-examples.asd` identify version **0.2.0**; the local `v0.2.0` tag already exists. The separate `elmtui-workbench.asd` declares **0.1.0**.
-- [x] Root FiveAM was re-run **inside a private live tmux session** using `ELMTUI_RUN_TMUX_INTEGRATION=1 clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp`: **8,060 passed / 0 skipped / 0 failed** (2026-10-09). The previous non-tmux baseline was **4,743 passed / 6 skipped / 0 failed**. Test success does **not** waive compiler warning-clean or final frozen-commit checks.
+- [x] Root FiveAM was re-run **inside a private live tmux session** using `ELMTUI_RUN_TMUX_INTEGRATION=1 clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp`: **8,060 passed / 0 skipped / 0 failed** (2026-10-09). The previous non-tmux baseline was **4,743 passed / 6 skipped / 0 failed**. Test success does **not** waive compiler warning-clean or final frozen-commit checks.
 - [x] `scripts/check-docstrings.sh`: non-regression gate passed; **1,819 unique exported bindings, 587 missing, 67.7% documented**. This is a ratchet pass, **not** complete public API documentation.
 - [x] README `defapplication` declaration and the standalone counter/async tutorial definitions smoke-loaded using the repository CLPM/SBCL bundle. This does not establish PTY/UI e2e.
 - [x] **Strict local site build passed** using an isolated `git archive HEAD` staging tree, `python3 scripts/prepare-site.py`, and `uv run --no-project --with 'mkdocs-material>=9.5,<10' python -m mkdocs build --strict`; exit 0, 63 generated files. MkDocs is still absent from the system Python; no permanent dependency installation was needed. Build success does **not** qualify remote Pages deployment.
@@ -17,7 +17,7 @@
 ## Remaining mandatory release blockers
 
 - [ ] **Version/tag policy.** A `v0.2.0` tag exists locally; do not force-move it. Decide whether this work qualifies as an existing 0.2.0 release fix or needs a new version/tag. Reconcile the separately versioned Workbench and freeze exact SHA/submodule dependencies.
-- [ ] **License/provenance and assets.** MIT is stated in root and subsystem metadata; independently finish predecessor/authorship, third-party dependencies, bundled images/fonts, screenshots, NOTICE and security/secret-history review before public publication. Historical GPL grants are not retroactively relicensed.
+- [ ] **Licenses and assets.** MIT is stated in root and subsystem metadata; independently review third-party dependencies, bundled images/fonts, screenshots, and security/secret-history before public publication. Historical GPL grants are not retroactively relicensed.
 - [ ] **Clean public checkout — BLOCKED BY UNPUBLISHED SUBMODULE COMMITS.** GitHub reports ElmTUI and all four `cl-*` repositories as public. The pinned `cl-events` (`d4399c08`) and `cl-styles` (`0ca5efcc`) commits exist remotely, but GitHub's commit lookup returns 422 for pinned `cl-inputs` `ea45ee1b6a4359380c7112743149bedb33c637e0` and `cl-state` `f95baab3be20d3161bbe193766737880d9a00672`. Their local main branches are respectively 2 and 8 commits ahead of local `origin/main` projections. Publish/reconcile these commits through their authorized release owners before a fresh public recursive clone can pass; do not substitute arbitrary earlier SHAs.
 - [ ] **Workbench independent approval and terminal coverage.** Earlier W5 startup failures are superseded by the **passing 3-size PTY smoke and 30/30 live matrix on 2026-10-09**. Obtain independent reviewer sign-off and separate tmux/real-terminal scrollback and resize coverage for the frozen release commit. Three optional independent tests remain skipped without `ELMTUI_WORKBENCH_TEST_CMD`; they do not negate the separately executed PTY matrix. **Never use alternate-screen mode** as a substitute.
 - [ ] **Maintained examples — PARTIAL; mini editor FAILS.** The general application harness passes **9/9 private tmux** and **9/9 urxvt/Xvfb** cases (minimal, focus, keymap, scroll, Game of Life, Wi-Fi). However, `python3 scripts/test-mini-text-editor.py --timeout 20` fails **7/7** real-tmux editor cases: `Ctrl+S` save and Save As dialogs do not appear, while dirty `Ctrl+Q` can exit without unsaved-change confirmation. Evidence: `/tmp/mini-editor-e2e-e8_wkz2r`. Route to the editor/runtime owner; no source files were changed here. Cursor inspector/hover/slider, rainbow, Pong, key-tester and remaining no-idle-write/scrollback checks still need qualification.
@@ -36,7 +36,7 @@
 ## Reproduction
 
     clpm bundle install
-    clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
+    clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp
     scripts/test-subsystems.sh
     scripts/check-docstrings.sh
     scripts/build-api-docs.sh

@@ -14,7 +14,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-COMMAND = [str(ROOT / "examples.sh"), "run", "game-of-life"]
+COMMAND = [str(ROOT / "scripts/examples.sh"), "run", "game-of-life"]
 
 
 def read_for(fd, seconds):

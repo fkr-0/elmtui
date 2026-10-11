@@ -20,7 +20,7 @@
 
 | Gate | Command | Observed verdict |
 | --- | --- | --- |
-| Full root FiveAM | `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp` | 4,707 checks: 4,701 pass, 6 intentional live-tmux skips, 0 fail; exit 0 |
+| Full root FiveAM | `clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp` | 4,707 checks: 4,701 pass, 6 intentional live-tmux skips, 0 fail; exit 0 |
 | Workbench PTY startup | `python3 tests/workbench/pty-workbench.py` | PASS at 80×24, 120×40 and 160×50 |
 | Workbench W6 application matrix | `python3 tests/workbench/validation/runner.py` | Application cases PASS=30 FAIL=0 NOT_RUN=0; separate dependency oracle still absent |
 | Tmux inspector | `python3 tests/e2e/example-overhaul-tmux.py -v` | 6 tests pass including repeated launches, interrupt, resize/history, shell restoration |
