@@ -43,6 +43,11 @@ The project follows semantic versioning from the first published release.
   written beneath the repository rather than system temporary directories.
 - Added warning-clean coverage execution and bridge commands for benchmarks,
   documentation generation/audit, and focused example verification.
+- Added the `wifi-inline` maintained example: a below-cursor NetworkManager
+  Wi-Fi scanner sharing the `wifi-menu` integration model, with escaped-SSID
+  parsing, one-shot startup scan subscriptions, and two-step connect
+  confirmation, covered by an offline unit suite and a fake-`nmcli`
+  private-tmux e2e harness.
 
 ### Changed
 
@@ -68,6 +73,12 @@ The project follows semantic versioning from the first published release.
   and loop code after executable behavior was covered independently.
 - Normalized ElmTUI terminal geometry and color aliases through `cl-styles`, while
   retaining inline-style priority and the existing flex/grid layout model.
+- Restyled the `wifi-menu` example with the neon palette used by the Neon demo
+  family (RGB fg/bg row roles, mint-on-navy selection highlight, amber status,
+  lavender footer) and made its panel height adaptive: the panel renders at a
+  four-row minimum before any scan, grows one row per discovered network, and
+  windows the list around the selection with a bounded row maximum instead of
+  a fixed-height list.
 
 ### Removed
 
@@ -78,6 +89,11 @@ The project follows semantic versioning from the first published release.
 
 ### Fixed
 
+- Hardened `wifi-menu` state reads against the hash-table state backend's
+  representation of NIL-valued initial keys (empty hash tables): the busy flag
+  now uses an explicit set-flag predicate and network lists are guarded before
+  sequence operations, keeping refresh ticks, selection, and disconnect paths
+  correct under both runtime and test-constructed application states.
 - Recognized `:gray` and `:grey` as bright-black ANSI foreground/background
   colors, preventing workbench and other UIs from losing frames to the
   previously unrecognized semantic gray color.
