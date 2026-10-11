@@ -60,7 +60,6 @@ class ExtendedExamplesPTY(unittest.TestCase):
         self.assertNotIn("alpha", app.screen())
         self.exit_cleanly(app, "Enter")
 
-    @unittest.expectedFailure  # Visible-item rendering is a tracked regression.
     def test_input_selector_filters_and_escapes(self):
         app = self.launch(
             "selector",
@@ -72,27 +71,23 @@ class ExtendedExamplesPTY(unittest.TestCase):
         app.expect("Banana")
         self.exit_cleanly(app, "Escape")
 
-    @unittest.expectedFailure  # View is blank; no animation proof yet.
     def test_glider_animation_and_exit(self):
         app = self.launch(
             "glider",
             "(elmtui.examples.glider:run-glider-animation)",
             "glider-real.lisp")
-        screen = app.expect("glider-real: q/esc quit")
-        self.assertIn("tick=", screen)
+        screen = app.expect("GLIDER  /  NEON FLIGHT CONTROL")
+        self.assertIn("TICK ", screen)
         self.exit_cleanly(app, "q")
 
-    @unittest.expectedFailure  # Inspector UI is blank in a real tmux pane.
     def test_cursor_inspector_visible_and_exit(self):
         app = self.launch(
             "cursor-inspector",
             "(elmtui-examples.cursor-inspector:run-cursor-inspector)",
             "cursor-inspector.lisp")
-        app.wait(lambda screen: "Snapshot lines:" in screen
-                 or "Controls:" in screen
-                 or "tmux is not available." in screen,
-                 "inspector panel is visible")
-        self.exit_cleanly(app, "q")
+        screen = app.expect("CURSOR INSPECTOR [TMUX]")
+        self.assertIn("Snapshot captured before UI launch", screen)
+        self.exit_cleanly(app, "Escape")
 
     def test_inline_pong_render_and_quit(self):
         app = self.launch(
@@ -132,7 +127,6 @@ class ExtendedExamplesPTY(unittest.TestCase):
         self.exit_cleanly(app)
 
 
-    @unittest.expectedFailure  # Reported q shortcut does not exit reliably.
     def test_root_viewport_q_exit(self):
         app = self.launch(
             "root-viewport-q",
@@ -141,7 +135,6 @@ class ExtendedExamplesPTY(unittest.TestCase):
         app.expect("Arrows move the block")
         self.exit_cleanly(app, "q")
 
-    @unittest.expectedFailure  # Ctrl+Q must not bypass unsaved-changes dialog.
     def test_mini_editor_ctrl_q_prompts_when_dirty(self):
         app = self.launch(
             "editor-ctrl-q",

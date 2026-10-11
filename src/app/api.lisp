@@ -189,8 +189,10 @@ ID-PATH accepts a scalar keyword, symbol or string, or a list of segments;
   "Validate a proper PLATFORM-OPTIONS keyword/value plist for PLATFORM."
   (declare (type symbol platform) (type list platform-options))
   (check-type platform-options list)
-  (unless (evenp (length platform-options))
-    (error "Platform options for ~S must contain key/value pairs: ~S" platform platform-options))
+  (let ((length (list-length platform-options)))
+    (unless (and length (evenp length))
+      (error "Platform options for ~S must contain key/value pairs: ~S"
+             platform platform-options)))
   (loop for (key value) on platform-options by #'cddr do
     (unless (member key '(:initial-terminal-dimensions
                           :initial-cursor-position

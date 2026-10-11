@@ -6,7 +6,7 @@ This guide describes how to build TUI apps with ElmTUI’s current API, integrat
 
 - Install deps: `clpm bundle install`
 - Load core: `clpm bundle exec --with-client sbcl -- --eval '(asdf:load-system :elmtui)'`
-- Load examples (optional): `clpm bundle exec --with-client sbcl -- --eval '(asdf:load-system :elmtui/examples)'`
+- Load maintained examples (optional): `clpm bundle exec --with-client sbcl -- --eval '(asdf:load-system :elmtui-examples)'`
 
 ## App Structure (defapplication)
 
@@ -15,7 +15,7 @@ This guide describes how to build TUI apps with ElmTUI’s current API, integrat
   - `:root-viewport-id`: unique ID for the root viewport.
   - `:root-component-dsl`: quoted DSL for the root component subtree.
   - `:update-fn`: function `(message app-state) -> update-result`.
-  - `:view-fn`: function `(app-state &key root-id) -> DSL`.
+  - `:view-fn`: function `(app-state) -> DSL`; the generated wrapper adds the root viewport.
 - Optional: `:initial-state-plist` or `:initial-state-fn`, `:command-processor-fn`, `:subscriptions-fn`.
 
 Example skeleton:
@@ -151,16 +151,21 @@ Tips:
 
 ## Examples
 
-- Stable examples: `asdf:load-system :elmtui/examples`
-  - Clean keymap usage: `focus-simple`, `key-tester`, `keymap-app`, `fzy-picker`, `mini-rainbow`, `rainbow-app`, `input-selector`.
-- Legacy/experimental: `asdf:load-system :elmtui/examples-legacy`
-  - May rely on older APIs or patterns; useful as references while migrating.
+The maintained examples are in the separate `elmtui-examples` ASDF system:
 
-### Quick discovery via `./exe`
+```lisp
+(asdf:load-system "elmtui-examples")
+(elmtui.examples.minimal:run-minimal)
+```
 
-- Interactive stable examples: `./exe examples`
-- Interactive legacy examples: `./exe examples_legacy`
-  - Select an entry like `ELMTUI.EXAMPLES.FOCUS-SIMPLE:RUN-FOCUS-SIMPLE-APP` to run it.
+Use `./examples.sh list` to discover runnable examples and
+`./examples.sh run NAME` to start one. `./exe examples` opens the same
+maintained-example picker. The removed `elmtui/examples-legacy` system is not a
+supported API or migration source.
+
+The optional fuzzy-picker integration is separate from the default examples
+system: install its external `cl-fzy` dependency, load
+`elmtui-examples-fzy`, and run `elmtui.examples.fzy-picker:run-fzy-picker`.
 
 ## Enhanced Widgets (Optional)
 

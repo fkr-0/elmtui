@@ -142,6 +142,7 @@
   (stream nil :type (or null stream))
   (cl-device nil :type (or null t))
   (input-source nil :type (or null t))
+  (original-termios nil :type (or null t))
   (width 80 :type integer)
   (height 24 :type integer)
   (cursor-start-col 24 :type integer)
@@ -231,18 +232,43 @@
     (values (and data (1- (getf data :row)))
             (and data (1- (getf data :column))))))
 
+(defun %capture-original-termios (device)
+  (declare (ignorable device))
+  #+sbcl
+  (when (and device (typep device 'cl-inputs.device.tty:tty-device))
+    (let ((fd (cl-inputs.device.api:device-fd device)))
+      (and fd (sb-posix:tcgetattr fd))))
+  #-sbcl nil)
+
+(defun %restore-original-termios (device termios)
+  (declare (ignorable device termios))
+  #+sbcl
+  (when (and device termios)
+    (handler-case
+        (progn
+          (cl-inputs.device.api:open-device device)
+          (let ((fd (cl-inputs.device.api:device-fd device)))
+            (unless fd
+              (error "TTY device did not expose a file descriptor during restoration."))
+            (sb-posix:tcsetattr fd sb-posix:tcsanow termios)))
+      (error (condition)
+        (log-warn "TERMINAL: Failed to restore original termios state: ~A" condition))))
+  #-sbcl nil)
+
 (defun make-terminal-instance-for-device (&key device publish-fn (initial-clear nil)
                                              (signal-keys-as-input nil))
   "Construct a terminal-instance around a cl-inputs DEVICE."
   (declare (ignore initial-clear))
-  (let ((stream (or (and device (device-output-stream device))
-                  (error "cl-inputs device did not provide an output stream."))))
+  (let* ((stream (or (and device (device-output-stream device))
+                     (error "cl-inputs device did not provide an output stream.")))
+         (original-termios (%capture-original-termios device)))
     (let ((instance (make-terminal-instance
                       :stream stream
                       :cl-device device
+                      :original-termios original-termios
                       :input-source (and device (cl-inputs.api:make-ready-input-source :device device))
                       :publish-fn publish-fn)))
-      ;; The input source already saved original termios for restoration.
+      ;; Preserve the pre-raw state independently of cl-inputs' raw-mode copy.
       ;; Opt in before UI startup; default SIGINT behavior is unchanged.
       (when signal-keys-as-input
         (let* ((input (cl-inputs.device.api:device-input-stream device))
@@ -425,7 +451,8 @@
           (setf (terminal-instance-input-source instance) nil)))
       (let ((device (terminal-instance-cl-device instance)))
         (when device
-          ;; cl-inputs close-input-source handles restoration; device kept for stream
+          (%restore-original-termios
+           device (terminal-instance-original-termios instance))
           (handler-case
               (cl-inputs.device.api:close-device device)
             (error (condition)

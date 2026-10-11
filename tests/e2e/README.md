@@ -76,3 +76,27 @@ current `result.json` before claiming the project is ready for release.
 The fake network fixture verifies application behavior and command arguments.
 It does not qualify NetworkManager, a real wireless adapter, or connection
 success against an actual access point.
+
+## Extended maintained-example lifecycle suite
+
+Run the focused private-tmux PTY coverage for the maintained examples that are
+not covered by the broader suite:
+
+```sh
+python3 tests/e2e/extended-examples-pty.py -v
+```
+
+The suite checks finder filtering, selector filtering, glider animation,
+cursor-inspector startup, inline Pong, root-viewport navigation and both dirty
+editor quit paths. It requires Python 3, `tmux`, `clpm`, and SBCL. Each case
+starts a private tmux server and fresh Lisp process; it does not use the
+caller's tmux session or make live network requests. Transcript bytes, screen
+frames, stderr, exit status, and before/after terminal settings are retained in
+per-case directories under
+`/tmp/elmtui-extended-evidence-20261009`.
+
+The opt-in live tmux integration gate is separate:
+
+```sh
+ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
+```

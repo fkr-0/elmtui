@@ -49,7 +49,7 @@ class QualifierRegression(unittest.TestCase):
 
     def test_unknown_export_cannot_pass_full_comparison(self):
         markdown, html = fake_reference(name="ELMTUI.APP:IMAGINARY")
-        with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory(dir=ROOT) as root:
             md = Path(root) / "api.md"
             out = Path(root) / "api.html"
             md.write_text(markdown)
@@ -58,6 +58,43 @@ class QualifierRegression(unittest.TestCase):
             with patch.object(MODULE, "live_entries", return_value=[live]):
                 with self.assertRaisesRegex(AssertionError, "stale or incorrectly qualified"):
                     MODULE.qualify(markdown=md, html=out, strict_coverage=False)
+
+    def test_stale_landing_page_coverage_rejected(self):
+        markdown, html = fake_reference()
+        with tempfile.TemporaryDirectory(dir=ROOT) as root:
+            root_path = Path(root)
+            (root_path / "website").mkdir()
+            (root_path / "website" / "reference.md").write_text(
+                "**Current audited coverage: 0/1 (0.0%).**\n"
+                "1 public bindings lack documentation.\n"
+            )
+            md = root_path / "api.md"
+            out = root_path / "api.html"
+            md.write_text(markdown)
+            out.write_text(html)
+            live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", True)
+            with patch.object(MODULE, "ROOT", root_path), \
+                    patch.object(MODULE, "live_entries", return_value=[live]):
+                with self.assertRaisesRegex(AssertionError, "landing page coverage"):
+                    MODULE.qualify(markdown=md, html=out, strict_coverage=False)
+
+    def test_wrapped_landing_page_coverage_is_accepted(self):
+        markdown, html = fake_reference()
+        with tempfile.TemporaryDirectory(dir=ROOT) as root:
+            root_path = Path(root)
+            (root_path / "website").mkdir()
+            (root_path / "website" / "reference.md").write_text(
+                "**Current audited coverage: 1/1 (100.0%).**\n"
+                "0 public bindings\nlack documentation.\n"
+            )
+            md = root_path / "api.md"
+            out = root_path / "api.html"
+            md.write_text(markdown)
+            out.write_text(html)
+            live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", True)
+            with patch.object(MODULE, "ROOT", root_path), \
+                    patch.object(MODULE, "live_entries", return_value=[live]):
+                MODULE.qualify(markdown=md, html=out, strict_coverage=False)
 
     def test_unsafe_unclosed_fence_rejected(self):
         markdown, _ = fake_reference()

@@ -158,6 +158,33 @@ support code is not mistaken for a runnable example. If `cl-fzy` is absent, the
 optional system reports a concise actionable diagnostic and points to the
 built-in `fzf-finder-real` alternative.
 
+## Optional, integration and support files
+
+These source files are intentionally not all standalone members of the default
+smoke-tested example set:
+
+| File | Classification |
+|---|---|
+| `async-weather.lisp` | Optional live Open-Meteo client; requires `curl`, `jq`, and network access. |
+| `fzy-picker.lisp` | Optional `elmtui-examples-fzy` integration; requires `cl-fzy`. |
+| `neon-kit.lisp` | Shared palette and rendering support for the Neon examples; not an application runner or CLI entry. |
+| `tmux-glider.lisp` | Optional overlay animation; requires a live tmux pane and preserves the captured underlay. |
+| `tmux-slider.lisp` | Optional styled tmux-pane animation; requires a live tmux pane. |
+| `workbench.lisp` | Standalone local developer launcher; loads the separate `elmtui-workbench` system and is not an `examples.sh` entry. See the [workbench guide](../docs/workbench-user-guide.md) for its direct launch command. |
+
+Launch the weather dashboard with `./examples.sh run async-weather`. It starts
+with Berlin; use `/` to enter another city or `LAT,LON`. Lisp callers can pass
+an initial city with
+`(elmtui.examples.async-weather:run-async-weather :city "Tokyo")`. The example
+talks to the public Open-Meteo endpoints when launched; it is not used by the
+offline example smoke or PTY tests. The tmux animations are also separate from
+the private-tmux example suite: they operate on the user's current pane and
+should only be launched intentionally. The `fzy-picker.lisp` loader is
+`examples/support/fzy-loader.lisp`.
+
+`./examples.sh list` includes only files with runnable example entry points;
+the support-only `neon-kit.lisp` and standalone `workbench.lisp` are excluded.
+
 ## Repaired directory, rainbow and key-inspection examples
 
 `dirli.lisp` now renders its list as native ElmTUI text rows; arrows (or
@@ -179,8 +206,10 @@ python3 tests/e2e/tmux-scrollback-restoration.py
 
 | File | Purpose |
 |---|---|
+| `tmux-glider.lisp` | Overlay a Conway glider while restoring the captured pane content |
 | `tmux-hover-demo.lisp` | Capture and display tmux pane content |
 | `tmux-idle-screensaver.lisp` | Tmux-aware idle application and timer subscriptions |
+| `tmux-slider.lisp` | Animate a styled band over captured pane content |
 
 Tmux examples require a running tmux session. The automated live integration
 checks are gated behind:
@@ -188,6 +217,9 @@ checks are gated behind:
 ```sh
 ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
 ```
+
+The live-pane animations can be launched intentionally with
+`./examples.sh run tmux-slider` or `./examples.sh run tmux-glider`.
 
 ## Example contract
 
@@ -206,6 +238,8 @@ ASDF example system until they satisfy this contract.
 ## Neon Life and Glider (animated)
 
 These dashboard apps use the ElmTUI diff renderer and shared `neon-kit` RGB palette (no raw ANSI).
+Their application sources are `neon-life.lisp` and `neon-glider.lisp`; both use
+the support component in `neon-kit.lisp`.
 
 ```sh
 ./examples.sh run neon-life
@@ -242,6 +276,29 @@ Run the state-machine suite and PTY lifecycle checks:
 clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
   --eval '(require :asdf)' --eval '(asdf:test-system "elmtui-neon-tests")'
 python3 tests/e2e/neon-life-glider-pty.py -v
+```
+
+## Example verification
+
+Run the complete Lisp test suite and the broader private-terminal example
+lifecycle suite from the repository root:
+
+```sh
+./rt.sh
+python3 tests/e2e/extended-examples-pty.py -v
+```
+
+The PTY suite requires Python 3, `tmux`, `clpm`, and SBCL. It starts isolated
+tmux servers and fresh Lisp processes; it does not connect to Wi-Fi or operate
+on the user's tmux session. Per-case transcripts, frames, terminal settings,
+and exit status are written under
+`/tmp/elmtui-extended-evidence-20261009`.
+
+The live tmux integration gate is intentionally opt-in and uses the current
+tmux environment:
+
+```sh
+ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
 ```
 
 The PTY suite checks timer advancement, frozen frames while paused, exact

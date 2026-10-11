@@ -67,6 +67,25 @@
      '((:name :fps :long "--fps" :type integer))
      '((:name :fps2 :long "--fps" :type integer)))))
 
+(test validate-platform-options-accepts-live-driver-options
+  (is (null
+       (elmtui.app.api:validate-platform-options
+        :terminal
+        '(:prefill-from-tmux t
+          :tmux-prefill-mode :screen
+          :use-alternate-screen nil
+          :signal-keys-as-input t)))))
+
+(test validate-platform-options-rejects-unknown-or-malformed-options
+  (signals error
+    (elmtui.app.api:validate-platform-options :terminal '(:unknown-option 1)))
+  (signals error
+    (elmtui.app.api:validate-platform-options :terminal '(:prefill-from-tmux)))
+  (signals error
+    (elmtui.app.api:validate-platform-options :terminal '(:use-alternate-screen :yes)))
+  (signals error
+    (elmtui.app.api:validate-platform-options :terminal '(:tmux-prefill-mode :history))))
+
 (defapplication extension-test-app
   :root-component-dsl '(:layout :id :main)
   :root-viewport-id :ext-root

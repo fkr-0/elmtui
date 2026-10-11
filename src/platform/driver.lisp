@@ -869,14 +869,13 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
 (defun run-app-platform (APP-SPEC
                           &key (BACKEND-TYPE :tty)
                           (TTY-PATH #+os-unix "/dev/tty" #-os-unix nil)
-                          (PLATFORM-OPTIONS nil)
-                          &allow-other-keys)
+                          (PLATFORM-OPTIONS nil))
   "Main entry point for running an application on the platform.
   Arguments:
     APP-SPEC (list): Application specification plist.
     BACKEND-TYPE (keyword): Backend type, e.g., :terminal.
     TTY-PATH (or string null): Path to TTY device, or NIL.
-    [Other platform options may be passed via &allow-other-keys.]
+    Platform-specific options are supplied in the validated PLATFORM-OPTIONS plist.
   Returns:
     NIL
   Example:
@@ -886,8 +885,10 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
   (declare (type list app-spec)
     (type keyword backend-type)
     (type (or string null) tty-path))
+  ;; Validate the public option surface before any input, terminal I/O or
+  ;; background threads start.
+  (elmtui.app.api:validate-platform-options backend-type platform-options)
   ;; Normal scrollback is a hard invariant, including for tmux-backed apps.
-  ;; Reject before starting input, terminal I/O or background event threads.
   (when (getf platform-options :use-alternate-screen)
     (error "ElmTUI does not support alternate-screen mode; use the normal terminal buffer."))
   (log-info "Running RUN_APP_PLATFORM")

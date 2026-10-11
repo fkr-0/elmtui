@@ -15,6 +15,10 @@
 (defvar *editor-path* nil)
 (defparameter +visible-editor-lines+ 12)
 
+(elmtui.keymaps:define-keymap *mini-text-editor-keymap*
+  ("C-q" :type :message :target '(:editor-request-quit)
+          :description "Request quit with dirty-buffer guard"))
+
 (defun split-editor-lines (text)
   "Preserve blank lines and a trailing newline as an empty final line."
   (coerce (loop with start = 0
@@ -33,6 +37,8 @@
                       ""))
          (lines (split-editor-lines content)))
     (list :path path :lines lines :row 0 :col 0 :goal 0 :top 0
+          :focus-manager '(:current-focus-id :mini-text-editor)
+          :component-keymaps (list (cons :mini-text-editor *mini-text-editor-keymap*))
           :version 0 :saved-version 0 :dirty nil :saving nil
           :modal nil :dialog-input "" :quit-after-save nil
           :quit-armed nil :should-quit nil
@@ -352,6 +358,8 @@
      (%editor-update-base message state))
     ((state-ref state :modal)
      (%modal-update message state))
+    ((and (consp message) (eq (first message) :editor-request-quit))
+     (%request-quit state))
     ((and (consp message) (eq (first message) :app-quit-requested))
      (%request-quit state))
     (t

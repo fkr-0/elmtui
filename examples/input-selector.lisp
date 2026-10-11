@@ -109,11 +109,11 @@
          (status (format nil " ~A items | Arrow keys: Navigate | Enter: Select | ESC: Quit"
                          (length filtered-items))))
     `(:container :id :selector-container
-      :style (:display :flex :flex-direction :column :width :fill :height :fill)
+      :style (:display :flex :flex-direction :column :width 80 :height 30)
       :classes ("selector-container")
       :children
       ((:text :id :input-field :classes ("input-field") :content ,(format nil " > ~A" query))
-       (:container :id :items :style (:display :flex :flex-direction :column :width :fill :height :fill)
+       (:container :id :items :style (:display :flex :flex-direction :column :width 80 :height 26)
         :children ,(loop for item in filtered-items
                          for idx from 0
                          collect `(:text :id ,(intern (format nil "ITEM-~A" idx) :keyword)
@@ -124,7 +124,9 @@
 (defapplication input-selector-app
   :root-viewport-id :selector-root
   :initial-state-fn #'%initial-state
-  :root-component-dsl '(:root-viewport :id :selector-root)
+  :root-component-dsl '(:root-viewport :id :selector-root
+                        :anchor :below-cursor
+                        :width 80 :height 30
+                        :child-dsl-spec (:view nil))
   :update-fn 'app-update
   :view-fn 'input-selector-view)
-

@@ -25,7 +25,8 @@ class TerminalApp:
     def __init__(self, name, expression, source=None, environment=None, prelude='', use_launcher=True):
         self.directory = OPTIONS.output / (name + '-' + uuid.uuid4().hex[:8])
         self.directory.mkdir(parents=True)
-        self.socket = str(self.directory / 'tmux.sock')
+        self.socket = str(Path(tempfile.gettempdir()) /
+                          ('elmtui-' + uuid.uuid4().hex[:16] + '.sock'))
         self.window = None
         self.emulator = None
         self.frames = []

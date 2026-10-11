@@ -25,7 +25,14 @@
     ("keymap-app" "KEYMAP-EXAMPLE-APP")
     ("key-tester" "KEY-TESTER-APP")
     ("minimal-app" "MINIMAL")
+    ("mini-text-editor" "MINI-TEXT-EDITOR-APP")
     ("mini-rainbow" "MINI-RAINBOW")
+    ("neon-glider" "NEON-GLIDER-APP")
+    ("neon-life" "NEON-LIFE-APP")
+    ("neon-less" "NEON-LESS-APP")
+    ("neon-nano" "NEON-NANO-APP")
+    ("neon-pong" "NEON-PONG-APP")
+    ("neon-tetris" "NEON-TETRIS-APP")
     ("pong-below-cursor" "PONG-BELOW-CURSOR-APP")
     ("rainbow-app" "RAINBOW-EXAMPLE-APP")
     ("root-viewport-test-app" "ROOT-VIEWPORT-TEST-APP")
@@ -350,3 +357,129 @@
                                    :test #'equal))))
       (is (string= "" (example.key-tester::key-tester-input revised)))
       (is (string= "a" (example.key-tester::key-tester-input component))))))
+
+(test root-viewport-q-exits-for-character-bearing-events
+  "Printable keys carry :CHAR even when KEY is not a character."
+  (asdf:load-system :elmtui-examples)
+  (let* ((pkg (find-package :elmtui.examples.root-viewport-test-app))
+         (update (symbol-function (find-symbol "ROOT-VIEWPORT-TEST-UPDATE" pkg)))
+         (result (funcall update
+                          (elmtui.core.event-types:make-key-event
+                           :key :character :char #\q)
+                          '(:offset-x 0 :offset-y 0))))
+    (is (equal '(((:should-quit) t))
+               (elmtui.state.api:ur-patches result)))))
+
+(defun %buffer-text (buffer)
+  (with-output-to-string (stream)
+    (loop for row below
+          (elmtui.platform.backend.common.virtual-buffer:buffer-height buffer)
+          do (loop for col below
+                   (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer)
+                   do (write-char
+                       (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                        (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at buffer row col))
+                       stream)))))
+
+(test input-selector-initial-frame-renders-options
+  "The real initial paint buffer contains the selector's first option."
+  (asdf:load-system :elmtui-examples)
+  (let* ((pkg (find-package :elmtui.examples.input-selector))
+         (app (find-symbol "INPUT-SELECTOR-APP" pkg))
+         (init (find-symbol "INITIALIZE-APP-STATE-INPUT-SELECTOR-APP" pkg))
+         (config (gethash app elmtui.core.globals:*applications*))
+         (view (elmtui.app.api:app-config-view-fn-sym config))
+         (root-id (getf (rest (elmtui.app.api:app-config-root-component-dsl config)) :id)))
+    (multiple-value-bind (state commands) (funcall init)
+      (declare (ignore commands))
+      (dolist (entry '((:terminal-size (100 35)) (:size-known t)
+                       (:pos-known t) (:first-ready-done t) (:cursor-pos (1 1))
+                       (:width 100) (:height 30) (:offset-x 0) (:offset-y 0)))
+        (setf (elmtui.state.api:state-ref state
+                 (list :components root-id (first entry)))
+              (second entry)))
+      (let* ((rect (elmtui.view.geo:make-rectangle
+                     :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+                     :size (elmtui.view.geo:make-size :w 100 :h 35)))
+             (ctx (elmtui.contracts:make-app-context
+                    :state state :view-fn (symbol-function view) :viewport-rect rect))
+             (out (elmtui.pipeline:render-pipeline-0-to-5 ctx)))
+        (is (search "Option 1"
+                    (%buffer-text (elmtui.contracts:ctx-back-buffer out))))))))
+
+(test mini-editor-control-q-routes-through-unsaved-guard
+  "The editor-specific C-q binding must reach its dirty-buffer quit guard."
+  (asdf:load-system :elmtui-examples)
+  (elmtui.keymaps:initialise)
+  (let* ((pkg (find-package :elmtui.examples.mini-text-editor))
+         (init (symbol-function (find-symbol "%INITIAL-STATE" pkg)))
+         (update (symbol-function (find-symbol "EDITOR-UPDATE" pkg)))
+         (state (copy-list (funcall init)))
+         (messages nil))
+    (setf (getf state :dirty) t)
+    (elmtui.keymaps:process-key-event
+     (elmtui.core.event-types:make-key-event :key #\q :modifiers '(:ctrl))
+     nil :app-state state
+     :dispatch-fn (lambda (message)
+                    (push (if (equal message '(:quit))
+                              '(:app-quit-requested)
+                              message)
+                          messages)))
+    (is (equal '((:editor-request-quit)) messages))
+    (let ((result (funcall update (first messages) state)))
+      (is (search "Unsaved changes"
+                  (prin1-to-string (elmtui.state.api:ur-patches result))
+                  :test #'char-equal)))))
+
+(defparameter *support-only-example-components*
+  '("neon-kit" "tmux-hover-demo"))
+
+(defparameter *optional-example-files*
+  '("async-weather" "fzy-picker" "tmux-glider" "tmux-slider" "workbench"))
+
+(test example-source-inventory-is-classified-and-smoke-covered
+  "Default ASDF files, optional files, and README classifications stay aligned."
+  (asdf:load-system :elmtui-examples)
+  (let* ((components
+           (mapcar #'asdf:component-name
+                   (asdf:component-children (asdf:find-system "elmtui-examples"))))
+         (maintained (mapcar #'first *maintained-examples*))
+         (accounted (append maintained *support-only-example-components*))
+         (source-files (mapcar #'pathname-name (directory #P"examples/*.lisp")))
+         (classified-files (append components *optional-example-files*))
+         (readme (uiop:read-file-string "examples/README.md")))
+    (is (null (set-difference components accounted :test #'string=))
+        "Every default component must be smoke-covered or support-only: ~S"
+        (set-difference components accounted :test #'string=))
+    (is (null (set-difference accounted components :test #'string=))
+        "Smoke/support entries must be default system components: ~S"
+        (set-difference accounted components :test #'string=))
+    (is (null (set-difference source-files classified-files :test #'string=))
+        "Every top-level Lisp example must be default or explicitly optional: ~S"
+        (set-difference source-files classified-files :test #'string=))
+    (is (null (set-difference classified-files source-files :test #'string=))
+        "Inventory entries must resolve to real top-level Lisp files: ~S"
+        (set-difference classified-files source-files :test #'string=))
+    (dolist (name source-files)
+      (is (search (format nil "`~A.lisp`" name) readme)
+          "README must classify ~A.lisp" name))
+    (is (search "`examples/support/fzy-loader.lisp`" readme)
+        "The nested optional-system loader must be classified too.")))
+
+(test examples-cli-list-excludes-support-and-script-files
+  "The CLI list includes runnable apps, not support sources or standalone scripts."
+  (let ((names (elmtui.examples.runner:list-implemented-examples)))
+    (is (member "async-weather" names :test #'string=))
+    (is (member "neon-glider" names :test #'string=))
+    (is (not (member "neon-kit" names :test #'string=)))
+    (is (not (member "workbench" names :test #'string=)))))
+
+(test examples-cli-rejects-support-files-with-a-specific-error
+  "Support sources fail before they are treated as runnable applications."
+  (dolist (runner (list #'elmtui.examples.runner::run-example
+                        #'elmtui.examples.runner::build-example-binary))
+    (let ((message
+            (handler-case
+                (progn (funcall runner "neon-kit") nil)
+              (error (condition) (princ-to-string condition)))))
+      (is (search "no examples CLI runner" message :test #'char-equal)))))
