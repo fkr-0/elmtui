@@ -62,6 +62,27 @@
 /.crush/
 \#1A(
 
+# Locally retained unreferenced top-level scripts/docs (tree minimalized 2026-10-12)
+/apispec.yml
+/architecture_design.md
+/contracts.md
+/PIPELINE_MIGRATION.md
+/PLAN.md
+/roadmap.org
+/run.sh
+/rt.sh
+/run-test.lisp
+/run-test-verbose.lisp
+/run-tests.lisp
+/test-compile.lisp
+/run-dirlister.lisp
+/run-dirlister-slynk.lisp
+/run_canvas_examples.lisp
+/run-canvas-tests.lisp
+/run-tests-clpm-input.lisp
+/run-tests-clpm-styles.lisp
+/dev-setup.lisp
+
 # Locally built executables and maintained example images
 /elmtui
 /elmtui-packager
