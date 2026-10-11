@@ -140,12 +140,19 @@ class QualifierRegression(unittest.TestCase):
             "<pre>Literal <em>tag</em> & escaped</pre>",
             "<pre>Literal &lt;em&gt;tag&lt;/em&gt; &amp; escaped</pre>",
         )
-        with tempfile.TemporaryDirectory() as root:
-            md, page = Path(root) / "api.md", Path(root) / "api.html"
+        with tempfile.TemporaryDirectory(dir=ROOT) as root:
+            root_path = Path(root)
+            (root_path / "website").mkdir()
+            (root_path / "website" / "reference.md").write_text(
+                "**Current audited coverage: 1/1 (100.0%).**\n"
+                "0 public bindings lack documentation.\n"
+            )
+            md, page = root_path / "api.md", root_path / "api.html"
             md.write_text(markdown)
             page.write_text(html)
             live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", True)
-            with patch.object(MODULE, "live_entries", return_value=[live]):
+            with patch.object(MODULE, "ROOT", root_path), \
+                    patch.object(MODULE, "live_entries", return_value=[live]):
                 MODULE.qualify(markdown=md, html=page, strict_coverage=False)
 
     def test_strict_coverage_rejects_missing_metadata(self):
@@ -158,12 +165,19 @@ class QualifierRegression(unittest.TestCase):
             "_No documentation metadata._",
         )
         html = html.replace("<pre>Forms</pre>", "<pre>No documentation metadata.</pre>")
-        with tempfile.TemporaryDirectory() as root:
-            md, page = Path(root) / "api.md", Path(root) / "api.html"
+        with tempfile.TemporaryDirectory(dir=ROOT) as root:
+            root_path = Path(root)
+            (root_path / "website").mkdir()
+            (root_path / "website" / "reference.md").write_text(
+                "**Current audited coverage: 0/1 (0.0%).**\n"
+                "1 public bindings lack documentation.\n"
+            )
+            md, page = root_path / "api.md", root_path / "api.html"
             md.write_text(markdown)
             page.write_text(html)
             live = MODULE.Entry("ELMTUI.APP:DEFAPPLICATION", "macro", False)
-            with patch.object(MODULE, "live_entries", return_value=[live]):
+            with patch.object(MODULE, "ROOT", root_path), \
+                    patch.object(MODULE, "live_entries", return_value=[live]):
                 MODULE.qualify(markdown=md, html=page, strict_coverage=False)
                 with self.assertRaisesRegex(AssertionError, "REFERENCE-DOCSTRING-DEBT"):
                     MODULE.qualify(markdown=md, html=page, strict_coverage=True)
