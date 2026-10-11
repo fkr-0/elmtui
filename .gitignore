@@ -37,6 +37,31 @@
 *.zip
 *.7z
 
+# Locally retained historical docs/artifacts (removed from the tree 2026-10-11)
+/dummy.txt
+/roo_task_*.md
+/docs_old/
+/architecture_docs/
+/dirlister_poc/
+/ai_documentation_plan.md
+/example_review.md
+/prod-plan.md
+/rendering_ref_progress.md
+/review_render.md
+/roadmapv2.md
+/state_final_api.md
+/style-system-refactor-plan.md
+/tea_architecture_impl.md
+/transition.md
+/view_impl_plan.md
+/VIEW_STYLE_STATE_notes.md
+/WIDGET_ENHANCEMENT_SUMMARY.md
+/dsl-design.md
+/dsl.md
+/cl-styles-refactor-task.yml
+/.crush/
+\#1A(
+
 # Locally built executables and maintained example images
 /elmtui
 /elmtui-packager
