@@ -34,24 +34,127 @@
 
 (defun %initial-state () (list :networks nil :selected-index 0 :mode :browse :password "" :busy nil :status "Waiting for NetworkManager; press r to refresh now." :should-quit nil))
 
-(defun %selected-network (app-state) (let* ((networks (state-ref app-state :networks ' ())) (selected (state-ref app-state :selected-index 0))) (and networks (nth (min selected (1- (length networks))) networks))))
+(defun %network-list (app-state)
+  "Return the networks slot as a proper list.
+
+The hash-table state backend represents a NIL-valued initial key as an empty
+hash table, so sequence operations must guard against non-list values."
+  (let ((value (state-ref app-state :networks '())))
+    (if (listp value) value '())))
+
+(defun %flag-set-p (app-state key)
+  "Whether boolean flag KEY is genuinely set.
+
+NIL-valued initial keys can read back as empty hash tables; only non-empty,
+non-hash-table values count as set."
+  (let ((value (state-ref app-state key nil)))
+    (not (or (null value)
+             (and (hash-table-p value) (zerop (hash-table-count value)))))))
+
+(defun %selected-network (app-state) (let* ((networks (%network-list app-state)) (selected (state-ref app-state :selected-index 0))) (and networks (nth (min selected (1- (length networks))) networks))))
 
 (defun %selected-index-after-scan (app-state networks) (let ((previous (%selected-network app-state))) (or (and previous (position-if (lambda (network) (or (and (plusp (length (wifi-network-bssid previous))) (string= (wifi-network-bssid previous) (wifi-network-bssid network))) (string= (wifi-network-ssid previous) (wifi-network-ssid network)))) networks)) 0)))
 
 (defun %event-character (event) (or (key-event-char event) (and (characterp (key-event-key event)) (key-event-key event))))
 
-(defun %browse-key-update (event app-state) (let* ((key (key-event-key event)) (networks (state-ref app-state :networks ' ())) (selected (state-ref app-state :selected-index 0)) (network (%selected-network app-state))) (cond ((member key ' (:escape :q #\q #\Q) :test #'eql) (make-update-result :patches ' (((:should-quit) t)))) ((member key ' (:arrow-up :up #\k #\K) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (max 0 (1- selected)))))) ((member key ' (:arrow-down :down #\j #\J) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (if networks (min (1- (length networks)) (1+ selected)) 0))))) ((member key ' (:r #\r #\R) :test #'eql) (make-update-result :patches ' (((:busy) t) ((:status) "Refreshing Wi-Fi networks...")) :commands (list (%scan-command :rescan t)))) ((member key ' (:d #\d #\D) :test #'eql) (if (and network (plusp (length (wifi-network-device network)))) (make-update-result :patches ' (((:busy) t) ((:status) "Disconnecting selected Wi-Fi device...")) :commands (list (%disconnect-command network))) (make-update-result :patches ' (((:status) "No disconnectable Wi-Fi network selected."))))) ((member key ' (:enter :return) :test #'eq) (cond ((null network) (make-update-result :patches ' (((:status) "No Wi-Fi network selected.")))) ((string= (wifi-network-ssid network) "") (make-update-result :patches ' (((:status) "Hidden SSIDs require a named profile and are not changed by this demo.")))) ((%secured-network-p network) (make-update-result :patches ' (((:mode) :password) ((:password) "") ((:status) "Enter the Wi-Fi password; Enter connects, Esc cancels.")))) (t (make-update-result :patches ' (((:busy) t) ((:status) "Connecting to open Wi-Fi network...")) :commands (list (%connect-command network nil)))))) (t (make-update-result)))))
+(defun %browse-key-update (event app-state) (let* ((key (key-event-key event)) (networks (%network-list app-state)) (selected (state-ref app-state :selected-index 0)) (network (%selected-network app-state))) (cond ((member key ' (:escape :q #\q #\Q) :test #'eql) (make-update-result :patches ' (((:should-quit) t)))) ((member key ' (:arrow-up :up #\k #\K) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (max 0 (1- selected)))))) ((member key ' (:arrow-down :down #\j #\J) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (if networks (min (1- (length networks)) (1+ selected)) 0))))) ((member key ' (:r #\r #\R) :test #'eql) (make-update-result :patches ' (((:busy) t) ((:status) "Refreshing Wi-Fi networks...")) :commands (list (%scan-command :rescan t)))) ((member key ' (:d #\d #\D) :test #'eql) (if (and network (plusp (length (wifi-network-device network)))) (make-update-result :patches ' (((:busy) t) ((:status) "Disconnecting selected Wi-Fi device...")) :commands (list (%disconnect-command network))) (make-update-result :patches ' (((:status) "No disconnectable Wi-Fi network selected."))))) ((member key ' (:enter :return) :test #'eq) (cond ((null network) (make-update-result :patches ' (((:status) "No Wi-Fi network selected.")))) ((string= (wifi-network-ssid network) "") (make-update-result :patches ' (((:status) "Hidden SSIDs require a named profile and are not changed by this demo.")))) ((%secured-network-p network) (make-update-result :patches ' (((:mode) :password) ((:password) "") ((:status) "Enter the Wi-Fi password; Enter connects, Esc cancels.")))) (t (make-update-result :patches ' (((:busy) t) ((:status) "Connecting to open Wi-Fi network...")) :commands (list (%connect-command network nil)))))) (t (make-update-result)))))
 
 (defun %password-key-update (event app-state) (let* ((key (key-event-key event)) (character (%event-character event)) (password (state-ref app-state :password "")) (network (%selected-network app-state))) (cond ((eq key :escape) (make-update-result :patches (quote (((:password) "") ((:should-quit) t))))) ((member key ' (:backspace :delete) :test #'eq) (make-update-result :patches (list (list ' (:password) (if (plusp (length password)) (subseq password 0 (1- (length password))) ""))))) ((member key ' (:enter :return) :test #'eq) (if (or (null network) (zerop (length password))) (make-update-result :patches ' (((:status) "A password is required for this network."))) (let ((command (%connect-command network password))) (make-update-result :patches ' (((:mode) :browse) ((:password) "") ((:busy) t) ((:status) "Connecting through NetworkManager...")) :commands (list command))))) ((and character (graphic-char-p character)) (make-update-result :patches (list (list ' (:password) (concatenate 'string password (string character)))))) (t (make-update-result)))))
 
-(defun wifi-menu-update (message app-state) "Update the NetworkManager Wi-Fi menu without running network commands inline." (cond ((and (consp message) (eq (first message) :keyevent) (typep (getf (rest message) :event) (quote key-event))) (wifi-menu-update (getf (rest message) :event) app-state)) ((typep message 'key-event) (if (eq (state-ref app-state :mode :browse) :password) (%password-key-update message app-state) (%browse-key-update message app-state))) ((and (consp message) (eq (first message) :wifi-refresh-tick)) (if (or (state-ref app-state :busy nil) (eq (state-ref app-state :mode :browse) :password)) (make-update-result) (make-update-result :patches ' (((:busy) t) ((:status) "Updating Wi-Fi networks...")) :commands (list (%scan-command :rescan nil))))) ((and (consp message) (eq (first message) :wifi-scan-succeeded)) (let ((networks (getf (rest message) :networks ' ()))) (make-update-result :patches (list (list ' (:networks) networks) (list ' (:selected-index) (%selected-index-after-scan app-state networks)) (list ' (:busy) nil) (list ' (:status) (format nil "~D Wi-Fi network~:P visible." (length networks))))))) ((and (consp message) (member (first message) ' (:wifi-connect-succeeded :wifi-disconnect-succeeded) :test #'eq)) (make-update-result :patches (quote (((:busy) nil) ((:password) "") ((:should-quit) t))))) ((and (consp message) (eq (first message) :wifi-operation-failed)) (make-update-result :patches (list (list ' (:busy) nil) (list ' (:password) "") (list ' (:mode) :browse) (list ' (:status) (format nil "NetworkManager error: ~A" (getf (rest message) :message "unknown error")))))) ((and (consp message) (eq (first message) :app-quit-requested)) (make-update-result :patches ' (((:should-quit) t)))) (t (make-update-result))))
+(defun wifi-menu-update (message app-state) "Update the NetworkManager Wi-Fi menu without running network commands inline." (cond ((and (consp message) (eq (first message) :keyevent) (typep (getf (rest message) :event) (quote key-event))) (wifi-menu-update (getf (rest message) :event) app-state)) ((typep message 'key-event) (if (eq (state-ref app-state :mode :browse) :password) (%password-key-update message app-state) (%browse-key-update message app-state))) ((and (consp message) (eq (first message) :wifi-refresh-tick)) (if (or (%flag-set-p app-state :busy) (eq (state-ref app-state :mode :browse) :password)) (make-update-result) (make-update-result :patches ' (((:busy) t) ((:status) "Updating Wi-Fi networks...")) :commands (list (%scan-command :rescan nil))))) ((and (consp message) (eq (first message) :wifi-scan-succeeded)) (let ((networks (getf (rest message) :networks ' ()))) (make-update-result :patches (list (list ' (:networks) networks) (list ' (:selected-index) (%selected-index-after-scan app-state networks)) (list ' (:busy) nil) (list ' (:status) (format nil "~D Wi-Fi network~:P visible." (length networks))))))) ((and (consp message) (member (first message) ' (:wifi-connect-succeeded :wifi-disconnect-succeeded) :test #'eq)) (make-update-result :patches (quote (((:busy) nil) ((:password) "") ((:should-quit) t))))) ((and (consp message) (eq (first message) :wifi-operation-failed)) (make-update-result :patches (list (list ' (:busy) nil) (list ' (:password) "") (list ' (:mode) :browse) (list ' (:status) (format nil "NetworkManager error: ~A" (getf (rest message) :message "unknown error")))))) ((and (consp message) (eq (first message) :app-quit-requested)) (make-update-result :patches ' (((:should-quit) t)))) (t (make-update-result))))
 
 (defun %network-line (network selected-p) (format nil "~A ~A ~3D% ~12A ~A" (if selected-p ">" " ") (if (wifi-network-active-p network) "*" " ") (wifi-network-signal network) (if (%secured-network-p network) (wifi-network-security network) "open") (if (string= (wifi-network-ssid network) "") "<hidden>" (wifi-network-ssid network))))
 
-(defun wifi-menu-view (app-state) "Render a compact nmcli-backed Wi-Fi chooser." (let* ((networks (state-ref app-state :networks ' ())) (selected (state-ref app-state :selected-index 0)) (status (state-ref app-state :status "")) (busy (state-ref app-state :busy nil)) (mode (state-ref app-state :mode :browse)) (password (state-ref app-state :password ""))) ` (:container :id :wifi-menu-content :style (:display :flex :flex-direction :column :width 78 :height 20) :children ((:text :id :title :content "Wi-Fi / NetworkManager" :style (:bold t :fg-color :cyan)) (:text :id :status :content , (format nil "~A~A" (if busy "[working] " "") status) :style (:fg-color :yellow)) (:container :id :networks :style (:display :flex :flex-direction :column :height 14 :width 78) :children , (if networks (loop for network in networks for index from 0 collect ` (:text :id , (intern (format nil "WIFI-~D" index) :keyword) :content , (%network-line network (= index selected)))) (list ' (:text :id :no-networks :content "No scan results yet.")))) ,@ (when (eq mode :password) (list ` (:text :id :password :content , (format nil "Password: ~A" (make-string (length password) :initial-element #\*))))) (:text :id :help :content "Up/Down select | Enter connect | d disconnect | r rescan | q/Esc quit")))))
+(defparameter +panel-width+ 78
+  "Painted width of every Wi-Fi panel row.")
+
+(defparameter +visible-network-rows+ 8
+  "Maximum network rows shown at once; the window follows the selection.")
+
+(defun %neon-style (role)
+  "Map a semantic ROLE onto the neon-kit palette (fg, bg, bold)."
+  (case role
+    (:title    '(:fg-color (97 233 250)  :bg-color (18 34 57) :bold t))
+    (:accent   '(:fg-color (248 199 115) :bg-color (10 17 31) :bold t))
+    (:selected '(:fg-color (103 245 206) :bg-color (18 34 57) :bold t))
+    (:danger   '(:fg-color (254 124 149) :bg-color (10 17 31) :bold t))
+    (:muted    '(:fg-color (125 143 169) :bg-color (10 17 31)))
+    (:footer   '(:fg-color (190 171 250) :bg-color (18 25 45)))
+    (t          '(:fg-color (216 225 242) :bg-color (10 17 31)))))
+
+(defun %neon-row-style (role)
+  "Full style plist for one panel row carrying ROLE."
+  (append (list :width +panel-width+ :height 1) (%neon-style role)))
+
+(defun %clip-text (text width)
+  (let ((s (or text "")))
+    (if (<= (length s) width) s (subseq s 0 width))))
+
+(defun %network-window (networks selected &optional (limit +visible-network-rows+))
+  "Window Networks around SELECTED, returning visible rows and start index."
+  (let* ((count (length networks))
+         (start (max 0 (min (max 0 (- selected (1- limit))) (max 0 (- count limit)))))
+         (end (min count (+ start limit))))
+    (values (subseq networks start end) start)))
+
+(defun wifi-menu-view (app-state)
+  "Render the neon-styled adaptive nmcli Wi-Fi chooser.
+
+The panel height tracks discovery: title, status, one row per visible
+network (windowed around the selection), an optional password row, and a
+help row. With no results the panel collapses to four rows and grows as
+networks appear, up to the windowed maximum."
+  (let* ((networks (%network-list app-state))
+         (selected (state-ref app-state :selected-index 0))
+         (status (state-ref app-state :status ""))
+         (busy (%flag-set-p app-state :busy))
+         (mode (state-ref app-state :mode :browse))
+         (password (state-ref app-state :password ""))
+         (password-p (eq mode :password))
+         (body-rows
+           (if (null networks)
+               (list `(:text :id :no-networks
+                        :content ,(%clip-text "No scan results yet." +panel-width+)
+                        :style ,(%neon-row-style :muted)))
+               (multiple-value-bind (visible start)
+                   (%network-window networks selected)
+                 (loop for network in visible
+                       for index from start
+                       for role = (cond ((= index selected) :selected)
+                                        ((wifi-network-active-p network) :accent)
+                                        (t :body))
+                       collect `(:text :id ,(intern (format nil "WIFI-~D" index) :keyword)
+                                 :content ,(%clip-text (%network-line network (= index selected))
+                                                       +panel-width+)
+                                 :style ,(%neon-row-style role))))))
+         (height (+ 2 (length body-rows) (if password-p 1 0) 1)))
+    `(:container :id :wifi-menu-content
+       :style (:display :flex :flex-direction :column
+               :width ,+panel-width+ :height ,height :gap 0 :padding 0)
+       :children
+       ((:text :id :title
+          :content ,(%clip-text "Wi-Fi / NetworkManager" +panel-width+)
+          :style ,(%neon-row-style :title))
+        (:text :id :status
+          :content ,(%clip-text (format nil "~A~A" (if busy "⟳ " "") status) +panel-width+)
+          :style ,(%neon-row-style (if busy :danger :accent)))
+        ,@body-rows
+        ,@(when password-p
+            (list `(:text :id :password
+                     :content ,(%clip-text
+                                (format nil "Password: ~A"
+                                        (make-string (length password)
+                                                     :initial-element #\*))
+                                +panel-width+)
+                     :style ,(%neon-row-style :danger))))
+        (:text :id :help
+          :content ,(%clip-text
+                     "Up/Down select | Enter connect | d disconnect | r rescan | q/Esc quit"
+                     +panel-width+)
+          :style ,(%neon-row-style :footer))))))
 
 (defun wifi-subscriptions (app-state) (declare (ignore app-state)) ' (:timer (:interval 5.0 :message (:wifi-refresh-tick))))
 
-(defapplication wifi-menu-app :root-viewport-id :wifi-menu-root :root-component-dsl ' (:root-viewport :id :wifi-menu-root :anchor :below-cursor :width 80 :height 20 :blank-on-exit t :child-dsl-spec (:view nil) :overflow-policy :scroll) :initial-state-fn #'%initial-state :update-fn #'wifi-menu-update :view-fn #'wifi-menu-view :subscriptions-fn (lambda (state) (wifi-subscriptions state)))
+(defapplication wifi-menu-app :root-viewport-id :wifi-menu-root :root-component-dsl ' (:root-viewport :id :wifi-menu-root :anchor :below-cursor :width 80 :height 13 :blank-on-exit t :child-dsl-spec (:view nil) :overflow-policy :scroll) :initial-state-fn #'%initial-state :update-fn #'wifi-menu-update :view-fn #'wifi-menu-view :subscriptions-fn (lambda (state) (wifi-subscriptions state)))
 
 (defun run-wifi-menu (&key (backend-type :terminal) platform-options argv) "Run the nmcli-backed Wi-Fi chooser." (run-wifi-menu-app :platform backend-type :platform-options platform-options :argv argv))

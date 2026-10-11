@@ -209,6 +209,39 @@
     (is (null (find "correct horse battery staple" argv :test #'string=)))
     (is (null (find "password" argv :test #'string=)))))
 
+(test wifi-menu-panel-height-adapts-to-discovery
+  (%assert-example-loads-and-has-entry "wifi-menu")
+  (let* ((pkg (find-package :elmtui.examples.wifi-menu))
+         (make-network (symbol-function (find-symbol "MAKE-WIFI-NETWORK" pkg)))
+         (view (symbol-function (find-symbol "WIFI-MENU-VIEW" pkg)))
+         (init (symbol-function (find-symbol "INITIALIZE-APP-STATE-WIFI-MENU-APP" pkg)))
+         (state (funcall init)))
+    (flet ((panel-height (s)
+             (getf (getf (rest (funcall view s)) :style) :height))
+           (child-ids (s)
+             (loop for child in (getf (rest (funcall view s)) :children)
+                   collect (getf (rest child) :id)))
+           (networks-for (count)
+             (loop for i below count
+                   collect (funcall make-network
+                                    :ssid (format nil "Net-~D" i)
+                                    :signal (- 90 i)))))
+      ;; Minimal panel before any scan: chrome plus one placeholder row.
+      (is (= 4 (panel-height state)))
+      ;; The panel grows one row per discovered network.
+      (setf (elmtui.state.api:state-ref state :networks) (networks-for 3))
+      (is (= 6 (panel-height state)))
+      ;; Beyond the visible-row window the panel stops growing...
+      (setf (elmtui.state.api:state-ref state :networks) (networks-for 12))
+      (is (= 11 (panel-height state)))
+      ;; ...and the window follows the selection.
+      (setf (elmtui.state.api:state-ref state :selected-index) 11)
+      (is (= 11 (panel-height state)))
+      (is (find :wifi-11 (child-ids state)))
+      ;; Password entry adds exactly one row.
+      (setf (elmtui.state.api:state-ref state :mode) :password)
+      (is (= 12 (panel-height state))))))
+
 (test maintained-example-wrappers-delegate-to-generated-runners
   (dolist (spec '(("focus-simple" "ELMTUI.EXAMPLES.FOCUS-SIMPLE" "RUN-FOCUS-SIMPLE" "RUN-FOCUS-SIMPLE-APP"
                     (:backend-type :fake) (:platform :fake :platform-options nil :argv nil))
