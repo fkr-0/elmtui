@@ -82,6 +82,18 @@ The project follows semantic versioning from the first published release.
 
 ### Removed
 
+- Minimalized the tracked top level to the necessary configuration and
+  load-bearing entry points: unreferenced legacy planning documents
+  (`apispec.yml`, `architecture_design.md`, `contracts.md`,
+  `PIPELINE_MIGRATION.md`, `PLAN.md`, `roadmap.org`) and superseded local
+  runner/one-off scripts (`run.sh`, `rt.sh`, `run-tests.lisp`,
+  `run-test.lisp`, `run-test-verbose.lisp`, `test-compile.lisp`,
+  `run-dirlister*.lisp`, `run_canvas_examples.lisp`,
+  `run-canvas-tests.lisp`, `run-tests-clpm-input.lisp`,
+  `run-tests-clpm-styles.lisp`, `dev-setup.lisp`) were removed from the
+  tree (working copies retained locally and ignored). CI-referenced
+  runners, the CLPM bundle files, documented entry points (`examples.sh`,
+  `exe`), and the coverage harness remain.
 - Removed the process-global rendering diagnostics API, including
   `rendering-stats`, `get-rendering-stats`, and `reset-rendering-stats`.
   Pure diff metrics remain per-call values and output counters require
