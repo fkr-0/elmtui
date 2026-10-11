@@ -34,11 +34,24 @@ tips or tags will reintroduce their objects and fail that guard.
 
 ## Scope and publication boundary
 
-The cleanroom was created from the local repository, including branch and
-tag refs, using a bare mirror and `git filter-repo --invert-paths
---paths-from-file scripts/history-purge-paths.txt`. Commit identities,
-including the public v0.2.0 tag's target, changed. The original working
-repository, dirty files and remote were **not** changed or force-pushed.
+The original repository at `/home/user/code/lisp/elmtui.lisp` was
+rewritten **in place** on 2026-10-12, including all local branches, tags,
+stash and auxiliary refs, with:
+
+```sh
+git filter-repo --force --invert-paths \
+  --paths-from-file scripts/history-purge-paths.txt
+```
+
+All historical commit IDs, including the local v0.2.0 tag's target, changed.
+A pre-filter mirror backup is stored outside the rewritten repository under
+`/home/user/code/lisp/.worktrees/elmtui-original-before-filter-20261012.git`.
+Linked worktrees' dirty patches and status inventories are preserved under
+`/home/user/code/lisp/.worktrees/elmtui-pre-filter-worktrees/`.
+Only indexes for purged paths were updated in linked worktrees; old local
+files remain on disk and are ignored via the main repository's local
+`.git/info/exclude`, not deleted. The GitHub remote URL was restored after
+filter-repo removed it; **no remote fetch or force-push occurred**.
 
 Rewriting a repository with published refs requires coordinating all
 contributors, dependent worktrees and automation. The rewrite is a new
