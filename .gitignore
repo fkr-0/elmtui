@@ -81,6 +81,7 @@
 /rainbow-app
 /root-viewport-test-app
 /scroll-panel-demo
+/wifi-inline
 
 ### Emacs ###
 # -*- mode: gitignore; -*-

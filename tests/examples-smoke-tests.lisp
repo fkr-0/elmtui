@@ -38,7 +38,8 @@
     ("root-viewport-test-app" "ROOT-VIEWPORT-TEST-APP")
     ("scroll-panel-demo" "SCROLL-PANEL-DEMO-APP")
     ("tmux-idle-screensaver" "TMUX-IDLE-APP")
-    ("wifi-menu" "WIFI-MENU-APP")))
+    ("wifi-menu" "WIFI-MENU-APP")
+    ("wifi-inline" "WIFI-INLINE-APP")))
 
 
 (defparameter *dropped-legacy-example-files*
