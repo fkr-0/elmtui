@@ -172,6 +172,14 @@ no global diagnostics are read or updated."
     (stream
       (write-string string stream))))
 
+(defun %physical-glyph-columns (glyph) "Display width of one terminal glyph, including combining and wide cells." (let ((code (char-code glyph))) (cond ((or (< code 32) (= code 127) (= code 8205) (= code 8204) (<= 768 code 879) (<= 6832 code 6911) (<= 7616 code 7679) (<= 8400 code 8447) (<= 65024 code 65039) (<= 917760 code 917999)) 0) ((or (<= 4352 code 4447) (<= 9001 code 9002) (<= 11904 code 42191) (<= 44032 code 55203) (<= 63744 code 64255) (<= 65040 code 65055) (<= 65281 code 65376) (<= 65504 code 65510) (<= 127744 code 129791)) 2) (t 1))))
+
+(defun %physical-run-columns (characters)
+  "Physical terminal-cell advance after emitting CHARACTERS."
+  (loop for glyph across characters sum (%physical-glyph-columns glyph)))
+
+(defun %clip-physical-diff-operations (operations columns rows origin-row origin-col) "Clip viewport-local styled runs against physical screen cell coordinates. No cursor command or printable byte may address outside the current pane. Wide glyphs are indivisible; combining marks follow a visible base." (if (not (and (plusp columns) (plusp rows))) nil (loop for op in operations append (if (not (eq (getf op :type) :write-chars)) (list op) (let* ((row (getf op :row)) (x (+ origin-col (getf op :start-col))) (base nil) (out (make-string-output-stream)) (last-visible nil)) (when (and (eq (getf op :type) :write-chars) (integerp row) (< -1 (+ origin-row row) rows)) (loop for glyph across (getf op :chars) for width = (%physical-glyph-columns glyph) do (cond ((zerop width) (when last-visible (write-char glyph out))) ((and (<= 0 x) (<= (+ x width) columns)) (unless base (setf base x)) (write-char glyph out) (setf last-visible t)) (t (setf last-visible nil))) do (incf x width)) (when base (list (list :type :write-chars :row row :start-col (- base origin-col) :chars (get-output-stream-string out) :style (getf op :style))))))))))
+
 (defun apply-diff-to-backend (diff-ops backend-instance
                                terminal-offset-row terminal-offset-col)
   "Apply a list of diff operations (DIFF-OPS) to BACKEND-INSTANCE.
@@ -181,6 +189,10 @@ TERMINAL-OFFSET-ROW/COL shift the canvas so its (0,0) lands on the terminal."
   (check-type diff-ops list)
   (check-type terminal-offset-row (integer 0 *))
   (check-type terminal-offset-col (integer 0 *))
+  (setf diff-ops (%clip-physical-diff-operations
+                   diff-ops (elmtui.platform.api:term-w backend-instance)
+                   (elmtui.platform.api:term-h backend-instance)
+                   terminal-offset-row terminal-offset-col))
 
   (with-terminal-lock (backend-instance)
     (let* ((stats (terminal-instance-output-stats backend-instance))
@@ -220,7 +232,7 @@ TERMINAL-OFFSET-ROW/COL shift the canvas so its (0,0) lands on the terminal."
             (%write-string device stream chars)
             (incf (terminal-output-stats-ops-processed stats))
             (incf (terminal-output-stats-chars-written stats) (length chars))
-            (incf cursor-col (length chars))
+            (incf cursor-col (%physical-run-columns chars))
             (setf last-row term-row)))))
 
     ;; Leave terminal tidy and flush output

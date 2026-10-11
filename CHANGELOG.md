@@ -101,6 +101,14 @@ The project follows semantic versioning from the first published release.
 
 ### Fixed
 
+- Clipped terminal diff writes to physical pane cells, including double-width
+  and combining glyphs, counted cursor movement in physical columns, and dropped
+  combining marks belonging to clipped glyphs. Reconciled tmux underlay restoration
+  after pane shrink/grow. Added focused regression coverage and a real tmux
+  history/style, key movement, idle-output and terminal-cleanup E2E gate.
+  On live pane shrink, tmux may temporarily move displayed overlay rows into
+  scrollback; normal-screen mode guarantees preservation of older history and
+  exact restoration after application exit, not zero transient scrollback writes.
 - Hardened `wifi-menu` state reads against the hash-table state backend's
   representation of NIL-valued initial keys (empty hash tables): the busy flag
   now uses an explicit set-flag predicate and network lists are guarded before
