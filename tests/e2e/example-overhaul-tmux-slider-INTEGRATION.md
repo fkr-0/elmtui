@@ -83,7 +83,7 @@ When EX-10 independently passes all acceptance tests and is committed:
 
 1. Add `examples/tmux-slider.lisp` to `elmtui-examples.asd` in the maintained
    examples component list, after the tmux examples it depends on.
-2. Register the `tmux-slider` argument in `examples.sh` with runner
+2. Register the `tmux-slider` argument in `scripts/examples.sh` with runner
    `(elmtui.examples.tmux-slider:run-tmux-slider)`.
 3. Update `examples/README.md` to document tmux requirement, capture
    preconditions, speed/finite-frame options, pause and quit controls,

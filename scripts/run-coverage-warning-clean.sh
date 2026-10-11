@@ -15,7 +15,7 @@ REPORT="${ROOT_DIR}/coverage/cover-index.html"
 cd "${ROOT_DIR}"
 
 set +e
-clpm bundle exec --with-client sbcl -- --noinform --load coverage.lisp \
+clpm bundle exec --with-client sbcl -- --noinform --load scripts/coverage.lisp \
   >"${STDOUT_LOG}" 2>"${STDERR_LOG}"
 rc=$?
 set -e

@@ -53,7 +53,7 @@ def run(name, header, controls, quit_keys):
         fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
 
     proc = subprocess.Popen(
-        [str(ROOT / "examples.sh"), "run", name],
+        [str(ROOT / "scripts/examples.sh"), "run", name],
         cwd=ROOT, stdin=slave, stdout=slave, stderr=slave, close_fds=True,
         preexec_fn=child_tty,
         env={**os.environ, "TERM": "xterm-256color"},

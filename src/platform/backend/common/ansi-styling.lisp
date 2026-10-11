@@ -203,7 +203,7 @@
   "Turn a list of strings/numbers into a full ESC[…m sequence."
   ;; (log-info "PARTS: ~A" parts)
   (format nil "~C[~{~A~}m" (code-char 27) parts))
-;; == uncharming-tui/lowterm/terminal-style/color.lisp ==
+;; == Terminal color tables and helpers ==
 ;; -------- Colour code tables & helpers --------
 
 (defparameter *basic-colors*
@@ -231,7 +231,7 @@
 ;;   (format nil "[~{~A~}m" parts))
 ;; == end/color.lisp ==
 
-;; == uncharming-tui/lowterm/terminal-style/to-ansi.lisp ==
+;; == ANSI serialization ==
 (defmethod to-ansi-seq ((col t)  &key bg)
   (cond
     ;; ---------- reset -------------
@@ -303,7 +303,7 @@ bg or fg, that causes the terminal to use the default color.
 
 ;; == end/to-ansi.lisp ==
 
-;; == uncharming-tui/lowterm/terminal-style/attributes.lisp ==
+;; == Terminal attributes ==
 (defparameter *attr-code*
   '((:bold         1 22)
     (:italic       3 23)

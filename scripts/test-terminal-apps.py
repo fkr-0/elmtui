@@ -52,13 +52,13 @@ class TerminalApp:
             command.extend(['--eval', '(asdf:load-system "elmtui-examples")'])
         command.extend(['--eval', self.expression])
         if self.source == 'wifi-menu.lisp' and self.use_launcher:
-            command = [str(ROOT / 'examples.sh'), 'run', 'wifi-menu']
+            command = [str(ROOT / 'scripts/examples.sh'), 'run', 'wifi-menu']
         elif self.use_launcher and self.name in {
                 'minimal', 'focus', 'keymap', 'scroll', 'life'}:
             example = {'minimal': 'minimal-app', 'focus': 'focus-simple',
                        'keymap': 'keymap-app', 'scroll': 'scroll-panel-demo',
                        'life': 'game-of-life'}[self.name]
-            command = [str(ROOT / 'examples.sh'), 'run', example]
+            command = [str(ROOT / 'scripts/examples.sh'), 'run', example]
         # Capture errors separately: log strings must never satisfy screen checks.
         script = self.directory / 'launch.sh'
         script.write_text('#!/bin/sh\ncd ' + shlex.quote(str(ROOT)) + '\n'

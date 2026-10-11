@@ -49,12 +49,14 @@ jobs:
             (let ((pkg (find-package p)))
               (when pkg (sb-ext:unlock-package pkg))))
           SBCLRC
+      - name: Verify release-tree and Git history hygiene
+        run: python3 -m unittest discover -s tests -p 'test_release_tree.py' -v
       - name: Verify cold ASDF compilation and package prerequisites
         run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:compile-system :elmtui :force t)'
       - name: Verify exported symbol identities and facade manifest
         run: python3 scripts/audit-facade-exports.py
       - name: Run FiveAM regression suite
-        run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load run-tests-clpm.lisp
+        run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp
       - name: Verify independent subproject bundles and public dependency direction
         run: scripts/test-subproject-bundles.sh
       - name: Verify reusable libraries inside the root CLPM bundle

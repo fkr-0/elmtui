@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 class StartupOutput(unittest.TestCase):
     def test_fresh_process_list_is_quiet(self):
         result = subprocess.run(
-            [str(ROOT / "examples.sh"), "list"], cwd=ROOT,
+            [str(ROOT / "scripts/examples.sh"), "list"], cwd=ROOT,
             text=True, capture_output=True, timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stderr)

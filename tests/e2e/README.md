@@ -1,7 +1,7 @@
 # Terminal application end-to-end tests
 
 These tests run actual example applications in fresh CLPM/SBCL processes through
-private tmux PTYs. Wi-Fi scenarios invoke the public `./examples.sh run wifi-menu`
+private tmux PTYs. Wi-Fi scenarios invoke the public `./scripts/examples.sh run wifi-menu`
 launcher. Their temporary `nmcli` executable returns deterministic networks and
 records connection requests, so the tests never change the host's Wi-Fi state.
 Secure network fixtures exercise Up/Down selection, password masking, typing,

@@ -64,7 +64,7 @@ class NativeUrxvt(unittest.TestCase):
             + "\n".join("printf '\\033[%d;1HROW-%02d'" % (row, row)
                         for row in range(1, 36))
             + "\nprintf '\\033[35;9H'\n"
-            + shlex.quote(str(ROOT / "examples.sh")) + " run wifi-menu 2>" + q("stderr.txt") + "\n"
+            + shlex.quote(str(ROOT / "scripts/examples.sh")) + " run wifi-menu 2>" + q("stderr.txt") + "\n"
             + 'status=$?\nprintf "%s\\n" "$status" > ' + q("exit-code") + "\n"
             + "stty -g > " + q("after.stty") + "\n"
             + shlex.quote(sys.executable) + " " + q("cursor-probe.py") + " " + q("cursor.json")

@@ -1,6 +1,6 @@
 ;;; ===============================================================
 ;;; File: src/view/geo.lisp
-;;; Geometric Primitives (Ported/Refactored from uncharming-tui.geo)
+;;; Geometric Primitives (ElmTUI geometry module)
 ;;; ===============================================================
 (uiop:define-package :elmtui.view.geo
   (:use #:cl)

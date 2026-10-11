@@ -54,7 +54,7 @@ class LogIsolation(unittest.TestCase):
                         fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
 
                     proc = subprocess.Popen(
-                        [str(ROOT / "examples.sh"), "run", example],
+                        [str(ROOT / "scripts/examples.sh"), "run", example],
                         cwd=ROOT, stdin=slave, stdout=slave, stderr=slave,
                         close_fds=True, preexec_fn=tty_child,
                         env={**os.environ, "TERM": "xterm-256color"},

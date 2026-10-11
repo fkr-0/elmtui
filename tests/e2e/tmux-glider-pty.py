@@ -164,7 +164,7 @@ class GliderTerminalPTY(unittest.TestCase):
         if driver_dir not in sys.path:
             sys.path.insert(0, driver_dir)
         from pty_driver import PrivateTmuxPTY
-        with PrivateTmuxPTY(["./run-glider.sh"], cols=100, rows=35,
+        with PrivateTmuxPTY(["./scripts/run-glider.sh"], cols=100, rows=35,
                             timeout=20) as terminal:
             first = terminal.wait_for("█", timeout=17)
             self.assertEqual(first.count("█"), 5)
@@ -177,7 +177,7 @@ class GliderTerminalPTY(unittest.TestCase):
         env = dict(os.environ)
         env.pop("TMUX", None)
         env.pop("TMUX_PANE", None)
-        result = subprocess.run([str(ROOT / "run-glider.sh")], cwd=ROOT, env=env,
+        result = subprocess.run([str(ROOT / "scripts/run-glider.sh")], cwd=ROOT, env=env,
                                 text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 2)
         self.assertIn("requires a live tmux pane", result.stderr)

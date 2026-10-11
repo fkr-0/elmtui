@@ -4,14 +4,14 @@ Runnable example applications make the ElmTUI concepts concrete. Begin with the 
 
 | Example | Role | Command |
 |---|---|---|
-| Minimal application | TEA update/view contract | `./examples.sh run minimal-app` |
-| Mini text editor | Editable buffer and asynchronous saving | `./examples.sh run mini-text-editor` |
-| Neon Pong | Input, animation and telemetry | `./examples.sh run neon-pong` |
-| Neon Tetris | Game loop and dynamic layout | `./examples.sh run neon-tetris` |
-| Neon Nano | Styled text editor with save flow | `./examples.sh run neon-nano` |
-| Neon Less | Read-only file viewer | `./examples.sh run neon-less` |
-| Key tester | Terminal key decoder instrumentation | `./examples.sh run key-tester` |
-| Wi-Fi menu | Asynchronous external-tool integration | `./examples.sh run wifi-menu` |
+| Minimal application | TEA update/view contract | `./scripts/examples.sh run minimal-app` |
+| Mini text editor | Editable buffer and asynchronous saving | `./scripts/examples.sh run mini-text-editor` |
+| Neon Pong | Input, animation and telemetry | `./scripts/examples.sh run neon-pong` |
+| Neon Tetris | Game loop and dynamic layout | `./scripts/examples.sh run neon-tetris` |
+| Neon Nano | Styled text editor with save flow | `./scripts/examples.sh run neon-nano` |
+| Neon Less | Read-only file viewer | `./scripts/examples.sh run neon-less` |
+| Key tester | Terminal key decoder instrumentation | `./scripts/examples.sh run key-tester` |
+| Wi-Fi menu | Asynchronous external-tool integration | `./scripts/examples.sh run wifi-menu` |
 | Workbench | Interactive REPL, completion, inspector | See [Workbench](workbench.md) |
 
 The [maintained examples catalog](guide/examples-catalog.md) records keybindings, configuration variables and known limitations. Live interactive PTY behavior remains part of the release gate; an example being present is not proof of passing tests.

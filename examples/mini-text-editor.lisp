@@ -1,5 +1,5 @@
 ;;;; Mini text editor -- self-contained ElmTUI TEA application.
-;;;; Run with ELMTUI_EDITOR_FILE=/tmp/notes.txt ./examples.sh run mini-text-editor
+;;;; Run with ELMTUI_EDITOR_FILE=/tmp/notes.txt ./scripts/examples.sh run mini-text-editor
 (uiop:define-package :elmtui.examples.mini-text-editor
   (:use :cl)
   (:import-from :elmtui.app #:defapplication)

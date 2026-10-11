@@ -18,9 +18,9 @@ clpm bundle install
 ## Try an existing application
 
 ```sh
-./examples.sh list
-./examples.sh run minimal-app
-./examples.sh run neon-pong
+./scripts/examples.sh list
+./scripts/examples.sh run minimal-app
+./scripts/examples.sh run neon-pong
 ```
 
 The complete executable and keybinding catalog is in [Examples](examples.md). Some examples require external executables (such as NetworkManager's `nmcli`) or wider terminal dimensions.

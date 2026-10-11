@@ -241,7 +241,7 @@ clpm bundle exec --with-client sbcl -- \
 
 See [[file:examples/README.md][examples/README.md]] for the curated example map and
 entry points.  Command-line example discovery/building is intentionally outside
-the core =elmtui= system: =./examples.sh list= loads the dedicated
+the core =elmtui= system: =./scripts/examples.sh list= loads the dedicated
 =elmtui-examples-cli= ASDF system.  Image packaging similarly lives in
 =elmtui-packager=, so loading =elmtui= alone does not intern either CLI package.
 
@@ -251,7 +251,7 @@ Run the root integration suite:
 
 #+begin_src sh
 clpm bundle exec --with-client sbcl -- \
-  --noinform --load run-tests-clpm.lisp
+  --noinform --load scripts/run-tests-clpm.lisp
 #+end_src
 
 Run every reusable subsystem independently:
