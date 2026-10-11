@@ -79,7 +79,9 @@
                                ;; (:file "state-extended-tests")
                                (:file "platform-tests")
                                (:file "faketerm-tests")
-               (:file "terminal-lifecycle-tests"))))
+               (:file "terminal-lifecycle-tests")
+                               (:module "render" :serial t
+                                :components ((:file "normal-screen-physical-clipping-tests"))))))
   ;; (:file "app-tests")
   ;; (:file "ui-widgets-tests")
   ;; (:file "view-extended-tests")
