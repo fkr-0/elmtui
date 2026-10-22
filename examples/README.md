@@ -105,7 +105,8 @@ rather than silently replacing an existing unreadable file.
 | File | Purpose |
 |---|---|
 | `key-tester.lisp` | Inspect decoded keyboard events |
-| `cursor-inspector.lisp` | Inspect cursor and terminal positioning behavior |
+| `tmux-cursor-inspector.lisp` | Move a real, reversible cell cursor-box and SGR tooltip over the existing tmux pane |
+| `cursor-inspector.lisp` | Legacy inspector state/view API and dashboard compatibility |
 | `input-selector.lisp` | Select and exercise input-related behavior |
 | `root-viewport-test-app.lisp` | Exercise root viewport anchoring and lifecycle |
 
@@ -223,7 +224,8 @@ python3 tests/e2e/tmux-scrollback-restoration.py
 | File | Purpose |
 |---|---|
 | `tmux-glider.lisp` | Overlay a Conway glider while restoring the captured pane content |
-| `tmux-hover-demo.lisp` | Capture and display tmux pane content |
+| `tmux-hover-demo.lisp` | Legacy compatibility alias for the dashboard inspector |
+| `tmux-cursor-inspector.lisp` | Combined physical hover and cursor inspection (recommended) |
 | `tmux-idle-screensaver.lisp` | Tmux-aware idle application and timer subscriptions |
 | `tmux-slider.lisp` | Animate a styled band over captured pane content |
 
@@ -236,6 +238,25 @@ ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
 
 The live-pane animations can be launched intentionally with
 `./scripts/examples.sh run tmux-slider` or `./scripts/examples.sh run tmux-glider`.
+
+### Physical tmux cell inspector
+
+Run `./scripts/examples.sh run tmux-cursor-inspector` in a tmux pane. The
+selected cell is surrounded by a cyan cursor box and its actual glyph, Unicode
+codepoint, display width, SGR foreground/background and attributes appear in a
+nearby tooltip. Move with **arrow keys or H/J/K/L**, and leave with **Q or
+Escape**. This operates on the real pane rather than rendering a separate
+dashboard; the older `tmux-hover-demo` and `cursor-inspector` names remain as
+compatibility interfaces to the existing inspector state model.
+
+The inspector snapshots the visible pane, restores the original glyphs and
+color/attribute runs on every movement and again upon quitting, and restores
+termios and terminal cursor. The last physical column is never written
+(avoiding autowrap and history corruption), the alternate screen is never
+entered, and blocking input produces **zero idle writes**. At pane edges the
+selection highlights the glyph without a three-row border; this avoids
+painting outside the captured area. A resize during an active inspection is
+not supported: quit, resize the pane and reopen to capture fresh geometry.
 
 ## Example contract
 

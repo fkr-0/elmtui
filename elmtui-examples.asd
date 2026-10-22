@@ -13,6 +13,7 @@
                (:file "minimal-app")
                (:file "keymap-app")
                (:file "cursor-inspector")
+               (:file "tmux-cursor-inspector")
                (:file "tmux-hover-demo")
                (:file "tmux-idle-screensaver")
                (:file "pong-below-cursor")
