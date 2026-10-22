@@ -1,5 +1,11 @@
 # ElmTUI examples
 
+**[Capability atlas / hallmark index](../docs/examples-capability-index.md)** —
+the complete inventory of all 33 top-level example sources, the single
+capability each demonstrates, a reproducible proof action, its runtime
+classification, and the acceptance bar before calling it a flagship. Start
+there when choosing a demo; use this guide for longer walkthroughs.
+
 The `elmtui-examples` ASDF system contains the maintained applications used by
 smoke tests and manual verification. Load the system once, then call an
 example's exported runner.
@@ -20,7 +26,7 @@ example; `q`, `Escape`, and `Ctrl-C` are the common choices.
 | File | Entry point | Demonstrates |
 |---|---|---|
 | `minimal-app.lisp` | `elmtui.examples.minimal:run-minimal` | Small TEA application, state patching, text rendering |
-| `keymap-app.lisp` | `elmtui.examples.keymap:run-keymap` | Application keymaps and command dispatch |
+| `keymap-app.lisp` | `elmtui.examples.keymap-app:main` | Application keymaps and component dispatch |
 | `focus-simple.lisp` | `elmtui.examples.focus-simple:run-focus-simple` | Focus traversal and button activation |
 | `mini-rainbow.lisp` | `elmtui.examples.mini-rainbow:run-mini-rainbow` | Compact styled layout |
 | `scroll-panel-demo.lisp` | `elmtui.examples.scroll-panel-demo:run-scroll-panel-demo` | Scrollable content and viewport behavior |
