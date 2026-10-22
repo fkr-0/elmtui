@@ -15,9 +15,9 @@ are not safe to reset or copy over.
 | Package | ASDF/CLPM | Local test results | Instrumented coverage | GitHub CI at baseline | GitHub revision after audit |
 |---|---|---|---|---|---|
 | cl-events | standalone systems and locked CLPM | 1,675 checks, 0 failures | **86.08%** (1,119/1,300 LCOV executable lines; gate 85%) | passed at d94f55f | 1664d9a |
-| cl-inputs | core and separately testable optional events adapter | 921 pass, 1 no-controlling-TTY skip, 0 failures | **52.66%** (2,234/4,242 LCOV owned lines; gate 49%) | passed at b9d0cbec | b9d0cbec unchanged |
-| cl-styles | standalone systems and locked CLPM | 218 checks, 0 failures | **60.42%** (774/1,281 LCOV owned lines; new gate 60%) | failed on old clpm setup step | 64000cb |
-| cl-state | standalone systems and locked CLPM | ASDF/FiveAM tests pass | **78.50%** (2,585/3,293 SB-COVER expressions; new gate 78%) | no prior main-branch workflow | e717802 |
+| cl-inputs | core and separately testable optional events adapter | 921 pass, 1 no-controlling-TTY skip, 0 failures | **52.66%** (2,234/4,242 LCOV owned lines; gate 52%) | passed at b9d0cbec | 6a9b184 |
+| cl-styles | standalone systems and locked CLPM | 218 checks, 0 failures | **60.42%** (774/1,281 LCOV owned lines; new gate 60%) | failed on old clpm setup step; corrected workflow passed | 64000cb |
+| cl-state | standalone systems and locked CLPM | ASDF/FiveAM tests pass | **78.50%** (2,585/3,293 SB-COVER expressions; new gate 78%) | no prior main-branch workflow | 8b29300 |
 
 These metrics are **not directly comparable**: cl-state gates instrumented
 expressions; the other three gate source-line LCOV. Percentages are actual
@@ -44,7 +44,9 @@ SBCL 2.6.2 local measurements, not fixture percentages or CI badge claims.
   GitHub-current source tree, not by resetting it to that old checkout.
   Added status badges, changelog, ignore rules, and OCP project manifest.
 - `cl-inputs`: preserved the pending device/PTY/input-loop changes;
-  existing GitHub main CI was green and matches the in-tree HEAD.
+  migrated CI to the same verified SBCL 2.6.2 / CLPM 0.4.1 binary setup
+  while retaining tmux dependency and SBCL package-compatibility setup.
+  Ratcheted the gate from 49% to 52% against the measured 52.66% baseline.
 - Updated the parent ElmTUI Git submodule pins to the reviewed commits,
   using path-specific local commits. Other dirty parent files are preserved.
 
@@ -69,12 +71,12 @@ SBCL 2.6.2 local measurements, not fixture percentages or CI badge claims.
    `cl-inputs-v0.2.0` lineage, which should not be rewritten. cl-styles
    and cl-state have no qualified GitHub 0.2.0 release tag; do not claim
    registry publication or invent a tag.
-5. **Toolchain convergence**: all four have ASDF tests, a CLPM lockfile,
-   GitHub Actions, and standalone ws-bridge workflow identity, but CI
-   installation paths are not byte-identical (events/styles use pinned
-   binaries; inputs/state have source-build paths). Consolidate
-   installer verification only after exercising it on the relevant CI
-   jobs, not by weakening qualification.
+5. **Toolchain convergence**: all four now have ASDF tests, a CLPM lockfile,
+   GitHub Actions, standalone ws-bridge workflow identity, and the same
+   SHA-verified pinned SBCL 2.6.2 / CLPM 0.4.1 CI binaries (cl-inputs
+   additionally installs tmux and its required compatibility startup).
+   Still qualify each new GitHub run; a verified download is not itself
+   proof of package integration correctness.
 6. **Other working copies**: `/home/user/code/lisp/cl-events` and
    `/home/user/code/lisp/cl-state` contain older or different branches
    with uncommitted research/refinement work. Preserve them. Do not
