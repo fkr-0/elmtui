@@ -1,0 +1,98 @@
+# ElmTUI standalone CL package release audit — 2026-10-22
+
+## Scope and source of truth
+
+Audited the four independent Git repositories under `cl-events/`,
+`cl-inputs/`, `cl-styles/`, and `cl-state/`, their GitHub `fkr-0/*`
+remotes, ASDF/CLPM entry points, tests, GitHub Actions, measured SB-COVER
+coverage, README badges, changelogs, and `bridge.yml` workflows.
+Treat the GitHub `main` branches and the in-tree submodule pins as the
+release source of truth; sibling checkouts containing uncommitted changes
+are not safe to reset or copy over.
+
+## Evidence
+
+| Package | ASDF/CLPM | Local test results | Instrumented coverage | GitHub CI at baseline | GitHub revision after audit |
+|---|---|---|---|---|---|
+| cl-events | standalone systems and locked CLPM | 1,675 checks, 0 failures | **86.08%** (1,119/1,300 LCOV executable lines; gate 85%) | passed at d94f55f | 1664d9a |
+| cl-inputs | core and separately testable optional events adapter | 921 pass, 1 no-controlling-TTY skip, 0 failures | **52.66%** (2,234/4,242 LCOV owned lines; gate 49%) | passed at b9d0cbec | b9d0cbec unchanged |
+| cl-styles | standalone systems and locked CLPM | 218 checks, 0 failures | **60.42%** (774/1,281 LCOV owned lines; new gate 60%) | failed on old clpm setup step | 64000cb |
+| cl-state | standalone systems and locked CLPM | ASDF/FiveAM tests pass | **78.50%** (2,585/3,293 SB-COVER expressions; new gate 78%) | no prior main-branch workflow | e717802 |
+
+These metrics are **not directly comparable**: cl-state gates instrumented
+expressions; the other three gate source-line LCOV. Percentages are actual
+SBCL 2.6.2 local measurements, not fixture percentages or CI badge claims.
+
+## Reconciliation performed
+
+- `cl-events`: fast-forwarded the nested checkout to its GitHub main,
+  which carries CI, real SB-COVER gate (85%), verified badge publishing,
+  release metadata, and expanded concurrency/E2E tests. Added a child
+  `bridge.yml` with `agent_workflow.project.id: cl-events`, fixing
+  inheritance of the parent's ElmTUI workflow.
+- `cl-styles`: fixed missing compiler line coverage vectors by enabling
+  SB-COVER coverage logging and data level 3. Replaced the failing
+  redundant CLPM job with one verified pinned SBCL 2.6.2 / CLPM 0.4.1
+  verification path, with regression-tested fail-closed LCOV gate,
+  verified coverage-data badge, and CI artifacts. Removed GitHub Pages
+  deployment because the repository's Pages configuration step failed;
+  Pages is **not** needed for the badge endpoint. Added README badges,
+  generated-artifact ignores, changelog, and OCP project manifest.
+- `cl-state`: installed a standalone CI workflow, fail-closed
+  expression-coverage gate and regression tests from its separately
+  maintained release-candidate checkout; verified on the **newer**
+  GitHub-current source tree, not by resetting it to that old checkout.
+  Added status badges, changelog, ignore rules, and OCP project manifest.
+- `cl-inputs`: preserved the pending device/PTY/input-loop changes;
+  existing GitHub main CI was green and matches the in-tree HEAD.
+- Updated the parent ElmTUI Git submodule pins to the reviewed commits,
+  using path-specific local commits. Other dirty parent files are preserved.
+
+## Remaining release-blocking work
+
+1. **Coverage depth**: cl-inputs (52.66%) and cl-styles (60.42%) are
+   materially under-covered. First extend adversarial decoder/terminal
+   and selector/properties/sheet tests, and ratchet gates based on actual
+   measured improvements; target at least 85%, with no denominator tricks.
+   cl-state measures 78.50%; target 85% with additional transaction/
+   observer/validation regression fixtures.
+2. **CI publication qualification**: Confirm the new GitHub runs on the
+   published cl-styles and cl-state `main` SHAs complete successfully.
+   A passing local gate is not a claim that the remote workflow passed.
+3. **Legacy task identity**: cl-inputs has OCP tasks under both
+   `cl-input` and `cl-inputs`. Do not casually rename the live
+   `agent_workflow.project.id: cl-input` until existing durable OCP
+   identities are explicitly migrated or an alias is supported.
+4. **Version/release lineage**: all four use independent candidate
+   0.2.0 ASDF version metadata and changelogs. cl-events has v0.2.0;
+   cl-inputs preserves historical `v0.2.0` plus
+   `cl-inputs-v0.2.0` lineage, which should not be rewritten. cl-styles
+   and cl-state have no qualified GitHub 0.2.0 release tag; do not claim
+   registry publication or invent a tag.
+5. **Toolchain convergence**: all four have ASDF tests, a CLPM lockfile,
+   GitHub Actions, and standalone ws-bridge workflow identity, but CI
+   installation paths are not byte-identical (events/styles use pinned
+   binaries; inputs/state have source-build paths). Consolidate
+   installer verification only after exercising it on the relevant CI
+   jobs, not by weakening qualification.
+6. **Other working copies**: `/home/user/code/lisp/cl-events` and
+   `/home/user/code/lisp/cl-state` contain older or different branches
+   with uncommitted research/refinement work. Preserve them. Do not
+   hard-reset or force-push over their state.
+7. **Parent publication**: parent ElmTUI Git submodule pin commits were
+   left local because its checkout has many unrelated in-progress changes
+   and prior unpushed commits. Publish via the normal coordinated
+   ElmTUI release lane, not with an indiscriminate parent push.
+
+## Suggested release contract
+
+For every package: `asdf:test-system` must fail on test failure;
+`bridge.yml` must select that package's own OCP identity; a full
+main-branch GitHub Action must pass with pinned, verified dependencies;
+the coverage gate must compile production sources under SB-COVER, inventory
+all owned sources, reject missing/uninstrumented records, and publish an
+endpoint **only on a passing gate**; the README should link live CI and
+measured coverage rather than static numbers; changelog and ASDF versions
+must agree with the intended **source** release; GitHub tags are only cut
+after the release criteria pass. Do not conflate registry publication
+with the presence of a public Git repository.
