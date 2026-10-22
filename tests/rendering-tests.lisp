@@ -47,6 +47,21 @@
       (is (eq :blue (terminal-color-simple (terminal-style-fg-color cell-style))))
       (is (eq t (terminal-style-bold cell-style))))))
 
+(test terminal-style-boolean-attributes
+  "The public :bold/:italic/:underline booleans must reach terminal cells."
+  (let* ((direct (elmtui.platform.backend.common.ansi-styling:style-to-terminal-style
+                  '(:fg-color :green :bold t :italic t :underline t)))
+         (overridden (elmtui.platform.backend.common.ansi-styling:style-to-terminal-style
+                      '(:attributes (:bold :italic) :bold nil :italic nil))))
+    (is (eq t (terminal-style-bold direct)))
+    (is (eq t (elmtui.platform.backend.common.ansi-styling:terminal-style-italic
+               direct)))
+    (is (eq t (elmtui.platform.backend.common.ansi-styling:terminal-style-underline
+               direct)))
+    (is (null (terminal-style-bold overridden)))
+    (is (null (elmtui.platform.backend.common.ansi-styling:terminal-style-italic
+               overridden)))))
+
 (test render-border-style
   (let* ((buffer (make-virtual-buffer 10 10))
          (node (make-instance 'container-element

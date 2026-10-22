@@ -37,13 +37,18 @@ The smoke verifies the visible transcript, editor prompt and status, the image i
 
 ## Important limitations
 
-Initial shell uses fixed-width row composition. **Architecture/release gate:**
-Workbench itself already uses `elmtui.app:defapplication`, canonical state/update/view,
-subscriptions and the terminal diff presenter. Its `frame-dsl` currently
-emits one ElmTUI text node per logical row, reducing per-token and
-per-element color/style fidelity. An attempt to replace this with nested
-flex-row segments compiled, but produced blank frames in actual PTY runs at
-80×24, 120×40 and 160×50; the experiment was reverted. The long-term
-fix belongs in ElmTUI's nested flex/text layout and renderer, **not** in
-raw ANSI or custom terminal painting inside Workbench. The existing
-single-row path remains the reliable native ElmTUI fallback. Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and normal-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.
+Workbench uses `elmtui.app:defapplication`, canonical state/update/view,
+subscriptions and the terminal diff presenter. **Native ASCII styled
+segments are now enabled** in `frame-dsl` using ElmTUI flex rows with
+explicit child widths. The former blank screen was traced to the application
+style validator rejecting `:white-space :nowrap` (although the terminal
+painter recognizes it), not a failure of the flex layout algorithm. The
+unsupported property is no longer emitted. Public boolean attributes such
+as `:bold t` are now propagated by the terminal style converter, too.
+
+**Remaining release gate:** display-cell-aware positioning, composition and
+syntax highlighting of arbitrary Unicode (combining marks, wide glyphs,
+emoji/ZWJ, tabs). Rows containing non-ASCII currently use a single ElmTUI
+text node to avoid splitting glyph clusters. There is no raw ANSI painter
+in Workbench. For the defect, verification and remaining work, see
+[the REPL composition note](reviews/repl-layout-native-composition-20261022.md). Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and normal-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.

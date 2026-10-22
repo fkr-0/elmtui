@@ -152,7 +152,21 @@
           (when (member :faint attrs) (setf (terminal-style-faint ts) t))
           (when (member :blink attrs) (setf (terminal-style-blink ts) t))
           (when (member :strike attrs) (setf (terminal-style-strike ts) t))
-          (when (member :invisible attrs) (setf (terminal-style-invisible ts) t)))))
+          (when (member :invisible attrs) (setf (terminal-style-invisible ts) t))))
+      ;; Public ElmTUI/CL-STYLES declarations also express attributes as
+      ;; individual booleans, e.g. (:bold t :italic nil). Honor an explicitly
+      ;; present NIL, which must override any legacy :attributes list value.
+      (dolist (entry (list (cons :bold #'(setf terminal-style-bold))
+                           (cons :italic #'(setf terminal-style-italic))
+                           (cons :underline #'(setf terminal-style-underline))
+                           (cons :inverse #'(setf terminal-style-inverse))
+                           (cons :faint #'(setf terminal-style-faint))
+                           (cons :blink #'(setf terminal-style-blink))
+                           (cons :strike #'(setf terminal-style-strike))
+                           (cons :invisible #'(setf terminal-style-invisible))))
+        (let ((value (getf style-plist (car entry) :not-present)))
+          (unless (eq value :not-present)
+            (funcall (cdr entry) (and value t) ts)))))
     ts))
 ;; (defgeneric mcopy-terminal-style (style)
 ;;   (:method ((style terminal-style))
