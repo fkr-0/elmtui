@@ -6,12 +6,24 @@ changed on exit.
 """
 
 import shutil
+import subprocess
 import unittest
 
 from pty_driver import PrivateTmuxPTY, ROOT
 
 
 class NativeReplPresentation(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("clpm"), "CLPM required for Lisp renderer")
+    def test_native_style_spans_survive_layout_and_terminal_conversion(self):
+        result = subprocess.run(
+            ["clpm", "bundle", "exec", "--with-client", "sbcl", "--",
+             "--noinform", "--non-interactive", "--load",
+             "tests/repl-native-layout-regression.lisp"],
+            cwd=ROOT, text=True, capture_output=True, timeout=45,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-4500:])
+        self.assertIn("REPL-NATIVE-LAYOUT-PASS", result.stdout)
+
     def test_only_one_repl_implementation_and_declarative_app(self):
         launcher = (ROOT / "examples/repl.lisp").read_text(encoding="utf-8")
         app = (ROOT / "src/workbench/app.lisp").read_text(encoding="utf-8")

@@ -308,16 +308,19 @@
     (values (coerce screen 'list) style-map)))
 
 (defun frame-dsl (rows width height &key style-map)
-  "Convert frame rows into stable text nodes. Preserve row-level styling.
-Multiple inline style segments cannot yet be composed reliably by the nested
-flex renderer: emitting a single text node per row keeps prompts, transcript,
-completion, inspector and status rows visible."
+  "Render semantic ASCII color spans as native ElmTUI flex text children.
+Do not pass :WHITE-SPACE here: the low-level terminal renderer accepts it,
+but the public style contract rejects it before layout. Explicit text
+widths preserve the intended single-row presentation without that property.
+Rows containing non-ASCII characters remain single text nodes until the
+framework's display-cell and grapheme geometry can be used end-to-end."
   (list :container
         :id :workbench-frame
         :style (list :display :flex
                      :flex-direction :column
                      :width (max 24 width)
-                     :height (max 8 height))
+                     :height (max 8 height)
+                     :padding 0 :gap 0)
         :children
         (loop for row in rows
               for row-index from 0
@@ -328,15 +331,30 @@ completion, inspector and status rows visible."
                                (< row-index (length style-map))
                                (aref style-map row-index))
               for segments = (%row-segments row spans default-style)
-              for active-style = (loop for span in spans
-                                       for style = (third span)
-                                       when (and (listp style)
-                                                 (getf style :bg-color))
-                                         return style)
-              collect (list :text
-                            :id (intern (format nil "WB-ROW-~D" row-index)
-                                        :keyword)
-                            :content row
-                            :style (or active-style
-                                       (getf (first segments) :style)
-                                       default-style)))))
+              for row-id = (intern (format nil "WB-ROW-~D" row-index)
+                                   :keyword)
+              collect
+              (if (or (<= (length segments) 1)
+                      (not (every (lambda (ch) (< (char-code ch) 128)) row)))
+                  (list :text :id row-id :content row
+                        :style (append (copy-list
+                                        (or (getf (first segments) :style)
+                                            default-style))
+                                       (list :width (length row) :height 1)))
+                  (list :container :id row-id
+                        :style (list :display :flex :flex-direction :row
+                                     :width (length row) :height 1
+                                     :padding 0 :gap 0)
+                        :children
+                        (loop for segment in segments
+                              for index from 0
+                              for content = (getf segment :content)
+                              collect (list :text
+                                            :id (intern (format nil "WB-SEG-~D-~D"
+                                                                row-index index)
+                                                        :keyword)
+                                            :content content
+                                            :style (append
+                                                    (copy-list (getf segment :style))
+                                                    (list :width (length content)
+                                                          :height 1)))))))))

@@ -172,12 +172,13 @@ system, without implementing its own evaluation or terminal rendering.
 
 **Prime flagship release gate:** The Workbench uses ElmTUI's application
 state/update/view, event subscriptions, root viewport and terminal presenter,
-not a separate REPL renderer. However its `frame-dsl` deliberately emits
-one text node per logical row: the previously attempted nested flex rows
-rendered blank screens at 80x24, 120x40 and 160x50 in real PTY tests. Restore
-correct nested text layout and Unicode display-cell alignment in ElmTUI core,
-then enable independent semantic style spans; do **not** mask the bug with raw
-ANSI terminal writes. Until then it is a prime *target*, not signed-off flagship.
+not a separate REPL renderer. ASCII semantic style spans now render via
+ElmTUI flex-row text children. The earlier blank frame was caused by an
+unsupported `:white-space` declaration rejected during style validation,
+not bad flex coordinates. **Still pending:** grapheme/cell-width accuracy,
+syntax highlighting, real screenshots and final release qualification.
+No Workbench-specific ANSI painter is permitted. It remains a prime *target*,
+not a signed-off flagship.
 The evaluator executes **trusted, unsandboxed Lisp**; cancellation is cooperative.
 `neon-kit` is intentionally support code, not a missing runnable demo.
 
