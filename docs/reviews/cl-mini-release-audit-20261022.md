@@ -50,6 +50,34 @@ SBCL 2.6.2 local measurements, not fixture percentages or CI badge claims.
 - Updated the parent ElmTUI Git submodule pins to the reviewed commits,
   using path-specific local commits. Other dirty parent files are preserved.
 
+## Verified remote CI results after reconciliation
+
+All current `main` GitHub Actions completed successfully after the final
+commits (verified 2026-10-22 UTC):
+
+| Repository | Green GitHub commit | Notes |
+|---|---|---|
+| `fkr-0/cl-events` | `1664d9a` | 85% measured runtime-line gate |
+| `fkr-0/cl-inputs` | `6a9b184` | 52% runtime-line ratchet; one justified local TTY skip |
+| `fkr-0/cl-styles` | `64000cb` | 60% measured-line ratchet; CI artifact + coverage-data badge, no Pages dependency |
+| `fkr-0/cl-state` | `8b29300` | 78% measured-expression ratchet |
+
+All package repos have been non-force pushed to their own GitHub `main`.
+The parent ElmTUI checkout contains **local-only** guarded submodule-pin
+commits, intentionally not pushed alongside unrelated in-progress work.
+
+## Next test investment, from actual uncovered modules
+
+| Package | Highest-return missing cases | Measured coverage evidence |
+|---|---|---|
+| cl-inputs | TTY raw-mode/termios/EOF restoration, URxvt escape handling, terminal failure paths | `tty.lisp` 54/437; `urxvt.lisp` 115/457 lines |
+| cl-styles | Property validation/normalization, stylesheet variable/inheritance paths, generic protocol integration | `properties.lisp` 135/308; `sheet.lisp` 38/85; distinguish pure declarations in packages/protocols before making denominator policy decisions |
+| cl-state | Persistent patch sharing/rollback adversarial cases, schema error branches | `persistent.lisp` 313/470; `schema.lisp` 212/347 expressions |
+
+These are gaps in actual executed source, not simply missing test filenames.
+Raise test coverage with behavior-driven assertions and regressions, not by
+lowering current CI floors or removing production files from the denominator.
+
 ## Remaining release-blocking work
 
 1. **Coverage depth**: cl-inputs (52.66%) and cl-styles (60.42%) are
@@ -58,9 +86,9 @@ SBCL 2.6.2 local measurements, not fixture percentages or CI badge claims.
    measured improvements; target at least 85%, with no denominator tricks.
    cl-state measures 78.50%; target 85% with additional transaction/
    observer/validation regression fixtures.
-2. **CI publication qualification**: Confirm the new GitHub runs on the
-   published cl-styles and cl-state `main` SHAs complete successfully.
-   A passing local gate is not a claim that the remote workflow passed.
+2. **Continued CI qualification**: all four published `main` builds now pass.
+   Keep them branch-protected and investigate future non-green badge/test runs
+   before promoting a new source release.
 3. **Legacy task identity**: cl-inputs has OCP tasks under both
    `cl-input` and `cl-inputs`. Do not casually rename the live
    `agent_workflow.project.id: cl-input` until existing durable OCP
