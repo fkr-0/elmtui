@@ -1,6 +1,14 @@
 # ElmTUI Lisp Workbench
 
-Optional local REPL application. Load with:
+**Prime ElmTUI showcase: interactive Common Lisp REPL.** Launch from the
+examples CLI:
+
+    ./scripts/examples.sh run repl
+
+This small `examples/repl.lisp` adapter loads the existing optional
+Workbench system and calls its generated ElmTUI application runner; it does
+not implement a second terminal renderer or evaluator. The direct standalone
+launcher remains available:
 
     clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load examples/workbench.lisp
 
@@ -20,12 +28,22 @@ W1 editor, W2 evaluation worker, W3 completion/docs, W4 inspector are imported t
 
 The evaluator is serialized and supplies tagged result messages; the optional inspector does not claim lexical locals outside debugger frames. Output is bounded and command-line completion is read-only. A 75 ms timer is installed only while evaluation, delayed documentation or live inspector watches require it; startup and idle have no timer subscription. The optional launcher passes :signal-keys-as-input t to the terminal backend. After cl-inputs saves original terminal attributes, the backend disables ISIG before the initial cursor query, so Ctrl+C is a key even at startup; terminal teardown restores the saved attributes. This opt-in policy leaves other ElmTUI applications unchanged. The real PTY stress suite checks zero idle writes and bounds process-wide SBCL CPU ticks.
 
-Run PTY smoke:
+Run PTY smoke and the CLI integration acceptance:
 
     python3 tests/workbench/pty-workbench.py
+    python3 -m unittest discover -s tests/workbench/independent -p test_native_repl_presentation.py -v
 
 The smoke verifies the visible transcript, editor prompt and status, the image inspector at 120+ columns, evaluation of `(+ 1 2)` to `3`, completion, and clean Ctrl+D/normal-screen/termios restoration. It is not by itself a complete golden/Unicode/keymap conformance matrix. Qualification and review require explicit independent verdict and 80x24 / 120x40 / 160x50 trace inspection. In particular, Ctrl+Enter and Ctrl+Space terminal support depends on key protocol negotiation; fallback Enter submits balanced forms.
 
 ## Important limitations
 
-Initial shell uses fixed-width row composition. While nested inline-style flex rows are being corrected in the framework, the workbench presents each complete row in a stable text node with row-level styling; per-token/segment styling is temporarily reduced. Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and normal-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.
+Initial shell uses fixed-width row composition. **Architecture/release gate:**
+Workbench itself already uses `elmtui.app:defapplication`, canonical state/update/view,
+subscriptions and the terminal diff presenter. Its `frame-dsl` currently
+emits one ElmTUI text node per logical row, reducing per-token and
+per-element color/style fidelity. An attempt to replace this with nested
+flex-row segments compiled, but produced blank frames in actual PTY runs at
+80×24, 120×40 and 160×50; the experiment was reverted. The long-term
+fix belongs in ElmTUI's nested flex/text layout and renderer, **not** in
+raw ANSI or custom terminal painting inside Workbench. The existing
+single-row path remains the reliable native ElmTUI fallback. Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and normal-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.

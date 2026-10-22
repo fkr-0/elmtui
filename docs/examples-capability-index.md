@@ -3,7 +3,7 @@
 > **One example, one visible promise.** An ElmTUI example should be something
 > you can demonstrate in front of another developer, not merely a file that
 > loads. This index covers **every top-level `examples/*.lisp` source** in
-> the checkout as of 2026-10-22. It records the current implementation and the
+> the checkout as of 2026-10-22, including the interactive REPL entry. It records the current implementation and the
 > specific experience each example should own.
 
 The [examples guide](../examples/README.md) contains longer usage notes.
@@ -13,9 +13,9 @@ example already meets the entire quality bar below.
 
 ## Five-minute tour
 
-Start in the repository root. The first four need no external service; the
-last two deliberately demonstrate the unusual *normal-screen, no-alternate-
-screen* tmux integration.
+Start in the repository root. The first four need no external service;
+acts five and six demonstrate *normal-screen, no-alternate-screen* tmux
+integration, and the final act opens the full interactive Lisp REPL.
 
 | Act | Example | The claim the audience should leave with | Action |
 |---|---|---|---|
@@ -25,6 +25,7 @@ screen* tmux integration.
 | 4. Animate | [`neon-tetris`](../examples/neon-tetris.lisp) | Stateful games can look polished without a custom screen painter. | Move, rotate, drop, reset. |
 | 5. Preserve | [`tmux-glider`](../examples/tmux-glider.lisp) | Even animation over existing shell output can leave scrollback and styling intact. | Run inside tmux, move the glider, quit, inspect the underlay. |
 | 6. Inspect | [`tmux-cursor-inspector`](../examples/tmux-cursor-inspector.lisp) | Physical terminal cells can carry reversible focus and semantic tooltips. | Move the cell box; confirm each vacated cell is restored. |
+| 7. Develop | [`repl`](../examples/repl.lisp) | ElmTUI can host its own interactive Lisp development environment. | Evaluate a form, complete a symbol, inspect the image, exit cleanly. |
 
 Run a named example using:
 
@@ -99,6 +100,7 @@ package/function).
 
 | Example | Hallmark statement / one thing to demonstrate | Proof to show | Track |
 |---|---|---|---|
+| [`repl`](../examples/repl.lisp) | **The flagship developer experience:** ElmTUI renders a multiline Lisp editor, responsive evaluator, completion, transcript and live inspector through one `defapplication`. | Run `./scripts/examples.sh run repl`, evaluate `(+ 40 2)`, invoke completion, use F2, then Ctrl+D; verify normal-buffer/termios restoration. | Optional · **Prime flagship target** |
 | [`dirli`](../examples/dirli.lisp) | **Navigable filesystem:** browse directories via a keyboard-selected list without accidental navigation. | Arrows or J/K select; Enter opens the selected directory. | Base · Flagship target |
 | [`fzf-finder-real`](../examples/fzf-finder-real.lisp) | **Composable picking:** give a finder items on stdin; filter and select interactively. | Pipe newline-delimited candidate strings into its runner. | Base · Workshop |
 | [`fzy-picker`](../examples/fzy-picker.lisp) | **External algorithm integration:** an optional `cl-fzy` matcher plugs into a native terminal picker. | Install `cl-fzy`, load optional ASDF system, filter and choose. | Optional · Integration |
@@ -162,9 +164,21 @@ after a resize; it does **not** claim live-resize support yet.
 | [`neon-kit`](../examples/neon-kit.lisp) | **Reusable presentation vocabulary:** shared colors, event helpers and stable row identities reduce duplicated game/editor UI. | Compare the common renderer-native header/rows/footer across Neon apps. | Base · Support, no standalone runner |
 | [`workbench`](../examples/workbench.lisp) | **A developer's own ElmTUI:** the separate Workbench system provides interactive development tooling via a standalone launcher. | Launch Workbench, inspect/evaluate in its own documented workflow. | Standalone · Separate ASDF system |
 
-Workbench is **not** part of `elmtui-examples.asd` or the examples CLI; see
-[the workbench guide](workbench-user-guide.md) and launch it from a configured
-environment with `sbcl --load examples/workbench.lisp`.
+Workbench is **not** part of `elmtui-examples.asd`; see
+[the workbench guide](workbench-user-guide.md). The new `repl` example
+is a small CLI-discoverable launcher that loads exactly that optional Workbench
+system, without implementing its own evaluation or terminal rendering.
+`examples/workbench.lisp` remains the standalone direct launcher.
+
+**Prime flagship release gate:** The Workbench uses ElmTUI's application
+state/update/view, event subscriptions, root viewport and terminal presenter,
+not a separate REPL renderer. However its `frame-dsl` deliberately emits
+one text node per logical row: the previously attempted nested flex rows
+rendered blank screens at 80x24, 120x40 and 160x50 in real PTY tests. Restore
+correct nested text layout and Unicode display-cell alignment in ElmTUI core,
+then enable independent semantic style spans; do **not** mask the bug with raw
+ANSI terminal writes. Until then it is a prime *target*, not signed-off flagship.
+The evaluator executes **trusted, unsandboxed Lisp**; cancellation is cooperative.
 `neon-kit` is intentionally support code, not a missing runnable demo.
 
 ## Qualification map: make the statements defensible
@@ -206,12 +220,13 @@ all been run in this documentation change.
 
 ### Inventory accounting
 
-- **33** top-level Lisp sources, **28** members of the base
+- **34** top-level Lisp sources, **28** members of the base
   `elmtui-examples.asd` (one is the support-only `neon-kit`).
-- **5** outside the base ASDF system: `async-weather`,
-  `fzy-picker`, `tmux-glider`, `tmux-slider`, `workbench`.
-- **31** discoverable example-name stems from `scripts/examples.sh list`
-  (the runner excludes `neon-kit` and `workbench`), **not** 31 fully
+- **6** outside the base ASDF system: `async-weather`,
+  `fzy-picker`, `tmux-glider`, `tmux-slider`, `repl`,
+  `workbench`.
+- **32** discoverable example-name stems from `scripts/examples.sh list`
+  (the runner excludes `neon-kit` and `workbench`), **not** 32 fully
   independently qualified features.
 - Every top-level `examples/*.lisp` has exactly one source link in the
   five capability tables; [catalog coverage test](../tests/test_examples_capability_index.py)

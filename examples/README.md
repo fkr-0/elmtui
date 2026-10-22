@@ -1,7 +1,7 @@
 # ElmTUI examples
 
 **[Capability atlas / hallmark index](../docs/examples-capability-index.md)** —
-the complete inventory of all 33 top-level example sources, the single
+the complete inventory of all 34 top-level example sources, the single
 capability each demonstrates, a reproducible proof action, its runtime
 classification, and the acceptance bar before calling it a flagship. Start
 there when choosing a demo; use this guide for longer walkthroughs.
@@ -17,6 +17,13 @@ clpm bundle exec --with-client sbcl -- \
   --eval '(asdf:load-system "elmtui-examples")' \
   --eval '(elmtui.examples.minimal:run-minimal)'
 ```
+
+**Prime developer showcase:** `./scripts/examples.sh run repl` launches the
+optional ElmTUI Workbench with one consistent editor/evaluator/inspector UI.
+See [Workbench](../docs/workbench-user-guide.md) and the
+[capability atlas](../docs/examples-capability-index.md). It evaluates
+trusted local Lisp, not sandboxed code, so use it only with expressions you
+intend to execute.
 
 Most examples use the terminal backend and are interactive. Exit keys vary by
 example; `q`, `Escape`, and `Ctrl-C` are the common choices.

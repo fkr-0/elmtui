@@ -18,7 +18,7 @@ The interactive Workbench joins:
 - **Symbol completion** with a cursor-anchored selection menu and delayed documentation.
 - **Package and image inspector** for loaded packages, exported symbols, globals and ASDF systems.
 - **Diagnostics** and tagged evaluation results, with a worker keeping the interface responsive during evaluation.
-- **Terminal lifecycle** management, including alternate-screen cleanup on exit.
+- **Terminal lifecycle** management in the normal buffer with restored terminal attributes; no alternate-screen mode.
 
 The evaluation backend is an in-process, trusted Lisp image. It is **not a sandbox**. Slynk is an optional integration adapter, not a mandatory dependency, and a remote listener is not started by default.
 
@@ -27,6 +27,9 @@ The evaluation backend is an in-process, trusted Lisp image. It is **not a sandb
 ```sh
 git submodule update --init --recursive
 clpm bundle install
+./scripts/examples.sh run repl
+
+# Alternatively, launch the same Workbench system directly:
 clpm bundle exec --with-client sbcl -- \
   --noinform --non-interactive \
   --load examples/workbench.lisp
@@ -46,7 +49,7 @@ Expected controls in the current implementation:
 | Ctrl+D | Exit on empty editor |
 
 !!! warning "Release qualification"
-    Targeted Workbench PTY smoke tests have passed during ongoing development, after earlier startup and terminal-restoration failures were diagnosed. The Workbench is **included as a release target**, but the final pinned release build still requires independent startup, evaluation, completion, resize, idle-output and terminal-restoration qualification. See [release status](release.md).
+    Targeted Workbench PTY smoke tests have passed during ongoing development, after earlier startup and terminal-restoration failures were diagnosed. The Workbench is already integrated with ElmTUI's model/update/view, but per-element styled rows still require a core nested-layout fix: attempting multiple native flex text segments produced blank actual terminal frames and was reverted. The Workbench is **included as a release target**, but the final pinned release build still requires independent startup, evaluation, completion, resize, idle-output and terminal-restoration qualification. See [release status](release.md).
 
 ## What it demonstrates
 
