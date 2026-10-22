@@ -61,7 +61,7 @@ class ExamplesCapabilityIndexTest(unittest.TestCase):
         self.assertEqual(
             sources - base,
             {"async-weather", "fzy-picker", "tmux-glider",
-             "tmux-slider", "workbench"},
+             "tmux-slider", "repl", "workbench"},
             "Update the atlas classification when the ASDF graph changes",
         )
 
