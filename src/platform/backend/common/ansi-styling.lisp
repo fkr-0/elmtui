@@ -65,6 +65,27 @@
   inverse
   strike
   invisible)
+
+(defun %hsl-terminal-rgb (hue saturation lightness)
+  "Convert an HSL percentage token to 8-bit RGB for the terminal backend."
+  (let* ((h (mod (/ hue 60.0d0) 6.0d0))
+         (s (/ saturation 100.0d0))
+         (l (/ lightness 100.0d0))
+         (c (* (- 1 (abs (- (* 2 l) 1))) s))
+         (x (* c (- 1 (abs (- (mod h 2.0d0) 1)))))
+         (m (- l (/ c 2.0d0))))
+    (multiple-value-bind (r g b)
+        (case (floor h)
+          (0 (values c x 0))
+          (1 (values x c 0))
+          (2 (values 0 c x))
+          (3 (values 0 x c))
+          (4 (values x 0 c))
+          (otherwise (values c 0 x)))
+      (values (round (* 255 (+ r m)))
+              (round (* 255 (+ g m)))
+              (round (* 255 (+ b m)))))))
+
 (defun fuzz-color (in &optional (bg nil))
   "Convert various color representations to a terminal-color.
    Supported input formats:
@@ -81,6 +102,11 @@
       (terminal-color in)
       (list
        (cond
+         ((and (= (length in) 4) (eq (first in) :hsl)
+               (every #'realp (rest in)))
+          (multiple-value-bind (r g b)
+              (%hsl-terminal-rgb (second in) (third in) (fourth in))
+            (make-terminal-color :red r :green g :blue b :bg bg)))
          ;; Canonical CL-STYLES RGB tokens.
          ((and (= (length in) 4) (eq (first in) :rgb)
                (every #'integerp (rest in)))

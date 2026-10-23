@@ -468,8 +468,12 @@
 (defparameter *support-only-example-components*
   '("neon-kit" "tmux-hover-demo"))
 
+(defparameter *independently-qualified-example-components*
+  '(("tmux-cursor-inspector" "tests/e2e/tmux-cursor-inspector-pty.py")))
+
 (defparameter *optional-example-files*
-  '("async-weather" "fzy-picker" "tmux-glider" "tmux-slider" "workbench"))
+  '("async-weather" "fzy-picker" "tmux-glider" "tmux-slider" "repl"
+    "workbench"))
 
 (test example-source-inventory-is-classified-and-smoke-covered
   "Default ASDF files, optional files, and README classifications stay aligned."
@@ -478,7 +482,9 @@
            (mapcar #'asdf:component-name
                    (asdf:component-children (asdf:find-system "elmtui-examples"))))
          (maintained (mapcar #'first *maintained-examples*))
-         (accounted (append maintained *support-only-example-components*))
+         (accounted (append maintained *support-only-example-components*
+                            (mapcar #'first
+                                    *independently-qualified-example-components*)))
          (source-files (mapcar #'pathname-name (directory #P"examples/*.lisp")))
          (classified-files (append components *optional-example-files*))
          (readme (uiop:read-file-string "examples/README.md")))
@@ -494,6 +500,10 @@
     (is (null (set-difference classified-files source-files :test #'string=))
         "Inventory entries must resolve to real top-level Lisp files: ~S"
         (set-difference classified-files source-files :test #'string=))
+    (dolist (entry *independently-qualified-example-components*)
+      (is (probe-file (second entry))
+          "Independent qualification fixture for ~A must exist: ~A"
+          (first entry) (second entry)))
     (dolist (name source-files)
       (is (search (format nil "`~A.lisp`" name) readme)
           "README must classify ~A.lisp" name))

@@ -200,6 +200,7 @@ smoke-tested example set:
 | `neon-kit.lisp` | Shared palette and rendering support for the Neon examples; not an application runner or CLI entry. |
 | `tmux-glider.lisp` | Optional overlay animation; requires a live tmux pane and preserves the captured underlay. |
 | `tmux-slider.lisp` | Optional styled tmux-pane animation; requires a live tmux pane. |
+| `repl.lisp` | CLI-discoverable Workbench REPL adapter; loads the optional `elmtui-workbench` ASDF system. Private-PTY qualified, evaluating trusted Lisp (not sandboxed). |
 | `workbench.lisp` | Standalone local developer launcher; loads the separate `elmtui-workbench` system and is not exposed by `scripts/examples.sh`. See the [workbench guide](../docs/workbench-user-guide.md) for its direct launch command. |
 
 Launch the weather dashboard with `./scripts/examples.sh run async-weather`. It starts
