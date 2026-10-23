@@ -753,58 +753,13 @@
 ;;; Color and Style Management (existing methods)
 ;;;---------------------------------------------------------------
 (defun style-to-terminal-style (style-plist)
-  (log-debug "Converting style plist to terminal style: ~S" style-plist)
-  (let ((normalized (when style-plist
-                      (normalize-tui-style-plist style-plist))))
-    (when normalized
-    (let ((ts (make-terminal-style)))
-      (let ((bg (getf normalized :bg-color)))
-        (cond
-          ((typep bg 'elmtui.platform.backend.common.ansi-styling:terminal-color)
-            (setf (terminal-style-bg-color ts) bg))
-          ((and (listp bg) (= (length bg) 3))
-            (destructuring-bind (r g b) bg
-              (setf (terminal-style-bg-color ts)
-                (elmtui.platform.backend.common.ansi-styling:make-termcolor
-                  :bg t :r r :g g :b b))))
-          ((integerp bg)
-            (setf (terminal-style-bg-color ts)
-              (elmtui.platform.backend.common.ansi-styling:make-termcolor
-                :bg t :color-256 bg)))
-          ((keywordp bg)
-            (setf (terminal-style-bg-color ts)
-              (elmtui.platform.backend.common.ansi-styling:make-termcolor
-                :bg t :simple bg)))
-          (t
-            ;; No background color specified; leave as default
-            )))
-      (let ((fg (getf normalized :fg-color)))
-        (cond
-          ((typep fg 'elmtui.platform.backend.common.ansi-styling:terminal-color)
-            (setf (terminal-style-fg-color ts) fg))
-          ((and (listp fg) (= (length fg) 3))
-            (destructuring-bind (r g b) fg
-              (setf (terminal-style-fg-color ts)
-                (elmtui.platform.backend.common.ansi-styling:make-termcolor
-                  :r r :g g :b b))))
-          ((integerp fg)
-            (setf (terminal-style-fg-color ts)
-              (elmtui.platform.backend.common.ansi-styling:make-termcolor
-                :color-256 fg)))
-          ((keywordp fg)
-            (setf (terminal-style-fg-color ts)
-              (elmtui.platform.backend.common.ansi-styling:make-termcolor
-                :simple fg)))
-          (t
-            ;; No foreground color specified; leave default
-            )))
-      (let ((attrs (getf normalized :attrs)))
-        (when (member :bold attrs) (setf (terminal-style-bold ts) t))
-        (when (member :italic attrs) (setf (terminal-style-italic ts) t))
-        (when (member :underline attrs) (setf (terminal-style-underline ts) t))
-        (when (member :inverse attrs) (setf (terminal-style-inverse ts) t)))
-      (log:debug "APPLY-STYLE-DIFF CALLED. Current: ~A" ts)
-      ts))))
+  "Compatibility entry for terminal style conversion.
+Project TUI aliases once and delegate to the shared terminal conversion
+implementation; do not maintain a second, subtly different color/attribute
+matrix here. NIL input preserves the historical NIL return contract."
+  (when style-plist
+    (elmtui.platform.backend.common.ansi-styling:style-to-terminal-style
+     (normalize-tui-style-plist style-plist))))
 
 (defun write-style-to-stream (stream style)
   "Write ANSI escape sequences for STYLE to STREAM. STYLE may be a style plist or a terminal-style instance."

@@ -68,6 +68,7 @@
                                (:file "async-tests")
                                (:file "event-pipeline-tests")
                                (:file "style-tests")
+                               (:file "style-contract-matrix-tests")
                                (:file "tmux-capture-tests")
                                (:file "tmux-capture-integration-tests")
                                (:file "tmux-restore-tests")
