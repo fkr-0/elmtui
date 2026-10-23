@@ -56,9 +56,12 @@ Operations carry zero-based frame coordinates and batched :WRITE-CHARS values."
              (new-batch (row col char style)
                (let ((chars (make-array 16 :element-type 'character
                                        :adjustable t :fill-pointer 0)))
-                 (vector-push-extend char chars)
+                 (loop for glyph across char
+                       do (vector-push-extend glyph chars))
                  (list :type :write-chars :row row :start-col col
-                       :chars chars :style style))))
+                       :chars chars :style style
+                       :cell-columns
+                       (elmtui.view.layout.size-utils:terminal-string-width char)))))
       (loop for row below (buffer-height back) do
         (let ((batch nil))
           (loop for col below (buffer-width back) do
@@ -68,16 +71,21 @@ Operations carry zero-based frame coordinates and batched :WRITE-CHARS values."
                                 (not (buffer-cell-equal-p
                                       (buffer-cell-at front row col) cell)))))
               (incf compared)
-              (if paint-p
-                  (let ((char (buffer-cell-char cell))
+              (if (and paint-p
+                       (not (char= (buffer-cell-char cell) #\Null)))
+                  (let ((char (or (elmtui.platform.backend.common.virtual-buffer:buffer-cell-grapheme cell)
+                                  (string (buffer-cell-char cell))))
                         (style (buffer-cell-style cell)))
-                    (when (char= char #\Null) (setf char #\Space))
                     (incf changed)
                     (if (and batch
                              (=? style (getf batch :style))
                              (= col (+ (getf batch :start-col)
-                                       (length (getf batch :chars)))))
-                        (vector-push-extend char (getf batch :chars))
+                                       (getf batch :cell-columns))))
+                        (progn
+                          (loop for glyph across char
+                                do (vector-push-extend glyph (getf batch :chars)))
+                          (incf (getf batch :cell-columns)
+                                (elmtui.view.layout.size-utils:terminal-string-width char)))
                         (progn
                           (flush batch)
                           (setf batch (new-batch row col char style)))))

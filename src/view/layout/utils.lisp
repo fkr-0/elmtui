@@ -13,6 +13,9 @@
 
   (:export
     #:measure-node-intrinsic-size
+    #:terminal-glyph-width
+    #:terminal-string-width
+    #:terminal-graphemes
     #:content-rect-of
     #:compute-layout
     #:compute-size))
@@ -77,8 +80,71 @@
 ;;;; ---------- intrinsic measurement ----------
 
 (defun %string-display-width (s)
-  "Very naive monospace width: character count."
-  (length (or s "")))
+  "Terminal display-cell width, not the Common Lisp string length."
+  (terminal-string-width (or s "")))
+
+(defun terminal-glyph-width (glyph)
+  "Conservative wcwidth-like width shared by layout, painter and diff.
+Grapheme clusters with ZWJ/emoji modifiers require a separate cluster model."
+  (let ((code (char-code glyph)))
+    (cond
+      ((or (< code 32) (= code 127)
+           (= code #x200d) (= code #x200c)
+           (<= #x300 code #x36f) (<= #x1ab0 code #x1aff)
+           (<= #x1dc0 code #x1dff) (<= #x20d0 code #x20ff)
+           (<= #xfe00 code #xfe0f) (<= #xfe20 code #xfe2f)
+           (<= #x1f3fb code #x1f3ff)
+           (<= #xe0100 code #xe01ef)) 0)
+      ((or (<= #x1100 code #x115f) (<= #x2329 code #x232a)
+           (<= #x2e80 code #xa4cf) (<= #xac00 code #xd7a3)
+           (<= #xf900 code #xfaff) (<= #xfe10 code #xfe19)
+           (<= #xfe30 code #xfe6f) (<= #xff01 code #xff60)
+           (<= #xffe0 code #xffe6) (<= #x1f1e6 code #x1f1ff)
+           (<= #x1f300 code #x1faff)) 2)
+      (t 1))))
+
+(defun terminal-graphemes (text)
+  "Return ordered (STRING . CELL-WIDTH) clusters.
+Handles combining/variation marks, emoji modifiers, ZWJ sequences and paired
+regional indicators. Widths are terminal estimates; font-specific shaping
+is outside a portable TUI's control."
+  (let ((start 0) (result nil) (n (length text)))
+    (labels ((emit (end)
+               (when (< start end)
+                 (let ((cluster (subseq text start end)))
+                   (push (cons cluster
+                               (max (if (or (find (code-char #xfe0f) cluster)
+                                            (find (code-char #x20e3) cluster))
+                                        2 0)
+                                    (loop for ch across cluster
+                                          maximize (terminal-glyph-width ch))))
+                         result)))))
+      (loop for i from 1 below n
+            for ch = (char text i)
+            for prev = (char text (1- i))
+            for code = (char-code ch)
+            for previous-code = (char-code prev)
+            for extension = (or (zerop (terminal-glyph-width ch))
+                                (= previous-code #x200d)
+                                (and (<= #x1f1e6 code #x1f1ff)
+                                     (<= #x1f1e6 previous-code #x1f1ff)
+                                     (= 1 (- i start))))
+            unless extension
+              do (emit i) (setf start i))
+      (emit n))
+    (nreverse result)))
+
+(defun terminal-string-width (text)
+  "Measure the widest line's display cells, with conventional tab stops."
+  (loop with column = 0 and maximum = 0
+        for (cluster . cells) in (terminal-graphemes text)
+        do (cond
+             ((string= cluster (string #\Newline))
+              (setf maximum (max maximum column) column 0))
+             ((string= cluster (string #\Tab))
+              (incf column (- 8 (mod column 8))))
+             (t (incf column cells)))
+        finally (return (max maximum column))))
 
 (defun %text-wrap (node)
   (elmtui.view.base-elements:text-wrap node))

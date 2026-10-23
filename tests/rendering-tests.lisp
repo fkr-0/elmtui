@@ -142,8 +142,8 @@
     (is (char= #\Space (buffer-cell-char (buffer-cell-at buffer 0 4))))
     (is (char= #\Space (buffer-cell-char (buffer-cell-at buffer 0 5))))))
 
-(test overlapping-siblings-use-source-order-not-z-index
-  "Later lowered siblings paint over earlier siblings; :z-index is not interpreted."
+(test overlapping-siblings-use-z-index-with-stable-source-order
+  "Larger z-index paints last; equal z-index retains source order."
   (let* ((buffer (make-virtual-buffer 3 1))
          (first (make-instance 'text-element
                                :content "A"
@@ -165,8 +165,8 @@
     (render-laid-out-tree-to-buffer parent :buffer buffer)
     (let* ((cell (buffer-cell-at buffer 0 1))
            (style (buffer-cell-style cell)))
-      (is (char= #\B (buffer-cell-char cell)))
-      (is (eq :blue (terminal-color-simple (terminal-style-fg-color style)))))))
+      (is (char= #\A (buffer-cell-char cell)))
+      (is (eq :red (terminal-color-simple (terminal-style-fg-color style)))))))
 
 (test image-element-renders-alt-text-on-terminal
   "Terminal image elements render ALT text instead of silently disappearing."

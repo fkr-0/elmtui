@@ -172,13 +172,55 @@ no global diagnostics are read or updated."
     (stream
       (write-string string stream))))
 
-(defun %physical-glyph-columns (glyph) "Display width of one terminal glyph, including combining and wide cells." (let ((code (char-code glyph))) (cond ((or (< code 32) (= code 127) (= code 8205) (= code 8204) (<= 768 code 879) (<= 6832 code 6911) (<= 7616 code 7679) (<= 8400 code 8447) (<= 65024 code 65039) (<= 917760 code 917999)) 0) ((or (<= 4352 code 4447) (<= 9001 code 9002) (<= 11904 code 42191) (<= 44032 code 55203) (<= 63744 code 64255) (<= 65040 code 65055) (<= 65281 code 65376) (<= 65504 code 65510) (<= 127744 code 129791)) 2) (t 1))))
+(defun %physical-glyph-columns (glyph)
+  "The physical clipper shares terminal-cell rules with intrinsic layout."
+  (elmtui.view.layout.size-utils:terminal-glyph-width glyph))
 
 (defun %physical-run-columns (characters)
   "Physical terminal-cell advance after emitting CHARACTERS."
-  (loop for glyph across characters sum (%physical-glyph-columns glyph)))
+  (elmtui.view.layout.size-utils:terminal-string-width characters))
 
-(defun %clip-physical-diff-operations (operations columns rows origin-row origin-col) "Clip viewport-local styled runs against physical screen cell coordinates. No cursor command or printable byte may address outside the current pane. Wide glyphs are indivisible; combining marks follow a visible base." (if (not (and (plusp columns) (plusp rows))) nil (loop for op in operations append (if (not (eq (getf op :type) :write-chars)) (list op) (let* ((row (getf op :row)) (x (+ origin-col (getf op :start-col))) (base nil) (out (make-string-output-stream)) (last-visible nil)) (when (and (eq (getf op :type) :write-chars) (integerp row) (< -1 (+ origin-row row) rows)) (loop for glyph across (getf op :chars) for width = (%physical-glyph-columns glyph) do (cond ((zerop width) (when last-visible (write-char glyph out))) ((and (<= 0 x) (<= (+ x width) columns)) (unless base (setf base x)) (write-char glyph out) (setf last-visible t)) (t (setf last-visible nil))) do (incf x width)) (when base (list (list :type :write-chars :row row :start-col (- base origin-col) :chars (get-output-stream-string out) :style (getf op :style))))))))))
+(defun %clip-physical-diff-operations
+    (operations columns rows origin-row origin-col)
+  "Clip complete Unicode grapheme clusters, never partial wide cells.
+Operations addressing disjoint physical segments remain separate runs."
+  (when (and (plusp columns) (plusp rows))
+    (loop for op in operations append
+      (if (not (eq (getf op :type) :write-chars))
+          (list op)
+          (let ((row (getf op :row))
+                (x (+ origin-col (getf op :start-col)))
+                (run-start nil)
+                (run (make-string-output-stream))
+                (result nil))
+            (labels ((flush-run ()
+                       (when run-start
+                         (let ((chars (get-output-stream-string run)))
+                           (when (plusp (length chars))
+                             (push (list :type :write-chars
+                                         :row row
+                                         :start-col (- run-start origin-col)
+                                         :chars chars
+                                         :style (getf op :style))
+                                   result)))
+                         (setf run-start nil))))
+              (when (and (integerp row)
+                         (< -1 (+ origin-row row) rows))
+                (dolist (segment
+                          (elmtui.view.layout.size-utils:terminal-graphemes
+                           (getf op :chars)))
+                  (let ((cluster (car segment)) (width (cdr segment)))
+                    (cond
+                      ((and (plusp width)
+                            (<= 0 x)
+                            (<= (+ x width) columns))
+                       (unless run-start (setf run-start x))
+                       (write-string cluster run))
+                      ((plusp width)
+                       (flush-run)))
+                    (incf x width)))
+                (flush-run)))
+            (nreverse result))))))
 
 (defun apply-diff-to-backend (diff-ops backend-instance
                                terminal-offset-row terminal-offset-col)

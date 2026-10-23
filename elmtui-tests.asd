@@ -70,6 +70,8 @@
                                (:file "style-tests")
                                (:file "style-contract-matrix-tests")
                                (:file "style-render-capabilities-tests")
+                               (:file "style-capability-contract-tests")
+                               (:file "style-unicode-cell-tests")
                                (:file "tmux-capture-tests")
                                (:file "tmux-capture-integration-tests")
                                (:file "tmux-restore-tests")
