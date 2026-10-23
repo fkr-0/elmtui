@@ -14,9 +14,60 @@
                 #:terminal-style-faint #:terminal-style-blink #:terminal-style-strike
                 #:terminal-style-invisible #:style-to-terminal-style)
   (:export
-   #:render-laid-out-tree-to-buffer))
+   #:render-laid-out-tree-to-buffer
+   #:style-property-capability
+   #:style-property-capability-report))
 
 (in-package :elmtui.platform.tree-renderer)
+
+;; Terminal-tree capability contract. This intentionally lives with the
+;; terminal painter, NOT in reusable cl-styles (which only validates syntax).
+;; The four tiers describe the observable effect in this backend:
+;; :rendered changes cells/paint order; :layout-only changes geometry;
+;; :metadata-only is retained for higher-level widgets; :unimplemented has no
+;; supported terminal effect. Qualified approximations are documented below.
+(defparameter *style-property-capabilities*
+  '((:rendered
+     :display :visibility :overflow :white-space :color :background-color
+     :attributes :bold :italic :underline :inverse :faint :blink :strike
+     :invisible :border :border-width :border-top-width :border-right-width
+     :border-bottom-width :border-left-width :border-style
+     :border-top-style :border-right-style :border-bottom-style
+     :border-left-style :border-color :border-top-color :border-right-color
+     :border-bottom-color :border-left-color :z-index :opacity)
+    (:layout-only
+     :width :height :min-width :max-width :min-height :max-height
+     :offset-x :offset-y :flex :flex-flow :flex-direction :flex-wrap
+     :justify-content :align-items :align-self :align-content
+     :gap :row-gap :column-gap :order :flex-grow :flex-shrink :flex-basis
+     :grid-template-columns :grid-template-rows :grid-template-areas
+     :grid-auto-flow :grid-auto-columns :grid-auto-rows :justify-items
+     :padding :padding-top :padding-right :padding-bottom :padding-left
+     :margin :margin-top :margin-right :margin-bottom :margin-left
+     :aspect-ratio)
+    (:metadata-only
+     :scroll-x :scroll-y :font-family :font-size :font-weight :font-style
+     :text-background-color)
+    (:unimplemented :position :border-radius))
+  "Exact ElmTUI terminal tree support classification of canonical cl-styles properties.")
+
+(defun style-property-capability (property)
+  "Return PROPERTY's ElmTUI terminal support tier, or NIL for unknown keys.
+Also accepts registered cl-styles aliases. This is terminal-specific:
+OPACITY is 0=hidden, 0<alpha<1=SGR faint, 1=opaque (no alpha blending);
+Z-INDEX is stable sibling stacking, not full CSS stacking contexts."
+  (let ((canonical (or (gethash property cl-styles.properties::*property-aliases*)
+                       property)))
+    (when (cl-styles.properties:property-definition canonical)
+      (first (find-if (lambda (group) (member canonical (rest group)))
+                      *style-property-capabilities*)))))
+
+(defun style-property-capability-report ()
+  "Return fresh (PROPERTY . TIER) pairs, including all registered properties."
+  (sort (loop for property being the hash-keys
+                of cl-styles.properties::*property-registry*
+              collect (cons property (style-property-capability property)))
+        #'string< :key (lambda (entry) (symbol-name (car entry)))))
 
 (defun style-value (node key &optional default)
   (getf (element-style node) key default))
@@ -133,13 +184,28 @@ Preserve the original node background and terminal attributes."
             (elmtui.platform.backend.common.ansi-styling:fuzz-color color)))
     style))
 
+(defun %border-edge-pattern (declarations side common-style)
+  (getf declarations
+        (ecase side
+          (:top :border-top-style)
+          (:right :border-right-style)
+          (:bottom :border-bottom-style)
+          (:left :border-left-style))
+        common-style))
+
 (defun draw-border (node buffer x y width height style)
   (let* ((smap (elmtui.view.element:el/styles node))
          (border-t (getf smap :border nil))
          (border-style-val
            (getf smap :border-style :solid)))
-    (when (and border-t (not (eq border-style-val :none)) style)
-      (let* ((border-width (if (eq border-style-val :none) 0 (getf smap :border-width 1)))
+    (when (and border-t style
+               (or (not (eq border-style-val :none))
+                   (some (lambda (key)
+                           (let ((value (getf smap key)))
+                             (and value (not (eq value :none)))))
+                         '(:border-top-style :border-right-style
+                           :border-bottom-style :border-left-style))))
+      (let* ((border-width (getf smap :border-width 1))
              (btw (getf smap :border-top-width border-width))
              (brw (getf smap :border-right-width border-width))
              (bbw (getf smap :border-bottom-width border-width))
@@ -147,68 +213,107 @@ Preserve the original node background and terminal attributes."
              (top-style (%border-side-style style smap :top))
              (right-style (%border-side-style style smap :right))
              (bottom-style (%border-side-style style smap :bottom))
-             (left-style (%border-side-style style smap :left)))
-        (destructuring-bind (&key h v tl tr bl br) (get-border-characters border-style-val)
-          (when (> btw 0) (loop for c from (if (> blw 0) 1 0)
-                                  below (- width (if (> brw 0) 1 0))
-                                do (draw-border-char
-                                    buffer y (+ x c) h top-style)))
-          (when (> bbw 0) (loop for c from (if (> blw 0) 1 0)
-                                  below (- width (if (> brw 0) 1 0))
-                                do (draw-border-char
-                                    buffer (+ y height -1) (+ x c) h bottom-style)))
-          (when (> blw 0) (loop for r from (if (> btw 0) 1 0)
-                                  below (- height (if (> bbw 0) 1 0))
-                                do (draw-border-char
-                                    buffer (+ y r) x v left-style)))
-          (when (> brw 0) (loop for r from (if (> btw 0) 1 0)
-                                  below (- height (if (> bbw 0) 1 0))
-                                do (draw-border-char
-                                    buffer (+ y r) (+ x width -1) v right-style)))
-          (when (and (> btw 0) (> blw 0))
-            (draw-border-char buffer y x tl top-style))
-          (when (and (> btw 0) (> brw 0))
-            (draw-border-char buffer y (+ x width -1) tr top-style))
-          (when (and (> bbw 0) (> blw 0))
-            (draw-border-char buffer (+ y height -1) x bl bottom-style))
-          (when (and (> bbw 0) (> brw 0))
-            (draw-border-char
-             buffer (+ y height -1) (+ x width -1) br bottom-style)))))))
+             (left-style (%border-side-style style smap :left))
+             (top-pattern (%border-edge-pattern smap :top border-style-val))
+             (right-pattern (%border-edge-pattern smap :right border-style-val))
+             (bottom-pattern (%border-edge-pattern smap :bottom border-style-val))
+             (left-pattern (%border-edge-pattern smap :left border-style-val))
+             (top-p (and (> btw 0) (not (eq top-pattern :none))))
+             (right-p (and (> brw 0) (not (eq right-pattern :none))))
+             (bottom-p (and (> bbw 0) (not (eq bottom-pattern :none))))
+             (left-p (and (> blw 0) (not (eq left-pattern :none))))
+             (tc (get-border-characters top-pattern))
+             (rc (get-border-characters right-pattern))
+             (bc (get-border-characters bottom-pattern))
+             (lc (get-border-characters left-pattern)))
+        (flet ((corner (row col horizontal-p vertical-p horizontal vertical
+                       horizontal-corner horizontal-style vertical-style)
+                 (cond
+                   ((and horizontal-p vertical-p)
+                    (draw-border-char buffer row col horizontal-corner
+                                      horizontal-style))
+                   (horizontal-p
+                    (draw-border-char buffer row col horizontal horizontal-style))
+                   (vertical-p
+                    (draw-border-char buffer row col vertical vertical-style)))))
+          (when top-p
+            (loop for c from (if left-p 1 0)
+                  below (- width (if right-p 1 0))
+                  do (draw-border-char buffer y (+ x c) (getf tc :h) top-style)))
+          (when bottom-p
+            (loop for c from (if left-p 1 0)
+                  below (- width (if right-p 1 0))
+                  do (draw-border-char buffer (+ y height -1) (+ x c)
+                                       (getf bc :h) bottom-style)))
+          (when left-p
+            (loop for r from (if top-p 1 0)
+                  below (- height (if bottom-p 1 0))
+                  do (draw-border-char buffer (+ y r) x (getf lc :v) left-style)))
+          (when right-p
+            (loop for r from (if top-p 1 0)
+                  below (- height (if bottom-p 1 0))
+                  do (draw-border-char buffer (+ y r) (+ x width -1)
+                                       (getf rc :v) right-style)))
+          (corner y x top-p left-p (getf tc :h) (getf lc :v)
+                  (getf tc :tl) top-style left-style)
+          (corner y (+ x width -1) top-p right-p (getf tc :h) (getf rc :v)
+                  (getf tc :tr) top-style right-style)
+          (corner (+ y height -1) x bottom-p left-p
+                  (getf bc :h) (getf lc :v) (getf bc :bl)
+                  bottom-style left-style)
+          (corner (+ y height -1) (+ x width -1) bottom-p right-p
+                  (getf bc :h) (getf rc :v) (getf bc :br)
+                  bottom-style right-style))))))
 
 (defun %render-string-content (content buffer x y w h style white-space)
-  "Render CONTENT into the current content rectangle using terminal text rules."
-  (cond
-    ((eq white-space :nowrap)
-     (loop for i from 0 below (min (length content) w)
-           for ch = (aref content i)
-           do (let ((rr y) (cc (+ x i)))
-                (when (inside-buffer-p buffer rr cc)
-                  (let* ((existing-style
-                           (buffer-cell-style (buffer-cell-at buffer rr cc)))
-                         (new-style (copy-term-style style)))
-                    (unless (terminal-style-bg-color new-style)
-                      (setf (terminal-style-bg-color new-style)
-                            (when existing-style
-                              (terminal-style-bg-color existing-style))))
-                    (set-buffer-cell-at buffer rr cc ch new-style))))))
-    (t
-     (loop with cur-x = 0 and cur-y = 0
-           for ch across content
-           do (when (>= cur-y h) (return))
-              (let ((rr (+ y cur-y)) (cc (+ x cur-x)))
-                (when (inside-buffer-p buffer rr cc)
-                  (let* ((existing-style
-                           (buffer-cell-style (buffer-cell-at buffer rr cc)))
-                         (new-style (copy-term-style style)))
-                    (unless (terminal-style-bg-color new-style)
-                      (setf (terminal-style-bg-color new-style)
-                            (when existing-style
-                              (terminal-style-bg-color existing-style))))
-                    (set-buffer-cell-at buffer rr cc ch new-style))))
-              (incf cur-x)
-              (when (>= cur-x w)
-                (setq cur-x 0)
-                (incf cur-y))))))
+  "Paint Unicode clusters as intact glyphs; #\Null reserves wide-cell tails.
+NFC normalizes composable accents; remaining multi-codepoint clusters live in
+the lead buffer cell's GRAPHEME slot and are emitted together by the diff."
+  (let ((text (sb-unicode:normalize-string content :nfc))
+        (nowrap (eq white-space :nowrap))
+        (col 0)
+        (row 0))
+    (labels ((paint-cell (ch rr cc &optional grapheme)
+               (when (inside-buffer-p buffer rr cc)
+                 (let* ((old (buffer-cell-style (buffer-cell-at buffer rr cc)))
+                        (next (copy-term-style style)))
+                   (unless (terminal-style-bg-color next)
+                     (setf (terminal-style-bg-color next)
+                           (and old (terminal-style-bg-color old))))
+                   (set-buffer-cell-at buffer rr cc ch next
+                                       :grapheme grapheme)))))
+      (loop for (cluster . cluster-columns)
+              in (elmtui.view.layout.size-utils:terminal-graphemes text)
+            for ch = (char cluster 0)
+            do
+        (when (>= row h) (return))
+        (when (and (char= ch #\Newline) (not nowrap))
+          (setf col 0 row (1+ row)))
+        (unless (char= ch #\Newline)
+          (let ((columns (if (char= ch #\Tab)
+                             (- 8 (mod col 8))
+                             cluster-columns)))
+            (when (> columns 0)
+              (when (> (+ col columns) w)
+                (if nowrap
+                    (return)
+                    (setf col 0 row (1+ row))))
+              (when (>= row h) (return))
+              (when (<= columns w)
+                (if (char= ch #\Tab)
+                    (dotimes (i columns)
+                      (paint-cell #\Space (+ y row) (+ x col i)))
+                    (when (and (inside-buffer-p buffer (+ y row) (+ x col))
+                               (or (= columns 1)
+                                   (inside-buffer-p buffer (+ y row)
+                                                    (+ x col columns -1))))
+                      (paint-cell ch (+ y row) (+ x col)
+                                  (and (> (length cluster) 1) cluster))
+                      (dotimes (i (1- columns))
+                        (paint-cell #\Null (+ y row) (+ x col i 1)))))
+                (incf col columns)
+                (when (and (not nowrap) (>= col w))
+                  (setf col 0 row (1+ row)))))))))))
 
 (defun render-content (node buffer x y w h style)
   (when (and style (> w 0) (> h 0))
@@ -229,6 +334,20 @@ Preserve the original node background and terminal attributes."
 (defvar *absolute-layout-rectangles-p* nil
   "Pipeline lists have absolute layout rects; direct legacy node tests use local rects.")
 
+(defvar *render-effective-opacity* 1
+  "Product of ancestor and node opacity for terminal approximation.
+No alpha blending exists on a terminal: partial opacity maps to SGR faint.")
+
+(defun %paint-order-children (node)
+  "Stable sibling-only z-index ordering; equal indices keep source order.
+All descendants retain their parent's clipping and stacking context."
+  (stable-sort (copy-list (elmtui.view.element:el/children node))
+               #'<
+               :key (lambda (child)
+                      (let ((z (getf (elmtui.view.element:el/styles child)
+                                     :z-index 0)))
+                        (if (realp z) z 0)))))
+
 (defun render-node (node buffer parent-x parent-y &optional inherited-clip)
   "Paint nodes according to the active layout rectangle coordinate contract."
   (log-debug "Rendering node ~A of type ~A, typep ~A"
@@ -245,13 +364,19 @@ Preserve the original node background and terminal attributes."
                      (abs-y (+ parent-y (y rect)))
                      (bw (w rect))
                      (bh (h rect)))
-                (when (visible-node-p node bw bh)
+                (let ((*render-effective-opacity*
+                        (* *render-effective-opacity*
+                           (or (style-value node :opacity nil) 1))))
+                  (when (and (plusp *render-effective-opacity*)
+                             (visible-node-p node bw bh))
                   (multiple-value-bind (cx cy cw ch)
                       (%content-geometry node abs-x abs-y bw bh)
                     (let ((*render-clip* inherited-clip)
                           (ts (style-to-terminal-style
                                (elmtui.view.element:el/styles node))))
                       (when ts
+                        (when (< *render-effective-opacity* 1)
+                          (setf (terminal-style-faint ts) t))
                         (render-background buffer abs-x abs-y bw bh ts)
                         (draw-border node buffer abs-x abs-y bw bh ts)
                         (render-content node buffer cx cy cw ch ts)))
@@ -261,12 +386,12 @@ Preserve the original node background and terminal attributes."
                               :size (elmtui.view.geo:make-size :w cw :h ch)))
                            (child-clip
                              (%child-render-clip node inherited-clip content-rect)))
-                      (dolist (child (elmtui.view.element:el/children node))
+                      (dolist (child (%paint-order-children node))
                         (render-node
                          child buffer
                          (if *absolute-layout-rectangles-p* parent-x abs-x)
                          (if *absolute-layout-rectangles-p* parent-y abs-y)
-                         child-clip))))))))
+                         child-clip)))))))))
           (log-debug "Skipping non-element node ~A of type ~A"
                      node (type-of node)))))
 

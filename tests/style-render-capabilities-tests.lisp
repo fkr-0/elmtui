@@ -106,6 +106,84 @@
     (is (char= #\Space (buffer-cell-char (%cell buffer 1 1))))
     (is (eq :green (terminal-color-simple (%bg buffer 1 1))))))
 
+(test independently-configured-border-side-styles
+  "Every side-specific style affects the actual glyph; NONE suppresses its edge."
+  (let ((buffer (%paint-box
+                 '(:border t :border-style :solid :border-color :white
+                   :border-top-style :dashed :border-top-color :red
+                   :border-right-style :dotted :border-right-color :green
+                   :border-bottom-style :double :border-bottom-color :blue
+                   :border-left-style :none))))
+    (is (char= #\┄ (buffer-cell-char (%cell buffer 1 4))))
+    (is (char= #\┊ (buffer-cell-char (%cell buffer 3 7))))
+    (is (char= #\═ (buffer-cell-char (%cell buffer 5 4))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 3 1))))
+    (is (char= #\┄ (buffer-cell-char (%cell buffer 1 1))))
+    (is (char= #\═ (buffer-cell-char (%cell buffer 5 1))))
+    (is (eq :red (terminal-color-simple (%fg buffer 1 1))))
+    (is (eq :green (terminal-color-simple (%fg buffer 3 7))))
+    (is (eq :blue (terminal-color-simple (%fg buffer 5 1))))))
+
+(test side-border-absent-edges-do-not-leave-phantom-corners
+  (let ((buffer (%paint-box
+                 '(:border t :border-style :solid :border-color :magenta
+                   :border-top-style :none :border-bottom-style :none
+                   :border-right-style :none :border-left-style :dotted))))
+    (is (char= #\┊ (buffer-cell-char (%cell buffer 1 1))))
+    (is (char= #\┊ (buffer-cell-char (%cell buffer 3 1))))
+    (is (char= #\┊ (buffer-cell-char (%cell buffer 5 1))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 1 4))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 1 7))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 5 7))))))
+
+(test side-border-style-can-override-a-globally-disabled-border
+  (let ((buffer (%paint-box
+                 '(:border t :border-style :none
+                   :border-top-style :dashed :border-color :cyan))))
+    (is (char= #\┄ (buffer-cell-char (%cell buffer 1 4))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 3 1))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 5 4))))
+    (is (eq :cyan (terminal-color-simple (%fg buffer 1 4))))))
+
+(test opacity-zero-skips-subtree-and-intermediate-opacity-uses-faint
+  "A TUI has no alpha channel: 0 hides, 0<value<1 produces inherited SGR faint."
+  (let* ((buffer (make-virtual-buffer 6 2))
+         (hidden (make-instance 'text-element :content "HIDE"
+                                :style '(:opacity 0 :fg-color :red)))
+         (dimmed (make-instance 'container-element
+                                :style '(:opacity 0.5)
+                                :children (list
+                                           (make-instance 'text-element
+                                             :content "OK"
+                                             :style '(:fg-color :green))))))
+    (setf (elmtui.view.element:el/layout-rect hidden) (%rect 0 0 4 1)
+          (elmtui.view.element:el/layout-rect dimmed) (%rect 0 1 4 1)
+          (elmtui.view.element:el/layout-rect
+           (first (elmtui.view.element:el/children dimmed))) (%rect 0 1 2 1))
+    (render-laid-out-tree-to-buffer (list hidden dimmed) :buffer buffer)
+    (is (char= #\Space (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\O (buffer-cell-char (%cell buffer 1 0))))
+    (is (elmtui.platform.backend.common.ansi-styling:terminal-style-faint
+         (buffer-cell-style (%cell buffer 1 0))))))
+
+(test sibling-z-index-is-sorted-but-equal-values-are-stable
+  (let* ((buffer (make-virtual-buffer 2 1))
+         (low (make-instance 'text-element :content "L"
+                             :style '(:z-index -2)))
+         (high (make-instance 'text-element :content "H"
+                              :style '(:z-index 5)))
+         (same (make-instance 'text-element :content "S"
+                              :style '(:z-index 5)))
+         (parent (make-instance 'container-element
+                                :children (list high low same))))
+    (dolist (node (list parent high low same))
+      (setf (elmtui.view.element:el/layout-rect node) (%rect 0 0 1 1)))
+    (render-laid-out-tree-to-buffer parent :buffer buffer)
+    (is (char= #\S (buffer-cell-char (%cell buffer 0 0))))
+    (setf (elmtui.view.element:el/children parent) (list same low high))
+    (render-laid-out-tree-to-buffer parent :buffer buffer)
+    (is (char= #\H (buffer-cell-char (%cell buffer 0 0))))))
+
 (test text-sgr-flags-and-hsl-color-survive-the-renderer
   (let ((buffer (make-virtual-buffer 7 2))
         (node (make-instance

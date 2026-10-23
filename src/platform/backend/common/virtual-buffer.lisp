@@ -28,6 +28,7 @@
    ;; Structs
    #:buffer-cell
    #:buffer-cell-char
+   #:buffer-cell-grapheme
    #:buffer-cell-style
    #:buffer-char
    #:buffer-style
@@ -109,9 +110,10 @@
   "Represents a single cell in the virtual terminal buffer.
 that is: at this point already a character with a style."
   (char #\Space :type character)
+  (grapheme nil :type (or null string))
   (style nil :type (or null terminal-style)))
 
-(defmethod make-buffer-cell (&key (char #\Space) (style nil))
+(defmethod make-buffer-cell (&key (char #\Space) (style nil) grapheme)
   "Creates a new BUFFER-CELL instance with the specified character and style.
    The style can be a plist, a terminal-style object, or nil."
   (let ((processed-style (cond
@@ -119,7 +121,7 @@ that is: at this point already a character with a style."
                            ((typep style 'terminal-style) style)
                            ((listp style) style) ; Keep as plist for now
                            (t (error "Unsupported style type: ~A" (type-of style))))))
-    (%make-buffer-cell :char char
+    (%make-buffer-cell :char char :grapheme (and grapheme (copy-seq grapheme))
                        :style (if (null processed-style) nil
                                   (if (typep processed-style 'terminal-style)
                                       processed-style
@@ -174,7 +176,8 @@ that is: at this point already a character with a style."
   (check-type bfr virtual-terminal-buffer)
   (check-type row (integer 0 *))
   (check-type col (integer 0 *))
-  (setf (buffer-cell-char (aref (virtual-terminal-buffer-cells bfr) row col)) value))
+  (setf (buffer-cell-char (aref (virtual-terminal-buffer-cells bfr) row col)) value
+        (buffer-cell-grapheme (aref (virtual-terminal-buffer-cells bfr) row col)) nil))
 
 (defmethod (setf buffer-style) ((value terminal-style) (bfr virtual-terminal-buffer) row col)
   "Sets the style at the given ROW and COL of the BUFFER to VALUE."
@@ -252,6 +255,7 @@ that is: at this point already a character with a style."
   (check-type cell1 buffer-cell)
   (check-type cell2 buffer-cell)
   (and (char= (buffer-cell-char cell1) (buffer-cell-char cell2))
+       (equal (buffer-cell-grapheme cell1) (buffer-cell-grapheme cell2))
        (let ((style1 (buffer-cell-style cell1))
              (style2 (buffer-cell-style cell2)))
          (cond
@@ -285,6 +289,7 @@ Signals INVALID-BUFFER-COORDINATES-ERROR if out of bounds."
           (let ((original-cell (aref (virtual-terminal-buffer-cells buffer) row col)))
             (make-buffer-cell
              :char (buffer-cell-char original-cell)
+             :grapheme (buffer-cell-grapheme original-cell)
              ;; Make a deep copy of the style
              :style (deep-copy-style (buffer-cell-style original-cell)))))
       (use-value (value)
@@ -300,7 +305,7 @@ Signals INVALID-BUFFER-COORDINATES-ERROR if out of bounds."
               (default-buffer-cell) ; Fallback, or re-signal
               (buffer-cell-at buffer clipped-row clipped-col)))))))
 
-(defun set-buffer-cell-at (buffer row col char style)
+(defun set-buffer-cell-at (buffer row col char style &key grapheme)
   "Modifies the cell at (ROW, COL) with CHAR and STYLE.
 Signals INVALID-BUFFER-COORDINATES-ERROR if out of bounds.
 Returns the modified BUFFER."
@@ -324,7 +329,8 @@ Returns the modified BUFFER."
           (progn
             (%check-bounds buffer row col)
             (setf (aref (virtual-terminal-buffer-cells buffer) row col)
-                  (make-buffer-cell :char char :style processed-style))
+                  (make-buffer-cell :char char :style processed-style
+                                    :grapheme grapheme))
             buffer)
         (use-value (&optional new-char new-style) ; Allow ignoring the operation by not providing values
           :report "Ignore the set operation or provide new char/style to use (or use defaults)."
@@ -423,6 +429,9 @@ Returns the new buffer."
                          do (let ((old-cell (aref old-cells r c))
                                   (new-cell (aref new-cells r c)))
                                (setf (buffer-cell-char new-cell) (buffer-cell-char old-cell)
+                                     (buffer-cell-grapheme new-cell)
+                                     (and (buffer-cell-grapheme old-cell)
+                                          (copy-seq (buffer-cell-grapheme old-cell)))
                                      (buffer-cell-style new-cell) (deep-copy-style (buffer-cell-style old-cell)))))))))
     new-buffer))
 
@@ -443,6 +452,7 @@ Returns the new buffer."
                           (setf (aref new-cells r c)
                                 (make-buffer-cell
                                  :char (buffer-cell-char old-cell)
+                                 :grapheme (buffer-cell-grapheme old-cell)
                                  :style (deep-copy-style (buffer-cell-style old-cell)))))))
       new-buffer)))
 
@@ -550,4 +560,5 @@ optionally including style information."
                             (when source-cell ; buffer-cell-at handles its own errors/restarts
                               (set-buffer-cell-at target-buffer r c
                                                   (buffer-cell-char source-cell)
-                                                  (buffer-cell-style source-cell))))))))))
+                                                  (buffer-cell-style source-cell)
+                                                  :grapheme (buffer-cell-grapheme source-cell))))))))))
