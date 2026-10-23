@@ -26,6 +26,8 @@
     (:solid   '(:h #\─ :v #\│ :tl #\┌ :tr #\┐ :bl #\└ :br #\┘))
     (:ascii   '(:h #\- :v #\| :tl #\+ :tr #\+ :bl #\+ :br #\+))
     (:double  '(:h #\═ :v #\║ :tl #\╔ :tr #\╗ :bl #\╚ :br #\╝))
+    (:dashed  '(:h #\┄ :v #\┆ :tl #\┌ :tr #\┐ :bl #\└ :br #\┘))
+    (:dotted  '(:h #\┈ :v #\┊ :tl #\┌ :tr #\┐ :bl #\└ :br #\┘))
     (t (get-border-characters :solid))))
 
 (defvar *render-clip* nil
@@ -115,6 +117,22 @@ behavior for compatibility."
   (when (and style (terminal-style-bg-color style))
     (fill-rect buffer x y w h #\Space style)))
 
+(defun %border-side-style (base-style declarations side)
+  "Use an edge-specific color, then :BORDER-COLOR, then text foreground.
+Preserve the original node background and terminal attributes."
+  (let* ((key (ecase side
+                (:top :border-top-color)
+                (:right :border-right-color)
+                (:bottom :border-bottom-color)
+                (:left :border-left-color)))
+         (color (or (getf declarations key)
+                    (getf declarations :border-color)))
+         (style (copy-term-style base-style)))
+    (when color
+      (setf (terminal-style-fg-color style)
+            (elmtui.platform.backend.common.ansi-styling:fuzz-color color)))
+    style))
+
 (defun draw-border (node buffer x y width height style)
   (let* ((smap (elmtui.view.element:el/styles node))
          (border-t (getf smap :border nil))
@@ -126,34 +144,36 @@ behavior for compatibility."
              (brw (getf smap :border-right-width border-width))
              (bbw (getf smap :border-bottom-width border-width))
              (blw (getf smap :border-left-width border-width))
-             (border-style (style-to-terminal-style
-                            (elmtui.view.element:el/styles node))))
+             (top-style (%border-side-style style smap :top))
+             (right-style (%border-side-style style smap :right))
+             (bottom-style (%border-side-style style smap :bottom))
+             (left-style (%border-side-style style smap :left)))
         (destructuring-bind (&key h v tl tr bl br) (get-border-characters border-style-val)
           (when (> btw 0) (loop for c from (if (> blw 0) 1 0)
                                   below (- width (if (> brw 0) 1 0))
                                 do (draw-border-char
-                                    buffer y (+ x c) h border-style)))
+                                    buffer y (+ x c) h top-style)))
           (when (> bbw 0) (loop for c from (if (> blw 0) 1 0)
                                   below (- width (if (> brw 0) 1 0))
                                 do (draw-border-char
-                                    buffer (+ y height -1) (+ x c) h border-style)))
+                                    buffer (+ y height -1) (+ x c) h bottom-style)))
           (when (> blw 0) (loop for r from (if (> btw 0) 1 0)
                                   below (- height (if (> bbw 0) 1 0))
                                 do (draw-border-char
-                                    buffer (+ y r) x v border-style)))
+                                    buffer (+ y r) x v left-style)))
           (when (> brw 0) (loop for r from (if (> btw 0) 1 0)
                                   below (- height (if (> bbw 0) 1 0))
                                 do (draw-border-char
-                                    buffer (+ y r) (+ x width -1) v border-style)))
+                                    buffer (+ y r) (+ x width -1) v right-style)))
           (when (and (> btw 0) (> blw 0))
-            (draw-border-char buffer y x tl border-style))
+            (draw-border-char buffer y x tl top-style))
           (when (and (> btw 0) (> brw 0))
-            (draw-border-char buffer y (+ x width -1) tr border-style))
+            (draw-border-char buffer y (+ x width -1) tr top-style))
           (when (and (> bbw 0) (> blw 0))
-            (draw-border-char buffer (+ y height -1) x bl border-style))
+            (draw-border-char buffer (+ y height -1) x bl bottom-style))
           (when (and (> bbw 0) (> brw 0))
             (draw-border-char
-             buffer (+ y height -1) (+ x width -1) br border-style)))))))
+             buffer (+ y height -1) (+ x width -1) br bottom-style)))))))
 
 (defun %render-string-content (content buffer x y w h style white-space)
   "Render CONTENT into the current content rectangle using terminal text rules."
