@@ -1,0 +1,184 @@
+;;; Executable capability matrix: not only accepted style declarations, but
+;;; the actual styled cells written by the terminal rendering pipeline.
+(uiop:define-package :elmtui.tests.style-render-capabilities
+  (:use :cl :fiveam)
+  (:import-from :elmtui.view.base-elements
+                #:container-element #:text-element)
+  (:import-from :elmtui.view.geo
+                #:make-rectangle #:make-pos #:make-size)
+  (:import-from :elmtui.platform.backend.common.virtual-buffer
+                #:make-virtual-buffer #:buffer-cell-at
+                #:buffer-cell-char #:buffer-cell-style)
+  (:import-from :elmtui.platform.backend.common.ansi-styling
+                #:terminal-color-simple #:terminal-style-fg-color
+                #:terminal-style-bg-color #:terminal-style-bold
+                #:terminal-style-underline #:terminal-style-inverse
+                #:terminal-style-faint #:terminal-style-strike)
+  (:import-from :elmtui.platform.tree-renderer
+                #:render-laid-out-tree-to-buffer))
+(in-package :elmtui.tests.style-render-capabilities)
+
+(def-suite style-render-capabilities-suite :in elmtui.tests:elmtui-test
+  :description "Style declarations must cause exact terminal buffer effects")
+(in-suite style-render-capabilities-suite)
+
+(defun %rect (x y width height)
+  (make-rectangle :pos (make-pos :x x :y y)
+                  :size (make-size :w width :h height)))
+
+(defun %cell (buffer row col)
+  (buffer-cell-at buffer row col))
+
+(defun %fg (buffer row col)
+  (terminal-style-fg-color (buffer-cell-style (%cell buffer row col))))
+
+(defun %bg (buffer row col)
+  (let ((style (buffer-cell-style (%cell buffer row col))))
+    (and style (terminal-style-bg-color style))))
+
+(defun %color-rgb (color)
+  (list (elmtui.platform.backend.common.ansi-styling::terminal-color-red color)
+        (elmtui.platform.backend.common.ansi-styling::terminal-color-green color)
+        (elmtui.platform.backend.common.ansi-styling::terminal-color-blue color)))
+
+(defun %paint-box (style &key (width 7) (height 5))
+  (let ((buffer (make-virtual-buffer (+ width 3) (+ height 3)))
+        (node (make-instance 'container-element :style style)))
+    (setf (elmtui.view.element:el/layout-rect node)
+          (%rect 1 1 width height))
+    (render-laid-out-tree-to-buffer node :buffer buffer)
+    buffer))
+
+(test border-color-is-the-border-foreground-not-the-text-foreground
+  "A registered :border-color must affect the rendered glyphs."
+  (let* ((buffer (%paint-box
+                  '(:border t :border-width 1 :border-style :solid
+                    :fg-color :white :bg-color :black
+                    :border-color :red :bold t)))
+         (corner (%cell buffer 1 1))
+         (style (buffer-cell-style corner)))
+    (is (char= #\┌ (buffer-cell-char corner)))
+    (is (eq :red (terminal-color-simple (%fg buffer 1 1))))
+    (is (eq :red (terminal-color-simple (%fg buffer 1 4))))
+    (is (eq :red (terminal-color-simple (%fg buffer 3 1))))
+    (is (eq :black (terminal-color-simple
+                    (terminal-style-bg-color style))))
+    (is (terminal-style-bold style))
+    (is (eq :black (terminal-color-simple (%bg buffer 3 4))))))
+
+(test border-side-colors-honor-specific-over-global-and-accept-rgb
+  "Top/right/bottom/left colors override the shared border color."
+  (let ((buffer (%paint-box
+                 '(:border t :border-style :double
+                   :border-color :white :fg-color :black
+                   :border-top-color :red
+                   :border-right-color (:rgb 11 22 33)
+                   :border-bottom-color (:hsl 120 100 50)
+                   :border-left-color :yellow))))
+    (is (char= #\═ (buffer-cell-char (%cell buffer 1 4))))
+    (is (char= #\║ (buffer-cell-char (%cell buffer 3 7))))
+    (is (eq :red (terminal-color-simple (%fg buffer 1 4))))
+    (is (equal '(11 22 33) (%color-rgb (%fg buffer 3 7))))
+    (is (equal '(0 255 0) (%color-rgb (%fg buffer 5 4))))
+    (is (eq :yellow (terminal-color-simple (%fg buffer 3 1))))
+    (is (eq :red (terminal-color-simple (%fg buffer 1 1))))
+    (is (equal '(0 255 0) (%color-rgb (%fg buffer 5 1))))
+    (is (eq :white (terminal-color-simple
+                    (%fg (%paint-box '(:border t :border-color :white))
+                         1 1))))))
+
+(test advertised-border-style-variants-produce-distinct-glyphs
+  "Solid, dashed, dotted, ASCII and double are not silent aliases."
+  (dolist (fixture '((:solid #\─ #\│ #\┌)
+                     (:dashed #\┄ #\┆ #\┌)
+                     (:dotted #\┈ #\┊ #\┌)
+                     (:ascii #\- #\| #\+)
+                     (:double #\═ #\║ #\╔)))
+    (destructuring-bind (style h v corner) fixture
+      (let ((buffer (%paint-box (list :border t :border-style style
+                                      :border-color :cyan))))
+        (is (char= h (buffer-cell-char (%cell buffer 1 4))))
+        (is (char= v (buffer-cell-char (%cell buffer 3 1))))
+        (is (char= corner (buffer-cell-char (%cell buffer 1 1))))
+        (is (eq :cyan (terminal-color-simple (%fg buffer 1 4)))))))
+  (let ((buffer (%paint-box
+                 '(:border t :border-style :none :bg-color :green))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 1 1))))
+    (is (eq :green (terminal-color-simple (%bg buffer 1 1))))))
+
+(test text-sgr-flags-and-hsl-color-survive-the-renderer
+  (let ((buffer (make-virtual-buffer 7 2))
+        (node (make-instance
+               'text-element :content "TEXT"
+               :style '(:fg-color (:hsl 240 100 50) :bg-color "#102030"
+                        :attributes (:bold :underline :inverse :faint :strike)))))
+    (setf (elmtui.view.element:el/layout-rect node)
+          (%rect 1 0 4 1))
+    (render-laid-out-tree-to-buffer node :buffer buffer)
+    (let ((style (buffer-cell-style (%cell buffer 0 1))))
+      (is (char= #\T (buffer-cell-char (%cell buffer 0 1))))
+      (is (equal '(0 0 255) (%color-rgb (terminal-style-fg-color style))))
+      (is (equal '(16 32 48) (%color-rgb (terminal-style-bg-color style))))
+      (is (terminal-style-bold style))
+      (is (terminal-style-underline style))
+      (is (terminal-style-inverse style))
+      (is (terminal-style-faint style))
+      (is (terminal-style-strike style)))))
+
+(test border-color-does-not-leak-into-child-foreground
+  "Separate text foreground remains unchanged after painting a colored border."
+  (let* ((buffer (make-virtual-buffer 9 5))
+         (child (make-instance 'text-element
+                               :content "OK" :style '(:fg-color :white)))
+         (parent (make-instance 'container-element
+                                :children (list child)
+                                :style '(:border t :border-color :magenta
+                                         :bg-color :black :fg-color :cyan))))
+    (setf (elmtui.view.element:el/layout-rect parent) (%rect 1 0 7 4)
+          (elmtui.view.element:el/layout-rect child) (%rect 1 1 2 1))
+    (render-laid-out-tree-to-buffer parent :buffer buffer)
+    (is (eq :magenta (terminal-color-simple (%fg buffer 0 1))))
+    (is (char= #\O (buffer-cell-char (%cell buffer 1 2))))
+    (is (eq :white (terminal-color-simple (%fg buffer 1 2))))
+    (is (eq :black (terminal-color-simple (%bg buffer 1 2))))))
+
+(test painted-border-color-survives-diff-and-idle-does-no-ops
+  "The real diff backend emits border style changes, never writes on idle."
+  (let* ((before (make-virtual-buffer 10 8))
+         (after (%paint-box '(:border t :border-color :red
+                              :bg-color :black :border-style :dashed)))
+         (operations (elmtui.render.diff:compute-buffer-diff
+                      before after :initial-frame-p nil))
+         (red-run (find-if
+                   (lambda (op)
+                     (let* ((style (getf op :style))
+                            (color (and style (terminal-style-fg-color style))))
+                       (and (eq (getf op :type) :write-chars)
+                            color
+                            (eq :red (terminal-color-simple color)))))
+                   operations)))
+    (is (not (null red-run)))
+    (when red-run
+      (is (search (string #\┄) (getf red-run :chars))))
+    (is (null (elmtui.render.diff:compute-buffer-diff
+               after after :initial-frame-p nil)))))
+
+(test visibility-none-and-overflow-hidden-actually-clip-cells
+  (dolist (style '((:display :none :bg-color :red)
+                   (:visibility :hidden :bg-color :red)))
+    (let ((buffer (%paint-box style)))
+      (is (char= #\Space (buffer-cell-char (%cell buffer 1 1))))
+      (is (null (%bg buffer 1 1)))))
+  (let ((buffer (make-virtual-buffer 8 2))
+        (child (make-instance 'text-element
+                              :content "WXYZ" :style '(:fg-color :cyan))))
+    (let ((parent (make-instance 'container-element
+                                 :children (list child)
+                                 :style '(:overflow :hidden :padding-left 1
+                                          :padding-right 1))))
+      (setf (elmtui.view.element:el/layout-rect parent) (%rect 1 0 4 1)
+            (elmtui.view.element:el/layout-rect child) (%rect 0 0 4 1))
+      (render-laid-out-tree-to-buffer parent :buffer buffer)
+      (is (char= #\X (buffer-cell-char (%cell buffer 0 2))))
+      (is (char= #\Y (buffer-cell-char (%cell buffer 0 3))))
+      (is (char= #\Space (buffer-cell-char (%cell buffer 0 4)))))))
