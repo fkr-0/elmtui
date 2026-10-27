@@ -6,7 +6,10 @@
                     (:view :elmtui.view.core)
                     (:glyph :elmtui.view.layout.size-utils)
                     (:vb :elmtui.platform.backend.common.virtual-buffer)
-                    (:diff :elmtui.render.diff)))
+                    (:diff :elmtui.render.diff)
+                    (:focus :elmtui.core.focus)
+                    (:geo :elmtui.view.geo)
+                    (:base :elmtui.view.base-elements)))
 (in-package :elmtui.tests.coverage-release-20261027)
 
 (def-suite coverage-release-20261027 :in elmtui.tests:elmtui-test)
@@ -111,3 +114,51 @@
   (is (string= " " (glyph:terminal-string-slice "A界B" 2 3)))
   (is (string= "B" (glyph:terminal-string-slice "A界B" 3 4)))
   (is (= 9 (glyph:terminal-string-width (format nil "x~CT" #\Tab)))))
+
+(test focus-ring-reconciles-after-component-removal
+  "The focused component disappearing must not retain an unreachable focus ID."
+  (let ((manager (focus:make-focus-manager :initial-focus :editing)))
+    (focus:recalculate-focusable-elements
+     manager '(:container (:id :root)
+               (:button (:id :opening :focusable t))
+               (:button (:id :editing :focusable t))
+               (:button (:id :unavailable :focusable t :disabled t)))
+     :preserve-focus t)
+    (is (eq :editing (focus:get-current-focus manager)))
+    (is (equal '(:opening :editing)
+               (focus:focus-manager-focusable-elements manager)))
+    (focus:recalculate-focusable-elements
+     manager '(:container (:id :root)
+               (:button (:id :opening :focusable t))
+               (:button (:id :unavailable :focusable t :disabled t)))
+     :preserve-focus t)
+    (is (eq :opening (focus:get-current-focus manager)))
+    (is (equal '(:opening)
+               (focus:focus-manager-focusable-elements manager)))
+    (focus:recalculate-focusable-elements manager nil :preserve-focus t)
+    (is (null (focus:get-current-focus manager)))))
+
+(test flex-wrap-uses-actual-available-space
+  "Sibling boxes wrap only when their combined widths exceed the parent."
+  (let* ((root (make-instance 'base:container-element
+                               :id :layout-root
+                               :style '(:display :flex :flex-direction :row
+                                        :flex-wrap :wrap :gap 1
+                                        :height 10 :width 15)))
+         (a (make-instance 'base:container-element
+                           :id :a :style '(:width 5 :height 2)))
+         (b (make-instance 'base:container-element
+                           :id :b :style '(:width 5 :height 2)))
+         (c (make-instance 'base:container-element
+                           :id :c :style '(:width 5 :height 2))))
+    (setf (base:element-children root) (list a b c))
+    (base:compute-layout root
+                         (geo:make-rectangle
+                          :pos (geo:make-pos :x 0 :y 0)
+                          :size (geo:make-size :w 15 :h 10)))
+    (let ((ar (elmtui.view.element:el/layout-rect a))
+          (br (elmtui.view.element:el/layout-rect b))
+          (cr (elmtui.view.element:el/layout-rect c)))
+      (is (< (geo:x ar) (geo:x br)))
+      (is (> (geo:y cr) (geo:y ar)))
+      (is (<= (geo:x cr) 15)))))
