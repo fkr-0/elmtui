@@ -94,6 +94,65 @@ NIL preserves the historical buffer-only clipping behavior.")
                 (>= c (x *render-clip*))
                 (< c (+ (x *render-clip*) (w *render-clip*)))))))
 
+(defun %wide-glyph-span-at (buffer row column)
+  "Return inclusive (START . END) of an existing wide glyph covering COLUMN.
+Continuations are identified by a lead cell, not treated as independent
+printable cells. Grapheme-bearing leads may be narrow codepoints with a
+two-column emoji presentation selector."
+  (let* ((cell (buffer-cell-at buffer row column))
+         (char (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                cell)))
+    (labels ((wide-lead-p (at)
+               (let* ((lead (buffer-cell-at buffer row at))
+                      (source (or (elmtui.platform.backend.common.virtual-buffer:buffer-cell-grapheme
+                                   lead)
+                                  (string (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                                           lead)))))
+                 (= 2 (elmtui.view.layout.size-utils:terminal-string-width
+                       source)))))
+      (cond
+        ((and (char= char #\Null)
+              (plusp column)
+              (wide-lead-p (1- column)))
+         (cons (1- column) column))
+        ((and (< (1+ column) (buffer-width buffer))
+              (not (char= char #\Null))
+              (wide-lead-p column)
+              (char= (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
+                      (buffer-cell-at buffer row (1+ column)))
+                     #\Null))
+         (cons column (1+ column)))))))
+
+(defun %paint-owned-glyph (buffer row column char style
+                           &key grapheme (columns 1))
+  "Atomically replace display cells owned by a glyph.
+Overdrawing a wide lead or its tail clears the entire former glyph first.
+If an old glyph crosses an inherited clip boundary, refuse the partial
+overwrite rather than invalidating cells outside the clipping region."
+  (when (and (plusp columns)
+             (loop for offset below columns
+                   always (inside-buffer-p buffer row (+ column offset))))
+    (let ((invalidated nil))
+      (loop for offset below columns
+            for target = (+ column offset)
+            for span = (%wide-glyph-span-at buffer row target)
+            when span do (pushnew span invalidated :test #'equal))
+      (when (every (lambda (span)
+                     (loop for col from (car span) to (cdr span)
+                           always (inside-buffer-p buffer row col)))
+                   invalidated)
+        (dolist (span invalidated)
+          (loop for col from (car span) to (cdr span)
+                for prior = (buffer-cell-at buffer row col)
+                do (set-buffer-cell-at
+                    buffer row col #\Space
+                    (buffer-cell-style prior))))
+        (set-buffer-cell-at buffer row column char style :grapheme grapheme)
+        (loop for offset from 1 below columns
+              do (set-buffer-cell-at buffer row (+ column offset)
+                                     #\Null style))
+        t))))
+
 
 
 (defun %content-geometry (node abs-x abs-y width height)
@@ -147,14 +206,14 @@ behavior for compatibility."
                  do (let ((rr (+ y row))
                           (cc (+ x col)))
                       (when (inside-buffer-p buffer rr cc)
-                        (set-buffer-cell-at buffer rr cc char style))))))
+                        (%paint-owned-glyph buffer rr cc char style))))))
 
 (defun draw-border-char (buffer r c ch base-style)
   (when (inside-buffer-p buffer r c)
     (let* ((existing-style (buffer-cell-style (buffer-cell-at buffer r c)))
            (style (copy-term-style (or existing-style base-style))))
       (setf (terminal-style-fg-color style) (terminal-style-fg-color base-style))
-      (set-buffer-cell-at buffer r c ch style))))
+      (%paint-owned-glyph buffer r c ch style))))
 
 (defun visible-node-p (node width height)
   (let* ((style (element-style node))
@@ -280,8 +339,12 @@ the lead buffer cell's GRAPHEME slot and are emitted together by the diff."
                    (unless (terminal-style-bg-color next)
                      (setf (terminal-style-bg-color next)
                            (and old (terminal-style-bg-color old))))
-                   (set-buffer-cell-at buffer rr cc ch next
-                                       :grapheme grapheme)))))
+                   (%paint-owned-glyph buffer rr cc ch next
+                                       :grapheme grapheme
+                                       :columns (if grapheme
+                                                    (elmtui.view.layout.size-utils:terminal-string-width
+                                                     grapheme)
+                                                    (elmtui.view.layout.size-utils:terminal-glyph-width ch)))))))
       (loop for (cluster . cluster-columns)
               in (elmtui.view.layout.size-utils:terminal-graphemes text)
             for ch = (char cluster 0)
@@ -308,9 +371,7 @@ the lead buffer cell's GRAPHEME slot and are emitted together by the diff."
                                    (inside-buffer-p buffer (+ y row)
                                                     (+ x col columns -1))))
                       (paint-cell ch (+ y row) (+ x col)
-                                  (and (> (length cluster) 1) cluster))
-                      (dotimes (i (1- columns))
-                        (paint-cell #\Null (+ y row) (+ x col i 1)))))
+                                  (and (> (length cluster) 1) cluster))))
                 (incf col columns)
                 (when (and (not nowrap) (>= col w))
                   (setf col 0 row (1+ row)))))))))))

@@ -260,3 +260,117 @@
       (is (char= #\X (buffer-cell-char (%cell buffer 0 2))))
       (is (char= #\Y (buffer-cell-char (%cell buffer 0 3))))
       (is (char= #\Space (buffer-cell-char (%cell buffer 0 4)))))))
+
+(test later-sibling-must-not-leave-a-half-wide-grapheme
+  "Painting onto the trailing cell of a wide sibling invalidates its lead."
+  (let* ((buffer (make-virtual-buffer 4 1))
+         (wide (make-instance 'text-element :content "界"
+                              :style '(:fg-color :cyan)))
+         (overlap (make-instance 'text-element :content "X"
+                                 :style '(:fg-color :yellow))))
+    (setf (elmtui.view.element:el/layout-rect wide) (%rect 0 0 2 1)
+          (elmtui.view.element:el/layout-rect overlap) (%rect 1 0 1 1))
+    (render-laid-out-tree-to-buffer (list wide overlap) :buffer buffer)
+    (is (char= #\Space (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\X (buffer-cell-char (%cell buffer 0 1))))
+    (is (eq :yellow (terminal-color-simple (%fg buffer 0 1))))
+    (let ((runs (elmtui.render.diff:compute-buffer-diff
+                 nil buffer :initial-frame-p t)))
+      (is (notany (lambda (op) (search "界" (getf op :chars))) runs))
+      (is (some (lambda (op) (search "X" (getf op :chars))) runs)))))
+
+(test later-sibling-overwriting-wide-lead-clears-continuation
+  "Overwriting the lead cell does not strand a non-printing continuation."
+  (let* ((buffer (make-virtual-buffer 4 1))
+         (wide (make-instance 'text-element :content "界"
+                              :style '(:fg-color :cyan)))
+         (overlap (make-instance 'text-element :content "X"
+                                 :style '(:fg-color :yellow))))
+    (setf (elmtui.view.element:el/layout-rect wide) (%rect 0 0 2 1)
+          (elmtui.view.element:el/layout-rect overlap) (%rect 0 0 1 1))
+    (render-laid-out-tree-to-buffer (list wide overlap) :buffer buffer)
+    (is (char= #\X (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\Space (buffer-cell-char (%cell buffer 0 1))))
+    (is (not (null
+              (elmtui.render.diff:compute-buffer-diff
+               nil buffer :initial-frame-p t))))))
+
+(test incremental-overlay-and-border-cannot-fragment-wide-cell
+  "Retained frames and border overlays obey the same two-cell ownership rule."
+  (let* ((buffer (make-virtual-buffer 4 2))
+         (wide (make-instance 'text-element :content "界"
+                              :style '(:fg-color :blue)))
+         (text (make-instance 'text-element :content "Z"
+                              :style '(:fg-color :green)))
+         (border (make-instance 'container-element
+                                :style '(:border t :border-style :ascii
+                                         :border-color :red))))
+    (setf (elmtui.view.element:el/layout-rect wide) (%rect 0 0 2 1)
+          (elmtui.view.element:el/layout-rect text) (%rect 1 0 1 1)
+          (elmtui.view.element:el/layout-rect border) (%rect 1 0 2 2))
+    (render-laid-out-tree-to-buffer wide :buffer buffer)
+    (render-laid-out-tree-to-buffer text :buffer buffer :clear-buffer-p nil)
+    (is (char= #\Space (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\Z (buffer-cell-char (%cell buffer 0 1))))
+    (render-laid-out-tree-to-buffer wide :buffer buffer :clear-buffer-p nil)
+    (render-laid-out-tree-to-buffer border :buffer buffer :clear-buffer-p nil)
+    (is (char= #\Space (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\+ (buffer-cell-char (%cell buffer 0 1))))))
+
+(test overlapping-wide-siblings-erase-the-previous-full-footprint
+  "Painting a new wide glyph over the tail of an earlier wide glyph is atomic."
+  (let* ((buffer (make-virtual-buffer 4 1))
+         (left (make-instance 'text-element :content "界"
+                              :style '(:fg-color :red)))
+         (right (make-instance 'text-element :content "語"
+                               :style '(:fg-color :blue))))
+    (setf (elmtui.view.element:el/layout-rect left) (%rect 0 0 2 1)
+          (elmtui.view.element:el/layout-rect right) (%rect 1 0 2 1))
+    (render-laid-out-tree-to-buffer (list left right) :buffer buffer)
+    (is (char= #\Space (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\語 (buffer-cell-char (%cell buffer 0 1))))
+    (is (char= #\Null (buffer-cell-char (%cell buffer 0 2))))
+    (is (eq :blue (terminal-color-simple (%fg buffer 0 1))))
+    (let* ((ops (elmtui.render.diff:compute-buffer-diff
+                 nil buffer :initial-frame-p t))
+           (chars (apply #'concatenate 'string
+                         (mapcar (lambda (op) (getf op :chars)) ops))))
+      (is (search "語" chars))
+      (is (not (search "界" chars))))))
+
+(test glyph-partly-outside-parent-clip-is-not-invalidated
+  "A clipped child cannot erase the outside half of an existing wide glyph."
+  (let* ((buffer (make-virtual-buffer 4 1))
+         (wide (make-instance 'text-element :content "界"
+                              :style '(:fg-color :cyan)))
+         (child (make-instance 'text-element :content "X"
+                               :style '(:fg-color :yellow)))
+         (parent (make-instance 'container-element
+                                :style '(:overflow :hidden :padding-left 1)
+                                :children (list child))))
+    (setf (elmtui.view.element:el/layout-rect wide) (%rect 0 0 2 1)
+          (elmtui.view.element:el/layout-rect parent) (%rect 0 0 2 1)
+          (elmtui.view.element:el/layout-rect child) (%rect 1 0 1 1))
+    (render-laid-out-tree-to-buffer wide :buffer buffer)
+    (render-laid-out-tree-to-buffer parent :buffer buffer
+                                    :clear-buffer-p nil)
+    (is (char= #\界 (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\Null (buffer-cell-char (%cell buffer 0 1))))))
+
+(test emoji-presentation-selector-is-invalidated-as-one-wide-glyph
+  "An emoji cluster whose first codepoint is narrow owns two physical cells."
+  (let* ((buffer (make-virtual-buffer 4 1))
+         (emoji (format nil "~C~C" (code-char #x2764) (code-char #xfe0f)))
+         (heart (make-instance 'text-element :content emoji
+                               :style '(:fg-color :magenta)))
+         (text (make-instance 'text-element :content "X"
+                              :style '(:fg-color :green))))
+    (setf (elmtui.view.element:el/layout-rect heart) (%rect 0 0 2 1)
+          (elmtui.view.element:el/layout-rect text) (%rect 1 0 1 1))
+    (render-laid-out-tree-to-buffer (list heart text) :buffer buffer)
+    (is (char= #\Space (buffer-cell-char (%cell buffer 0 0))))
+    (is (char= #\X (buffer-cell-char (%cell buffer 0 1))))
+    (is (notany
+         (lambda (op) (search emoji (getf op :chars)))
+         (elmtui.render.diff:compute-buffer-diff
+          nil buffer :initial-frame-p t)))))
