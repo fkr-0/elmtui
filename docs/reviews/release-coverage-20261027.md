@@ -16,7 +16,7 @@
 | Weighted coverage | 55.73% | 55.95% | **+0.22 pp** |
 | Primary source files | 88 | 88 | 0 |
 | Explicit gate minimum | 55.00% | 55.00% | **unchanged** |
-| Instrumented run FiveAM checks | 9,972 | 10,016 | **+44** |
+| Instrumented run FiveAM checks | 9,972 | 10,024 | **+52** |
 | Fail / optional live tmux skips | 0 / 6 | 0 / 6 | 0 / 0 |
 
 The **frozen October 26 candidate** had 22,318/40,199 (55.52%). The current dirty checkout had *already* risen to 22,401/40,199 (55.73%) before E4 touched files. The earlier +83 forms **are not credited to E4**. Current E4 gained +91 additional runtime-reached forms; no denominator reduction, source-exclusion change, or threshold relaxation was used.
@@ -35,19 +35,21 @@ The 12 zero-hit primary files are still in the denominator:
 
 ## E4 behavior-driven regressions and CI wiring
 
-File: `tests/coverage-release-quality-20261027.lisp`. Six new FiveAM cases, 44 assertions:
+File: `tests/coverage-release-quality-20261027.lisp`. Eight new FiveAM cases, 52 assertions:
 1. Atomic nested state patch batches, update/prepend/append/delete and unchanged earlier snapshot.
 2. Invalid patch after a valid change throws without altering original state.
 3. Legacy transaction failure returns original state and no committed transaction; expected warning is intercepted *inside the assertion* (not globally masked).
 4. Nested updater / merge / full forward and reverse state diffs.
 5. Whole-view replacement plus dynamic view context restoration after nested scope and error.
 6. Terminal-cell and grapheme-aware slicing, wide-glyph clipping and tab-stop width.
+7. Dynamic focus recovery after the focused widget is removed, excluding disabled targets.
+8. Responsive flex wrapping and sibling geometry under bounded terminal space.
 
-First falsification run (as designed) failed **two new test expectations**, not production code: reversed state diffs report all changed fields, not merely the removed key; a tab after the first column followed by a character occupies nine display columns. Corrected the expectations after reviewing actual behavior. First run exit **1**, 10,015 checks, 2 failures; final run exit **0**, 10,016 checks, no failures.
+First falsification run (as designed) failed **two new test expectations**, not production code: reversed state diffs report all changed fields, not merely the removed key; a tab after the first column followed by a character occupies nine display columns. Corrected the expectations after reviewing actual behavior. First run exit **1**, 10,015 checks, 2 failures; final run exit **0**, 10,024 checks, no failures.
 
 The tests have an explicit **fatal load** in `scripts/coverage.lisp` after `elmtui-tests` is loaded and SB-COVER instrumentation disabled. CI (`.github/workflows/ci.yml`) invokes `scripts/run-coverage-warning-clean.sh`, which invokes this script and enforces failure status and the 55% gate. A missing E4 source file or load error therefore fails the CI coverage job rather than being skipped. This hook is the sole E4 addition to the previously dirty coverage script; E4 did not commit another agent's pre-existing changes.
 
-**Important ASDF limitation:** `elmtui-tests.asd` is shared, already dirty, and not in the E4 governed write scope. Therefore `scripts/run-tests-warning-clean.sh` and `asdf:test-system "elmtui-tests"` still perform **9,972** rather than **10,016** checks. The E4 regressions *are run by CI coverage* but are **not independently present in the plain ASDF/root test run**. This is a known integration gap, not a claim of complete root-suite wiring. Coordination note `469d15b1-2633-40aa-96d7-0f86af4da234` requests governed addition of the new test file to the root ASDF components after owner review. No shared CI/ASDF edits have been made in E4.
+**Important ASDF limitation:** `elmtui-tests.asd` is shared, already dirty, and not in the E4 governed write scope. Therefore `scripts/run-tests-warning-clean.sh` and `asdf:test-system "elmtui-tests"` still perform **9,972** rather than **10,024** checks. The E4 regressions *are run by CI coverage* but are **not independently present in the plain ASDF/root test run**. This is a known integration gap, not a claim of complete root-suite wiring. Coordination note `469d15b1-2633-40aa-96d7-0f86af4da234` requests governed addition of the new test file to the root ASDF components after owner review. No shared CI/ASDF edits have been made in E4.
 
 The root ASDF test-op wiring itself is verified: `elmtui-tests.asd` invokes `elmtui.tests:run-all-elmtui-tests` and errors on a false result. `tests/test_asdf_acceptance.py` tests that injected FiveAM failure changes process status and that the declared default acceptance suites execute. All two cases passed. CI also invokes 15 negative coverage-gate cases and one badge/provenance negative test, all passed.
 
@@ -57,7 +59,8 @@ The root ASDF test-op wiring itself is verified: `elmtui-tests.asd` invokes `elm
 | --- | ---: | --- |
 | `ELMTUI_TEST_RUN_ID=e4-pre-20261027 scripts/run-coverage-warning-clean.sh` | 0 | `test-output/coverage-e4-pre-20261027.{stdout,stderr}.log` |
 | `ELMTUI_TEST_RUN_ID=e4-post-first-20261027 scripts/run-coverage-warning-clean.sh` | 1 | Two falsified assertions, `test-output/coverage-e4-post-first-20261027.{stdout,stderr}.log` |
-| `ELMTUI_TEST_RUN_ID=e4-post-fixed-20261027 scripts/run-coverage-warning-clean.sh` | **0** | `test-output/coverage-e4-post-fixed-20261027.{stdout,stderr}.log`; `coverage/coverage-summary.json` |
+| `ELMTUI_TEST_RUN_ID=e4-post-fixed-20261027 scripts/run-coverage-warning-clean.sh` | **0** | `test-output/coverage-e4-post-fixed-20261027.{stdout,stderr}.log` (first six fixed cases) |
+| `ELMTUI_TEST_RUN_ID=e4-extended-20261027 scripts/run-coverage-warning-clean.sh` | **0** | `test-output/coverage-e4-extended-20261027.{stdout,stderr}.log`; `coverage/coverage-summary.json`; eight final cases |
 | `ELMTUI_TEST_RUN_ID=e4-root-20261027 scripts/run-tests-warning-clean.sh` | **0** | `test-output/warning-clean-e4-root-20261027.{stdout,stderr}.log`: 9,966 pass/6 opt-in skips |
 | `python3 -m unittest discover -s tests -p 'test_asdf_acceptance.py' -v` | 0 | 2/2 |
 | `python3 -m unittest discover -s tests -p 'test_coverage_gate.py' -v` | 0 | 15/15 |
