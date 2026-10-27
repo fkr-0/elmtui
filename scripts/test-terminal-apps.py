@@ -70,8 +70,13 @@ class TerminalApp:
                           'status=$?\nstty -g > ' + shlex.quote(str(self.directory / 'after.stty')) + '\n'
                           'printf "%s\\n" "$status" > ' + shlex.quote(str(self.directory / 'exit-code')) + '\n'
                           'printf "ELMTUI_E2E_SHELL_RESTORED"\nsleep 300\n')
+        # OPTIONS is also supplied by independent PTY fixtures. Preserve their
+        # default geometry while allowing this runner to probe narrow screens.
+        columns = getattr(OPTIONS, 'columns', 100)
+        rows = getattr(OPTIONS, 'rows', 35)
         self.tmux('-f', '/dev/null', 'new-session', '-d', '-s', 'app',
-                  '-x', '100', '-y', '35', 'sh ' + shlex.quote(str(script)))
+                  '-x', str(columns), '-y', str(rows),
+                  'sh ' + shlex.quote(str(script)))
         self.tmux('set-option', '-g', 'status', 'off')
         self.tmux('set-option', '-g', 'history-limit', '10000')
         self.tmux('pipe-pane', '-t', 'app:0.0',
@@ -79,7 +84,8 @@ class TerminalApp:
         if OPTIONS.terminal == 'urxvt':
             title = 'elmtui-e2e-' + self.directory.name
             self.emulator = subprocess.Popen(
-                ['urxvt', '-name', title, '-title', title, '-geometry', '100x35',
+                ['urxvt', '-name', title, '-title', title,
+                 '-geometry', f'{columns}x{rows}',
                  '-e', 'tmux', '-S', self.socket, 'attach-session', '-t', 'app'],
                 stdout=subprocess.DEVNULL,
                 stderr=(self.directory / 'urxvt.stderr').open('w'))
@@ -142,8 +148,17 @@ class TerminalApp:
         if 'ELMTUI_E2E_SHELL_RESTORED' not in self.screen():
             raise AssertionError('Shell output is not visible after shutdown')
         errors = (self.directory / 'stderr.txt').read_text(errors='replace')
-        if re.search(r'unhandled|fatal error|undefined function|WARNING:', errors, re.I):
-            raise AssertionError('Compiler/runtime diagnostic in stderr: ' + errors[-3000:])
+        # Loading mini-text-editor directly may re-register three upstream
+        # Log4CL methods. Preserve strict diagnostics for every other warning.
+        known_log4cl_warnings = {
+            'WARNING: redefining LOG4CL-IMPL:APPENDER-ADDED in DEFGENERIC',
+            'WARNING: redefining LOG4CL-IMPL:APPENDER-REMOVED in DEFGENERIC',
+            'WARNING: redefining LOG4CL-IMPL::PROPERTY-ALIST in DEFGENERIC',
+        }
+        unexpected = '\n'.join(line for line in errors.splitlines()
+                               if line.strip() not in known_log4cl_warnings)
+        if re.search(r'unhandled|fatal error|undefined function|WARNING:', unexpected, re.I):
+            raise AssertionError('Compiler/runtime diagnostic in stderr: ' + unexpected[-3000:])
 
     def close(self):
         try:
@@ -282,6 +297,112 @@ class FullTerminalApps(unittest.TestCase):
         app.expect('Hello B')
         app.finish()
 
+    def test_minimal_live_resize_and_redraw(self):
+        # Force a real tmux window resize (SIGWINCH) rather than faking the
+        # layout width within the Lisp process. Attached urxvt controls its
+        # window geometry; the independent initial-geometry matrix covers it.
+        if OPTIONS.terminal != 'tmux':
+            self.skipTest('dynamic tmux resize is owned by the native tmux lane')
+        app = self.app('minimal', '(elmtui.examples.minimal:run-minimal :platform :terminal)')
+        app.expect('Hello slurp')
+        app.tmux('set-window-option', '-t', 'app:0', 'window-size', 'manual')
+        for columns, rows, key, label in [
+                (68, 22, 'a', 'Hello A'), (120, 40, 'b', 'Hello B')]:
+            app.tmux('resize-window', '-t', 'app:0', '-x', str(columns), '-y', str(rows))
+            dimensions = app.tmux('display-message', '-p', '-t', 'app:0',
+                                  '#{window_width}x#{window_height}').stdout.strip()
+            self.assertEqual(dimensions, f'{columns}x{rows}')
+            app.key(key, key, literal=True)
+            app.expect(label)
+            app.frames.append({'assertion': 'real terminal resize',
+                               'dimensions': dimensions, 'screen': app.screen()})
+        app.finish()
+
+    def test_editor_dirty_quit_cancel_and_discard(self):
+        target = OPTIONS.output / ('unsaved-editor-' + uuid.uuid4().hex + '.txt')
+        app = self.app('editor',
+                       '(elmtui.examples.mini-text-editor:run-mini-text-editor)',
+                       source='mini-text-editor.lisp', use_launcher=False,
+                       environment={'ELMTUI_EDITOR_FILE': str(target)})
+        app.expect('Mini Text Editor')
+        app.key('a', 'a', literal=True)
+        # The header elides long filenames when the viewport is narrow. The
+        # dirty marker and Modified status are semantic, not filename width.
+        dirty_header = lambda screen: bool(re.search(
+            r'(?m)^.Mini Text Editor \|[^\n]*\*', screen))
+        app.wait(lambda screen: dirty_header(screen)
+                 and 'Modified | Ctrl+S save' in screen,
+                 'editor marks buffer dirty')
+        app.key('C-q', 'ctrl+q')
+        app.expect('Unsaved changes')
+        self.assertFalse((app.directory / 'exit-code').exists(),
+                         'unsaved Ctrl+Q must not exit immediately')
+        app.key('c', 'c', literal=True)
+        app.wait(lambda screen: 'Unsaved changes' not in screen
+                 and dirty_header(screen),
+                 'cancel returns to dirty editor')
+        app.key('C-q', 'ctrl+q')
+        app.expect('Unsaved changes')
+        app.key('d', 'd', literal=True)
+        app.finish(key=None)
+        self.assertFalse(target.exists(), 'discard must not write editor buffer')
+
+    def test_editor_ctrl_s_persists_and_quits_cleanly(self):
+        target = OPTIONS.output / ('saved-editor-' + uuid.uuid4().hex + '.txt')
+        app = self.app('editor-save',
+                       '(elmtui.examples.mini-text-editor:run-mini-text-editor)',
+                       source='mini-text-editor.lisp', use_launcher=False,
+                       environment={'ELMTUI_EDITOR_FILE': str(target)})
+        app.expect('Mini Text Editor')
+        pane_tty = app.tmux('display-message', '-p', '-t', 'app:0.0',
+                           '#{pane_tty}').stdout.strip()
+        tty_flags = subprocess.run(['stty', '-F', pane_tty, '-a'], check=True,
+                                   capture_output=True, text=True).stdout
+        self.assertIn('-ixon', tty_flags,
+                      'Ctrl+S requires software flow control to be disabled')
+        app.key('a', 'a', literal=True)
+        app.wait(lambda screen: 'Modified | Ctrl+S save' in screen,
+                 'modified editor before saving')
+        app.key('C-s', 'ctrl+s')
+        app.wait(lambda screen: 'Saved' in screen
+                 and 'Modified | Ctrl+S save' not in screen,
+                 'save completes and dirty state clears')
+        self.assertEqual(target.read_text(encoding='utf-8'), 'a')
+        app.finish('C-q', 'ctrl+q')
+
+    def test_init_exception_restores_terminal(self):
+        # Inject a fault in the example's state initializer: unlike an error
+        # before run-application, this executes after backend initialization.
+        # The harness must observe a nonzero exit but restored tty/cursor.
+        expression = (
+            '(progn (setf (symbol-function '
+            '(quote elmtui.examples.minimal::%minimal-initial-state)) '
+            '(lambda () (error "E2_INJECTED_INIT_FAILURE"))) '
+            '(elmtui.examples.minimal:run-minimal :platform :terminal))')
+        app = self.app('fault-init', expression, source='minimal-app.lisp',
+                       use_launcher=False)
+        deadline = time.monotonic() + OPTIONS.timeout
+        while not (app.directory / 'exit-code').exists():
+            if time.monotonic() >= deadline:
+                self.fail('Injected application did not exit')
+            time.sleep(.05)
+        code = (app.directory / 'exit-code').read_text().strip()
+        errors = (app.directory / 'stderr.txt').read_text(errors='replace')
+        before = (app.directory / 'before.stty').read_text()
+        after = (app.directory / 'after.stty').read_text()
+        cursor = app.tmux('display-message', '-p', '-t', 'app:0.0',
+                          '#{cursor_flag}').stdout.strip()
+        screen = app.screen()
+        app.frames.append({'assertion': 'startup exception cleanup',
+                           'exit_code': code, 'termios_restored': before == after,
+                           'cursor_visible': cursor == '1', 'screen': screen})
+        self.assertNotEqual(code, '0', 'injected error must propagate')
+        self.assertIn('E2_INJECTED_INIT_FAILURE', errors,
+                      'the expected fault must actually fire')
+        self.assertIn('ELMTUI_E2E_SHELL_RESTORED', screen)
+        self.assertEqual(before, after, 'exception must restore termios')
+        self.assertEqual(cursor, '1', 'exception must restore cursor visibility')
+
     def test_focus_tab_button_activation(self):
         app = self.app('focus', '(elmtui.examples.focus-simple:run-focus-simple)')
         app.expect('Cancel')
@@ -317,9 +438,14 @@ class FullTerminalApps(unittest.TestCase):
         app = self.app('life', '(elmtui.examples.game-of-life:run-game-of-life-app :platform :terminal)')
         app.expect('● RUNNING')
         app.key('Space', 'space')
-        app.expect('Ⅱ PAUSED')
+        app.expect('◉ PAUSED')
+        # Single-step while paused so the generation is provably nonzero before reset.
+        app.key('s', 's', literal=True)
+        app.wait(lambda screen: 'PAUSED' in screen and 'GEN 0000' not in screen,
+                 'step advances generation while paused')
         app.key('r', 'r', literal=True)
-        app.expect('GEN 000 Ⅱ PAUSED')
+        app.wait(lambda screen: 'GEN 0000' in screen and '◉ PAUSED' in screen,
+                 'reset returns to generation 0 and stays paused')
         app.key('Space', 'space')
         app.expect('● RUNNING')
         app.finish('q', 'q')
@@ -330,6 +456,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--terminal', choices=['tmux', 'urxvt'], default='tmux')
     parser.add_argument('--timeout', type=float, default=30)
+    parser.add_argument('--columns', type=int, default=100)
+    parser.add_argument('--rows', type=int, default=35)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--case', help='Run only tests whose name contains this string')
     OPTIONS = parser.parse_args()
@@ -339,6 +467,8 @@ def main():
         parser.error('Required executables missing: ' + ', '.join(missing))
     if OPTIONS.timeout <= 0:
         parser.error('--timeout must be positive')
+    if OPTIONS.columns < 20 or OPTIONS.rows < 10:
+        parser.error('--columns >= 20 and --rows >= 10 are required')
     if OPTIONS.terminal == 'urxvt' and not os.environ.get('ELMTUI_E2E_PRIVATE_X'):
         # Always use a fresh display, even when the user has a desktop DISPLAY.
         env = dict(os.environ, ELMTUI_E2E_PRIVATE_X='1')
@@ -354,6 +484,7 @@ def main():
     started = time.monotonic()
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     report = {'terminal': OPTIONS.terminal, 'tests': result.testsRun,
+              'columns': OPTIONS.columns, 'rows': OPTIONS.rows,
               'failures': len(result.failures), 'errors': len(result.errors),
               'seconds': time.monotonic() - started,
               'git_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
