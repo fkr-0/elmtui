@@ -95,6 +95,38 @@ Use it in a parent view by referencing its DSL type:
 '(:my-label :id :greeting :text "Hello, world!")
 ```
 
+## DSL type registration
+
+Every `defcomponent` expansion automatically registers the component's
+DSL type keyword in a global registry at load time. The keyword is
+derived from the class name (e.g., `my-label` becomes `:my-label`).
+
+This registration serves two purposes:
+
+1. **DSL resolution** -- The `resolve-dsl-type` generic function
+   dispatches on the keyword via the auto-generated `dsl-type` method
+   to map it to the component class.
+2. **Parser disambiguation** -- The `split-props/children` function
+   consults the registry to decide whether a keyword in an ambiguous
+   position is a child node type or a property key. Without
+   registration, user-defined component keywords would be consumed as
+   property keys when they appear as positional children in a DSL form.
+
+You do not need to call `register-dsl-type` manually; `defcomponent`
+handles it. If you define types outside of `defcomponent` (for example
+using `defcomponent-dsl`), they are also registered automatically.
+
+User-defined components work as child nodes in DSL trees with no extra
+registration step:
+
+```lisp
+;; my-label is recognized as a child node, not a property key
+`(:container :id :root
+   :children
+   ((:my-label :id :greeting :text "Hello!")
+    (:text :content "plain text")))
+```
+
 ## Update handler contract
 
 Each handler branch under `:update` is keyed by a message keyword:

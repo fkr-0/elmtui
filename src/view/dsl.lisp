@@ -4,7 +4,8 @@
   (:import-from #:elmtui.view.base-elements
     #:element-class)
   (:import-from #:elmtui.ui.dsl-resolution
-    #:resolve-dsl-type)
+    #:resolve-dsl-type
+    #:known-dsl-type-p)
   (:import-from #:elmtui.core.errors
     #:dsl-error #:signal-dsl-validation-error
     #:with-error-context #:error-with-context)
@@ -40,6 +41,8 @@ This macro is useful for building extensible DSLs, especially for UI or data str
        ;; Define a dsl-type method for this component type
        (defmethod elmtui.ui.dsl-resolution:dsl-type ((type (eql ,dsl-type)) &optional props)
          (values ',class-name props))
+       ;; Register so split-props/children recognizes it as a child node type
+       (elmtui.ui.dsl-resolution:register-dsl-type ,dsl-type ',class-name)
        (defun ,helper-fn-name (id &rest args &key &allow-other-keys)
          (declare (ignore &allow-other-keys))
          (list* ,dsl-type :id id args))
@@ -105,17 +108,15 @@ If NIL, summaries are not truncated.")
                    (setf children v)
                    (setf cursor (cddr cursor)))
                   ;; If v looks like a DSL element (list starting with keyword),
-                  ;; then (k v) is actually the first child, not a property
-                  ;; Check if k is a component type (child) vs a property key
-                  ;; Component types include layout elements, widgets, etc.
-                  ;; Property keys are structural: :id, :class, :style, etc.
+                  ;; then (k v) is actually the first child, not a property.
+                  ;; Check if k is a component type (child) vs a property key.
+                  ;; Component types are those registered in the DSL type
+                  ;; registry (via defcomponent, defcomponent-dsl, or
+                  ;; register-dsl-type) or in the base-element class table.
                   ((and (listp v) (keywordp (first v))
-                        (member k '(:row :column :text :container :vbox :hbox
-                                       :layout :viewport :root-viewport
-                                       :grid-container :scroll-panel
-                                       :button :label :input
-                                       :counter)))  ; Add more as needed
-                   ;; k looks like a component type, so (k v) is actually the first child
+                        (or (known-dsl-type-p k)
+                            (element-class k)))
+                   ;; k is a known DSL node type, so (k v ...) are children
                    (setf children cursor)
                    (setf cursor nil))
                   (t

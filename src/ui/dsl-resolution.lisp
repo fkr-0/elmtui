@@ -5,9 +5,35 @@
   (:use :cl)
   (:import-from :elmtui.api #:dsl-type)
   (:export #:dsl-type
-    #:resolve-dsl-type))
+    #:resolve-dsl-type
+    #:*dsl-type-registry*
+    #:register-dsl-type
+    #:known-dsl-type-p))
 
 (in-package :elmtui.ui.dsl-resolution)
+
+;;; ---------------------------------------------------------------
+;;; DSL Type Registry
+;;; ---------------------------------------------------------------
+
+(defvar *dsl-type-registry* (make-hash-table :test 'eq)
+  "Registry mapping DSL type keywords to their component class names.
+Consulted by KNOWN-DSL-TYPE-P to decide whether a keyword names a DSL
+node type (as opposed to a property key) during argument splitting.
+Entries are added at load time by REGISTER-DSL-TYPE, which is called
+automatically by defcomponent and defcomponent-dsl expansions.")
+
+(defun register-dsl-type (keyword &optional class)
+  "Register KEYWORD as a known DSL node type, optionally mapping to CLASS.
+Registration is idempotent: calling with the same KEYWORD and CLASS
+has no additional effect."
+  (setf (gethash keyword *dsl-type-registry*) (or class t))
+  keyword)
+
+(defun known-dsl-type-p (keyword)
+  "Return non-NIL if KEYWORD is a registered DSL node type.
+Returns the associated class (or T when no class was recorded), NIL otherwise."
+  (values (gethash keyword *dsl-type-registry*)))
 
 (define-condition invalid-dsl-form (error)
   ((form :initarg :form :reader invalid-dsl-form-form)

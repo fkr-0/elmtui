@@ -18,6 +18,7 @@
     #:suggest-fixes
     #:with-error-context)
   (:import-from :elmtui.api #:dsl-type)
+  (:import-from :elmtui.ui.dsl-resolution #:register-dsl-type)
   (:import-from :elmtui.ui.component-metaclass
     #:component-class
     #:make-metadata)
@@ -815,6 +816,11 @@ SYNTAX:
          ;; Auto-generate dsl-type method for this component
          (defmethod dsl-type ((type (eql ,(infer-dsl-type-from-class-name component-class-name))) &optional props)
            (values ',component-class-name props))
+
+         ;; Register the DSL type keyword so the parser recognizes it as a
+         ;; child node type without hardcoding.
+         (register-dsl-type ,(infer-dsl-type-from-class-name component-class-name)
+                            ',component-class-name)
 
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (setf (gethash ',component-class-name *component-state-slots*) ',parsed-state-slots))

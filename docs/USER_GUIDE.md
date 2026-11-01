@@ -309,6 +309,29 @@ and keep the callback parameter:
 - `:view-fn` returns a lightweight DSL tree (e.g., `:container`, `:text`, `:button`, etc.).
 - ElmTUI’s pipeline resolves, styles, lays out, and renders this tree.
 
+### Custom components as DSL child nodes
+
+When you define a component with `defcomponent`, its DSL type keyword
+(derived from the class name) is automatically registered in a global
+type registry. This means the DSL parser recognizes your component as a
+valid child node type without any extra configuration.
+
+For example, after defining `(defcomponent my-widget ...)`, the keyword
+`:my-widget` is registered and can appear as a child anywhere in a DSL
+tree:
+
+```lisp
+`(:container :id :root
+   :children
+   ((:my-widget :id :w1 :some-prop "value")
+    (:text :content "sibling text")))
+```
+
+The parser correctly distinguishes your component keyword from property
+keys. You can also use `register-dsl-type` from
+`elmtui.ui.dsl-resolution` to register types manually when needed outside
+of `defcomponent`.
+
 ## Style Classes
 
 Style classes let you name a reusable bag of style properties and
