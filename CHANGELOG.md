@@ -6,6 +6,14 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Changed
+
+- **`cmd-async` progress callback is now opt-in.** By default, FUNCTION
+  receives only `:args`. Pass `:progress t` to inject the progress
+  callback as the first argument (previous mandatory behavior). Existing
+  code that ignored the progress parameter can now drop it; code that
+  uses progress adds `:progress t`.
+
 ### Added
 
 - `patch` and `patch*` convenience constructors for flat-key update results.

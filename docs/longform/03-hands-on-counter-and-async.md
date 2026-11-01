@@ -361,9 +361,29 @@ This is especially useful in Common Lisp because dynamic binding can make test a
 
 ## 13. Build the effect using `cmd-async`
 
-The current `elmtui.core.async:cmd-async` contract expects the task function to accept a progress callback as its first argument, followed by `:args`.
+`elmtui.core.async:cmd-async` runs a function asynchronously. By default the function receives only `:args`; pass `:progress t` to inject a progress callback as the first argument.
 
-A lookup command can be translated into:
+A simple lookup command without progress:
+
+```lisp
+(defun lookup-command->async (query request-id)
+  (elmtui.core.async:cmd-async
+   (lambda (query)
+     (funcall *fetch-summary-fn* query))
+   :args (list query)
+   :on-complete
+   (lambda (result)
+     `(:lookup-succeeded
+       :request-id ,request-id
+       :result ,result))
+   :on-error
+   (lambda (condition)
+     `(:lookup-failed
+       :request-id ,request-id
+       :condition ,condition))))
+```
+
+The same command with progress reporting:
 
 ```lisp
 (defun lookup-command->async (query request-id)
@@ -374,6 +394,7 @@ A lookup command can be translated into:
                          :phase :requesting))
      (funcall *fetch-summary-fn* query))
    :args (list query)
+   :progress t
    :on-complete
    (lambda (result)
      `(:lookup-succeeded
@@ -396,7 +417,7 @@ The transport can change without changing the update state machine.
 
 ## 14. Keep progress optional and declarative
 
-`cmd-async` supplies a progress callback. Progress messages can update a model field if useful:
+When `:progress t` is passed, `cmd-async` supplies a progress callback. Progress messages can update a model field if useful:
 
 ```lisp
 '(:lookup-progress :request-id 12 :phase :requesting)

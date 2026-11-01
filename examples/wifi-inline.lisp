@@ -96,13 +96,13 @@
   (%run-nmcli (list "--colors" "no" "--wait" "15" "device" "wifi" "connect" ssid)))
 
 (defun %scan-command ()
-  (cmd-async (lambda (progress) (declare (ignore progress)) (scan-networks)) :on-complete
+  (cmd-async (lambda () (scan-networks)) :on-complete
              (lambda (networks) (list :wifi-scan-complete :networks networks)) :on-error
              (lambda (condition)
                (list :wifi-scan-failed :message (princ-to-string condition)))))
 
 (defun %connect-command (ssid)
-  (cmd-async (lambda (progress) (declare (ignore progress)) (connect-network ssid))
+  (cmd-async (lambda () (connect-network ssid))
              :on-complete
              (lambda (_output)
                (declare (ignore _output))

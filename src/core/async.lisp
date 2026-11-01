@@ -56,14 +56,17 @@
 ;;; Command Construction
 ;;;-----------------------------------------------------------------------------
 
-(defun cmd-async (function &key args on-complete on-error timeout cancellation-fn)
+(defun cmd-async (function &key args on-complete on-error timeout cancellation-fn (progress nil))
   "Construct an asynchronous ElmTUI command around FUNCTION.
 
 Arguments:
-  FUNCTION receives a progress callback followed by ARGS. ON-COMPLETE maps a
-  successful result to an application message; ON-ERROR maps a failure to an
-  application message. TIMEOUT schedules promise cancellation after the given
-  seconds. CANCELLATION-FN is optional best-effort cancellation cleanup.
+  FUNCTION is called with ARGS by default. When PROGRESS is true, FUNCTION
+  receives a progress callback as its first argument followed by ARGS; the
+  callback sends (:ASYNC-PROGRESS-UPDATE ...) messages to the application.
+  ON-COMPLETE maps a successful result to an application message; ON-ERROR maps
+  a failure to an application message. TIMEOUT schedules promise cancellation
+  after the given seconds. CANCELLATION-FN is optional best-effort cancellation
+  cleanup.
 
 Returns:
   A command plist beginning with :ASYNC and containing the task, generated task
@@ -86,10 +89,19 @@ Restarts:
   construction may allocate a new task/promise pair.
 
 Example:
+  ;; Without progress (default):
+  (cmd-async (lambda (value) (1+ value))
+             :args '(41)
+             :on-complete
+             (lambda (result)
+               `(:lookup-succeeded :result ,result)))
+
+  ;; With progress opt-in:
   (cmd-async (lambda (progress value)
                (funcall progress '(:phase :working))
                (1+ value))
              :args '(41)
+             :progress t
              :on-complete
              (lambda (result)
                `(:lookup-succeeded :result ,result)))"
@@ -100,11 +112,13 @@ Example:
              (lambda (progress-data)
                ;; Sends progress updates to the app
                (funcall *app-sender* `(:async-progress-update :task-id ,task-id :progress ,progress-data))))
-           ;; Wrap the original function to inject the progress callback
+           ;; Wrap the original function, injecting progress callback only when requested
            (wrapped-function
              (lambda ()
                (handler-case
-                   (let ((result (apply function progress-callback args)))
+                   (let ((result (if progress
+                                     (apply function progress-callback args)
+                                     (apply function args))))
                      ;; Check if the promise was cancelled during execution
                      (if (promise-cancelled-p promise)
                          (progn
@@ -178,10 +192,8 @@ Example:
                                           (log:info "Task failed, retrying (~A attempts left): ~A"
                                                     (1- remaining-attempts) error)
                                           ;; Schedule retry after delay
-                                          (cmd-async (lambda (_)
-                                                       (declare (ignore _))
+                                          (cmd-async (lambda ()
                                                        (interpret-cmd (do-attempt (1- remaining-attempts))))
-                                                     :args nil
                                                      :timeout delay)
                                           ;; Return an interim message about retry
                                           `(:async-retry :remaining ,(1- remaining-attempts) :error ,error))))))
@@ -328,7 +340,7 @@ Restarts:
 Example:
   (multiple-value-bind (task promise)
       (interpret-cmd
-       (cmd-async (lambda (_progress) :ready)))
+       (cmd-async (lambda () :ready)))
     (values task promise))"
 
   ;;Ensure we have a valid *app-sender* to send messages

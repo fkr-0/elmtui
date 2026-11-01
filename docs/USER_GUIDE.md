@@ -146,6 +146,125 @@ work in both constructors.
 (make-update-result :patches '(((:should-quit) t)) :commands nil)
 ```
 
+## Async Commands
+
+`cmd-async` constructs an asynchronous command that the runtime executes
+on a worker thread. The update function never performs I/O directly;
+instead it returns one or more `cmd-async` commands inside
+`make-update-result`, and completion/error results re-enter the message
+loop.
+
+### Basic usage (no progress)
+
+By default, `cmd-async` calls FUNCTION with the supplied `:args`. No
+progress callback is injected.
+
+```lisp
+(elmtui.core.async:cmd-async
+ (lambda (query)
+   (fetch-data query))
+ :args (list user-query)
+ :on-complete
+ (lambda (result)
+   `(:data-arrived :data ,result))
+ :on-error
+ (lambda (condition)
+   `(:data-failed :err ,condition))
+ :timeout 10)
+```
+
+You can also pass a named function directly:
+
+```lisp
+(cmd-async #'fetch-data
+  :args '("query")
+  :on-complete (lambda (result) `(:data-arrived :data ,result))
+  :on-error    (lambda (condition) `(:data-failed :err ,condition)))
+```
+
+### Progress callback (opt-in)
+
+Pass `:progress t` when your function needs to report intermediate
+progress. The progress callback is injected as the first argument
+before `:args`.
+
+```lisp
+(cmd-async
+ (lambda (progress query)
+   (funcall progress '(:phase :connecting))
+   (let ((result (fetch-data query)))
+     (funcall progress '(:phase :parsing))
+     result))
+ :args (list user-query)
+ :progress t
+ :on-complete
+ (lambda (result)
+   `(:data-arrived :data ,result))
+ :on-error
+ (lambda (condition)
+   `(:data-failed :err ,condition)))
+```
+
+Each `(funcall progress data)` sends an `(:async-progress-update :task-id
+ID :progress DATA)` message to the application, which your update function
+can handle to show loading indicators or phase changes.
+
+### Timeout and cancellation
+
+```lisp
+(cmd-async #'long-running-task
+  :timeout 30
+  :cancellation-fn (lambda () (cleanup-resources))
+  :on-complete (lambda (result) `(:task-done :result ,result))
+  :on-error    (lambda (condition) `(:task-failed :err ,condition)))
+```
+
+When TIMEOUT seconds elapse, the promise is cancelled and
+CANCELLATION-FN is invoked for best-effort cleanup.
+
+### Returning commands from update
+
+```lisp
+(defun my-update (message state)
+  (cond
+    ((eq (first message) :start-fetch)
+     (make-update-result
+      :patches '(((:status) :loading))
+      :commands (list (cmd-async #'fetch-data
+                        :on-complete (lambda (r) `(:fetched :data ,r))))))
+    ((eq (first message) :fetched)
+     (make-update-result
+      :patches `(((:status) :ready)
+                 ((:data) ,(getf (rest message) :data)))))
+    (t (make-update-result))))
+```
+
+### Migration from mandatory progress
+
+Before this change, `cmd-async` always injected a progress callback as
+the first argument, requiring every user to write:
+
+```lisp
+;; OLD (no longer needed):
+(cmd-async (lambda (progress) (declare (ignore progress)) (do-work)) ...)
+```
+
+Now simply write:
+
+```lisp
+;; NEW (default, no progress):
+(cmd-async (lambda () (do-work)) ...)
+```
+
+For functions that actively use the progress callback, add `:progress t`
+and keep the callback parameter:
+
+```lisp
+;; NEW (with progress opt-in):
+(cmd-async (lambda (progress) (funcall progress '(:phase :loading)) (do-work))
+           :progress t ...)
+```
+
 ## Rendering
 
 - `:view-fn` returns a lightweight DSL tree (e.g., `:container`, `:text`, `:button`, etc.).

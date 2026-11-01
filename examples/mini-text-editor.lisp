@@ -151,8 +151,7 @@
 
 (defun %save-command (path lines version)
   ;; Snapshot the buffer; a later edit must not be marked clean by this save.
-  (cmd-async (lambda (progress)
-               (declare (ignore progress))
+  (cmd-async (lambda ()
                (%write-file path lines))
              :on-complete (lambda (saved-path)
                             (list :editor-saved saved-path version))

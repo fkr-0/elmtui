@@ -355,5 +355,5 @@ Returns the active debounce thread when one is pending, otherwise NIL."
    Use via (nconc commands (list (reactive:next-frame-cmd :fps 60 :message :tick)))."
   (let ((interval (/ 1.0 (max 1 fps))))
     (elmtui.core.async:cmd-async
-     (lambda (_progress) (declare (ignore _progress)) (sleep interval) :ok)
+     (lambda () (sleep interval) :ok)
      :on-complete (lambda (_res) (declare (ignore _res)) message))))

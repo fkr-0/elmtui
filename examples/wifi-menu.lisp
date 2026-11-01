@@ -57,11 +57,11 @@ or nonzero status, terminate the process before closing its output stream."
 
 (defun %disconnect-wifi (network) (if (string= (wifi-network-device network) "") (error "Selected network has no NetworkManager device") (%run-command (wifi-disconnect-argv network))))
 
-(defun %scan-command (&key rescan) (cmd-async (lambda (progress) (declare (ignore progress)) (%scan-wifi :rescan rescan)) :on-complete (lambda (networks) (list :wifi-scan-succeeded :networks networks)) :on-error (lambda (condition) (list :wifi-operation-failed :message (princ-to-string condition)))))
+(defun %scan-command (&key rescan) (cmd-async (lambda () (%scan-wifi :rescan rescan)) :on-complete (lambda (networks) (list :wifi-scan-succeeded :networks networks)) :on-error (lambda (condition) (list :wifi-operation-failed :message (princ-to-string condition)))))
 
-(defun %connect-command (network password) (cmd-async (lambda (progress) (declare (ignore progress)) (%connect-wifi network password)) :on-complete (lambda (output) (list :wifi-connect-succeeded :output output)) :on-error (lambda (condition) (list :wifi-operation-failed :message (princ-to-string condition)))))
+(defun %connect-command (network password) (cmd-async (lambda () (%connect-wifi network password)) :on-complete (lambda (output) (list :wifi-connect-succeeded :output output)) :on-error (lambda (condition) (list :wifi-operation-failed :message (princ-to-string condition)))))
 
-(defun %disconnect-command (network) (cmd-async (lambda (progress) (declare (ignore progress)) (%disconnect-wifi network)) :on-complete (lambda (output) (list :wifi-disconnect-succeeded :output output)) :on-error (lambda (condition) (list :wifi-operation-failed :message (princ-to-string condition)))))
+(defun %disconnect-command (network) (cmd-async (lambda () (%disconnect-wifi network)) :on-complete (lambda (output) (list :wifi-disconnect-succeeded :output output)) :on-error (lambda (condition) (list :wifi-operation-failed :message (princ-to-string condition)))))
 
 (defun %initial-state () (list :networks nil :selected-index 0 :mode :browse :password "" :busy nil :status "Waiting for NetworkManager; press r to refresh now." :should-quit nil))
 

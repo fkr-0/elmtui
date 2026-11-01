@@ -145,8 +145,7 @@ cursor."
 
 (defun %refresh-command (mode)
   (cmd-async
-   (lambda (progress)
-     (declare (ignore progress))
+   (lambda ()
      (handler-case
          (if (tmux-available-p)
              (list :inspector-capture mode (%capture mode))

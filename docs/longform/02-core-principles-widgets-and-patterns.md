@@ -646,11 +646,26 @@ The corresponding Lisp condition should still retain the original transport cond
 
 ## 7. Async work pattern
 
-`elmtui.core.async:cmd-async` builds an async command around a function. The current function contract supplies a progress callback as the first argument, followed by `:args`.
+`elmtui.core.async:cmd-async` builds an async command around a function. By default, FUNCTION is called with `:args` only. Pass `:progress t` to inject a progress callback as the first argument.
 
 A task can return application messages through `:on-complete` and `:on-error` callbacks.
 
-Schematic example:
+Schematic example (default, no progress):
+
+```lisp
+(elmtui.core.async:cmd-async
+ (lambda (query)
+   (lookup query))
+ :args (list query)
+ :on-complete
+ (lambda (result)
+   `(:lookup-succeeded :result ,result))
+ :on-error
+ (lambda (condition)
+   `(:lookup-failed :condition ,condition)))
+```
+
+With progress opt-in:
 
 ```lisp
 (elmtui.core.async:cmd-async
@@ -658,6 +673,7 @@ Schematic example:
    (funcall progress '(:phase :connecting))
    (lookup query))
  :args (list query)
+ :progress t
  :on-complete
  (lambda (result)
    `(:lookup-succeeded :result ,result))
