@@ -99,12 +99,14 @@ every example re-imports.
 
 ### P1-2: framework logging draws over the application
 
-Loading `elmtui` and running an application from a plain SBCL writes log4cl
-INFO and WARN lines (driver startup, "presenter is not ready") to standard
-output, i.e. onto the UI. The examples launcher silences this privately
-(`%configure-binary-logging` in `src/tools/examples-runner.lisp`). There is no
-public switch; users must call log4cl directly
-(`(log4cl:remove-all-appenders log4cl:*root-logger*)`).
+Running the `deftea-app` counter from a plain SBCL wrote log4cl INFO and WARN
+lines (driver startup, "presenter is not ready") onto the UI.
+
+*Correction (same day):* `defapplication` runners already remove all log
+appenders while the application runs and accept `--log-file`/`--log-buffer`
+in ARGV, so the leak was specific to the broken `deftea-app` path, which did
+not go through that runner. What was missing was a documented, Lisp-level
+way to keep logs.
 
 ### P1-3: two update contracts taught as one
 
@@ -180,6 +182,30 @@ Breaking (0.4.0):
    `elmtui.state.msg` predicates, `elmtui.view.core` helpers,
    `elmtui.pipeline` stage names, `elmtui.view.geo` shapes) or implement
    them with tests.
+
+## Resolution
+
+0.3.2 (non-breaking):
+
+- P0-1: `deftea-app` expands into `defapplication` with `:strict-elm`
+  semantics, keeping the model under `:tea-model`; its view may still return a
+  `:root-viewport` tree. New optional `:anchor`/`:height` keys. Release gate
+  `deftea_app` (`tests/e2e/deftea-app-pty.py`) runs one in tmux.
+- P0-2 root cause: UIOP `:reexport` exports symbols *by name* and interns
+  fresh ones for names not already accessible; it does not import.
+  `elmtui.state` and `elmtui.state.api` now use `:use-reexport`
+  (`diff-states` is resolved to the `cl-state` symbol), and `elmtui.app`
+  defines `defapplication` on the `elmtui.app.api` symbol. Unbound exports
+  fell from 328 to 215; release gate `api_bindings` forbids increases.
+- P1-1: `elmtui.app:key-pressed-p` (`:char`, `:key`, `:modifiers`) and
+  `elmtui.app:quit-requested-p`.
+- P1-2: `RUN-NAME` accepts `:log-file` and `:log-buffer`.
+- P1-3, P2-1: the `defapplication` docstring states the update contract,
+  `:should-quit`, `RUN-NAME`, the `:height` rule and logging; chapter 01 and
+  the Quickstart use them.
+
+0.4.0 (breaking): the root `elmtui` package is a curated facade of the
+application API, and the remaining never-implemented exports are removed.
 
 ## Reproduction
 

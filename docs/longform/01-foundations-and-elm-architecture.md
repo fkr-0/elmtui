@@ -138,7 +138,7 @@ Regular `DEFAPPLICATION` update functions do not receive a writable store interf
 
 The runtime applies the returned patches when it commits the transition; the update function never changes STATE itself.
 
-Component update functions (`DEFCOMPONENT`, the viewports) work through an *update context* instead: `ELMTUI.STATE.UPDATE:MAKE-UPDATE-CONTEXT` wraps the state, and `SREF`, `SAPPLY` and `SDELETE` from `ELMTUI.STATE.UPDATE` read and record changes against a private draft, for example `(sapply ctx :count #'1+ 0)`. (Use the `ELMTUI.STATE.UPDATE` symbols: `ELMTUI.STATE.API` currently exports unbound symbols with the same names; see the [API review](../reviews/api-review-20261101.md).)
+Component update functions (`DEFCOMPONENT`, the viewports) work through an *update context* instead: `ELMTUI.STATE.UPDATE:MAKE-UPDATE-CONTEXT` wraps the state, and `SREF`, `SAPPLY` and `SDELETE` from `ELMTUI.STATE.UPDATE` read and record changes against a private draft, for example `(sapply ctx :count #'1+ 0)`. (`ELMTUI.STATE.API` re-exports the same symbols.)
 
 The context owns a draft. That draft is now a deep copy across the supported `cl-state` container graph:
 

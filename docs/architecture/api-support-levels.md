@@ -14,11 +14,13 @@ symbols or change ASDF dependency direction.
 | Backend | Runtime/terminal backend writers | elmtui.platform.backend.*, virtual buffers, renderer, elmtui.core.loop | Advanced contracts; distinguish backend-specific behavior; test affected integrations |
 | Compatibility/experimental | Historical facades and partially implemented utilities | root :elmtui reexports, elmtui.view.memo, elmtui.view.core:VIEW-DIFF | Keep old qualified symbols for now; document precise semantics and limitations |
 
-**Known defects (0.3.1, see [the API review](../reviews/api-review-20261101.md)):**
-`DEFTEA-APP` applications do not run in a terminal (only `DEFAPPLICATION` is
-usable to run applications); the root `:elmtui` facade's re-exports are shadowed
-by fresh unbound symbols; and 328 exported symbols across 27 packages have no
-binding (`scripts/audit-api-bindings.lisp`).
+**Known defects (0.3.2, see [the API review](../reviews/api-review-20261101.md)):**
+the root `:elmtui` facade exports fresh unbound symbols instead of the
+framework's, and 88 further exported symbols have no binding
+(`scripts/audit-api-bindings.lisp`; the release gate forbids increases). Both
+are removed in 0.4.0. Fixed in 0.3.2: `DEFTEA-APP` applications run;
+`ELMTUI.STATE`, `ELMTUI.STATE.API` and `ELMTUI.APP.API` export the working
+symbols.
 
 ## Concrete contracts tightened
 
