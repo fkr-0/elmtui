@@ -22,7 +22,8 @@ OPTIONS = None
 
 
 class TerminalApp:
-    def __init__(self, name, expression, source=None, environment=None, prelude='', use_launcher=True):
+    def __init__(self, name, expression, source=None, environment=None, prelude='', use_launcher=True,
+                 command=None):
         self.directory = OPTIONS.output / (name + '-' + uuid.uuid4().hex[:8])
         self.directory.mkdir(parents=True)
         self.socket = str(Path(tempfile.gettempdir()) /
@@ -36,6 +37,8 @@ class TerminalApp:
         self.environment = environment or {}
         self.prelude = prelude
         self.use_launcher = use_launcher
+        # An explicit argv replaces the default SBCL/launcher command.
+        self.command = command
 
     def tmux(self, *args, check=True):
         return subprocess.run(['tmux', '-S', self.socket, *args], check=check,
@@ -59,6 +62,8 @@ class TerminalApp:
                        'keymap': 'keymap-app', 'scroll': 'scroll-panel-demo',
                        'life': 'game-of-life'}[self.name]
             command = [str(ROOT / 'scripts/examples.sh'), 'run', example]
+        if self.command:
+            command = list(self.command)
         # Capture errors separately: log strings must never satisfy screen checks.
         script = self.directory / 'launch.sh'
         script.write_text('#!/bin/sh\ncd ' + shlex.quote(str(ROOT)) + '\n'

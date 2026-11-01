@@ -72,7 +72,7 @@ class AdditionalExamplesPTY(unittest.TestCase):
     def test_both_rainbows_show_colored_stable_frames(self):
         cases = [
             ("rainbow", "(elmtui.examples.rainbow-app:run-rainbow-example-app)",
-             "CHROMATIC / 08", "Layout:"),
+             "CHROMATIC / 07", "Layout:"),
             ("mini-rainbow", "(elmtui.examples.mini-rainbow:run-mini-rainbow)",
              "RAINBOW / mini", "Direction:"),
         ]
