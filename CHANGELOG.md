@@ -25,6 +25,9 @@ The project follows semantic versioning from the first published release.
   renders when started on the terminal's last row.
 - The wifi-inline e2e script loads `elmtui-examples-cli` instead of the
   removed `elmtui-tools` system.
+- `scripts/examples.sh build` and `elmtui-packager` compress dumped cores only
+  when SBCL was built with zstd (`:sb-core-compression`), instead of failing
+  on runtimes without it.
 
 ### Added
 

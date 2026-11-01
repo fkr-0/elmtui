@@ -97,7 +97,9 @@ Examples:~%~
     (sb-ext:save-lisp-and-die (namestring output)
                               :toplevel entry-fn
                               :executable t
-                              :compression 9))
+                              ;; zstd core compression exists only in SBCL builds with
+                              ;; :SB-CORE-COMPRESSION; elsewhere save uncompressed.
+                              :compression (and (member :sb-core-compression *features*) 9)))
   #-sbcl
   (error "Image dumping is currently supported only on SBCL."))
 
