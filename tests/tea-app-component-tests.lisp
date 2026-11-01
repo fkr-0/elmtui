@@ -97,22 +97,23 @@
 ;;; ===================================================================
 
 ;; Minimal deftea-app with a component in its DSL
-(defun %test-tea-comp-init ()
-  (values (list :count 0 :should-quit nil) nil))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun %test-tea-comp-init ()
+    (values (list :count 0 :should-quit nil) nil))
 
-(defun %test-tea-comp-transition (msg model)
-  (cond
-    ((and (consp msg) (eq (first msg) :increment))
-     (values (list :count (1+ (getf model :count 0)) :should-quit nil) nil))
-    ((and (consp msg) (eq (first msg) :app-quit-requested))
-     (values (list :count (getf model :count 0) :should-quit t) nil))
-    (t (values model nil))))
+  (defun %test-tea-comp-transition (msg model)
+    (cond
+      ((and (consp msg) (eq (first msg) :increment))
+       (values (list :count (1+ (getf model :count 0)) :should-quit nil) nil))
+      ((and (consp msg) (eq (first msg) :app-quit-requested))
+       (values (list :count (getf model :count 0) :should-quit t) nil))
+      (t (values model nil))))
 
-(defun %test-tea-comp-view (model)
-  `(:container :id :main
-     :children
-     ((:text :id :counter-label
-        :content ,(format nil "Count: ~A" (getf model :count 0))))))
+  (defun %test-tea-comp-view (model)
+    `(:container :id :main
+       :children
+       ((:text :id :counter-label
+          :content ,(format nil "Count: ~A" (getf model :count 0)))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (deftea-app test-tea-with-component
@@ -189,9 +190,10 @@
 ;;; Plain deftea-app (no root-component-dsl) still works
 ;;; ===================================================================
 
-(defun %plain-init () (values (list :x 1) nil))
-(defun %plain-transition (msg model) (declare (ignore msg)) (values model nil))
-(defun %plain-view (model) `(:text :id :t :content ,(format nil "~A" (getf model :x))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun %plain-init () (values (list :x 1) nil))
+  (defun %plain-transition (msg model) (declare (ignore msg)) (values model nil))
+  (defun %plain-view (model) `(:text :id :t :content ,(format nil "~A" (getf model :x)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (deftea-app test-plain-tea

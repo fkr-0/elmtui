@@ -140,7 +140,7 @@
     (is (eq :parent (getf props :id)))
     ;; :container should be recognized as a child, not consumed as a property
     (is (not (null children)))
-    (is (eq :container (first (first children))))))
+    (is (eq :container (first children)))))
 
 (test split-props-recognizes-registered-component-child
   "split-props/children recognizes a defcomponent-defined type as a child"
@@ -150,7 +150,7 @@
     (is (eq :parent (getf props :id)))
     ;; :registry-test-widget should be recognized as a child node
     (is (not (null children)))
-    (is (eq :registry-test-widget (first (first children))))))
+    (is (eq :registry-test-widget (first children)))))
 
 (test split-props-unknown-keyword-stays-property
   "Unknown keywords are consumed as properties, not treated as children"
@@ -214,7 +214,7 @@
     (is (eq :root (getf props :id)))
     (is (not (null children)))
     ;; The children should start with :registry-test-widget
-    (is (eq :registry-test-widget (first (first children))))))
+    (is (eq :registry-test-widget (first children)))))
 
 ;;; ---------------------------------------------------------------
 ;;; Helper

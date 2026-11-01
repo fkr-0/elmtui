@@ -495,7 +495,7 @@
 (defcomponent test-init-destructured-rest ()
   (:state
    (primary nil)
-   (extras nil :type list))
+   (extras nil :type (or null list)))
   (:init ((primary &rest extras) self-id-path)
     (values `(:primary ,primary :extras ,extras)
             nil)))

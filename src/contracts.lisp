@@ -839,17 +839,33 @@
 
          result))))
 
+(defun %subscription-descriptor-valid-p (item)
+  "Return T when ITEM is either a SUBSCRIPTION struct or a keyword-headed plist
+descriptor (:every, :window-resize, :file-watch, :process, etc.)."
+  (or (subscription-p item)
+      (and (consp item) (keywordp (first item)))))
+
 (defun validate-subscriptions (subscriptions function-name model)
-  "Validates subscriptions list structure"
-  (unless (or (null subscriptions)
-            (and (listp subscriptions)
-              (every #'subscription-p subscriptions)))
-    (error 'subscription-contract-violation
-      :function-name function-name
-      :expected-type "list of subscription structures"
-      :actual-value subscriptions
-      :context (format nil "generating subscriptions for model ~S" model)))
-  subscriptions)
+  "Validates subscriptions list structure.
+Accepts NIL, a single keyword-headed descriptor plist, a subscription struct,
+or a list of either form."
+  (let ((normalized
+          (cond
+            ((null subscriptions) nil)
+            ((subscription-p subscriptions) (list subscriptions))
+            ((and (consp subscriptions) (keywordp (first subscriptions)))
+             (list subscriptions))
+            ((listp subscriptions) subscriptions)
+            (t subscriptions))))
+    (unless (or (null normalized)
+                (and (listp normalized)
+                     (every #'%subscription-descriptor-valid-p normalized)))
+      (error 'subscription-contract-violation
+        :function-name function-name
+        :expected-type "list of subscription structures or keyword descriptors"
+        :actual-value subscriptions
+        :context (format nil "generating subscriptions for model ~S" model)))
+    subscriptions))
 
 ;;;--------------------------------------------------------------
 ;;; Pipeline Stage Contracts (unchanged)

@@ -27,9 +27,10 @@
 ;;; Style registry
 ;;;--------------------------------------------------------------
 
-(defvar *style-registry* (make-hash-table :test 'eq)
-  "Global registry mapping keyword names to style property lists.
-Styles are typically registered at load time via DEFSTYLE.")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *style-registry* (make-hash-table :test 'eq)
+    "Global registry mapping keyword names to style property lists.
+Styles are typically registered at load time via DEFSTYLE."))
 
 (defmacro defstyle (name style-plist)
   "Register a named style class.  NAME must be a keyword; STYLE-PLIST is a
