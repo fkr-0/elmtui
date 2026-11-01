@@ -3,7 +3,7 @@
 (asdf:defsystem "elmtui-tests"
   :description "Test suite for the elmtui system"
   :author "ElmTUI contributors"
-  :version "0.3.1"
+  :version "0.3.2"
   :depends-on (#:elmtui #:elmtui-widgets-enhanced #:elmtui-packager #:elmtui-examples-cli
                #:elmtui-dev-tests #:elmtui-api-contract-tests #:elmtui-core-slim-tests #:fiveam)
 :license "MIT"

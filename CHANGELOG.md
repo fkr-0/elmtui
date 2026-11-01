@@ -6,44 +6,64 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+## [0.3.2] - 2026-11-01
+
 ### Fixed
 
+- `deftea-app` applications now run. Their runners drew nothing and signalled
+  a type error on shutdown, because the driver received a bare model instead of
+  an application state; `deftea-app` only had macroexpansion tests.
+  `deftea-app` now expands into `defapplication` (`:strict-elm`), keeping the
+  model under `:tea-model`; views may still return a `:root-viewport` tree, and
+  new optional `:anchor`/`:height` keys place the viewport. Ctrl-C, or a model
+  with `:should-quit t`, quits.
+- `elmtui.state` and `elmtui.state.api` exported fresh, unbound symbols instead
+  of the ones they meant to re-export (UIOP `:reexport` exports by name only),
+  so for example `elmtui.state.api:sapply`, `sref` and `defupdate` were
+  unusable. They now re-export the working `elmtui.state.update`,
+  `elmtui.state.model` and `cl-state` symbols; `diff-states` is the `cl-state`
+  one.
+- `elmtui.app.api:defapplication` is now the same symbol as
+  `elmtui.app:defapplication`.
+- `defmsg` exported `<variant>-p` predicate names it never defined; it now also
+  exports the `<variant>-<message>-p` predicates it does define. The undefined
+  names are deprecated.
 - The `tmux-slider` example's arrow keys quit the app: its raw input loop read
   the ESC byte that starts an arrow sequence as the Escape quit key. Left/Right
   now set the direction and Up/Down (or `+`/`-`) change the speed; a bare
-  Escape still quits. Covered by a new e2e regression test.
+  Escape still quits.
 
 ### Added
 
+- `elmtui.app:key-pressed-p` matches key messages by `:char`, `:key` and
+  `:modifiers`; `elmtui.app:quit-requested-p` recognises Ctrl-C.
+- Generated `run-NAME` functions accept `:log-file` and `:log-buffer`.
+  `:initial-state-fn` may return startup commands as a second value.
+- Release gates: `deftea_app` runs a `deftea-app` counter in tmux;
+  `readme_quickstart` runs the README Quickstart and checks the website shows
+  the same code; `api_bindings` (`scripts/audit-api-bindings.lisp`) forbids an
+  increase in exported symbols with no binding (215 remain, removed in 0.4.0).
 - `scripts/record-demo-media.py` records the website and release media from
-  real example sessions (Xvfb, urxvt, tmux, ffmpeg).
-- Website media: a Workbench hero still and the tmux-slider animation fill the
-  home and Workbench page slots, and the examples page gains recorded
-  Workbench, neon-tetris and tmux-glider sessions.
-
-### Changed
-
-- The website release page announces the published 0.3.1 release.
-- README: a tested Quickstart (install, run the examples, a first
-  `defapplication` counter with `+`/`-`/`q`) replaces the minimal-application,
-  requirements and setup sections; stale status, release and tmux notes and a
-  broken Workbench command were fixed. The website quickstart shows the same
-  application.
-- Long-form docs: the foundations chapter showed an application update taking
-  an update context and calling the unbound `elmtui.state.api:sapply`; it now
-  shows the real `(message state)` patch contract and explains that contexts
-  belong to component updates. The tutorial notes that `deftea-app` runners do
-  not yet work in a terminal and that the counter widget moved to
-  `elmtui-example-widgets`.
+  real example sessions; the website shows a Workbench still, the
+  tmux-slider animation and recorded Workbench, neon-tetris and tmux-glider
+  sessions.
 
 ### Documentation
 
-- `docs/reviews/api-review-20261101.md`: review of the exported API and its
-  documentation (unbound exports, root facade shadowing, the `deftea-app`
-  runtime failure, missing key/logging helpers) with recommendations.
-- `scripts/audit-api-bindings.lisp` reports exported symbols with no binding.
-- Release gate `readme_quickstart` (`tests/e2e/readme-quickstart.py`) runs the
-  README Quickstart code in tmux and checks the website shows the same code.
+- README: a tested Quickstart replaces the minimal-application, requirements
+  and setup sections; stale status, release and tmux notes and a broken
+  Workbench command were fixed. The website quickstart shows the same
+  application.
+- The `defapplication` docstring states the update-function contract,
+  `:should-quit`, `run-NAME`, the root viewport `:height` rule and logging.
+- The foundations chapter showed an application update taking an update
+  context and calling the then-unbound `elmtui.state.api:sapply`; it now shows
+  the `(message state)` patch contract and explains that contexts belong to
+  component updates. The tutorial shows how to run its `deftea-app` counter and
+  translate keys into messages, and that the counter widget moved to
+  `elmtui-example-widgets`.
+- `docs/reviews/api-review-20261101.md` reviews the exported API and its
+  documentation; the website release page announces 0.3.1.
 
 ## [0.3.1] - 2026-11-01
 
