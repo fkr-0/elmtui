@@ -8,6 +8,11 @@ The project follows semantic versioning from the first published release.
 
 ### Added
 
+- `defcomponent` now auto-registers DSL type keywords in a global
+  registry so the parser's `split-props/children` heuristic recognizes
+  user-defined components as valid child nodes without hardcoding.
+  New public API: `register-dsl-type`, `known-dsl-type-p`, and
+  `*dsl-type-registry*` in `elmtui.ui.dsl-resolution`.
 - `patch` and `patch*` convenience constructors for flat-key update results.
 - `quit-result` shorthand for the universal quit response.
 - `key-event-parts` unified key-event destructuring (handles both struct and legacy plist forms).
