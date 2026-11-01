@@ -319,7 +319,9 @@ route warnings there, or full diagnostics when ELMTUI_VERBOSE_LOGS is set."
                                             (%configure-binary-logging)
                                             (%invoke-entry entry :backend-type backend-type)))
                               :executable t
-                              :compression 9))
+                              ;; zstd core compression exists only in SBCL builds with
+                              ;; :SB-CORE-COMPRESSION; elsewhere save uncompressed.
+                              :compression (and (member :sb-core-compression *features*) 9)))
   #-sbcl
   (error "Binary dumping is currently supported only on SBCL."))
 
