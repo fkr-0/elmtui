@@ -11,7 +11,7 @@ are restored exactly when they exit.
 #+HTML: <a href="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml/badge.svg?branch=main"></a>
 #+HTML: <a href="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml"><img alt="SB-COVER primary expression coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffkr-0%2Felmtui%2Fcoverage-data%2Fcoverage.json"></a>
 
-The latest release is [[https://github.com/fkr-0/elmtui/releases/tag/v0.3.2][0.3.2]]. It is qualified on SBCL on
+The latest release is [[https://github.com/fkr-0/elmtui/releases/tag/v0.4.0][0.4.0]]. It is qualified on SBCL on
 POSIX terminals; other Common Lisp implementations are not yet supported,
 because parts of the toolkit use SB-POSIX and SB-MOP. ElmTUI is pre-1.0:
 minor versions may change the API (see the [[file:CHANGELOG.md][changelog]]), and
@@ -56,8 +56,9 @@ Save this as =counter.lisp=:
 #+begin_src lisp
 (uiop:define-package :counter
   (:use :cl)
-  (:import-from :elmtui.app #:defapplication #:key-pressed-p #:quit-requested-p)
-  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui
+                #:defapplication #:make-update-result #:state-ref
+                #:key-pressed-p #:quit-requested-p)
   (:export #:run-counter))
 (in-package :counter)
 
@@ -114,7 +115,10 @@ How it fits together:
   application.
 - =view= is a pure function from state to a declarative UI tree
   (=:container=, =:text=, …) with CSS-like styles.
-- =defapplication= wires them together and defines =run-counter=. The root
+- =defapplication= wires them together and defines =run-counter=. The
+  root =elmtui= package exports the application API; extension and backend
+  APIs live in the =elmtui.ui.*=, =elmtui.state.*= and =elmtui.platform.*=
+  packages. The root
   viewport is drawn below the cursor and needs an explicit =:height=.
   Framework logging is off while the application runs; pass
   =:log-file "counter.log"= to =run-counter= to keep it.
@@ -231,7 +235,7 @@ scripts/check-docstrings.sh
 #+end_src
 
 The default audit is a debt ratchet: it fails if public documentation coverage
-regresses. For 0.3.2 it passes at 90.3% coverage
+regresses. For 0.4.0 it passes at 90.3% coverage
 (1,840 documented-or-missing bindings; 178 missing docstrings). This is not the
 same as complete API documentation.  To require every supported exported binding to have documentation
 metadata, use the strict target:
