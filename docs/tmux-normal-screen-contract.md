@@ -89,16 +89,16 @@ python3 tests/e2e/example-overhaul-tmux-slider.py
 python3 tests/e2e/example-overhaul-tmux-resize-driver-geometry.py
 python3 tests/e2e/example-overhaul-tmux-backend-pty.py
 
-# Explicit P0 release gate (currently RED):
-ELMTUI_STRICT_TMUX_ACCEPTANCE=1 python3 tests/e2e/example-overhaul-tmux-review-contracts.py
-
 # Existing full hover gate (currently RED):
 python3 tests/e2e/example-overhaul-tmux.py
 ~~~
 
-The default review suite **skips** the two full release criteria;
-a skip is never release approval. Run the strict form for actual B2
-coordinates and reverse-resize preservation.
+The review suite runs every test on every invocation; nothing is skipped or
+opt-in. The two full release criteria (actual B2 coordinates and reverse-resize
+preservation) are declared `expectedFailure` because they are open P0 defects:
+the run stays green only while they keep failing and turns red with an
+"unexpected success" as soon as one is fixed, which is the cue to remove the
+decorator. An expected failure is never release approval.
 
 ### Evidence, 2026-10-09
 

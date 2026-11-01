@@ -1,5 +1,15 @@
 # ElmTUI 0.2.0 release checklist
 
+## 2026-10-27 E5 release gate (supersedes earlier readiness assertions)
+
+The release is **on HOLD**. E5 now supplies scripts/release-matrix-test.py and an expanded scripts/release-check.sh. A complete release qualification requires a clean, frozen superproject + four dependency Git SHA vector, successful exact-public-pin fetches, a dependency-complete source archive, independently isolated CLPM install from that archive, and the full warning-clean/coverage/Workbench/Neon/PTy/docs matrix with path/exit receipts. Local helper smoke results against committed HEAD do not qualify active dirty E1–E4 changes.
+
+- **RESOLVED (site aligned to 0.2.0):** the website previously announced 0.1.0 while ASDF, the changelog and the immutable local `v0.2.0` tag say 0.2.0. Confirm 0.2.0 is the intended version before publishing; the existing tag points at an older commit and must not be moved.
+- **BLOCK:** the frozen root HEAD and cl-styles pin do not resolve from public remotes, and the checkout gitlinks disagree with live dependency working HEADs.
+- **BLOCK:** CI does not invoke the complete declared release matrix; E2 review and E3/E4 revisions remain open.
+- **PASS, narrow scope only:** 7 adversarial archive/contract tests; an immutable-Git-object archive including all dependency trees; a fresh XDG-isolated CLPM/SBCL load of that historical HEAD archive.
+- **NO RELEASE:** no tag, push, deploy, or publication. See docs/reviews/final-release-gate-20261027.md for the exact SHA vector, probes, receipts and outstanding owners.
+
 ## Automated gate
 
 Run from the repository root:
@@ -12,7 +22,7 @@ The command must complete with exit status zero and prove:
 
 - both staged and unstaged patches contain no whitespace errors;
 - all four reusable systems are pinned, initialized Git submodules at their exact superproject gitlinks;
-- root release-critical files are tracked, and submodule contents are bundled explicitly (a plain Git archive omits submodule contents);
+- root release-critical files are tracked and the four submodules are initialized at their pins (the gate does **not** yet produce or install a bundled source archive; a plain Git archive omits submodule contents, see Publication);
 - both the release/test and optional development CLPM bundles contain no
   machine-specific absolute paths;
 - `cl-events` passes independently;
@@ -20,15 +30,17 @@ The command must complete with exit status zero and prove:
 - `cl-state` passes independently;
 - `cl-styles` passes independently;
 - the full ElmTUI suite passes;
-- compiler/runtime stderr contains no warning or undefined-symbol markers.
+- compiler/runtime stderr contains no warning or undefined-symbol markers;
+- generated API reference is current, the Python qualification guards pass (documentation staging, coverage gate/badge, API reference), and Neon passes;
+- the documentation site builds with `mkdocs build --strict` after `scripts/prepare-site.py`;
+- Workbench independent and real-PTY checks pass, measured primary coverage meets its floor, and the packaged executable starts in a real PTY;
+- the root and all four dependency trees are clean both before and after the checks. A development checkout may set `ELMTUI_RELEASE_ALLOW_DIRTY=1` for a dry run; such a run is **not** a release qualification and its result must not be cited.
 
-Live tmux tests are an additional environment-specific gate:
+`.github/workflows/ci.yml` executes `scripts/release-check.sh` itself, so CI and a maintainer's local run share one definition of the matrix (`scripts/release-matrix-test.py contract` rejects drift). `pages.yml` still builds the site independently for deployment. The hosted run is unvalidated until the exact revision and its dependency pins are pushed: the `public_pins` gate is expected to fail until then.
 
-```sh
-ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
-```
-
-Run that command from inside a tmux session.
+The tmux capture integration tests are part of that gate, not an extra one: they
+start and remove their own private tmux server, so they run identically inside
+or outside tmux. They require the `tmux` binary and fail (never skip) without it.
 
 ## Metadata and licensing
 
@@ -68,9 +80,9 @@ Run that command from inside a tmux session.
 - [x] Maintained examples are catalogued in `examples/README.md`.
 - [x] Architectural ownership is documented.
 - [x] Nine representative maintained application scenarios passed under **private tmux (9/9)** and **urxvt/Xvfb (9/9)**: minimal, focus, keymap, scroll, Game of Life, Wi-Fi.
-- [ ] Complete hover/slider/cursor inspector and remaining example testing, normal-screen scrollback/no-idle-write/shutdown checks. **Mini text editor remains RED: 7/7 real-tmux cases failed** (Ctrl+S save/Save As and dirty Ctrl+Q confirmation failures; evidence `/tmp/mini-editor-e2e-e8_wkz2r`). **Never use alternate-screen mode.**
+- [ ] Complete hover/slider/cursor inspector and remaining example testing (the Game of Life pause/step/reset/resume sweep case now asserts the rendered `◉ PAUSED` / `GEN 0000` format and passes under tmux), normal-screen scrollback/no-idle-write/shutdown checks. **Mini text editor now passes 7/7 real-tmux cases** (2026-10-27; the earlier Ctrl+S / dirty Ctrl+Q failures no longer reproduce). Two physical-terminal contracts remain open P0 defects, declared `expectedFailure` in `tests/e2e/example-overhaul-tmux-review-contracts.py`: B2 painting actual pane coordinates and history preservation across a 120x40 to 80x24 shrink. **Never use alternate-screen mode.**
 - [x] Workbench genuine CLPM/SBCL PTY smoke passed in **80x24 / 120x40 / 160x50**, and 30/30 independent live Workbench validation scenarios passed, including bracketed multiline paste. Independent review and example-specific terminal qualification are still open.
-- [x] Optional tmux integration was exercised **inside a real private tmux session** using `ELMTUI_RUN_TMUX_INTEGRATION=1`: **8,060 checks passed, zero skipped or failed** (2026-10-09). The compiler-warning cleanliness gate still fails.
+- [x] Historical (2026-10-09, when tmux integration was an opt-in via the since-removed `ELMTUI_RUN_TMUX_INTEGRATION=1`; it now always runs against a private server): tmux integration was exercised **inside a real private tmux session**: **8,060 checks passed, zero skipped or failed** (2026-10-09). The compiler-warning cleanliness gate still fails.
 - [ ] Manually verify shutdown restores cursor visibility, normal-screen scrollback, and terminal mode for **all maintained examples**, not only Workbench.
 - [ ] Manually verify the packager produces and starts a clean executable.
 
@@ -104,5 +116,5 @@ The public `origin` is already configured at `git@github.com:fkr-0/elmtui.git`. 
 - [ ] Decide whether and when to submit systems to Quicklisp or another registry.
 - [ ] Open portability work for non-SBCL implementations.
 - [x] GitHub CI (`.github/workflows/ci.yml`) and Pages (`.github/workflows/pages.yml`) definitions exist on the public repository.
-- [ ] Obtain a **green** CI checkout and release matrix after publishing exact submodule pins; previous CI run `37947086203` failed before tests. Local `scripts/release-check.sh` currently fails only at warning cleanliness: `tests/api-tests.lisp:40` causes an SBCL type-related compiler warning despite zero failed FiveAM tests.
+- [ ] Obtain a **green** CI checkout and release matrix after publishing exact submodule pins; previous CI run `37947086203` failed before tests. The warning-cleanliness failure previously recorded here (`tests/api-tests.lisp:40`) is superseded by the 2026-10-26 reviews; confirm it from the final-revision run rather than from this note.
 - [ ] Qualify GitHub Pages delivery: isolated **strict MkDocs Material build passed** (63 output files), but `https://elmtui.fkr.dev/` returned HTTP 404 and no Pages workflow runs were recorded. Verify HTTPS enforcement and deployed assets independently.
