@@ -441,6 +441,21 @@
         (is (search "Option 1"
                     (%buffer-text (elmtui.contracts:ctx-back-buffer out))))))))
 
+(test mini-editor-terminal-normalized-control-s-opens-save-as
+  "The terminal adapter emits a character key plus :CTRL, with no CHAR slot."
+  (asdf:load-system :elmtui-examples)
+  (let* ((pkg (find-package :elmtui.examples.mini-text-editor))
+         (init (symbol-function (find-symbol "%INITIAL-STATE" pkg)))
+         (update (symbol-function (find-symbol "EDITOR-UPDATE" pkg)))
+         (state (funcall init))
+         (event (elmtui.core.event-types:make-key-event
+                  :key #\s :modifiers '(:ctrl)))
+         (result (funcall update event state)))
+    (is (search "Save As" (prin1-to-string
+                           (elmtui.state.api:ur-patches result))
+                :test #'char-equal))
+    (is (null (elmtui.state.api:ur-commands result)))))
+
 (test mini-editor-control-q-routes-through-unsaved-guard
   "The editor-specific C-q binding must reach its dirty-buffer quit guard."
   (asdf:load-system :elmtui-examples)

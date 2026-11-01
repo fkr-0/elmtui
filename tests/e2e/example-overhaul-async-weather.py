@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Offline weather example checks; opt-in live network smoke.
+"""Offline weather example checks (hermetic; no live network access).
 
 python3 tests/e2e/example-overhaul-async-weather.py
-ELMTUI_WEATHER_LIVE_SMOKE=1 python3 tests/e2e/example-overhaul-async-weather.py
 """
 import os
 import pty
@@ -119,13 +118,6 @@ class AsyncWeatherTests(unittest.TestCase):
             with self.subTest(repetition=n):
                 code, data = interactive()
                 self.assertEqual(code, 0, data.decode("utf-8", errors="replace")[-1200:])
-
-    @unittest.skipUnless(os.environ.get("ELMTUI_WEATHER_LIVE_SMOKE") == "1",
-                         "Opt-in network smoke only")
-    def test_live(self):
-        code, data = interactive(live=True)
-        self.assertEqual(code, 0, data.decode("utf-8", errors="replace")[-1300:])
-        self.assertIn(b"OPEN METEO", data)
         self.assertIn(b"Updated", data)
 
 

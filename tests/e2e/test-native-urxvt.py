@@ -98,8 +98,7 @@ class NativeUrxvt(unittest.TestCase):
         self.wait(directory, lambda: b"E2E-Guest" in self.raw(directory), "visible scanned network")
         before_ocr = self.wait_screenshot(window, directory / "menu.png",
                                           r"(?i)E2E[- ]?Guest")
-        if before_ocr is not None:
-            self.assertRegex(before_ocr, r"(?i)E2E[- ]?Guest")
+        self.assertRegex(before_ocr, r"(?i)E2E[- ]?Guest")
         started = time.monotonic()
         subprocess.run(["xdotool", "key", "--clearmodifiers", "--window", window, key],
                        check=True, timeout=5)
@@ -118,17 +117,17 @@ class NativeUrxvt(unittest.TestCase):
                          {"row": 35, "column": 9}, "actual native terminal cursor response")
         after_ocr = self.wait_screenshot(window, directory / "restored.png",
                                          r"NATIVE[ _]SHELL[ _]RESTORED")
-        if after_ocr is not None:
-            self.assertNotRegex(after_ocr, r"(?i)E2E[- ]?Guest|NetworkManager")
-            self.assertRegex(after_ocr, r"NATIVE[ _]SHELL[ _]RESTORED")
-            for row in range(21, 36):
-                self.assertRegex(after_ocr, r"(?i)ROW-%02d" % row,
-                                 "surrounding native terminal content must survive")
+        self.assertNotRegex(after_ocr, r"(?i)E2E[- ]?Guest|NetworkManager")
+        self.assertRegex(after_ocr, r"NATIVE[ _]SHELL[ _]RESTORED")
+        for row in range(21, 36):
+            self.assertRegex(after_ocr, r"(?i)ROW-%02d" % row,
+                             "surrounding native terminal content must survive")
         raw = self.raw(directory).split(b"\x1b[6n", 1)[-1]
         self.assertNotRegex(raw, rb"\x1b\[(?:2|3)J|\x1b\[\?1049[hl]")
         up = [int(n or b"1") for n in re.findall(rb"\x1b\[(\d*)S", raw)]
         down = [int(n or b"1") for n in re.findall(rb"\x1b\[(\d*)T", raw)]
-        self.assertEqual((up, down), ([1] * 20, [1] * 20))
+        self.assertEqual((sum(up), sum(down)), (13, 13),
+                         "native viewport reserves and reverses the declared 13 rows")
         diagnostics = (directory / "stderr.txt").read_text()
         self.assertEqual(diagnostics, "", "launcher/runtime stderr must remain clean")
         calls = [json.loads(line) for line in (directory / "nmcli-calls.jsonl").read_text().splitlines()]
@@ -151,11 +150,12 @@ class NativeUrxvt(unittest.TestCase):
         self.fail("Timed out waiting for " + description + "; artifacts: " + str(directory))
 
     def screenshot(self, window, path):
-        if not shutil.which("import"):
-            return None
-        subprocess.run(["import", "-window", window, str(path)], check=True, timeout=10)
+        capture = shutil.which("import", path="/usr/bin:/bin")
+        if not capture:
+            raise AssertionError("ImageMagick import not found in system executable paths")
         if not shutil.which("tesseract"):
-            return None
+            raise AssertionError("tesseract is required for visible framebuffer verification")
+        subprocess.run([capture, "-window", window, str(path)], check=True, timeout=10)
         result = subprocess.run(["tesseract", str(path), "stdout", "--psm", "6"],
                                 check=True, capture_output=True, text=True, timeout=10)
         path.with_suffix(".ocr.txt").write_text(result.stdout)
@@ -168,7 +168,7 @@ class NativeUrxvt(unittest.TestCase):
         deadline = time.monotonic() + 5
         while True:
             text = self.screenshot(window, path)
-            if text is None or re.search(expected, text) or time.monotonic() >= deadline:
+            if re.search(expected, text) or time.monotonic() >= deadline:
                 return text
             time.sleep(.05)
 

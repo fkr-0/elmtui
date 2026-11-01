@@ -63,9 +63,12 @@ class NeonRestoration(unittest.TestCase):
                          (app.directory / 'after.stty').read_text())
         raw = (app.directory / 'terminal.raw').read_bytes().split(b'\x1b[6n', 1)[-1]
         first_frame = raw.find(b'TETRIS')
-        first_scroll = raw.find(b'\x1b[1S')
-        steps_up = len(re.findall(rb'\x1b\[1S', raw))
-        steps_down = len(re.findall(rb'\x1b\[1T', raw))
+        scrolls_up = [int(value or b'1') for value in re.findall(rb'\x1b\[(\d*)S', raw)]
+        scrolls_down = [int(value or b'1') for value in re.findall(rb'\x1b\[(\d*)T', raw)]
+        first_scroll_match = re.search(rb'\x1b\[\d*S', raw)
+        first_scroll = first_scroll_match.start() if first_scroll_match else -1
+        steps_up = sum(scrolls_up)
+        steps_down = sum(scrolls_down)
         self.assertEqual(steps_up, expected_scroll)
         self.assertEqual(steps_down, expected_scroll)
         if expected_scroll:

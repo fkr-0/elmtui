@@ -1,11 +1,13 @@
 ;;; Physical, reversible tmux cell inspector. Never uses the alternate screen.
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; *LOAD-TRUENAME* can name a test runner or an ASDF FASL cache file.
+  ;; Locate the maintained sources through ASDF instead of that caller context.
   (unless (find-package :elmtui-examples.cursor-inspector)
-    (load (merge-pathnames #P"cursor-inspector.lisp"
-                           (or *load-truename* *compile-file-truename*))))
+    (load (asdf:system-relative-pathname :elmtui-examples
+                                         "examples/cursor-inspector.lisp")))
   (unless (find-package :elmtui.examples.tmux-slider)
-    (load (merge-pathnames #P"tmux-slider.lisp"
-                           (or *load-truename* *compile-file-truename*)))))
+    (load (asdf:system-relative-pathname :elmtui-examples
+                                         "examples/tmux-slider.lisp"))))
 
 (uiop:define-package :elmtui.examples.tmux-cursor-inspector
   (:use :cl)

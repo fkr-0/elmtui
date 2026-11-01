@@ -27,7 +27,6 @@
 ;;;--------------------------------------------------------------
 (defvar rainbow-colors-with-names
   '((:red "red-stripe" (255 0 0))
-     (:pink "pink-stripe" (255 192 203))
      (:orange "orange-stripe" (255 165 0))
      (:yellow "yellow-stripe" (255 255 0))
      (:green "green-stripe" (0 255 0))
@@ -78,7 +77,9 @@
           (member (elmtui.core.event-types:key-event-key message)
                   '(:q :escape :esc #\q #\Q) :test #'eql))
       (make-update-result :patches '(((:should-quit) t))))
-    ((typep message 'key-event)
+    ((and (typep message 'key-event)
+          (or (eql (elmtui.core.event-types:key-event-char message) #\Space)
+              (eql (elmtui.core.event-types:key-event-key message) :space)))
       (let* ((current-count (state-ref app-state :switch-count 0))
               (new-count (1+ current-count)))
         (if (>= new-count 15)
@@ -111,6 +112,22 @@
 ;;                      :bg-color ,(rgb rgb-val))))))
 
 
+(defun rainbow-terminal-depth ()
+  "Use RGB only when advertised; otherwise use 256 or basic terminal colors."
+  (let ((term (string-downcase (or (uiop:getenv "TERM") "")))
+        (ct (string-downcase (or (uiop:getenv "COLORTERM") ""))))
+    (cond ((or (search "truecolor" ct) (search "24bit" ct)) :truecolor)
+          ((search "256color" term) :indexed)
+          (t :basic))))
+
+(defun rainbow-select-color (value index)
+  "Convert a rainbow color to the supported native DSL token."
+  (ecase (rainbow-terminal-depth)
+    (:truecolor (if (and (consp value) (eq (first value) :rgb))
+                    value (cons :rgb value)))
+    (:indexed (list :256 (nth index '(196 208 226 46 27 54 201))))
+    (:basic (nth index '(:red :yellow :white :green :blue :cyan :magenta)))))
+
 (defun rainbow-content-view (state)
   "Paint visible color bands rather than blank background-only cells."
   (let ((orientation (state-ref state :orientation :row))
@@ -118,9 +135,9 @@
     `(:container :id :rainbow-content
        :style (:display :flex :flex-direction :column :width 68 :height 14)
        :children
-       ((:text :id :rainbow-heading :content "CHROMATIC / 08  |  Space rotate  |  Q quit"
+       ((:text :id :rainbow-heading :content "CHROMATIC / 07  |  Space rotate  |  Q quit"
                :style (:fg-color :cyan :bold t))
-        (:text :id :rainbow-state :content ,(format nil "Layout: ~A" orientation))
+        (:text :id :rainbow-state :content ,(format nil "Layout: ~A | Color mode: ~A" orientation (rainbow-terminal-depth)))
         (:container :id :rainbow-bands
            :style (:display :flex
                    :flex-direction ,(if (eq orientation :row) :row :column)
@@ -131,7 +148,8 @@
                              :id ,(intern (format nil "RAINBOW-BAND-~D" index) :keyword)
                              :content ,(if (eq orientation :row) "██████"
                                            (make-string 60 :initial-element #\#))
-                             :style (:fg-color ,(cons :rgb color)
+                             :style (:fg-color ,(rainbow-select-color color index)
+                                     :bg-color :black
                                      :height ,(if (eq orientation :row) 10 1)
                                      :width ,(if (eq orientation :row) 6 60)))))))))
 

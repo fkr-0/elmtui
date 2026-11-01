@@ -186,8 +186,12 @@
 (defun %control-key-p (key char mods letter code)
   (or (eql char (code-char code))
       (and (or (member :control mods) (member :ctrl mods))
-           (or (eql key letter)
-               (and (characterp char) (char-equal char (char-downcase (char (symbol-name letter) 0))))))))
+           (let ((base (char-downcase (char (symbol-name letter) 0))))
+             ;; The terminal adapter represents ^S as KEY=#\s, CHAR=NIL,
+             ;; MODIFIERS=(:CTRL), rather than KEY=:S. Accept both shapes.
+             (or (eql key letter)
+                 (and (characterp key) (char-equal key base))
+                 (and (characterp char) (char-equal char base)))))))
 
 (defun %show-save-dialog (state &key (quit-after nil))
   (declare (ignore state))
