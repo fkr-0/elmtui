@@ -6,6 +6,8 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+## [0.3.0] - 2026-11-01
+
 ### Repository hygiene and developer entry points
 
 - Rebuilt a sanitized Git lineage that removes root-level scratch scripts,
@@ -26,6 +28,23 @@ The project follows semantic versioning from the first published release.
 
 
 ### Added
+
+- Added the `elmtui-example-widgets` system (keytester, keytester-map and
+  counter example widgets) and moved buffer dumps, condition-preserving
+  `WITH-BUFFER-DUMP-ON-ERROR` and process diagnostics into `elmtui-dev`.
+- Added `elmtui-api-contract-tests` (documented API support levels),
+  `elmtui-core-slim-tests`, and backend/defaults/focus/widget behaviour
+  suites; `scripts/coverage-gate.py` enforces the reviewed SB-COVER source
+  inventory and minimum.
+- Added `*tmux-socket*` and `*tmux-target-pane*` so a process can address a
+  tmux server and pane it owns without running inside tmux.
+- Added `terminal-string-slice` for grapheme-preserving display-cell slices.
+- Added `scripts/release-matrix-test.py` (frozen Git-vector source archive,
+  checksum/provenance verification) and CI now runs the canonical
+  `scripts/release-check.sh` with uploaded receipts.
+- Added PTY/tmux release gates for the key tester, rainbow colour modes, the
+  mini editor, dumped binaries, the packager and Wi-Fi robustness, and E3
+  Workbench release suites.
 
 - Added `elmtui.render.diff`, a terminal-independent virtual-frame differ with
   explicit first-frame policy and deterministic, per-call diff metrics.
@@ -62,6 +81,22 @@ The project follows semantic versioning from the first published release.
 
 ### Changed
 
+- **Breaking:** the primary `elmtui` system no longer loads the example
+  widgets or `dev/dev`; load `elmtui-example-widgets` or `elmtui-dev`.
+- The Workbench renders through native DSL/flex panes instead of an
+  application-owned character grid.
+- `with-defaults` binds the defaults registry dynamically (thread-local and
+  restored on unwind); ancestor overrides apply before the nearest context.
+- `memoize` caches live in weak wrapper tables so dropped wrappers release
+  their cached results; textinput keeps externally stored state with a
+  character-index cursor.
+- Rainbow examples choose truecolor, 256-colour or basic colours from
+  `TERM`/`COLORTERM`.
+- `elmtui-tests` aggregates the dev, API-contract and core-slim systems and
+  its `test-op` signals on failure.
+- Pinned `cl-events` 798cb3b, `cl-inputs` 10c75b3a, `cl-state` 91a29b7 and
+  `cl-styles` e4d64c5 (all published).
+
 - Routed the display pipeline through the presenter interface; unchanged frames
   perform no backend writes or flushes and rejected frames do not advance the
   authoritative front buffer. Idle event-driven periods do not render.
@@ -93,6 +128,8 @@ The project follows semantic versioning from the first published release.
 
 ### Removed
 
+- Removed the obsolete history-purge manifest document.
+
 - Minimalized the tracked top level to the necessary configuration and
   load-bearing entry points: unreferenced legacy planning documents
   (`apispec.yml`, `architecture_design.md`, `contracts.md`,
@@ -111,6 +148,26 @@ The project follows semantic versioning from the first published release.
   an explicit terminal-instance.
 
 ### Fixed
+
+- tmux capture parsing accepts only SGR and drops OSC, C1 and incomplete
+  controls; failed tmux commands no longer yield stderr as cells. Restore
+  after a resize copies only cells known in both geometries, and the driver
+  owns terminal cleanup from the first backend-initialisation step.
+- A self-sized root viewport keeps following later terminal resizes.
+- Focus history navigation no longer cycles between two nodes; focus
+  traversal understands lowered elements and canonical DSL nodes.
+- Terminal styles compare the invisible attribute; box drawing restores the
+  previous style on unwind and honours border colours.
+- DSL resolution rejects improper, circular and over-deep forms with
+  `invalid-dsl-form`; listbox clamps empty lists; scrollable-container
+  matches its keyword messages.
+- `wifi-menu` runs `nmcli` without a shell, with a deadline, an output limit
+  and guaranteed child reaping; `mini-text-editor` accepts the adapter's
+  character-key shape for Ctrl chords; `tmux-cursor-inspector` loads
+  independently of the caller's FASL location.
+- Workbench E3 defects: hidden selected inspector/completion rows in short
+  viewports, lost editor input on tiny resizes, transcript over-scroll and
+  regional-indicator/ZWJ cell alignment.
 
 - Clipped terminal diff writes to physical pane cells, including double-width
   and combining glyphs, counted cursor movement in physical columns, and dropped

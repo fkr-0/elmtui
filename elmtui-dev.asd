@@ -1,1 +1,1 @@
-(asdf:defsystem "elmtui-dev" :version "0.2.0" :description "Optional ElmTUI developer benchmarks and diagnostics" :author "ElmTUI contributors" :license "MIT" :depends-on (#:elmtui) :pathname "./src/dev/" :serial t :components ((:file "dev") (:file "benchmark")))
+(asdf:defsystem "elmtui-dev" :version "0.3.0" :description "Optional ElmTUI developer benchmarks and diagnostics" :author "ElmTUI contributors" :license "MIT" :depends-on (#:elmtui) :pathname "./src/dev/" :serial t :components ((:file "dev") (:file "benchmark")))
