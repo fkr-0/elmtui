@@ -802,6 +802,13 @@ recovers native scrollback."
   (launch-history nil :type (or null integer))
   (pulled 0 :type (integer 0 *)))
 
+(setf (documentation 'normal-screen-ledger-p 'function)
+      "Return true when OBJECT is a NORMAL-SCREEN-LEDGER."
+      (documentation 'normal-screen-ledger-launch-history 'function)
+      "Return the pane's tmux history size when the ledger was created, or NIL."
+      (documentation 'normal-screen-ledger-pulled 'function)
+      "Return how many history rows tmux has pulled back into the visible pane.")
+
 (defun tmux-history-size ()
   "Return the scrollback line count of the target pane, or NIL when unknown."
   (let ((raw (apply #'%run-tmux "display-message" "-p"
@@ -828,6 +835,7 @@ recovers native scrollback."
   (%make-normal-screen-ledger (copy-virtual-buffer saved) launch-history))
 
 (defun normal-screen-ledger-logical-height (ledger)
+  "Return the row count of LEDGER's logical underlay (pulled rows + launch capture)."
   (buffer-height (normal-screen-ledger-logical ledger)))
 
 (defun normal-screen-ledger-prepend-rows (ledger rows count)
