@@ -65,6 +65,12 @@ class RetargetLinksTests(unittest.TestCase):
 class StagedSiteIntegrationTests(unittest.TestCase):
     """Real staged document and image files, including a second identical run."""
 
+    def setUp(self):
+        import contextlib
+        import io
+        # site.main() reports each staged page; keep a passing run quiet.
+        self.enterContext(contextlib.redirect_stdout(io.StringIO()))
+
     def test_copy_links_and_images_from_fixture_repository(self):
         import tempfile
         from unittest import mock
@@ -134,14 +140,56 @@ class StagedSiteIntegrationTests(unittest.TestCase):
                     site, "PAGES",
                     {"docs/workbench-user-guide.md":
                      "website/guide/workbench-user-guide.md"}):
-                self.assertEqual(site.main(), 1)
+                import contextlib
+                import io
+                captured = io.StringIO()
+                with contextlib.redirect_stderr(captured):
+                    self.assertEqual(site.main(), 1)
+                self.assertIn("missing source docs/workbench-user-guide.md",
+                              captured.getvalue())
                 self.assertFalse((root / "website/guide/workbench-user-guide.md").exists())
 
-class BuiltSiteIntegrationTests(unittest.TestCase):
-    """Run with ELMTUI_SITE_BUILT=1 after a *fresh* mkdocs build --strict."""
+def _mkdocs_command():
+    """Return an argv prefix that runs mkdocs-material, or None if unavailable."""
+    import importlib.util
+    import shutil
+    import sys
+    if importlib.util.find_spec("mkdocs") and importlib.util.find_spec("material"):
+        return [sys.executable, "-m", "mkdocs"]
+    if shutil.which("uv"):
+        return ["uv", "run", "--with", "mkdocs-material>=9.5,<10", "mkdocs"]
+    return None
 
-    @unittest.skipUnless(__import__("os").environ.get("ELMTUI_SITE_BUILT") == "1",
-                         "requires freshly built site; set ELMTUI_SITE_BUILT=1")
+
+class BuiltSiteIntegrationTests(unittest.TestCase):
+    """Stage and strictly build the real site into a temp dir, then check hrefs.
+
+    The site is always built here, never read from a possibly stale dist/site."""
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        import subprocess
+        import sys
+        import tempfile
+
+        command = _mkdocs_command()
+        if command is None:
+            raise AssertionError(
+                "mkdocs-material (or uv, to fetch it) is required to build the site")
+        cls._temp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._temp.cleanup)
+        cls.output = Path(cls._temp.name) / "site"
+        subprocess.run([sys.executable, str(SCRIPT)], cwd=ROOT, check=True,
+                       capture_output=True, text=True)
+        build = subprocess.run(
+            command + ["build", "--strict", "-d", str(cls.output)], cwd=ROOT,
+            env=dict(os.environ, NO_MKDOCS_2_WARNING="1"),
+            capture_output=True, text=True)
+        if build.returncode != 0:
+            raise AssertionError("mkdocs build --strict failed:\n" +
+                                 (build.stdout + build.stderr)[-3000:])
+
     def test_generated_html_local_hrefs_and_assets(self):
         from html.parser import HTMLParser
         from urllib.parse import unquote, urlsplit
@@ -157,7 +205,7 @@ class BuiltSiteIntegrationTests(unittest.TestCase):
                 if tag in ("a", "link", "img", "script", "source") and attrs.get(attribute):
                     self.urls.append(attrs[attribute])
 
-        output = ROOT / "dist/site"
+        output = self.output
         self.assertTrue((output / "index.html").is_file())
         pages = sorted(output.rglob("*.html"))
         self.assertTrue(any("examples-catalog" in str(p) for p in pages))

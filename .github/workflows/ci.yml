@@ -18,7 +18,8 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y curl bzip2 ca-certificates git tar tmux ripgrep
+          sudo apt-get install -y curl bzip2 ca-certificates git tar tmux ripgrep \
+            xvfb rxvt-unicode xdotool
           cd "$RUNNER_TEMP"
           curl -fLsS --retry 3 -o sbcl.tar.bz2 \
             https://downloads.sourceforge.net/project/sbcl/sbcl/2.6.2/sbcl-2.6.2-x86-64-linux-binary.tar.bz2
@@ -49,33 +50,25 @@ jobs:
             (let ((pkg (find-package p)))
               (when pkg (sb-ext:unlock-package pkg))))
           SBCLRC
-      - name: Verify release-tree and Git history hygiene
-        run: python3 -m unittest discover -s tests -p 'test_release_tree.py' -v
-      - name: Verify cold ASDF compilation and package prerequisites
-        run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:compile-system :elmtui :force t)'
-      - name: Verify exported symbol identities and facade manifest
-        run: python3 scripts/audit-facade-exports.py
-      - name: Run FiveAM regression suite
-        run: clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/run-tests-clpm.lisp
-      - name: Verify independent subproject bundles and public dependency direction
-        run: scripts/test-subproject-bundles.sh
-      - name: Verify reusable libraries inside the root CLPM bundle
-        run: scripts/test-subsystems.sh
-      - name: Generate API reference
-        run: scripts/build-api-docs.sh
-      - name: Reject stale checked-in public API references
-        run: git diff --exit-code -- docs/api/generated/api.md docs/api/generated/api.html
-      - name: Test API reference qualification guards
-        run: python3 -m unittest discover -s tests/reference -p 'test_*.py' -v
-      - name: Qualify API reference structure against live exports
-        run: python3 scripts/qualify-api-reference.py --structure-only
-      - name: Enforce public-docstring debt threshold
-        run: scripts/check-docstrings.sh
-      - name: Neon unit tests
-        run: |
-          clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
-            --eval '(asdf:test-system "elmtui-neon-tests")'
-      - name: Workbench independent tests
-        run: python3 -m unittest discover -s tests/workbench/independent -p 'test_*.py' -v
-      - name: Workbench real PTY
-        run: python3 tests/workbench/pty-workbench.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install documentation build dependencies
+        run: python -m pip install 'mkdocs-material>=9.5,<10'
+      - name: Run the canonical release gate
+        # One definition of "ready": CI executes exactly what a maintainer runs.
+        # Per-gate logs and the matrix receipt land in ELMTUI_RELEASE_RECEIPT_DIR.
+        env:
+          ELMTUI_RELEASE_RECEIPT_DIR: ${{ runner.temp }}/release-receipts
+          ELMTUI_WORKBENCH_TEST_CMD: ./scripts/examples.sh run repl
+        run: scripts/release-check.sh
+      - name: Upload release receipts and coverage evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-evidence
+          path: |
+            ${{ runner.temp }}/release-receipts/
+            coverage/
+            test-output/coverage-*.log
+          if-no-files-found: warn
