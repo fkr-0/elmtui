@@ -1,10 +1,10 @@
 #+title: ElmTUI
 #+subtitle: Elm-style terminal user interfaces for Common Lisp
 
-ElmTUI is an Elm-architecture (model, message, update, view) toolkit for
-building terminal user interfaces in Common Lisp. Applications run in the
-normal terminal screen below your prompt, and the terminal and its scrollback
-are restored exactly when they exit.
+ElmTUI brings the Elm architecture to Common Lisp terminal UIs. Describe your
+interface as a declarative tree, transform state through messages, and let the
+framework diff and render only what changed.  Model, update, view — the same
+separation that makes Elm programs easy to reason about, applied to the terminal.
 
 #+HTML: <p align="center"><img src="website/assets/workbench.gif" alt="Lisp Workbench" width="100%"></p>
 #+HTML: <table><tr>
