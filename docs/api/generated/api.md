@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1662 of 1840 bindings documented; 178 have no metadata (90.3% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1681 of 1859 bindings documented; 178 have no metadata (90.4% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -5555,56 +5555,6 @@ Methods are defined per component or variant:
 Returns (values class props).
 ```
 
-## ELMTUI.APP:DEFAPPLICATION
-
-Kinds: macro
-
-```text
-Define the normative full-featured ElmTUI application called NAME.
-
-DEFAPPLICATION is the application constructor selected for the next stable major
-version. It owns the production application surface: CL-STATE initialization,
-component/root-viewport wiring, context/patch updates, subscriptions, CLI and
-binary configuration, keymaps, generated runners, and selectable
-:TRANSACTIONAL/:STRICT-ELM commit semantics. ELMTUI.APP.TEA-CORE:DEFTEA-APP
-remains a supported minimal direct-transition adapter for small or pedagogical
-TEA programs; both constructors lower to MAKE-RUNTIME-APP-SPEC and therefore
-share the same INIT/TRANSITION/VIEW/SUBSCRIPTIONS runtime vocabulary.
-
-Arguments:
-  NAME is a non-keyword application symbol. ARGS is the DEFAPPLICATION keyword
-  plist. :ROOT-VIEWPORT-ID and :ROOT-COMPONENT-DSL are required. Optional keys
-  include :INITIAL-STATE-PLIST/:INITIAL-STATE-FN, :UPDATE-FN, :VIEW-FN,
-  :SUBSCRIPTIONS-FN, :COMMAND-PROCESSOR-FN, :STATE-SEMANTICS, CLI/binary
-  configuration, and platform options.
-
-Returns:
-  Macro expansion defining application helpers, configuration, and RUN-NAME;
-  the expansion itself yields NAME.
-
-Mutation:
-  Macro expansion registers application configuration and generated functions.
-  Runtime mutation follows :STATE-SEMANTICS: :TRANSACTIONAL commits through the
-  state transaction machinery; :STRICT-ELM installs frozen replacement
-  snapshots with structural sharing.
-
-Conditions:
-  Macro expansion signals an error for missing required keys, unsupported state
-  semantics, or invalid function/configuration designators. Runtime conditions
-  from generated update/view/subscription code remain inspectable through their
-  owning framework boundaries.
-
-Example:
-  (defapplication counter
-    :root-viewport-id :root
-    :root-component-dsl '(:root-viewport :id :root :children ())
-    :initial-state-plist '(:count 0)
-    :update-fn #'counter-update
-    :view-fn #'counter-view
-    :subscriptions-fn #'counter-subscriptions
-    :state-semantics :strict-elm)
-```
-
 ## ELMTUI.APP:DEFINE-WIDGET-KEYMAP
 
 Kinds: macro
@@ -5613,11 +5563,43 @@ Kinds: macro
 DSL = DEFINE-KEYMAP + automatic registration + context.
 ```
 
+## ELMTUI.APP:KEY-PRESSED-P
+
+Kinds: function
+
+```text
+Return true when MESSAGE is a key press matching CHAR, KEY and MODIFIERS.
+
+MESSAGE is any message an update function receives; non-key messages never
+match. CHAR is a character compared with the typed character (case-sensitive,
+so #\q and #\Q differ). KEY is a keyword naming a key, such as :UP,
+:ENTER or :ESCAPE, or a list of such keywords any of which matches. When both
+are given, either may match. MODIFIERS is a list of modifiers that must all be
+held, e.g. (:CTRL); :CONTROL and :CTRL, and :META and :ALT, are synonyms. With
+no MODIFIERS the modifier state is not checked.
+
+  (key-pressed-p message :char #\q)                    ; q
+  (key-pressed-p message :key '(:up :k))                 ; Up arrow or k
+  (key-pressed-p message :char #\s :modifiers '(:ctrl)) ; Ctrl-S
+```
+
 ## ELMTUI.APP:MAKE-APP-CONFIG
 
 Kinds: function
 
 _No documentation metadata._
+
+## ELMTUI.APP:QUIT-REQUESTED-P
+
+Kinds: function
+
+```text
+Return true when MESSAGE asks the application to quit.
+
+The runtime sends (:APP-QUIT-REQUESTED) for Ctrl-C and for keymap :QUIT
+bindings. An update function normally answers it by patching :SHOULD-QUIT to
+true, which ends the application.
+```
 
 ## ELMTUI.APP:REGISTER-MESSAGE-BINDING
 
@@ -5737,6 +5719,70 @@ Kinds: function
 
 ```text
 Return the view callback symbol, function, or form used to produce the declarative UI.
+```
+
+## ELMTUI.APP.API:DEFAPPLICATION
+
+Kinds: macro
+
+```text
+Define the normative full-featured ElmTUI application called NAME.
+
+DEFAPPLICATION is the application constructor selected for the next stable major
+version. It owns the production application surface: CL-STATE initialization,
+component/root-viewport wiring, context/patch updates, subscriptions, CLI and
+binary configuration, keymaps, generated runners, and selectable
+:TRANSACTIONAL/:STRICT-ELM commit semantics. ELMTUI.APP.TEA-CORE:DEFTEA-APP
+remains a supported minimal direct-transition adapter for small or pedagogical
+TEA programs; both constructors lower to MAKE-RUNTIME-APP-SPEC and therefore
+share the same INIT/TRANSITION/VIEW/SUBSCRIPTIONS runtime vocabulary.
+
+Arguments:
+  NAME is a non-keyword application symbol. ARGS is the DEFAPPLICATION keyword
+  plist. :ROOT-VIEWPORT-ID and :ROOT-COMPONENT-DSL are required. Optional keys
+  include :INITIAL-STATE-PLIST/:INITIAL-STATE-FN, :UPDATE-FN, :VIEW-FN,
+  :SUBSCRIPTIONS-FN, :COMMAND-PROCESSOR-FN, :STATE-SEMANTICS, CLI/binary
+  configuration, and platform options.
+
+Application contract:
+  :INITIAL-STATE-FN returns the initial state as a plist (optionally startup
+  commands as a second value). :UPDATE-FN is called as (UPDATE MESSAGE STATE)
+  with the current application state; it reads with STATE-REF and returns
+  (MAKE-UPDATE-RESULT :PATCHES ((PATH VALUE) ...) :COMMANDS (...)) without
+  changing STATE. Key presses arrive as KEY-EVENT objects (match them with
+  KEY-PRESSED-P); Ctrl-C arrives as (:APP-QUIT-REQUESTED) (QUIT-REQUESTED-P).
+  Patching :SHOULD-QUIT to true ends the application. :VIEW-FN is a pure
+  function of the state returning the DSL tree rendered inside the root
+  viewport. A :BELOW-CURSOR root viewport needs an explicit :HEIGHT.
+
+Returns:
+  Macro expansion defining application helpers, configuration, and RUN-NAME;
+  the expansion itself yields NAME. RUN-NAME (interned in the current package,
+  not exported) takes &KEY PLATFORM PLATFORM-OPTIONS ARGV LOG-FILE LOG-BUFFER;
+  logging is silent while the application runs unless LOG-FILE or LOG-BUFFER
+  (or --log-file/--log-buffer in ARGV) is given.
+
+Mutation:
+  Macro expansion registers application configuration and generated functions.
+  Runtime mutation follows :STATE-SEMANTICS: :TRANSACTIONAL commits through the
+  state transaction machinery; :STRICT-ELM installs frozen replacement
+  snapshots with structural sharing.
+
+Conditions:
+  Macro expansion signals an error for missing required keys, unsupported state
+  semantics, or invalid function/configuration designators. Runtime conditions
+  from generated update/view/subscription code remain inspectable through their
+  owning framework boundaries.
+
+Example:
+  (defapplication counter
+    :root-viewport-id :root
+    :root-component-dsl '(:root-viewport :id :root :children ())
+    :initial-state-plist '(:count 0)
+    :update-fn #'counter-update
+    :view-fn #'counter-view
+    :subscriptions-fn #'counter-subscriptions
+    :state-semantics :strict-elm)
 ```
 
 ## ELMTUI.APP.API:GET-CLI-ARG
@@ -5883,8 +5929,11 @@ full application constructor for the next stable major version. Use
 ELMTUI.APP:DEFAPPLICATION for production application composition, component and
 root-viewport initialization, CL-STATE patch/context updates, CLI/binary
 configuration, keymaps, and selectable transaction semantics. DEFTEA-APP remains
-compatible for direct model-replacement programs and lowers through the same
-MAKE-RUNTIME-APP-SPEC INIT/TRANSITION/VIEW/SUBSCRIPTIONS vocabulary.
+compatible for direct model-replacement programs. It expands into
+DEFAPPLICATION with :STRICT-ELM state semantics, keeping the model under the
+:TEA-MODEL key of the application state, so both constructors share one runtime.
+Ctrl-C quits; so does a transition that returns a plist model with :SHOULD-QUIT
+true.
 
 Syntax:
 
@@ -5895,7 +5944,9 @@ Syntax:
     &key
       :subscriptions      SUBS-FN
       :command-processor  CMD-FN
-      :root-viewport-id   ROOT-ID)
+      :root-viewport-id   ROOT-ID
+      :anchor             ANCHOR      ; default :BELOW-CURSOR
+      :height             ROWS)       ; default: sized by the content
 
 Required arguments:
 
@@ -5903,7 +5954,7 @@ Required arguments:
     A non-keyword symbol naming the application. This is used to derive:
 
       * *NAME-APP-SPEC* — a DEFparameter holding the app spec plist
-      * RUN-NAME        — a function that hands the spec to RUN-APPLICATION
+      * RUN-NAME        — the DEFAPPLICATION runner for the application
 
   :INIT
     A function designator (symbol or lambda) called with no arguments:
@@ -5985,28 +6036,19 @@ Expansion / side effects:
 
   (deftea-app NAME ...) expands to:
 
-    - A DEFparameter
+    - Adapter functions %TEA-INIT-NAME, %TEA-UPDATE-NAME, %TEA-VIEW-NAME and
+      %TEA-SUBSCRIPTIONS-NAME that translate between the direct model and
+      the application state (the model is stored under :TEA-MODEL; a new
+      model becomes one patch). A view that returns a :ROOT-VIEWPORT tree is
+      unwrapped to its children, because the application owns the viewport.
 
-        *NAME-APP-SPEC*
+    - (DEFAPPLICATION NAME ...), which defines RUN-NAME:
 
-      containing a plist with at least:
+        (RUN-NAME &key (platform :tty) platform-options argv
+                       log-file log-buffer &allow-other-keys)
 
-        :name                NAME
-        :init-fn             INIT-FN
-        :update-fn           TRANSITION-FN  ; legacy internal runtime key
-        :view-fn             VIEW-FN
-        :subscriptions-fn    SUBS-FN-OR-DEFAULT
-        :command-processor-fn COMMAND-PROCESSOR
-        :message-queue       (MAKE-MESSAGE-CHANNEL :CAPACITY 20)
-        :root-viewport-id    ROOT-ID-KEYWORD
-
-    - A function
-
-        (defun RUN-NAME (&key (platform :terminal) platform-options &allow-other-keys)
-          ...)
-
-      which simply calls ELMTUI.APP.API:RUN-APPLICATION with the
-      constructed spec and the given backend options.
+    - A DEFparameter *NAME-APP-SPEC*: the MAKE-RUNTIME-APP-SPEC plist of the
+      generated application, for callers of ELMTUI.APP.API:RUN-APPLICATION.
 
 Contracts / validation:
 
@@ -13094,6 +13136,14 @@ Kinds: function
 Validates that a state schema is properly defined
 ```
 
+## ELMTUI.STATE.MSG:ACTIVATEUSER-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for ACTIVATEUSER variant of APPMSG.
+```
+
 ## ELMTUI.STATE.MSG:ARG-DEF
 
 Kinds: type
@@ -13118,6 +13168,14 @@ Kinds: function
 Return the type specifier required for an argument in a declared message variant.
 ```
 
+## ELMTUI.STATE.MSG:ASYNCPROGRESSUPDATE-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for ASYNCPROGRESSUPDATE variant of APPMSG.
+```
+
 ## ELMTUI.STATE.MSG:CANONICALIZE-MESSAGE-VARIANT
 
 Kinds: function
@@ -13128,12 +13186,68 @@ Accepts symbol heads from any package as long as their names match a declared va
 Returns NIL when MESSAGE-INSTANCE is not a recognized variant for MESSAGE-TYPE.
 ```
 
+## ELMTUI.STATE.MSG:CURSORPOSITION-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for CURSORPOSITION variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:DEACTIVATEUSER-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for DEACTIVATEUSER variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:DECREMENTCOUNTER-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for DECREMENTCOUNTER variant of APPMSG.
+```
+
 ## ELMTUI.STATE.MSG:DEFMSG
 
 Kinds: macro
 
 ```text
 Define a message type NAME with variants and auto-generated constructors.
+```
+
+## ELMTUI.STATE.MSG:FOCUSNEXT-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for FOCUSNEXT variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:FOCUSPREVIOUS-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for FOCUSPREVIOUS variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:INCREMENTCOUNTER-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for INCREMENTCOUNTER variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:KEYEVENT-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for KEYEVENT variant of APPMSG.
 ```
 
 ## ELMTUI.STATE.MSG:MAKE-ACTIVATEUSER-APPMSG
@@ -13312,6 +13426,14 @@ Kinds: function
 Check whether MESSAGE-INSTANCE uses a registered variant keyword for MESSAGE-TYPE.
 ```
 
+## ELMTUI.STATE.MSG:MOUSEEVENT-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for MOUSEEVENT variant of APPMSG.
+```
+
 ## ELMTUI.STATE.MSG:MSG-DATA
 
 Kinds: function
@@ -13328,6 +13450,54 @@ Kinds: function
 
 ```text
 Returns the type of the message MSG.
+```
+
+## ELMTUI.STATE.MSG:REQUESTFOCUS-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for REQUESTFOCUS variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:SCROLL-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for SCROLL variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:SETCOUNTERLABEL-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for SETCOUNTERLABEL variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:SETTHEME-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for SETTHEME variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:STATECHANGED-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for STATECHANGED variant of APPMSG.
+```
+
+## ELMTUI.STATE.MSG:UPDATEFOCUSABLEIDS-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for UPDATEFOCUSABLEIDS variant of APPMSG.
 ```
 
 ## ELMTUI.STATE.MSG:VARIANT-DEFINITION
@@ -13368,6 +13538,14 @@ Kinds: function
 
 ```text
 Return the canonical keyword name of a declared message variant.
+```
+
+## ELMTUI.STATE.MSG:WINDOWRESIZE-APPMSG-P
+
+Kinds: function
+
+```text
+Predicate for WINDOWRESIZE variant of APPMSG.
 ```
 
 ## ELMTUI.STATE.UPDATE:*LOG-UPDATE-RESULTS*
