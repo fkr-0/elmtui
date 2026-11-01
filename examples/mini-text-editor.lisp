@@ -5,7 +5,7 @@
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.state.api #:state-ref #:make-update-result)
   (:import-from :elmtui.core.async #:cmd-async)
-  (:import-from :elmtui.core.event-types
+  (:import-from :elmtui.keys
                 #:key-event #:key-event-key #:key-event-char
                 #:key-event-modifiers)
   (:export #:run-mini-text-editor #:editor-update #:editor-view

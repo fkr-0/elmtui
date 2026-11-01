@@ -10,7 +10,7 @@
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.state.msg #:msg-type #:msg-data)
-  (:import-from :elmtui.core.event-types
+  (:import-from :elmtui.keys
     #:key-event #:key-event-key #:key-event-char #:key-event-modifiers)
   (:import-from :cl-fzy
     #:choices #:options #:choices-init #:choices-add #:choices-search

@@ -63,7 +63,7 @@
          (search (string-downcase query) (string-downcase item)))
        items)))
 
-(defun %key-event-parts (message) "Return KEY and CHAR for struct, canonical keyevent, or legacy list shapes." (cond ((typep message 'elmtui.core.event-types:key-event) (values (elmtui.core.event-types:key-event-key message) (elmtui.core.event-types:key-event-char message))) ((and (consp message) (member (first message) ' (:keyevent :key-event) :test #'eq)) (let ((tail (rest message))) (if (and tail (member (first tail) ' (:key :char :event :modifiers) :test #'eq)) (values (getf tail :key) (getf tail :char)) (values (second message) (third message))))) (t (values nil nil))))
+(defun %key-event-parts (message) "Return KEY and CHAR for struct, canonical keyevent, or legacy list shapes." (cond ((typep message 'elmtui.keys:key-event) (values (elmtui.keys:key-event-key message) (elmtui.keys:key-event-char message))) ((and (consp message) (member (first message) ' (:keyevent :key-event) :test #'eq)) (let ((tail (rest message))) (if (and tail (member (first tail) ' (:key :char :event :modifiers) :test #'eq)) (values (getf tail :key) (getf tail :char)) (values (second message) (third message))))) (t (values nil nil))))
 
 
 (defun app-update (message app-state)

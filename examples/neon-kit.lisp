@@ -1,7 +1,7 @@
 ;;;; Shared, renderer-native visual vocabulary for the NILMSP-inspired demos.
 (uiop:define-package :elmtui.examples.neon-kit
   (:use :cl)
-  (:import-from :elmtui.core.event-types
+  (:import-from :elmtui.keys
                 #:key-event #:key-event-key #:key-event-char
                 #:key-event-modifiers)
   (:import-from :elmtui.ui.styles #:defstyle)

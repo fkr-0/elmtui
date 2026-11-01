@@ -16,6 +16,13 @@ The project follows semantic versioning from the first published release.
 
 ### Added
 
+- `elmtui.keys` secondary package for low-level key-event struct accessors
+  (`key-event`, `key-event-p`, `key-event-key`, `key-event-char`,
+  `key-event-modifiers`, `make-key-event`). Prefer `key-event-parts` or
+  `key-pressed-p` from the `elmtui` facade for most key handling.
+- "Key Event Handling" section in `docs/USER_GUIDE.md` documenting the
+  recommended `key-event-parts` path, `elmtui.keys` for low-level access,
+  and the deprecation timeline.
 - `patch` and `patch*` convenience constructors for flat-key update results.
 - `quit-result` shorthand for the universal quit response.
 - `key-event-parts` unified key-event destructuring (handles both struct and legacy plist forms).
@@ -58,8 +65,18 @@ The project follows semantic versioning from the first published release.
   `:every` subscriptions.
 - Subscriptions section in `docs/USER_GUIDE.md`.
 
+### Deprecated
+
+- Direct use of `key-event`, `key-event-p`, `key-event-key`,
+  `key-event-char`, and `key-event-modifiers` from the `elmtui` facade
+  package. These symbols will move exclusively to `elmtui.keys` in 0.7.0.
+  Use `key-event-parts` or `key-pressed-p` for most key handling, or
+  import struct accessors from `elmtui.keys` for low-level access.
+
 ### Changed
 
+- Migrated example imports from `elmtui.core.event-types` to `elmtui.keys`
+  for key-event struct accessors.
 - Migrated simple examples to `deftea-app` to demonstrate the minimal application constructor.
 - Refactored `examples/neon-kit.lisp` to use `defstyle` and `:class`
   instead of repeating inline palette styles on every row.

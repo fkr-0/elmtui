@@ -16,7 +16,7 @@
                 #:listbox-model-selected-index #:listbox-model-scroll-offset
                 #:listbox-model-height
                 #:listbox-model-on-select)
-  (:import-from :elmtui.core.event-types
+  (:import-from :elmtui.keys
                 #:key-event #:key-event-key #:key-event-modifiers)
   (:export #:run-dirli #:main))
 

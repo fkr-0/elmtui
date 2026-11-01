@@ -3,7 +3,7 @@
   (:use :cl)
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.state.api #:state-ref #:make-update-result)
-  (:import-from :elmtui.core.event-types #:key-event #:key-event-key)
+  (:import-from :elmtui.keys #:key-event #:key-event-key)
   (:import-from :elmtui.core.async #:cmd-async)
   (:import-from :elmtui.platform.tmux
                 #:tmux-available-p #:capture-lines #:parse-ansi-string)

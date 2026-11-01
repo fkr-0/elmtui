@@ -3,7 +3,7 @@
                              (:import-from :elmtui.app #:defapplication)
                              (:import-from :elmtui.app.api #:run-application)
                              (:import-from :elmtui.core.async #:cmd-async)
-                             (:import-from :elmtui.core.event-types #:key-event
+                             (:import-from :elmtui.keys #:key-event
                               #:key-event-key #:key-event-char)
                              (:import-from :elmtui.state.api #:state-ref
                               #:make-update-result)

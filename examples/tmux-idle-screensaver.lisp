@@ -5,7 +5,7 @@
 (uiop:define-package :elmtui.examples.tmux-idle
   (:use :cl :log4cl)
   (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.core.event-types
+  (:import-from :elmtui.keys
                 #:key-event)
   (:import-from :elmtui.state.api
                 #:state-ref

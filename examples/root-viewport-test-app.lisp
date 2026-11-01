@@ -1,8 +1,8 @@
 (uiop:define-package :elmtui.examples.root-viewport-test-app
   (:use :cl)
   (:import-from :elmtui.app.tea-core #:deftea-app)
-  (:import-from :elmtui.core.event-types
-                #:key-event #:key-event-key #:key-event-char #:key-event-parts)
+  (:import-from :elmtui.keys #:key-event #:key-event-key #:key-event-char)
+  (:import-from :elmtui.core.event-types #:key-event-parts)
   (:export #:main #:run-root-viewport-test-app))
 
 (in-package :elmtui.examples.root-viewport-test-app)

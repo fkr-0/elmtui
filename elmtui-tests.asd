@@ -75,6 +75,7 @@
                                (:file "async-tests")
                                (:file "event-pipeline-tests")
                                (:file "style-tests")
+                               (:file "keys-package-tests")
                                (:file "style-classes-tests")
                                (:file "style-contract-matrix-tests")
                                (:file "style-render-capabilities-tests")

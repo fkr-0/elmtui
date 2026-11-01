@@ -1,4 +1,4 @@
-(uiop:define-package :elmtui.examples.tmux-slider (:use :cl) (:import-from :elmtui.app #:defapplication) (:import-from :elmtui.core.event-types #:key-event #:key-event-key #:key-event-char) (:import-from :elmtui.state.api #:state-ref #:make-update-result) (:import-from :elmtui.platform.tmux #:tmux-available-p #:parse-ansi-string) (:export #:run-tmux-slider #:slider-view #:slider-update #:slider-subscriptions #:snapshot-from-styled-string #:slider-rows #:*slider-snapshot*))
+(uiop:define-package :elmtui.examples.tmux-slider (:use :cl) (:import-from :elmtui.app #:defapplication) (:import-from :elmtui.keys #:key-event #:key-event-key #:key-event-char) (:import-from :elmtui.state.api #:state-ref #:make-update-result) (:import-from :elmtui.platform.tmux #:tmux-available-p #:parse-ansi-string) (:export #:run-tmux-slider #:slider-view #:slider-update #:slider-subscriptions #:snapshot-from-styled-string #:slider-rows #:*slider-snapshot*))
 (in-package :elmtui.examples.tmux-slider)
 (defvar *slider-snapshot* nil)
 (defvar *slider-initial-speed* 0.085)
