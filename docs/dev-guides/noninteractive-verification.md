@@ -20,8 +20,7 @@ operator deliberately opts in.
 
 | Purpose | Command | Notes |
 | --- | --- | --- |
-| Run live tmux integration when tmux is available | `ELMTUI_RUN_TMUX_INTEGRATION=1 clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp` | Enables live tmux capture tests, but still skips them if tmux is unavailable. |
-| Require live tmux integration | `ELMTUI_REQUIRE_TMUX=1 clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp` | Enables live tmux tests and treats missing tmux as a test failure. Use only on a host prepared for tmux integration checks. |
+| tmux capture integration | none; part of `scripts/run-tests-warning-clean.sh` | Runs by default against a private tmux server the tests create and remove; needs the `tmux` binary but no surrounding session, and fails (never skips) if `tmux` is missing |
 
 ## Faketerm tests
 

@@ -57,13 +57,14 @@ def test_clpm_runner_removes_stdout_log_appenders_before_running_tests() -> None
     )
 
 
-def test_tmux_integration_tests_are_opt_in_by_default():
+def test_tmux_integration_tests_use_a_private_server_and_never_skip():
     path = ROOT / "tests" / "tmux-capture-integration-tests.lisp"
     text = path.read_text(encoding="utf-8")
 
-    assert "ELMTUI_RUN_TMUX_INTEGRATION" in text, "missing explicit opt-in env var"
-    assert "*run-tmux-integration-tests*" in text, "missing opt-in switch"
-    assert "(not *run-tmux-integration-tests*)" in text, "skip macro must skip before probing live tmux"
+    assert "with-private-tmux-pane" in text, "tests must own a private tmux server"
+    assert "(skip " not in text, "tmux integration tests must run, not skip"
+    for retired in ("ELMTUI_RUN_TMUX_INTEGRATION", "ELMTUI_REQUIRE_TMUX"):
+        assert retired not in text, f"retired opt-in switch {retired} is still referenced"
 
 
 def test_terminal_app_uses_a_short_private_tmux_socket_path() -> None:
@@ -170,8 +171,7 @@ def test_noninteractive_command_matrix_is_documented() -> None:
     required = [
         "scripts/run-tests-warning-clean.sh",
         "clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp",
-        "ELMTUI_RUN_TMUX_INTEGRATION=1",
-        "ELMTUI_REQUIRE_TMUX=1",
+        "private tmux",
         "tests/faketerm-tests.lisp",
         "faketerm-run-to-quiescence",
         "test-output/",
@@ -264,7 +264,7 @@ def main() -> int:
         test_clpm_runner_converts_test_result_to_process_exit_status,
         test_runner_does_not_reference_test_package_at_read_time,
         test_clpm_runner_removes_stdout_log_appenders_before_running_tests,
-        test_tmux_integration_tests_are_opt_in_by_default,
+        test_tmux_integration_tests_use_a_private_server_and_never_skip,
         test_terminal_app_uses_a_short_private_tmux_socket_path,
         test_widgets_enhanced_asdf_definitions_match_file_stem,
         test_focus_keymaps_contract_is_not_skipped_or_example_bound,
