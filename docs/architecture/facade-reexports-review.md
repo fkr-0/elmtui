@@ -18,13 +18,13 @@ origin visibility. After an *independent, compatibility-aware review*, use
 
 | Classification | Count | Interim decision |
 |---|---:|---|
-| `public-alias-retain` | 1071 | Public originating symbols: preserve under 0.2.x ABI; semantic rationale per binding still needs owner review. |
+| `public-alias-retain` | 1063 | Public originating symbols: preserve under 0.2.x ABI; semantic rationale per binding still needs owner review. |
 | `private-origin-compat-review` | 7 | Exports originating from an internal symbol. Preserve existing alias to avoid breakage; individual cases below require contract-owner decision before 0.3/1.0 API reduction. |
-| `legacy-standard-restart` | 2 | `CL:USE-VALUE` is a standardized restart name, not a framework function; preserve existing export aliases until a deliberately announced deprecation. |
-| **Total** | **1080** | **No symbol-identity mismatches and no `SB-*` private symbol exports.** |
+| `legacy-standard-restart` | 1 | `CL:USE-VALUE` is a standardized restart name, not a framework function; preserve existing export aliases until a deliberately announced deprecation. |
+| **Total** | **1071** | **No symbol-identity mismatches and no `SB-*` private symbol exports.** |
 
-The **1078** re-exports with a project-owned home are therefore partitioned
-into 1071 external-origin/public aliases and 7 internal-origin compatibility
+The **1070** re-exports with a project-owned home are therefore partitioned
+into 1063 external-origin/public aliases and 7 internal-origin compatibility
 exceptions. This is a *complete mechanical origin/identity inventory*, not a
 claim that every function's semantics and reason for publication were independently
 reviewed. The CI ratchet preserves the entire compatibility shape until that
@@ -42,6 +42,16 @@ for the old fresh symbols. ELMTUI.APP:DEFAPPLICATION is now the
 ELMTUI.APP.API symbol, and ELMTUI.STATE re-exports the 17 `<VARIANT>-APPMSG-P`
 predicates DEFMSG defines, which it now exports. See `scripts/audit-api-bindings.lisp` for unbound
 exports.
+
+## 0.4.0 refresh
+
+The root ELMTUI package is now a curated facade: it imports and exports 13
+application-level framework symbols (DEFAPPLICATION, DEFTEA-APP,
+MAKE-UPDATE-RESULT, STATE-REF, KEY-PRESSED-P, QUIT-REQUESTED-P, the KEY-EVENT
+accessors and the two theme presets) instead of 127 fresh, unbound names, and
+no longer re-exports CL:USE-VALUE. The never-implemented exports elsewhere
+(including DEFMSG's undefined `<variant>-p` names and STATECHANGEMSG) were
+removed; `scripts/audit-api-bindings.lisp` reports none.
 
 ## Seven private-origin compatibility exceptions
 

@@ -18,13 +18,11 @@
    ;; Transformation generics
    #:render-view
    #:apply-style
-   #:resolve-view
-   #:layout-view
+   
    #:render-to-buffer
    ;; Diff-pipeline generics
    #:diff-buffer
    #:apply-diff
-   #:stylable-id
    ;; Abstract node classes
    ))
 

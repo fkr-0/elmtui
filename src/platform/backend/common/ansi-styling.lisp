@@ -25,7 +25,6 @@
    #:copy-term-color
 
    #:terminal-color-simple
-   #:terminal-color-kv
    #:terminal-color-bg
    #:style-to-terminal-style
    #:terminal-style-kv

@@ -13,16 +13,14 @@
    ;; View Definition
    :defview :with-view-context
    ;; Node Creation DSL
-   :container :text :vbox :hbox :widget
    ;; Composition & Updates
-   :merge-props :update-props :update-children
    :with-props :with-children
    ;; Dynamic Updates
    :view-diff :apply-diff
    ;; Accessibility
-   :with-aria :accessible-p
+   :with-aria 
    ;; Properties
-   :get-prop :set-prop :has-prop-p :remove-prop))
+      ))
 (in-package :elmtui.view.core)
 
 ;;;-----------------------------------------------------------------------------

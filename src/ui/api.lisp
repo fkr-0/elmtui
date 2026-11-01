@@ -12,13 +12,12 @@
    #:init #:update #:view #:destroy ;; Core lifecycle
    #:component-children #:component-width #:component-height
    #:resolve-component-node
-   #:layout-node
    #:id-from-path #:get-path
    ;; State Helpers
    #:+component-state-root+
    #:component-state-path #:get-component-property #:make-state-patch #:component-state-map-path
    ;; Update Macro and its local functions
-   #:with-update-patch #:add-patch #:add-command #:get-property
+   #:with-update-patch   
    #:normalize-update-args
    ;; DSL Resolution
    #:dsl-type #:resolve-dsl-type

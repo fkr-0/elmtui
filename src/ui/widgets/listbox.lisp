@@ -11,7 +11,7 @@
                 #:defwidget-view
                 #:with-widget-model
                 #:widget-focused-p)
-  (:export #:listbox-model #:make-listbox-model ; Struct and constructor
+  (:export #:listbox-model  ; Struct and constructor
            ;; Accessors
            #:listbox-model-id
            #:listbox-model-items

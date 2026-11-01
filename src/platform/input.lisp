@@ -22,7 +22,7 @@
   (:export :start-reader
     #:cl-inputs-token->event
     :stop-reader
-    :request-stop-input-reader)) ; Assuming request-stop-input-reader might be a default name
+    )) ; Assuming request-stop-input-reader might be a default name
 
 (in-package :elmtui.platform.input)
 

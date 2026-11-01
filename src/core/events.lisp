@@ -83,7 +83,6 @@
    :consume-event)
   (:export :message
    :make-message
-           :message-p
 
            :message-type
    :message-data

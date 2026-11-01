@@ -63,7 +63,6 @@
    #:print-buffer-to-string
    ;; Restarts
    #:use-value
-   #:clip-coordinates
    #:clear-buffer
    ;; Accessors for terminal style colors
    ;; #:terminal-style-fg-color-val

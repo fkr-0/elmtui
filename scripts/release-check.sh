@@ -179,7 +179,7 @@ run_gate cold_compile clpm bundle exec --with-client sbcl -- --noinform --non-in
 run_gate facade python3 scripts/audit-facade-exports.py
 run_gate docstrings scripts/check-docstrings.sh
 # Exported symbols with no binding may not increase (scripts/audit-api-bindings.lisp).
-run_gate api_bindings env ELMTUI_API_PHANTOM_MAX="${ELMTUI_API_PHANTOM_MAX:-215}" \
+run_gate api_bindings env ELMTUI_API_PHANTOM_MAX="${ELMTUI_API_PHANTOM_MAX:-0}" \
   clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/audit-api-bindings.lisp
 run_gate standalone_subsystems scripts/test-subproject-bundles.sh
 run_gate integrated_subsystems scripts/test-subsystems.sh

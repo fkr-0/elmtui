@@ -13,7 +13,7 @@
     #:make-focusnext-appmsg #:make-focusprevious-appmsg #:make-keyevent-appmsg
     :variant-definition #:variant-definition-name #:variant-definition-args #:variant-definition-arg-spec #:variant-definition-constructor-name
     :arg-def #:arg-def-type #:arg-def-keyword
-    :AppMsg :StateChangeMsg))
+    :AppMsg))
 (in-package :elmtui.state.msg)
 
 (defvar *message-schemas* (make-hash-table :test 'eq)
@@ -126,9 +126,7 @@
                                        (symbol-name (variant-definition-name vdef))
                                        (symbol-name name)))
                             ,*package*))
-       ;; Deprecated: <VARIANT>-P was exported but never defined; removed in 0.4.0.
-       ,@(loop for vdef in parsed-variants
-           collect `(export ',(sb-int:symbolicate (format nil "~A-P" (symbol-name (variant-definition-name vdef)))) ,*package*))
+
        ',name)))
 
 (defun message-variant-p (message-type message-instance)
