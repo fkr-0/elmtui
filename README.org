@@ -48,10 +48,10 @@ clpm bundle exec --with-client sbcl -- \\
   --noinform --non-interactive --load examples/workbench.lisp
 #+end_src
 
-See [[file:docs/workbench-user-guide.md][Workbench user guide]] and [[file:docs/release-0.1.0-checklist.md][0.2.0 release qualification gates (legacy filename)]]. The dominant Workbench screenshot is planned
-for =website/assets/workbench-hero.webp=; the animated terminal slider is
-planned for =website/assets/terminal-slider.gif=. They will appear on
-[[https://elmtui.fkr.dev/][the project website]] once deployment and qualification are complete.
+See [[file:docs/workbench-user-guide.md][Workbench user guide]] and [[file:docs/release-0.1.0-checklist.md][0.2.0 release qualification gates (legacy filename)]]. The recordings below are real
+sessions of the maintained examples; more are on [[https://elmtui.fkr.dev/][the project website]].
+
+[[file:website/assets/workbench.gif]]
 
 * What ElmTUI provides
 
@@ -201,8 +201,8 @@ python3 -m mkdocs build --strict
 python3 -m mkdocs serve
 #+end_src
 
-The pending screenshot and GIF use the filenames specified in
-[[file:website/assets/README.md][website/assets/README.md]]. The release gates, including the licensing and Workbench PTY checks, are in
+The site media are recorded from real example sessions by
+=scripts/record-demo-media.py=; see [[file:website/assets/README.md][website/assets/README.md]]. The release gates, including the licensing and Workbench PTY checks, are in
 [[file:docs/release-0.1.0-checklist.md][the 0.2.0 release checklist (legacy filename)]].
 
 * Documentation
