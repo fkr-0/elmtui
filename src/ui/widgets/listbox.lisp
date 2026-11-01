@@ -34,7 +34,7 @@
 ;;;---------------------------------------------------------------
 (defun clamp-index (idx item-count)
   "Clamps the index within valid bounds for the list."
-  (when idx
+  (when (and idx (plusp item-count))
     (alexandria:clamp idx 0 (max 0 (1- item-count)))))
 
 (defun clamp-scroll (offset height item-count)

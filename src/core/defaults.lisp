@@ -287,24 +287,14 @@ SOURCE: Source file or system where this default originated"
   (%make-default-context :parent parent))
 
 (defmacro with-defaults (overrides context-or-parent &body body)
-  "Execute BODY with overridden defaults."
-  `(let* ((parent-context (if (default-context-p ,context-or-parent)
-                            context-or-parent
-                            (make-default-context ,context-or-parent)))
-           (new-context (make-default-context parent-context))
-           (old-registry *default-registry*))
-     ;; Apply overrides to new context
-     (loop for (key value) on ,overrides by #'cddr do
-       (setf (gethash key (default-context-overrides new-context)) value))
-
-     (unwind-protect
-       (progn
-         ;; Temporarily use context-aware registry
-         (setf *default-registry*
-           (make-context-aware-registry new-context old-registry))
-         (progn ,@body))
-       ;; Restore original registry
-       (setf *default-registry* old-registry))))
+  "Execute BODY with thread-local defaults, restoring the caller's binding on exit."
+  (let ((context (gensym "CONTEXT")) (registry (gensym "REGISTRY")))
+    `(let* ((,context (make-default-context ,context-or-parent))
+            (,registry *default-registry*))
+       (loop for (key value) on ,overrides by #'cddr do
+         (setf (gethash key (default-context-overrides ,context)) value))
+       (let ((*default-registry* (make-context-aware-registry ,context ,registry)))
+         ,@body))))
 
 (defun make-context-aware-registry (context base-registry)
   "Create a registry that respects context overrides."
@@ -317,6 +307,8 @@ SOURCE: Source file or system where this default originated"
     ;; Apply context overrides
     (labels ((apply-override (ctx)
                (when ctx
+                 ;; Ancestors provide defaults; the nearest override wins.
+                 (apply-override (default-context-parent ctx))
                  (maphash (lambda (key value)
                             (let ((spec (gethash key context-registry)))
                               (setf (gethash key context-registry)
@@ -331,8 +323,7 @@ SOURCE: Source file or system where this default originated"
                                   :validator (when spec (default-spec-validator spec))
                                   :category (when spec (default-spec-category spec))
                                   :source "context-override"))))
-                   (default-context-overrides ctx))
-                 (apply-override (default-context-parent ctx)))))
+                   (default-context-overrides ctx)))))
       (apply-override context))
 
     context-registry))

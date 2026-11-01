@@ -616,7 +616,7 @@
     (let ((dev (%terminal-device instance)))
       (if dev
         (cl-inputs.terminal.api:scroll-lines dev lines)
-        (send-sequence instance :scroll-down lines)))))
+        (write-output (format nil "~C[~DS" #\Escape lines) (%terminal-stream instance))))))
 
 (defmethod scroll-up ((instance terminal-instance) &optional (lines 1))
   (with-terminal-lock (instance)
@@ -624,10 +624,10 @@
     (let ((dev (%terminal-device instance)))
       (if dev
         (cl-inputs.terminal.api:scroll-lines dev (- lines))
-        (send-sequence instance :scroll-up lines)))))
+        (write-output (format nil "~C[~DT" #\Escape lines) (%terminal-stream instance))))))
 
 (defmethod elmtui.platform.api:scroll ((instance terminal-instance) n)
-  "Scroll the terminal by N lines (positive=down, negative=up)."
+  "Advance the viewport by N lines: positive moves content up, negative down."
   (elmtui.platform.api:scroll-lines instance n)
   t)
 
@@ -640,10 +640,8 @@
 (defmethod elmtui.platform.api:clear-below-cursor ((instance terminal-instance))
   "Clear from cursor position to end of screen using ANSI escape sequence."
   (with-terminal-lock (instance)
-    (let ((stream (term-stream instance)))
-      ;; ANSI escape code: ESC[0J clears from cursor to end of screen
-      (write-string (format nil "~C[0J" #\Escape) stream)
-      (force-output stream))))
+    (send-sequence instance :erase-screen-down)
+    (flush-output instance)))
 
 ;;;---------------------------------------------------------------
 ;;; Drawing Primitives (draw to a specified target-buffer)
@@ -704,13 +702,19 @@
   (log:debug "BUFFER: draw-styled-box on target-buffer - Pos: (~A,~A), Size: (~A,~A), Style: ~S, BorderStyle: ~S, BorderColor: ~S"
     row col height width style border-style border-color)
   (when (and (> width 1) (> height 1))
-    (let* ((effective-style (if border-color (list :fg border-color) (getf style :attrs)))
+    (let* ((effective-style
+             (if (typep style 'elmtui.platform.backend.common.ansi-styling:terminal-style)
+                 (elmtui.platform.backend.common.ansi-styling:copy-term-style style)
+                 (or (style-to-terminal-style style) (make-terminal-style))))
             (chars (case border-style
                       (:single '(#\┌ #\┐ #\└ #\┘ #\─ #\│))
                      (:double '(#\╔ #\╗ #\╚ #\╝ #\═ #\║))
                      (otherwise '(#\+ #\+ #\+ #\+ #\- #\|))))
             (tl (first chars)) (tr (second chars)) (bl (third chars)) (br (fourth chars))
             (horiz (fifth chars)) (vert (sixth chars)))
+      (when border-color
+        (setf (terminal-style-fg-color effective-style)
+              (elmtui.platform.backend.common.ansi-styling:fuzz-color border-color)))
       (when target-buffer
         (with-virtual-buffer-lock (target-buffer)
           (draw-char-at instance target-buffer row col tl :style effective-style)

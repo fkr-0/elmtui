@@ -9,6 +9,29 @@
 
 (in-package :elmtui.ui.dsl-resolution)
 
+(define-condition invalid-dsl-form (error)
+  ((form :initarg :form :reader invalid-dsl-form-form)
+   (reason :initarg :reason :reader invalid-dsl-form-reason))
+  (:report (lambda (condition stream)
+             (format stream "Invalid DSL form (~A)" (invalid-dsl-form-reason condition)))))
+
+(defun %dsl-proper-list-p (form)
+  "Recognize a finite proper list without looping through circular CDRs."
+  (loop with slow = form
+        with fast = form
+        do (cond ((null fast) (return t))
+                 ((atom fast) (return nil)))
+           (setf fast (cdr fast))
+           (cond ((null fast) (return t))
+                 ((atom fast) (return nil)))
+           (setf fast (cdr fast) slow (cdr slow))
+           (when (eq fast slow) (return nil))))
+
+(defun %validate-dsl-list (form)
+  (unless (and (consp form) (%dsl-proper-list-p form))
+    (error 'invalid-dsl-form :form form :reason :empty-or-improper-list))
+  form)
+
 ;;; ---------------------------------------------------------------
 ;;; Default Methods
 ;;; ---------------------------------------------------------------
@@ -39,13 +62,32 @@ they are not components."
   ;; For other cases, use the default error behavior
   (call-next-method))
 
+(defparameter *dsl-list-maximum-depth* 512
+  "Maximum nesting accepted by built-in list DSL resolution.")
+
+(defvar *dsl-list-active-types* nil
+  "Dynamically scoped identity set shared by nested public DSL-TYPE calls.")
+
+(defvar *dsl-list-depth* 0)
+
 (defmethod dsl-type ((type list) &optional props)
   "TYPE is a list - first element is the real type, rest are extra props.
 
 When DSL form is a list like (:my-widget :prop1 val1 :prop2 val2),
 the first element is the type and the rest are additional properties
 to be merged with defaults."
-  (dsl-type (first type) (append (rest type) props)))
+  (let ((*dsl-list-active-types* (or *dsl-list-active-types*
+                                      (make-hash-table :test #'eq)))
+        (*dsl-list-depth* (1+ *dsl-list-depth*)))
+    (when (> *dsl-list-depth* *dsl-list-maximum-depth*)
+      (error 'invalid-dsl-form :form type :reason :type-depth-exceeded))
+    (%validate-dsl-list type)
+    (when (gethash type *dsl-list-active-types*)
+      (error 'invalid-dsl-form :form type :reason :cyclic-type-chain))
+    (setf (gethash type *dsl-list-active-types*) t)
+    (unwind-protect
+         (dsl-type (first type) (append (rest type) props))
+      (remhash type *dsl-list-active-types*))))
 
 ;;; ---------------------------------------------------------------
 ;;; Helper Functions
@@ -72,10 +114,25 @@ Examples:
 When chaining, props are accumulated from right to left:
   (resolve-dsl-type '(:outer :inner)) calls
   (dsl-type :inner) then appends (:outer) to result"
-  (etypecase item
-    ;; List: first element is type, rest are additional props
-    (list (resolve-dsl-type (first item) (append (rest item) props)))
-    ;; Keyword: look up via dsl-type generic (recurse)
-    (keyword (dsl-type item props))
-    ;; Symbol: terminate - it's a class
-    (symbol (values item props))))
+  (let ((active (make-hash-table :test #'eq))
+        (depth 0))
+    (labels ((walk (form accumulated)
+               (typecase form
+                 (cons
+                  (when (>= depth *dsl-list-maximum-depth*)
+                    (error 'invalid-dsl-form :form form :reason :type-depth-exceeded))
+                  (%validate-dsl-list form)
+                  (when (gethash form active)
+                    (error 'invalid-dsl-form :form form :reason :cyclic-type-chain))
+                  (setf (gethash form active) t)
+                  (incf depth)
+                  (unwind-protect
+                       (walk (car form) (append (cdr form) accumulated))
+                    (decf depth)
+                    (remhash form active)))
+                 (keyword (dsl-type form accumulated))
+                 (symbol (if (null form)
+                             (error 'invalid-dsl-form :form form :reason :empty-type)
+                             (values form accumulated)))
+                 (t (error 'invalid-dsl-form :form form :reason :invalid-type)))))
+      (walk item props))))

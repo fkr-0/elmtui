@@ -13,9 +13,17 @@
 
 ;; Cache implementation
 (defvar *memo-cache* (make-hash-table :test #'equal)
-  "Cache for memoized function results")
+  "Cache for the legacy MEMOIZE component+props helper.")
 
-(defvar *cache-stats* (make-hash-table :test #'eq)
+(defvar *memo-function-caches*
+  #+sbcl (make-hash-table :test #'eq :weakness :key)
+  #-sbcl (make-hash-table :test #'eq)
+  "Weak wrapper -> (original function . cache). Originals never own cache lists.
+Both the original function and its memoizing wrapper may invalidate them.
+Discarding the last wrapper releases its cached arguments and results on SBCL.")
+
+(defvar *cache-stats* #+sbcl (make-hash-table :test #'eq :weakness :key)
+                     #-sbcl (make-hash-table :test #'eq)
   "Statistics for cache usage")
 
 (defvar *memoization-enabled* t
@@ -33,82 +41,37 @@
   (function nil))
 
 (defun memo (fn &key (key #'identity) (test #'equal))
-  "Create a memoized version of a function, with customizable keying and cache behavior.
+  "Return a memoizing wrapper around FN, caching its primary return value.
 
-Arguments:
-+ ~fn~ :: function
-  The function to be memoized. Should accept any number of arguments.
-+ ~:key~ :: function (default: ~identity~)
-  Function applied to the argument list to produce a cache key. Should accept a list of arguments and return a hashable key.
-+ ~:test~ :: function (default: ~equal~)
-  Function used to compare cache keys in the hash table.
+:KEY receives a list of FN's arguments and defaults to IDENTITY; :TEST is
+the hash-table equality predicate and defaults to EQUAL. Each wrapper has its
+own cache. Repeated argument keys return the cached primary value, including
+NIL; multiple return values are not preserved. With memoization disabled,
+FN executes normally and no entry is cached.
 
-Return:
-+ Returns a function that behaves like ~fn~, but caches results based on the computed key.
-
-Side-effects:
-+ Creates a hash table for caching results (local to the returned function).
-+ Updates global ~*cache-stats*~ hash table with statistics for ~fn~.
-+ Increments cache hit/miss counters in the stats object.
-+ Reads global variable ~*memoization-enabled*~ to determine whether to use memoization.
-
-Globals:
-+ ~*cache-stats*~ :: hash table mapping functions to their statistics objects.
-+ ~*memoization-enabled*~ :: boolean flag controlling whether memoization is enabled.
-
-Behavior:
-1. When called, the returned function checks ~*memoization-enabled*~.
-2. If enabled, it computes a cache key using ~key~ and looks up the result in the cache.
-3. If found, returns the cached value and increments the hit counter.
-4. If not found, computes the result, stores it in the cache, increments the miss counter, and returns the result.
-5. If memoization is disabled, simply calls ~fn~ with the arguments.
-
-Examples:
-
-;; Example: Memoizing a recursive Fibonacci function
-(defun fib (n)
-  (if (< n 2) n
-      (+ (fib (- n 1)) (fib (- n 2)))))
-
-(setq *memoization-enabled* t)
-(setq *cache-stats* (make-hash-table))
-(defun make-cache-stats (&key function)
-  (list :function function :hits 0 :misses 0))
-(defun cache-stats-hits (stats) (getf stats :hits))
-(defun cache-stats-misses (stats) (getf stats :misses))
-
-(let ((memo-fib (memo #'fib :key #'identity :test #'eql)))
-  (funcall memo-fib 10)) ; => 55
-
-;; Check statistics
-(gethash #'fib *cache-stats*) ; => (:function #'fib :hits ... :misses ...)
-
-;; Example: Custom key function for argument normalization
-(defun slow-add (a b)
-  (sleep 1)
-  (+ a b))
-
-(let ((memo-add (memo #'slow-add :key (lambda (args) (sort args #'<)))))
-  (funcall memo-add 2 3) ; computes and caches
-  (funcall memo-add 3 2)) ; returns cached result (same key)
-"
-  (let ((cache (make-hash-table :test test))
-         (stats (make-cache-stats :function fn)))
+CLEAR-MEMOIZATION-CACHE accepts either FN or the returned wrapper, or no
+argument to invalidate every live wrapper. Hit/miss statistics for FN remain
+available separately."
+  (let* ((cache (make-hash-table :test test))
+         (stats (make-cache-stats :function fn))
+         (wrapper
+           (lambda (&rest args)
+             (if *memoization-enabled*
+                 (let ((k (funcall key args)))
+                   (multiple-value-bind (val found) (gethash k cache)
+                     (if found
+                         (progn
+                           (incf (cache-stats-hits stats))
+                           val)
+                         (progn
+                           (incf (cache-stats-misses stats))
+                           (let ((result (apply fn args)))
+                             (setf (gethash k cache) result)
+                             result)))))
+                 (apply fn args)))))
+    (setf (gethash wrapper *memo-function-caches*) (cons fn cache))
     (setf (gethash fn *cache-stats*) stats)
-    (lambda (&rest args)
-      (if *memoization-enabled*
-        (let ((k (funcall key args)))
-          (multiple-value-bind (val found) (gethash k cache)
-            (if found
-              (progn
-                (incf (cache-stats-hits stats))
-                val)
-              (progn
-                (incf (cache-stats-misses stats))
-                (let ((result (apply fn args)))
-                  (setf (gethash k cache) result)
-                  result)))))
-        (apply fn args)))))
+    wrapper))
 
 ;; Helper macro for defining memoized functions
 (defmacro defmemo (name args &body body)
@@ -132,32 +95,59 @@ Examples:
 
 ;; Cache management
 (defun clear-memoization-cache (&optional function)
-  "Clear the entire memoization cache or just for a specific function"
+  "Invalidate memoized results. With FUNCTION, clear that original function's
+or wrapper's MEMO caches; without FUNCTION, clear all MEMO and MEMOIZE caches.
+Existing wrappers stay callable and their hit/miss statistics are retained."
   (if function
-    (remhash function *memo-cache*)
-    (clrhash *memo-cache*)))
+      (progn
+        (maphash (lambda (wrapper entry)
+                   (when (or (eq function wrapper) (eq function (car entry)))
+                     (clrhash (cdr entry))))
+                 *memo-function-caches*)
+        ;; Default MEMOIZE keys are (FUNCTION . PROPS). A custom :KEY may
+        ;; deliberately erase that identity, so only recognizable entries
+        ;; can be invalidated selectively.
+        (maphash (lambda (key value)
+                   (declare (ignore value))
+                   (when (and (consp key) (eq (car key) function))
+                     (remhash key *memo-cache*)))
+                 *memo-cache*))
+      (progn
+        (clrhash *memo-cache*)
+        (maphash (lambda (wrapper entry)
+                   (declare (ignore wrapper))
+                   (clrhash (cdr entry)))
+                 *memo-function-caches*)))
+  t)
 
 ;; Component memoization
 (defun memoize (component props &key (key #'identity) (test #'equal))
-  "Memoize a component with given props"
+  "Memoize a one-argument component with PROPS in the legacy shared cache.
+When memoization is disabled, invoke COMPONENT without storing the result.
+The legacy :TEST keyword is accepted but the shared cache uses EQUAL."
   (declare (ignorable test))
-  (when *memoization-enabled*
-    (let ((cache-key (funcall key (cons component props))))
-      (multiple-value-bind (cached-result found) (gethash cache-key *memo-cache*)
-        (when found
-          (return-from memoize cached-result))))
-
-    ;; Not found, compute and cache
-    (let ((result (funcall component props)))
-      (setf (gethash (funcall key (cons component props)) *memo-cache*) result)
-      result)))
+  (if (not *memoization-enabled*)
+      (funcall component props)
+      (let ((cache-key (funcall key (cons component props))))
+        (multiple-value-bind (cached-result found)
+            (gethash cache-key *memo-cache*)
+          (when found
+            (return-from memoize cached-result)))
+        (let ((result (funcall component props)))
+          (setf (gethash cache-key *memo-cache*) result)
+          result))))
 
 ;; Higher order component for memoization
 (defun memoize-component (component &key (key #'identity) (test #'equal))
-  "Create a memoized version of a component"
-  (let ((memo-fn (memo component :key key :test test)))
-    (lambda (props &rest args)
-      (apply memo-fn props args))))
+  "Wrap COMPONENT while retaining its first PROPS argument as one argument.
+Additional arguments are forwarded unchanged. Cache invalidation accepts
+the original function or the returned wrapper."
+  (let* ((memo-fn (memo component :key key :test test))
+         (adapter (lambda (props &rest args)
+                    (apply memo-fn (cons props args)))))
+    (setf (gethash adapter *memo-function-caches*)
+          (gethash memo-fn *memo-function-caches*))
+    adapter))
 
 ;; Define a memoized component
 (defmacro define-memoized-component (name args &body body)

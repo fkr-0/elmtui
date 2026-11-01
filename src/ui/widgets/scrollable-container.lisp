@@ -125,7 +125,7 @@
 
     (etypecase msg
       ;; (:scroll-container-scroll :delta-x <dx> :delta-y <dy>)
-      ((cons (eql msg-scroll-container-scroll))
+      ((cons (eql :scroll-container-scroll))
        (let ((dx (getf (rest msg) :delta-x 0))
              (dy (getf (rest msg) :delta-y 0)))
          (incf (scrollable-container-model-scroll-left new-model) dx)
@@ -133,7 +133,7 @@
          (setf scroll-changed t)))
 
       ;; (:scroll-container-set-scroll :x <x> :y <y>)
-      ((cons (eql msg-scroll-container-set-scroll))
+      ((cons (eql :scroll-container-set-scroll))
        (let ((new-x (getf (rest msg) :x))
              (new-y (getf (rest msg) :y)))
          (when new-x
@@ -144,7 +144,7 @@
            (setf scroll-changed t))))
 
       ;; (:scroll-container-key-press :key <key>)
-      ((cons (eql msg-scroll-container-key-press))
+      ((cons (eql :scroll-container-key-press))
        (let ((key (getf (rest msg) :key)))
          (case key
            ((:up :k)
@@ -182,7 +182,7 @@
 
       ;; (:scroll-container-update-dimensions :viewport-width <vw> :viewport-height <vh>
       ;;                                      :content-width <cw> :content-height <ch>)
-      ((cons (eql msg-scroll-container-update-dimensions))
+      ((cons (eql :scroll-container-update-dimensions))
        (let ((vw (getf (rest msg) :viewport-width))
              (vh (getf (rest msg) :viewport-height))
              (cw (getf (rest msg) :content-width))
@@ -282,7 +282,7 @@
          (effective-on-scroll (or on-scroll
                                   (when model (scrollable-container-model-on-scroll model))
                                   nil))
-         (is-focused (widget-focused-p model widget))
+         (is-focused (widget-focused-p app-state widget))
 
          ;; Determine if scrollbars should be visible based on content overflow and settings
          (content-overflows-x (> effective-content-width effective-viewport-width))

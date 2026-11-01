@@ -1,170 +1,115 @@
-;;;===============================================================
-;;; File: src/ui/widgets/textinput.lisp
-;;; Standardized Elm-style Text Input Widget
-;;;===============================================================
+;;; Standard text input using the shared component lifecycle and patch protocol.
 (uiop:define-package :elmtui.ui.widgets.textinput
-  (:use :cl) ; Added alexandria
-  (:import-from :elmtui.ui.defcomponent
-                #:defcomponent #:id-from-path) ; Removed unused imports
-  (:import-from :elmtui.ui.api ; Added for component base class
-                #:component
-                #:make-state-patch)
-  (:import-from :elmtui.state.api ; For make-update-result
-                #:make-update-result)
-  (:import-from :elmtui.utils
-                #:ensure-list #:ensure-keyword)
-  (:import-from :elmtui.view.styled #:make-styled-node)
-  ;; (:import-from :elmtui.state.msg #:defmsg) ; defmsg not used, messages are keywords
-  ;; (:import-from :elmtui.core.async #:cmd #:cmd-payload) ; Not directly used for commands here
-  ;; (:import-from :elmtui.core.events #:send-message) ; Not directly used
-  (:export #:textinput #:make-textinput ; Class name and constructor
-           ;; Messages (keywords)
-           #:msg-textinput-key-press
-           #:msg-textinput-set-value
-           #:msg-textinput-submit
-           ))
-
+  (:use :cl)
+  (:import-from :elmtui.ui.api #:component #:component-id #:id-from-path
+                #:init #:update #:view #:make-state-patch #:component-state-map-path)
+  (:import-from :elmtui.state.api #:make-update-result #:get-path)
+  (:export #:textinput #:make-textinput #:msg-textinput-key-press
+           #:msg-textinput-set-value #:msg-textinput-submit))
 (in-package :elmtui.ui.widgets.textinput)
 
-;; No defcomponent needed if we define class and methods manually
 (defclass textinput (component) ()
-  (:documentation "A text input widget that manages its state (value, cursor position, etc.) externally in the application state."))
+  (:documentation "Externally stored text input with a character-index cursor.
+Updates return patches and optional on-change/on-submit commands. Stored callback
+commands pass through unchanged; on-change runs only when the value changes."))
 
 (defun make-textinput (&key id)
-  "Creates a new textinput component instance. ID is for direct use, but in DSL, it's derived."
+  "Create a text input component; initialize its state through INIT."
   (make-instance 'textinput :id id))
 
-;;;---------------------------------------------------------------
-;;; Messages (Keywords) - Standardized as plain keywords for simplicity
-;;;---------------------------------------------------------------
 (defparameter msg-textinput-key-press :textinput-key-press)
 (defparameter msg-textinput-set-value :textinput-set-value)
 (defparameter msg-textinput-submit :textinput-submit)
 
-;;;---------------------------------------------------------------
-;;; Init Method
-;;;---------------------------------------------------------------
 (defmethod init ((component textinput) &key id-path
-                                         (initial-value "")
-                                         (initial-placeholder "")
-                                         (initial-cursor-pos 0)
-                                         initial-on-change
-                                         initial-on-submit
-                                         (initial-disabled nil)
+                 (initial-value "") (initial-placeholder "") (initial-cursor-pos 0)
+                 initial-on-change initial-on-submit initial-disabled
+                 (value initial-value) (placeholder initial-placeholder)
+                 (cursor-pos initial-cursor-pos) (on-change initial-on-change)
+                 (on-submit initial-on-submit) (disabled initial-disabled)
                  &allow-other-keys)
-  (let ((component-id (id-from-path id-path)))
+  (check-type value string)
+  (check-type cursor-pos integer)
+  (let* ((path (component-state-map-path (or id-path (list (component-id component)))))
+         (id (id-from-path path)))
+    (setf (component-id component) id)
     (values component
-            (list (make-state-patch `(:components ,component-id)
-                                    `(:type ,(type-of component)
-                                      :id ,component-id
-                                      :value ,initial-value
-                                      :placeholder ,initial-placeholder
-                                      :cursor-pos ,initial-cursor-pos
-                                      :on-change ,initial-on-change
-                                      :on-submit ,initial-on-submit
-                                      :disabled ,initial-disabled)))
-            nil))) ; No initial commands by default
+            (list (make-state-patch path
+                    (list :type (type-of component) :id id :value value
+                          :placeholder placeholder :cursor-pos (max 0 (min cursor-pos (length value)))
+                          :on-change on-change :on-submit on-submit :disabled (and disabled t))))
+            nil)))
 
-;;;---------------------------------------------------------------
-;;; Update Method
-;;;---------------------------------------------------------------
-(defmethod update ((component textinput) state msg &key id-path)
-  (let* ((component-id (id-from-path id-path))
-         (component-state-path `(:components ,component-id))
-         (props (getf state component-state-path)) ; Get all props for this component
-         (current-value (getf props :value ""))
-         (current-cursor-pos (getf props :cursor-pos 0))
-         (current-on-change (getf props :on-change))
-         (current-on-submit (getf props :on-submit))
-         (current-disabled (getf props :disabled nil))
-         (patches nil)
-         (commands nil)
-         (value-changed nil))
-    (declare (ignore current-on-change)) ; state is not used directly in this method
-
-    (unless props
-      (warn "Textinput ~A state not found at ~S" component-id component-state-path)
-      (return-from update (make-update-result :patches nil :commands nil)))
-
-    (etypecase msg
-      ;; 1. (:textinput-key-press :key <key-data>)
-      ((cons (eql msg-textinput-key-press) t)
-       (unless current-disabled
-         (let* ((key-data (getf (rest msg) :key))
-                (char (getf key-data :char))
-                (key-sym (getf key-data :key-sym)))
+(defmethod update ((component textinput) message app-state &key id-path)
+  (multiple-value-bind (message state) (elmtui.ui.api:normalize-update-args message app-state)
+    (let* ((path (component-state-map-path (or id-path (list (component-id component)))))
+           (props (get-path path state))
+           (original (get-path '(:value) props ""))
+           (value original)
+           (cursor (max 0 (min (get-path '(:cursor-pos) props 0) (length value))))
+           (old-cursor (get-path '(:cursor-pos) props 0))
+           (disabled (get-path '(:disabled) props))
+           (patches nil) (commands nil))
+      (unless props (return-from update (make-update-result)))
+      (labels ((set-value (new)
+                 (check-type new string)
+                 (setf value new cursor (length new)))
+               (submit ()
+                 (let ((command (get-path '(:on-submit) props)))
+                   (when command (push command commands))))
+               (property (key new)
+                 (case key
+                   (:value (set-value new))
+                   (:cursor-pos (check-type new integer)
+                                (setf cursor (max 0 (min new (length value)))))
+                   ((:placeholder :on-change :on-submit :disabled)
+                    (push (make-state-patch (append path (list key)) new) patches)))))
+        (cond
+          ((and (consp message) (eq (first message) :set-property))
+           (property (second message) (third message)))
+          ((not disabled)
            (cond
-             (char ; Printable character
-              (push (make-state-patch (append component-state-path '(:value))
-                                      (concatenate 'string
-                                                   (subseq current-value 0 current-cursor-pos)
-                                                   (string char)
-                                                   (subseq current-value current-cursor-pos))) patches)
-              (push (make-state-patch (append component-state-path '(:cursor-pos)) (1+ current-cursor-pos)) patches)
-              (setf value-changed t))
-             ((eq key-sym :backspace)
-              (when (> current-cursor-pos 0)
-                (push (make-state-patch (append component-state-path '(:value))
-                                        (concatenate 'string
-                                                     (subseq current-value 0 (1- current-cursor-pos))
-                                                     (subseq current-value current-cursor-pos))) patches)
-                (push (make-state-patch (append component-state-path '(:cursor-pos)) (1- current-cursor-pos)) patches)
-                (setf value-changed t)))
-             ((eq key-sym :delete)
-              (when (< current-cursor-pos (length current-value))
-                (push (make-state-patch (append component-state-path '(:value))
-                                        (concatenate 'string
-                                                     (subseq current-value 0 current-cursor-pos)
-                                                     (subseq current-value (1+ current-cursor-pos)))) patches)
-                (setf value-changed t)))
-             ((eq key-sym :left)
-              (when (> current-cursor-pos 0)
-                (push (make-state-patch (append component-state-path '(:cursor-pos)) (1- current-cursor-pos)) patches)))
-             ((eq key-sym :right)
-              (when (< current-cursor-pos (length current-value))
-                (push (make-state-patch (append component-state-path '(:cursor-pos)) (1+ current-cursor-pos)) patches)))
-             ((eq key-sym :home)
-              (push (make-state-patch (append component-state-path '(:cursor-pos)) 0) patches))
-             ((eq key-sym :end)
-              (push (make-state-patch (append component-state-path '(:cursor-pos)) (length current-value)) patches))
-             ((eq key-sym :enter)
-              (when current-on-submit
-                (push current-on-submit commands)))))))
+             ((eq message :textinput-submit) (submit))
+             ((and (consp message) (eq (first message) :textinput-set-value))
+              (let ((new (getf (rest message) :new-value)))
+                (unless (equal new value) (set-value new))))
+             ((and (consp message) (eq (first message) :textinput-key-press))
+              (let* ((data (getf (rest message) :key))
+                     (character (getf data :char)) (key (getf data :key-sym)))
+                (cond
+                  ((characterp character)
+                   (setf value (concatenate 'string (subseq value 0 cursor)
+                                            (string character) (subseq value cursor)))
+                   (incf cursor))
+                  ((eq key :backspace)
+                   (when (plusp cursor)
+                     (setf value (concatenate 'string (subseq value 0 (1- cursor)) (subseq value cursor)))
+                     (decf cursor)))
+                  ((eq key :delete)
+                   (when (< cursor (length value))
+                     (setf value (concatenate 'string (subseq value 0 cursor) (subseq value (1+ cursor))))))
+                  ((eq key :left) (setf cursor (max 0 (1- cursor))))
+                  ((eq key :right) (setf cursor (min (length value) (1+ cursor))))
+                  ((eq key :home) (setf cursor 0))
+                  ((eq key :end) (setf cursor (length value)))
+                  ((eq key :enter) (submit)))))))))
+      (unless (string= original value)
+        (push (make-state-patch (append path '(:value)) value) patches)
+        (let ((command (get-path '(:on-change) props)))
+          (when command (push command commands))))
+      (unless (= cursor old-cursor)
+        (push (make-state-patch (append path '(:cursor-pos)) cursor) patches))
+      (make-update-result :patches (nreverse patches) :commands (nreverse commands)))))
 
-      ;; 2. (:textinput-set-value :new-value "new text")
-      ((cons (eql msg-textinput-set-value) t)
-       (unless current-disabled
-         (let ((new-val (getf (rest msg) :new-value)))
-           (unless (string= current-value new-val)
-             (push (make-state-patch (append component-state-path '(:value)) new-val) patches)
-             (push (make-state-patch (append component-state-path '(:cursor-pos)) (length new-val)) patches) ; Move cursor to end
-             (setf value-changed t)))))
-
-      ;; 3. Bare keyword :textinput-submit
-      ((eql msg-textinput-submit)
-       (unless current-disabled
-         (when current-on-submit
-           (push current-on-submit commands))))
-
-      ;; 4. Direct property mutation for external control (e.g., from a form)
-      ;;    (:set-property :property-name <value>)
-      ((cons (eql :set-property) t)
-       (let ((prop-key (second msg))
-             (prop-val (third msg)))
-         (case prop-key
-           (:value
-            (unless (string= current-value prop-val)
-              (push (make-state-patch (append component-state-path '(:value)) prop-val) patches)
-              (push (make-state-patch (append component-state-path '(:cursor-pos)) (length prop-val)) patches)
-              (setf value-changed t)))
-           (:placeholder
-            (push (make-state-patch (append component-state-path '(:placeholder)) prop-val) patches))
-           (:cursor-pos
-            (push (make-state-patch (append component-state-path '(:cursor-pos)) prop-val) patches))
-           (:on-change
-            (push (make-state-patch (append component-state-path '(:on-change)) prop-val) patches))
-           (:on-submit
-            (push (make-state-patch (append component-state-path '(:on-submit)) prop-val) patches))
-           (:disabled
-            (push (make-state-patch (append component-state-path '(:disabled)) prop-val) patches))
-           (t (warn "Unknown property for textinput set-property: ~S" prop-key))))))))
+(defmethod view ((component textinput) app-state &key id-path children)
+  (declare (ignore children))
+  (let* ((path (component-state-map-path (or id-path (list (component-id component)))))
+         (props (get-path path app-state))
+         (value (get-path '(:value) props ""))
+         (placeholder (get-path '(:placeholder) props ""))
+         (disabled (get-path '(:disabled) props)))
+    (list :text :id (component-id component)
+          :content (if (zerop (length value)) placeholder value)
+          :props (list :id (component-id component) :value value :placeholder placeholder
+                       :cursor-pos (get-path '(:cursor-pos) props 0)
+                       :disabled disabled :focusable (not disabled)))))

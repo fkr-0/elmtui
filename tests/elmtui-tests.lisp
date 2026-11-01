@@ -273,8 +273,7 @@ Returns T if all tests pass, NIL otherwise."
   ;;   (format t "~&~%--- Overall Test Summary ---~%")
   ;;   (fiveam:explain! (fiveam:results-status t)) ; Provides a summary of all tests run.
   ;;   (format t "~&--- End of Test Summary ---~%~%")
-  ;;   overall-success)
-  )
+  (elmtui.tests:run-all-elmtui-tests))
 
 ;;;-----------------------------------------------------------------------------
 ;;; ASDF test-op integration

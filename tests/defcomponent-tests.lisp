@@ -23,6 +23,32 @@
 
 (in-suite defcomponent-tests)
 
+(test update-transform-preserves-explicit-nil-default
+  "An explicit NIL default must retain the original GETF arity."
+  (is (equal '(elmtui.ui.defcomponent::get-state-value :counter local-state nil)
+             (elmtui.ui.defcomponent::transform-update-code
+              '(getf local-state :counter nil) 'local-state))))
+
+(test update-transform-preserves-quoted-syntax
+  "Macro rewriting must not traverse literal quoted forms or function designators."
+  (let* ((state 'local-state)
+         (quoted '(quote (getf local-state :counter)))
+         (function-form '(function (lambda () (getf local-state :counter)))))
+    (is (equal quoted
+               (elmtui.ui.defcomponent::transform-update-code quoted state)))
+    ;; FUNCTION with a lambda denotes executable code; its body needs rewriting.
+    (is (equal '(function (lambda ()
+                            (elmtui.ui.defcomponent::get-state-value :counter local-state)))
+               (elmtui.ui.defcomponent::transform-update-code function-form state)))
+    ;; Symbol function designators are not executable source syntax to walk.
+    (is (equal '(function getf)
+               (elmtui.ui.defcomponent::transform-update-code '(function getf) state)))
+    (is (equal '(list (elmtui.ui.defcomponent::get-state-value :counter local-state)
+                      (quote (getf local-state :counter)))
+               (elmtui.ui.defcomponent::transform-update-code
+                '(list (getf local-state :counter)
+                       (quote (getf local-state :counter))) state)))))
+
 ;;; Test component definitions
 
 ;; Simple component with state slots
@@ -397,6 +423,22 @@
   (:state (child-value 0 :type integer :documentation "Child update value"))
   (:update (msg local-state app-state id-path)
     (:tick (value) (values `(:child-value ,value) nil))))
+
+(defcomponent test-update-inheriting-child (test-update-parent)
+  (:state (child-value 0 :type integer :documentation "Child value")))
+
+(test defcomponent-without-update-inherits-parent-handler
+  "Omitting :UPDATE must preserve the parent's update handler."
+  (let* ((instance (make-instance 'test-update-inheriting-child))
+         (id-path '(:components :inherited))
+         (state (make-state :initial
+                  (alexandria:plist-hash-table
+                    '(:components (:inherited (:parent-value 0 :child-value 0))))))
+         (result (update instance state '(:tick 11) :id-path id-path))
+         (parent-patch (find '(:components :inherited :parent-value)
+                         (ur-patches result) :key #'first :test #'equal)))
+    (is (not (null parent-patch)))
+    (when parent-patch (is (= 11 (second parent-patch))))))
 
 (test defcomponent-update-inheritance-composes-next-method
   "A child custom update preserves patches produced by its applicable parent update."

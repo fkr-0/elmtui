@@ -6,6 +6,14 @@
   :description "Wide glyphs and NFC text occupy measured terminal cells")
 (in-suite unicode-cell-contract-suite)
 
+(test layout-controls-remain-separate-from-graphemes
+  (is (= 9 (elmtui.view.layout.size-utils:terminal-string-width (format nil "a~Cb" #\Tab))))
+  (is (= 3 (elmtui.view.layout.size-utils:terminal-string-width (format nil "ab~%xyz"))))
+  (is (string= "       b" (elmtui.view.layout.size-utils:terminal-string-slice
+                           (format nil "a~Cb" #\Tab) 1 9)))
+  (is (string= "ab" (elmtui.view.layout.size-utils:terminal-string-slice
+                     (format nil "ab~%xyz") 0))))
+
 (defun %buffer-glyph (buffer x &optional (y 0))
   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
    (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at buffer y x)))
