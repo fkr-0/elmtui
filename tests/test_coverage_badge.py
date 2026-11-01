@@ -28,9 +28,14 @@ class BadgeTests(unittest.TestCase):
             provenance = json.loads((out / "coverage-summary.json").read_text())
             self.assertEqual((provenance["covered_expressions"], provenance["total_expressions"]), (1, 2))
             self.assertIn("50.00%", (out / "coverage-badge.svg").read_text())
+            endpoint = json.loads((out / "endpoint.json").read_text())
+            self.assertEqual(endpoint["schemaVersion"], 1)
+            self.assertEqual(endpoint["message"], "50.00%")
             with self.assertRaisesRegex(ValueError, "ratchet"):
                 gate.check(report, inventory, root, 51.0, out, baseline=inventory)
             self.assertFalse((out / "coverage-badge.svg").exists())
+            self.assertFalse((out / "endpoint.json").exists(),
+                             "a failed gate must not leave a publishable badge endpoint")
             self.assertFalse((out / "coverage-summary.json").exists())
 
 

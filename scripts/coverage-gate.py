@@ -61,7 +61,8 @@ class ReportParser(HTMLParser):
 def check(report, inventory, root, minimum, output, expected_total=None, baseline=None):
     # Invalidate previously generated success evidence before parsing anything.
     if output:
-        for name in ('coverage-summary.csv', 'coverage-summary.txt', 'coverage-summary.json', 'coverage-badge.svg'):
+        for name in ('coverage-summary.csv', 'coverage-summary.txt', 'coverage-summary.json',
+                     'coverage-badge.svg', 'endpoint.json'):
             (output / name).unlink(missing_ok=True)
     if not report.is_file() or not inventory.is_file():
         raise ValueError("Missing coverage HTML index or ASDF inventory")
@@ -120,6 +121,12 @@ def check(report, inventory, root, minimum, output, expected_total=None, baselin
                'text-anchor="middle"><text x="88" y="14">SB-COVER expressions</text>'
                '<text x="211" y="14">' + label + '</text></g></svg>\n')
         (output / 'coverage-badge.svg').write_text(svg)
+        # shields.io endpoint schema; CI publishes it to the coverage-data branch
+        # only from a passing main-branch gate, so a red run can never refresh it.
+        color = 'brightgreen' if percent >= 80 else 'green' if percent >= 65 else 'yellowgreen'
+        (output / 'endpoint.json').write_text(json.dumps(
+            {'schemaVersion': 1, 'label': 'SB-COVER expressions',
+             'message': label, 'color': color}, sort_keys=True) + '\n')
         (output / "coverage-summary.txt").write_text(
             f"SB-COVER expressions: {covered}/{total} ({percent:.2f}%)\n"
             f"Sources: {len(included)}\nMinimum: {minimum:.2f}%\n"
