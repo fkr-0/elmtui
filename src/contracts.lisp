@@ -1206,9 +1206,6 @@ validation code, but are not enforced here directly."
 ;;                    (setq ,result-sym ,input-sym))))
 ;;              ,result-sym))))))
 
-;; (deftransformer generate-dsl (dsl-tree) (dsl-tree)
-;;                 (abc &key state view-fn)
-;;   (make-dsl-tree :root (funcall view-fn state)))
 ;; (defmacro define-pipeline (name &rest stage-fns)
 ;;   "Compose STAGE-FNS into a single function that threads a context through them."
 ;;   (let ((context (gensym "CONTEXT")))

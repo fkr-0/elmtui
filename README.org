@@ -335,8 +335,7 @@ terminal content.  The contract:
 No special user setup is needed — run your application inside tmux and the
 framework handles the rest.  The platform API (=tmux-available-p=,
 =capture-pane-string=, =capture-screen-string=) is in the
-=elmtui.platform.*= packages.  See
-[[file:docs/tmux-normal-screen-contract.md][the tmux normal-screen contract]] for the full specification.
+=elmtui.platform.*= packages.
 
 * Repository systems
 

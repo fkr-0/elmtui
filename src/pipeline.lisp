@@ -196,11 +196,6 @@ must then fall back rather than composite onto misaligned content."
                 :root-rect viewport-rect))))
         ctx))))
 
-;; As transformers:
-;; STAGE 0: Generate DSL from the component's view function
-;; (deftransformer generate-dsl (nil) (dsl-tree)
-;;                 (abc &key state view-fn)
-;;   (make-dsl-tree :root (funcall view-fn state)))
 ;;; STAGE 1: DSL tree -> Raw tree (pure, typed)
 (defun make-component-path (parent-path component-id)
   "Return a canonical [:components …] path.
