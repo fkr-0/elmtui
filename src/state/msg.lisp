@@ -119,6 +119,14 @@
            (setf (gethash ',name *message-schemas*) schema)))
        ,@(loop for vdef in parsed-variants
            collect `(export ',(variant-definition-constructor-name vdef) ,*package*))
+       ;; Export the predicates DEFMSG defines (<VARIANT>-<NAME>-P).
+       ,@(loop for vdef in parsed-variants
+           collect `(export ',(sb-int:symbolicate
+                               (format nil "~A-~A-P"
+                                       (symbol-name (variant-definition-name vdef))
+                                       (symbol-name name)))
+                            ,*package*))
+       ;; Deprecated: <VARIANT>-P was exported but never defined; removed in 0.4.0.
        ,@(loop for vdef in parsed-variants
            collect `(export ',(sb-int:symbolicate (format nil "~A-P" (symbol-name (variant-definition-name vdef)))) ,*package*))
        ',name)))

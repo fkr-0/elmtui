@@ -3,8 +3,11 @@
 ;;; Public API for the ElmTUI state management system.
 ;;;===============================================================
 (uiop:define-package :elmtui.state.api
-  (:use :cl :log4cl :cl-state.api)
-  (:reexport :cl-state.api :elmtui.state.update)
+  (:use :cl :log4cl)
+  ;; :USE-REEXPORT imports and re-exports the same symbols. Plain UIOP
+  ;; :REEXPORT only exports by name and interned fresh, unbound symbols for
+  ;; every ELMTUI.STATE.UPDATE export (SREF, SAPPLY, DEFUPDATE, ...).
+  (:use-reexport :cl-state.api :elmtui.state.update)
   (:import-from :elmtui.state.update
                 #:malformed-update-result-error
                 #:malformed-update-result-fn-name
