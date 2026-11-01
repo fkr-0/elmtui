@@ -24,6 +24,8 @@ QUIT-REQUESTED-P or the KEY-EVENT accessors.")
                 #:key-event #:key-event-p #:key-event-key #:key-event-char
                 #:key-event-modifiers)
   (:import-from :elmtui.style.presets #:dark-theme #:light-theme)
+  (:import-from :elmtui.ui.styles
+                #:defstyle #:resolve-style-class #:apply-theme)
   (:export
    ;; Defining applications
    #:defapplication #:deftea-app
@@ -33,4 +35,6 @@ QUIT-REQUESTED-P or the KEY-EVENT accessors.")
    #:key-event #:key-event-p #:key-event-key #:key-event-char
    #:key-event-modifiers
    ;; Style presets
-   #:dark-theme #:light-theme))
+   #:dark-theme #:light-theme
+   ;; Style classes
+   #:defstyle #:resolve-style-class #:apply-theme))

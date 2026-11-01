@@ -6,6 +6,26 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Added
+
+- `defstyle` macro and `:class` property on DSL nodes for named style
+  classes. Define reusable style plists with `(defstyle :name (...))` and
+  apply them with `:class :name` or `:class (:name1 :name2)`. Inline
+  `:style` still wins on conflict.
+- Eight built-in style presets: `:flex-row`, `:flex-column`, `:bold`,
+  `:dim`, `:centered`, `:padded`, `:bordered`, `:bordered-rounded`.
+- `apply-theme` for batch-registering named styles from a theme plist.
+- `resolve-style-class` exported from the `elmtui` facade for programmatic
+  style lookup.
+- FiveAM test suite for the style-class system (registry, merge
+  precedence, DSL integration, built-in presets, theme support).
+- "Style Classes" section in `docs/USER_GUIDE.md`.
+
+### Changed
+
+- Refactored `examples/neon-kit.lisp` to use `defstyle` and `:class`
+  instead of repeating inline palette styles on every row.
+
 ## [0.4.1] - 2026-11-01
 
 ### Documentation

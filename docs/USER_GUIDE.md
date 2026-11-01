@@ -76,6 +76,132 @@ The normative runtime vocabulary is `INIT`, `TRANSITION`, `VIEW`, and
 - `:view-fn` returns a lightweight DSL tree (e.g., `:container`, `:text`, `:button`, etc.).
 - ElmTUI’s pipeline resolves, styles, lays out, and renders this tree.
 
+## Style Classes
+
+Style classes let you name a reusable bag of style properties and
+reference it from any DSL node with `:class`.  This eliminates the
+repetitive inline `:style` plists that otherwise accumulate across a
+view tree.
+
+### Defining a style class
+
+Use the `defstyle` macro (exported from the `elmtui` package).  The
+first argument is a keyword name; the second is a style property list.
+
+```lisp
+(elmtui:defstyle :card
+  (:display :flex :flex-direction :column
+   :border :rounded :padding-x 2 :padding-y 1))
+
+(elmtui:defstyle :muted-text
+  (:dim t :fg :white))
+```
+
+Styles are registered at load time in a global registry and are
+available to every view function in the image.
+
+### Applying a style class
+
+Add a `:class` property to any DSL node.  The value is either a single
+keyword or a list of keywords.
+
+```lisp
+;; Single class
+(:container :id :profile :class :card
+  :children ((:text :id :name :content "Alice")))
+
+;; Multiple classes
+(:text :id :note :class (:muted-text :bold) :content "Draft")
+```
+
+When multiple classes are listed, they are merged left to right: if two
+classes define the same property, the later class wins.
+
+### Inline overrides
+
+An explicit `:style` on the same node always wins over class-resolved
+properties.  This lets you use a class for the common case and override
+individual properties per-node.
+
+```lisp
+;; :card sets :padding-x 2, but this node needs more
+(:container :id :wide-card :class :card :style (:padding-x 4)
+  :children ((:text :id :body :content "Wider padding here")))
+```
+
+### Merge semantics
+
+Resolution proceeds in three steps:
+
+1. Each keyword in `:class` is looked up in the style registry.
+2. The resulting plists are merged left to right (later overrides earlier).
+3. Any inline `:style` plist is merged on top (inline wins on conflict).
+
+The merged result replaces the node’s `:style` before the rest of the
+pipeline sees it.  Existing behaviour of nodes that use only `:style`
+(and no `:class`) is completely unchanged.
+
+### Built-in presets
+
+ElmTUI ships eight commonly useful presets so you can start using
+`:class` immediately:
+
+| Name                | Properties                                           |
+|---------------------|------------------------------------------------------|
+| `:flex-row`         | `:display :flex :flex-direction :row`                |
+| `:flex-column`      | `:display :flex :flex-direction :column`             |
+| `:bold`             | `:bold t`                                            |
+| `:dim`              | `:dim t`                                             |
+| `:centered`         | `:justify-content :center :align-items :center`      |
+| `:padded`           | `:padding-x 1 :padding-y 1`                         |
+| `:bordered`         | `:border :single`                                    |
+| `:bordered-rounded` | `:border :rounded`                                   |
+
+Example using presets:
+
+```lisp
+(:container :id :root :class (:flex-column :padded)
+  :style (:width 80 :height 24)
+  :children
+  ((:text :id :title :class :bold :content "Dashboard")
+   (:container :id :body :class (:flex-row :bordered-rounded)
+     :children
+     ((:text :id :left :content "Sidebar")
+      (:text :id :right :content "Main")))))
+```
+
+### Theme integration
+
+`apply-theme` registers a batch of named styles at once, making it easy
+to define a colour vocabulary for your application or switch palettes at
+runtime.
+
+```lisp
+(elmtui:apply-theme
+  ‘(:title  (:bold t :fg-color (97 233 250) :bg-color (18 34 57))
+    :accent (:bold t :fg-color (248 199 115) :bg-color (10 17 31))
+    :muted  (:dim t  :fg-color (125 143 169) :bg-color (10 17 31))))
+
+;; Then in your view:
+(:text :id :heading :class :title :content "Hello")
+```
+
+`apply-theme` overwrites any previously registered style with the same
+name, so calling it again with a different palette is sufficient to
+switch themes.
+
+### Programmatic access
+
+`resolve-style-class` (exported from `elmtui`) returns the property list
+for a registered name, or signals an error if the name is unknown.  Use
+it when you need to inspect or compose styles in code rather than in DSL
+nodes.
+
+```lisp
+(elmtui:resolve-style-class :flex-column)
+;; => (:DISPLAY :FLEX :FLEX-DIRECTION :COLUMN)
+```
+
 ## Keyboard Input and Keymaps
 
 The keymap system (`elmtui.keymaps`) normalizes key events and dispatches actions/messages via contexts.
