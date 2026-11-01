@@ -6,6 +6,13 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Fixed
+
+- The `tmux-slider` example's arrow keys quit the app: its raw input loop read
+  the ESC byte that starts an arrow sequence as the Escape quit key. Left/Right
+  now set the direction and Up/Down (or `+`/`-`) change the speed; a bare
+  Escape still quits. Covered by a new e2e regression test.
+
 ## [0.3.1] - 2026-11-01
 
 ### Fixed

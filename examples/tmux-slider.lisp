@@ -144,6 +144,26 @@
           do (%slider-paint-cell snapshot x 0 nil))
     (format t "~C8" #\Escape)
     (finish-output)))
+(defun %read-arrow-key ()
+  "After an ESC byte, decode a following CSI/SS3 arrow sequence.
+Return :UP, :DOWN, :RIGHT or :LEFT; #\\Escape for a bare Escape; NIL for any
+other sequence, whose bytes are consumed."
+  (flet ((next-char ()
+           (loop repeat 30
+                 when (listen *standard-input*)
+                   return (read-char *standard-input* nil nil)
+                 do (sleep 0.001))))
+    (let ((intro (next-char)))
+      (cond ((null intro) #\Escape)
+            ((member intro '(#\[ #\O))
+             (let ((final (loop for ch = (next-char)
+                                while (and ch (not (alpha-char-p ch)) (char/= ch #\~))
+                                finally (return ch))))
+               (case final
+                 (#\A :up) (#\B :down) (#\C :right) (#\D :left)
+                 (otherwise nil))))
+            (t nil)))))
+
 (defun %run-slider-overlay (snapshot speed frames)
   "Move a transient color band through the preserved tmux pane.
 No alternate buffer, newline, scroll or clear is ever requested."
@@ -169,8 +189,16 @@ No alternate buffer, newline, scroll or clear is ever requested."
              (let ((key (when (listen *standard-input*)
                           (read-char *standard-input* nil nil))))
                (when key
+                 (when (char= key #\Escape)
+                   ;; Arrow keys arrive as ESC [ A-D (or ESC O A-D); only a
+                   ;; bare Escape quits.
+                   (setf key (%read-arrow-key)))
                  (case key
                    ((#\q #\Q #\Escape) (return))
+                   ((:left) (setf step -1))
+                   ((:right) (setf step 1))
+                   ((:up #\+) (setf speed (max 0.035 (- speed 0.02))))
+                   ((:down #\-) (setf speed (min 0.5 (+ speed 0.02))))
                    ((#\Space #\p #\P) (setf paused (not paused)))
                    ((#\h #\H) (setf step -1))
                    ((#\l #\L) (setf step 1))
