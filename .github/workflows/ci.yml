@@ -72,3 +72,36 @@ jobs:
             coverage/
             test-output/coverage-*.log
           if-no-files-found: warn
+  publish-coverage:
+    name: Publish verified coverage badge endpoint
+    # Only a fully green release gate on main may refresh the public badge.
+    needs: lisp
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-gate-evidence
+          path: evidence
+      - name: Publish measured endpoint to the coverage-data branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          endpoint="$(find evidence -type f -path '*coverage/endpoint.json' -print -quit)"
+          test -n "$endpoint"
+          python3 -m json.tool "$endpoint" > /dev/null
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/coverage-data" > /dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/coverage-data" -f sha="$GITHUB_SHA"
+          fi
+          args=(-f "branch=coverage-data" -f "message=chore: update verified coverage badge for $GITHUB_SHA" \
+                -f "content=$(base64 -w0 "$endpoint")")
+          previous="$(gh api "repos/$GITHUB_REPOSITORY/contents/coverage.json?ref=coverage-data" --jq .sha 2>/dev/null || true)"
+          if [[ -n "$previous" ]]; then
+            args+=(-f "sha=$previous")
+          fi
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/coverage.json" "${args[@]}"
