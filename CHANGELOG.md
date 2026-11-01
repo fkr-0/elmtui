@@ -6,6 +6,33 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Added
+
+- **Subscription types**: four new built-in subscription descriptors beyond
+  `:timer`:
+  - `:every` — cleaner timer alias supporting `:seconds` and `:ms` interval
+    units (e.g. `(:every (:seconds 0.5 :message (:tick)))`).
+  - `:window-resize` — delivers a message with `:width`/`:height` on terminal
+    resize via SIGWINCH
+    (e.g. `(:window-resize (:message (:resized)))`).
+  - `:file-watch` — polling-based file watcher that fires on
+    create/modify/delete events
+    (e.g. `(:file-watch (:path "/tmp/data.json" :message (:file-changed)))`).
+  - `:process` — runs an external process and delivers per-line output and
+    exit messages
+    (e.g. `(:process (:command ("tail" "-f" "log") :on-output (:line) :on-exit (:done)))`).
+- New example `examples/file-watcher.lisp` demonstrating `:file-watch` and
+  `:every` subscriptions.
+- Comprehensive FiveAM test suite for all subscription types
+  (`tests/subscription-types-tests.lisp`).
+- Subscriptions section in `docs/USER_GUIDE.md`.
+
+### Changed
+
+- `examples/pong-below-cursor.lisp` and `examples/game-of-life.lisp` now use
+  `:every` instead of `:timer` (both remain supported).
+- `:timer` subscriptions continue to work unchanged (backward compatible).
+
 ## [0.4.1] - 2026-11-01
 
 ### Documentation

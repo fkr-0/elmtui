@@ -61,6 +61,7 @@
                                (:file "driver-tests")
                                (:file "driver-subscription-tests")
                                (:file "runtime-effects-tests")
+                              (:file "subscription-types-tests")
                                (:file "runtime-context-tests")
                                (:file "runtime-e2e-tests")
                                (:file "errs-regression-tests")
