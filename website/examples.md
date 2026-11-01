@@ -16,12 +16,30 @@ Runnable example applications make the ElmTUI concepts concrete. Begin with the 
 
 The [maintained examples catalog](guide/examples-catalog.md) records keybindings, configuration variables and known limitations. Live interactive PTY behavior remains part of the release gate; an example being present is not proof of passing tests.
 
-## Planned animated demonstration
+## Recorded sessions
+
+These are real terminal sessions of the maintained examples, launched with `scripts/examples.sh run <name>` in urxvt and tmux and recorded with `scripts/record-demo-media.py`.
+
+### tmux slider
 
 <div class="media-stage motion-stage" role="img" aria-label="Animated terminal slider interaction" data-preview="../assets/terminal-slider.gif">
   <div class="motion-placeholder"><span class="motion-bars">▁ ▃ ▅ ▇ ▅ ▃ ▁</span><br>TERMINAL SLIDER / ANIMATION PREVIEW<br><small>website/assets/terminal-slider.gif</small></div>
-  <span class="preview-caption">Demonstration GIF pending</span>
+  <span class="preview-caption">tmux-slider: reverse, speed up, pause</span>
 </div>
+
+### Workbench
+
+![The Workbench evaluating forms, completing a symbol with its signature and browsing packages and symbols](assets/workbench.gif)
+
+### neon-tetris
+
+![neon-tetris clearing seven lines](assets/neon-tetris.gif)
+
+### tmux glider
+
+The glider walks a Conway glider over whatever is in the tmux pane, then restores every cell and colour as it moves on.
+
+![A Conway glider crossing a coloured git log and directory listing in tmux](assets/tmux-glider.gif)
 
 ## Example authoring standard
 

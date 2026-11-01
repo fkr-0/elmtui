@@ -7,7 +7,7 @@ The Workbench is an ElmTUI application for editing and evaluating Common Lisp in
 <div class="media-stage hero-shot" role="img" aria-label="ElmTUI Workbench showing Lisp REPL and image inspector" data-preview="../assets/workbench-hero.webp">
   <div class="window-top">LISP WORKBENCH · SCREENSHOT</div>
   <div class="shot-placeholder"><div class="mock-main">CL-USER&gt; (mapcar #'1+ '(1 2 3))<br><span class="mock-result">(2 3 4)</span><br><br>CL-USER&gt; (describe 'defun)</div><div class="mock-side">Packages<br>Symbols<br>ASDF systems<br>Diagnostics</div></div>
-  <span class="preview-caption">Pending screenshot: website/assets/workbench-hero.webp</span>
+  <span class="preview-caption">Workbench transcript, completion popup and image inspector</span>
 </div>
 
 ## Design

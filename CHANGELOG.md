@@ -13,6 +13,18 @@ The project follows semantic versioning from the first published release.
   now set the direction and Up/Down (or `+`/`-`) change the speed; a bare
   Escape still quits. Covered by a new e2e regression test.
 
+### Added
+
+- `scripts/record-demo-media.py` records the website and release media from
+  real example sessions (Xvfb, urxvt, tmux, ffmpeg).
+- Website media: a Workbench hero still and the tmux-slider animation fill the
+  home and Workbench page slots, and the examples page gains recorded
+  Workbench, neon-tetris and tmux-glider sessions.
+
+### Changed
+
+- The website release page announces the published 0.3.1 release.
+
 ## [0.3.1] - 2026-11-01
 
 ### Fixed
@@ -56,6 +68,9 @@ The project follows semantic versioning from the first published release.
 - tmux width reflow of rows wider than a shrunken pane is not modelled.
 
 ## [0.3.0] - 2026-11-01
+
+Never tagged or published on its own: these changes first shipped in 0.3.1,
+the first release whose commit passed the full release gate.
 
 ### Repository hygiene and developer entry points
 
