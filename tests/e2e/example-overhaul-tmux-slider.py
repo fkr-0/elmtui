@@ -137,6 +137,22 @@ class SliderPTY(unittest.TestCase):
         app.key("q", literal=True)
         self.await_exit(app)
 
+    def test_arrow_and_speed_keys_do_not_quit(self):
+        # Arrow key events also carry ESC as their character; they once
+        # matched the Escape quit binding and ended the slider.
+        app = self.launch("slider-arrows",
+                          "(elmtui.examples.tmux-slider:run-tmux-slider)",
+                          prelude='printf "SLIDER-ARROW-UNDERLAY\\n"')
+        self.wait_for_overlay(app)
+        for key in ("Left", "Right", "Up", "Down"):
+            app.key(key)
+            time.sleep(.4)
+            self.assertFalse((app.directory / "exit-code").exists(),
+                             f"{key} quit the slider")
+            self.assertIn("CYAN SHIFT", app.screen(), f"{key} removed the overlay")
+        app.key("q", literal=True)
+        self.await_exit(app)
+
     def test_deterministic_finite_frames(self):
         app = self.launch("slider-finite",
                           "(elmtui.examples.tmux-slider:run-tmux-slider :frames 8)",
