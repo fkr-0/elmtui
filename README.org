@@ -374,8 +374,7 @@ python3 -m mkdocs serve
 #+end_src
 
 The site media are recorded from real example sessions by
-=scripts/record-demo-media.py=; see [[file:website/assets/README.md][website/assets/README.md]]. The release gates are recorded in
-[[file:docs/release-checklist.md][the release checklist]].
+=scripts/record-demo-media.py=; see [[file:website/assets/README.md][website/assets/README.md]].
 
 * Documentation
 
@@ -510,8 +509,7 @@ checkout with =git submodule update --init --recursive=.
 * Release information
 
 - [[file:CHANGELOG.md][CHANGELOG.md]] records release-visible changes.
-- [[file:docs/release-checklist.md][docs/release-checklist.md]] records the release gate; releases are tagged
-  only on commits that pass =scripts/release-check.sh= in CI.
+- Releases are tagged only on commits that pass =scripts/release-check.sh= in CI.
 - Releases and their notes: [[https://github.com/fkr-0/elmtui/releases][github.com/fkr-0/elmtui/releases]].  The four reusable
   libraries are published independently under the same GitHub account.
   Signed release artifacts are not provided yet.
