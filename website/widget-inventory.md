@@ -48,6 +48,6 @@ For larger work, prefer explicit state ownership and application-specific messag
 
 ## Before describing the library as extensive
 
-For 0.3.2, we need an inventory of **shipped, exported, documented, independently tested** APIs with test fixtures for keyboard focus, narrow widths, Unicode display cells, scroll behavior, async effects, and terminal restoration. Current examples show the potential, but file count is not a stability claim.
+For 0.4.0, we need an inventory of **shipped, exported, documented, independently tested** APIs with test fixtures for keyboard focus, narrow widths, Unicode display cells, scroll behavior, async effects, and terminal restoration. Current examples show the potential, but file count is not a stability claim.
 
 See [example gallery](examples.md) and [Workbench](workbench.md) for full applications that exercise these primitives.

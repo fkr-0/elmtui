@@ -1,7 +1,7 @@
 
 ;; Standalone packager executable for dumping fast-boot images
 (asdf:defsystem "elmtui-packager"
-  :version "0.3.2"
+  :version "0.4.0"
   :description "ElmTUI packager: dump fast-boot executable Lisp images"
   :author "ElmTUI contributors"
   :license "MIT"
