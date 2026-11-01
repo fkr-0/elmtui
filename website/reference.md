@@ -10,8 +10,8 @@ CL-STATE, CL-INPUTS, and CL-STYLES. Qualified names use a public, single-colon
 package export, with missing documentation explicitly marked rather than
 silently omitted.
 
-**Current audited coverage: 1,643/1,822 (90.2%).** The reference has passed the
-structural live-export and Markdown/HTML equivalence checks; 179 public bindings
+**Current audited coverage: 1,644/1,822 (90.2%).** The reference has passed the
+structural live-export and Markdown/HTML equivalence checks; 178 public bindings
 lack documentation. The current ratchet threshold is set in
 `scripts/check-docstrings.sh`, and subsequent documentation passes may further
 reduce the debt. Passing this gate does not mean the API is fully documented.

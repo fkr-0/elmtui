@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1643 of 1822 bindings documented; 179 have no metadata (90.2% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1644 of 1822 bindings documented; 178 have no metadata (90.2% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -698,6 +698,8 @@ Kinds: function
 
 ```text
 Cancel TOKEN once, wake its waiters, and return the resulting lifecycle state.
+Every listener is notified, even if a preceding listener signals an error.
+Re-signal the first callback error after all cleanup listeners have run.
 ```
 
 ## CL-EVENTS.LOOP:+DEFAULT-POLL-INTERVAL-SECONDS+
@@ -2103,7 +2105,9 @@ for restoring raw mode and closing the device exactly once. Partial-open or
 raw-mode failure is cleaned up before the original condition is re-signaled.
 When OWNS-DEVICE-P is false, the caller retains ownership and must keep DEVICE
 open, raw-configured, and nonblocking for the source lifetime; the source never
-changes or closes that borrowed device.
+changes or closes that borrowed device. MONITOR-RESIZE-P opts into ioctl-backed
+size sampling for an open Linux/SBCL TTY. Other device kinds cannot claim
+kernel resize evidence through this contract.
 ```
 
 ## CL-INPUTS.LOOP:NEXT-TOKEN
@@ -4019,7 +4023,9 @@ Define and register a type predicate
 
 Kinds: function
 
-_No documentation metadata._
+```text
+True for finite real and complex numbers, rejecting nonfinite components.
+```
 
 ## CL-STATE.SCHEMA:KEYWORD-SYMBOL-P
 
@@ -5306,7 +5312,8 @@ Construct a character-cell relative length token for style resolution.
 Kinds: function
 
 ```text
-Accept normalized CSS colors and the ElmTUI 256-color palette token.
+Colors supported by the ElmTUI terminal conversion boundary.
+RGB channels are 8-bit integers; HSL saturation/lightness are percentages.
 ```
 
 ## CL-STYLES.TOKENS:EM
@@ -7550,7 +7557,7 @@ Validate that a default specification is valid.
 Kinds: macro
 
 ```text
-Execute BODY with overridden defaults.
+Execute BODY with thread-local defaults, restoring the caller's binding on exit.
 ```
 
 ## ELMTUI.CORE.ERRORS:+DIAGNOSTIC-CONTEXT-KEYS+
@@ -9754,7 +9761,10 @@ Returns T on success, NIL on drop. Safe after shutdown.
 Kinds: function
 
 ```text
-Initialize and start the main event loop using the channel-based system.
+Initialize the event-driven channel consumer once and return T.
+Legacy :FPS and :WAIT are deprecated, ignored compatibility arguments.
+They do not configure a frame ticker or alter startup behavior.
+The loop sleeps on the channel and emits no idle frames.
 ```
 
 ## ELMTUI.CORE.LOOP:SUBSCRIBE
@@ -10110,56 +10120,6 @@ Kinds: function
 
 ```text
 Return a subscription's dispatch priority, one of :HIGH, :NORMAL, or :LOW.
-```
-
-## ELMTUI.DEV:BUFFER->STRING
-
-Kinds: function
-
-```text
-Return BUFFER as plain text without writing to *STANDARD-OUTPUT*.
-```
-
-## ELMTUI.DEV:DEV-MAIN
-
-Kinds: function
-
-```text
-Print and return a current runtime snapshot.
-```
-
-## ELMTUI.DEV:FORMAT-ELEMENT-TREE
-
-Kinds: function
-
-```text
-Render a compact textual view of a lowered BASE-ELEMENT tree.
-ROOT may be one BASE-ELEMENT or a list of sibling elements.  Layout coordinates
-are included when available; INCLUDE-STYLE adds the resolved style plist.
-```
-
-## ELMTUI.DEV:FORMAT-RUNTIME-SNAPSHOT
-
-Kinds: function
-
-```text
-Format SNAPSHOT returned by RUNTIME-SNAPSHOT for interactive REPL use.
-```
-
-## ELMTUI.DEV:RUNTIME-SNAPSHOT
-
-Kinds: function
-
-```text
-Return a side-effect-free snapshot of the maintained runtime diagnostics.
-```
-
-## ELMTUI.DEV:WITH-BUFFER-DUMP
-
-Kinds: macro
-
-```text
-Run BODY and print BUFFER to *ERROR-OUTPUT* before entering the debugger on error.
 ```
 
 ## ELMTUI.DOCS:BUILD-API-DOCS
@@ -10907,7 +10867,7 @@ Release a previously acquired synchronization lock.
 Kinds: function
 
 ```text
-Scroll the terminal display by N lines. Positive N scrolls down, negative N scrolls up.
+Advance the terminal viewport by N lines. Positive N moves the viewport down (content up), making space below; negative N moves it up (content down).
 ```
 
 ## ELMTUI.PLATFORM.API:SCROLL-LINES
@@ -11331,6 +11291,12 @@ Kinds: function
 Compares two BUFFER-CELL instances for equality (char and style).
 ```
 
+## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL-GRAPHEME
+
+Kinds: function
+
+_No documentation metadata._
+
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:BUFFER-CELL-STYLE
 
 Kinds: function
@@ -11643,7 +11609,12 @@ _No documentation metadata._
 
 Kinds: function
 
-_No documentation metadata._
+```text
+Compatibility entry for terminal style conversion.
+Project TUI aliases once and delegate to the shared terminal conversion
+implementation; do not maintain a second, subtly different color/attribute
+matrix here. NIL input preserves the historical NIL return contract.
+```
 
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL:TERMINAL-INSTANCE
 
@@ -12074,8 +12045,10 @@ No scrollback-sized intermediate buffer or terminal I/O is required.
 Kinds: function
 
 ```text
-Copy saved cell characters and styles into virtual BUFFER, returning BUFFER. No
-physical repaint, cursor restoration, or tmux scrollback recovery occurs here.
+Copy the overlapping saved cell rectangle into virtual BUFFER, returning it.
+Any newly exposed rows/columns after a resize remain untouched; a saved visible
+pane cannot reconstruct them. This never repaints the physical terminal or
+recovers native scrollback.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:SAVE-TMUX-CAPTURE
@@ -12093,9 +12066,11 @@ displacement.
 Kinds: function
 
 ```text
-Split CONTENT into segments separated by ANSI escape sequences.
-Returns a list of alternating plain text and ANSI sequences.
-Consecutive plain text segments are merged together.
+Split terminal text into literal runs and complete ESC controls.
+This scanner recognizes CSI, OSC, DCS, SOS, PM, APC and designations instead
+of stopping at an alphabetic byte. All controls remain distinct segments;
+PARSE-ANSI-STRING interprets only SGR, never control payloads or titles.
+Unterminated controls are kept together to be discarded by the parser.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:TMUX-AVAILABLE-P
@@ -12111,6 +12086,25 @@ Return true when tmux is available and current process is running inside tmux.
 Kinds: function
 
 _No documentation metadata._
+
+## ELMTUI.PLATFORM.TREE-RENDERER:STYLE-PROPERTY-CAPABILITY
+
+Kinds: function
+
+```text
+Return PROPERTY's ElmTUI terminal support tier, or NIL for unknown keys.
+Also accepts registered cl-styles aliases. This is terminal-specific:
+OPACITY is 0=hidden, 0<alpha<1=SGR faint, 1=opaque (no alpha blending);
+Z-INDEX is stable sibling stacking, not full CSS stacking contexts.
+```
+
+## ELMTUI.PLATFORM.TREE-RENDERER:STYLE-PROPERTY-CAPABILITY-REPORT
+
+Kinds: function
+
+```text
+Return fresh (PROPERTY . TIER) pairs, including all registered properties.
+```
 
 ## ELMTUI.RENDER.DIFF:BUFFERS-NOT-COMPATIBLE-ERROR
 
@@ -13739,14 +13733,6 @@ Kinds: type
 A clickable button widget, refactored to the new defcomponent style.
 ```
 
-## ELMTUI.UI.WIDGETS.COUNTER:COUNTER
-
-Kinds: type
-
-```text
-A simple counter widget that can be incremented, decremented, and reset using the new defcomponent style.
-```
-
 ## ELMTUI.UI.WIDGETS.DRAWABLE-CONTENT:DRAWABLE-CONTENT
 
 Kinds: type
@@ -14245,7 +14231,7 @@ Creates a UI representation of a scrollable container.
 Kinds: function
 
 ```text
-Creates a new textinput component instance. ID is for direct use, but in DSL, it's derived.
+Create a text input component; initialize its state through INIT.
 ```
 
 ## ELMTUI.UI.WIDGETS.TEXTINPUT:MSG-TEXTINPUT-KEY-PRESS
@@ -14271,7 +14257,9 @@ _No documentation metadata._
 Kinds: type
 
 ```text
-A text input widget that manages its state (value, cursor position, etc.) externally in the application state.
+Externally stored text input with a character-index cursor.
+Updates return patches and optional on-change/on-submit commands. Stored callback
+commands pass through unchanged; on-change runs only when the value changes.
 ```
 
 ## ELMTUI.UI.WIDGETS.UTILS:DEFWIDGET-VIEW
@@ -15078,8 +15066,10 @@ Define a pure view function: Model → UiTree.
 Kinds: function
 
 ```text
-Calculate the minimal set of changes between views.
-   Returns a function that can transform old-node into new-node.
+Compatibility-only whole-tree replacement operation, not a minimal diff.
+The terminal's *buffer differ* is a distinct optimized facility. This view
+function ignores OLD-NODE and returns a closure replacing any supplied tree
+with NEW-NODE; use the renderer for efficient physical terminal changes.
 ```
 
 ## ELMTUI.VIEW.CORE:WITH-ARIA
@@ -15723,12 +15713,52 @@ Return 4 values: (minw maxw minh maxh). Never NIL.
    - text           → width≈string length (or wrapped to container-w); height≥1
 ```
 
+## ELMTUI.VIEW.LAYOUT.SIZE-UTILS:TERMINAL-GLYPH-WIDTH
+
+Kinds: function
+
+```text
+Conservative wcwidth-like width shared by layout, painter and diff.
+Grapheme clusters with ZWJ/emoji modifiers require a separate cluster model.
+```
+
+## ELMTUI.VIEW.LAYOUT.SIZE-UTILS:TERMINAL-GRAPHEMES
+
+Kinds: function
+
+```text
+Return ordered (STRING . CELL-WIDTH) clusters.
+Handles combining/variation marks, emoji modifiers, ZWJ sequences and paired
+regional indicators. Widths are terminal estimates; font-specific shaping
+is outside a portable TUI's control.
+```
+
+## ELMTUI.VIEW.LAYOUT.SIZE-UTILS:TERMINAL-STRING-SLICE
+
+Kinds: function
+
+```text
+Slice a single line by display cells in [START, END), preserving graphemes.
+A wide cluster cut at either boundary becomes spaces. Tabs use eight-cell stops;
+a newline ends the line. END defaults to the line's display width.
+```
+
+## ELMTUI.VIEW.LAYOUT.SIZE-UTILS:TERMINAL-STRING-WIDTH
+
+Kinds: function
+
+```text
+Measure the widest line's display cells, with conventional tab stops.
+```
+
 ## ELMTUI.VIEW.MEMO:CLEAR-MEMOIZATION-CACHE
 
 Kinds: function
 
 ```text
-Clear the entire memoization cache or just for a specific function
+Invalidate memoized results. With FUNCTION, clear that original function's
+or wrapper's MEMO caches; without FUNCTION, clear all MEMO and MEMOIZE caches.
+Existing wrappers stay callable and their hit/miss statistics are retained.
 ```
 
 ## ELMTUI.VIEW.MEMO:DEFINE-MEMOIZED-COMPONENT
@@ -15752,65 +15782,17 @@ Define a memoized function
 Kinds: function
 
 ```text
-Create a memoized version of a function, with customizable keying and cache behavior.
+Return a memoizing wrapper around FN, caching its primary return value.
 
-Arguments:
-+ ~fn~ :: function
-  The function to be memoized. Should accept any number of arguments.
-+ ~:key~ :: function (default: ~identity~)
-  Function applied to the argument list to produce a cache key. Should accept a list of arguments and return a hashable key.
-+ ~:test~ :: function (default: ~equal~)
-  Function used to compare cache keys in the hash table.
+:KEY receives a list of FN's arguments and defaults to IDENTITY; :TEST is
+the hash-table equality predicate and defaults to EQUAL. Each wrapper has its
+own cache. Repeated argument keys return the cached primary value, including
+NIL; multiple return values are not preserved. With memoization disabled,
+FN executes normally and no entry is cached.
 
-Return:
-+ Returns a function that behaves like ~fn~, but caches results based on the computed key.
-
-Side-effects:
-+ Creates a hash table for caching results (local to the returned function).
-+ Updates global ~*cache-stats*~ hash table with statistics for ~fn~.
-+ Increments cache hit/miss counters in the stats object.
-+ Reads global variable ~*memoization-enabled*~ to determine whether to use memoization.
-
-Globals:
-+ ~*cache-stats*~ :: hash table mapping functions to their statistics objects.
-+ ~*memoization-enabled*~ :: boolean flag controlling whether memoization is enabled.
-
-Behavior:
-1. When called, the returned function checks ~*memoization-enabled*~.
-2. If enabled, it computes a cache key using ~key~ and looks up the result in the cache.
-3. If found, returns the cached value and increments the hit counter.
-4. If not found, computes the result, stores it in the cache, increments the miss counter, and returns the result.
-5. If memoization is disabled, simply calls ~fn~ with the arguments.
-
-Examples:
-
-;; Example: Memoizing a recursive Fibonacci function
-(defun fib (n)
-  (if (< n 2) n
-      (+ (fib (- n 1)) (fib (- n 2)))))
-
-(setq *memoization-enabled* t)
-(setq *cache-stats* (make-hash-table))
-(defun make-cache-stats (&key function)
-  (list :function function :hits 0 :misses 0))
-(defun cache-stats-hits (stats) (getf stats :hits))
-(defun cache-stats-misses (stats) (getf stats :misses))
-
-(let ((memo-fib (memo #'fib :key #'identity :test #'eql)))
-  (funcall memo-fib 10)) ; => 55
-
-;; Check statistics
-(gethash #'fib *cache-stats*) ; => (:function #'fib :hits ... :misses ...)
-
-;; Example: Custom key function for argument normalization
-(defun slow-add (a b)
-  (sleep 1)
-  (+ a b))
-
-(let ((memo-add (memo #'slow-add :key (lambda (args) (sort args #'<)))))
-  (funcall memo-add 2 3) ; computes and caches
-  (funcall memo-add 3 2)) ; returns cached result (same key)
-
+CLEAR-MEMOIZATION-CACHE accepts either FN or the returned wrapper, or no
+argument to invalidate every live wrapper. Hit/miss statistics for FN remain
+available separately.
 ```
 
 ## ELMTUI.VIEW.MEMO:MEMOIZE
@@ -15818,7 +15800,9 @@ Examples:
 Kinds: function
 
 ```text
-Memoize a component with given props
+Memoize a one-argument component with PROPS in the legacy shared cache.
+When memoization is disabled, invoke COMPONENT without storing the result.
+The legacy :TEST keyword is accepted but the shared cache uses EQUAL.
 ```
 
 ## ELMTUI.VIEW.MEMO:MEMOIZE-COMPONENT
@@ -15826,7 +15810,9 @@ Memoize a component with given props
 Kinds: function
 
 ```text
-Create a memoized version of a component
+Wrap COMPONENT while retaining its first PROPS argument as one argument.
+Additional arguments are forwarded unchanged. Cache invalidation accepts
+the original function or the returned wrapper.
 ```
 
 ## ELMTUI.VIEW.MEMO:WITH-MEMO-STATS
