@@ -4,7 +4,8 @@
   :description "Test suite for the elmtui system"
   :author "ElmTUI contributors"
   :version "0.2.0"
-  :depends-on (#:elmtui #:elmtui-widgets-enhanced #:elmtui-packager #:elmtui-examples-cli #:fiveam)
+  :depends-on (#:elmtui #:elmtui-widgets-enhanced #:elmtui-packager #:elmtui-examples-cli
+               #:elmtui-dev-tests #:elmtui-api-contract-tests #:elmtui-core-slim-tests #:fiveam)
 :license "MIT"
   :serial t
   :components ((:module "tests"
@@ -18,6 +19,10 @@
                                (:file "rainbow-test")
                                (:file "defcomponent-tests")
                                (:file "keymaps-tests")
+                               (:file "coverage-focus-behavior-tests")
+                               (:file "coverage-widget-behavior-tests")
+                               (:file "coverage-backend-behavior-tests")
+                               (:file "coverage-defaults-behavior-tests")
                                (:file "application-init-tests")
                                (:file "application-extension-tests")
                                (:file "component-init-tests")
@@ -59,7 +64,6 @@
                                (:file "runtime-context-tests")
                                (:file "runtime-e2e-tests")
                                (:file "errs-regression-tests")
-                               (:file "dev-tests")
                                (:file "tools-tests")
                                (:file "packager-tests")
                                (:file "examples-smoke-tests")
@@ -90,7 +94,10 @@
   ;; (:file "ui-widgets-tests")
   ;; (:file "view-extended-tests")
   ;; (:file "terminal-scroll-behavior-tests"))))
-  :perform (test-op (op c) (symbol-call :elmtui.tests :run-all-elmtui-tests)))
+  :perform (test-op (op c)
+             (declare (ignore op c))
+             (unless (symbol-call :elmtui.tests :run-all-elmtui-tests)
+               (error "ElmTUI integration tests failed"))))
 ;; (:file "elmtui-loop-async-tests")
 ;; (:file "elmtui-state-tests")
 ;; (:file "elmtui-core-keymap-tests") ; Added keymap tests
