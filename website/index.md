@@ -6,17 +6,22 @@
     <a class="hero-primary" href="quickstart/">Build your first app ↗</a>
     <a class="hero-secondary" href="workbench/">Explore the Workbench →</a>
   </div>
-  <div class="hero-feature-label">SHIPPED EXAMPLES <span>Real applications built with ElmTUI</span></div>
-  <div class="hero-triptych">
-    <div class="media-stage triptych-cell" role="img" aria-label="Tmux Glider animation" data-preview="assets/tmux-glider.gif">
+  <div class="hero-feature-label">THE ELM TUI WORKBENCH <span>Flagship application · shipped in 0.3.1</span></div>
+  <div class="media-stage hero-shot" role="img" aria-label="ElmTUI Workbench terminal REPL" data-preview="assets/workbench.gif">
+    <div class="window-top"><span class="window-indicator"></span> ELMTUI / LISP WORKBENCH <span class="window-right">SBCL · CL-USER</span></div>
+    <div class="shot-placeholder">
+      <div class="mock-main"><span class="mock-dim">;;; A live Common Lisp environment</span><br><br><span class="mock-prompt">CL-USER&gt;</span> (mapcar #'1+ '(1 2 3))<br><span class="mock-result">(2 3 4)</span><br><br><span class="mock-prompt">CL-USER&gt;</span> (describe 'defun)<span class="mock-caret">▌</span><br><br><span class="mock-complete">▸ DEFUN &nbsp; Define a function<br>&nbsp; DEFMACRO &nbsp; Define a macro</span></div>
+      <div class="mock-side">IMAGE INSPECTOR<br><br><span>Packages</span><br>Symbols<br>ASDF systems<br>Diagnostics<br><br><span>INSPECTION</span></div>
+    </div>
+    <span class="preview-caption">LISP WORKBENCH · transcript, symbol completion and image inspector</span>
+  </div>
+  <div class="hero-feature-label hero-feature-label--secondary">MORE EXAMPLES <span>Interactive demos shipped with the framework</span></div>
+  <div class="hero-duo">
+    <div class="media-stage duo-cell" role="img" aria-label="Tmux Glider animation" data-preview="assets/tmux-glider.gif">
       <div class="triptych-placeholder"><span class="motion-bars">▁ ▃ ▅ ▇</span><br>TMUX GLIDER</div>
       <span class="triptych-label">tmux-glider</span>
     </div>
-    <div class="media-stage triptych-cell" role="img" aria-label="ElmTUI Workbench REPL" data-preview="assets/workbench.gif">
-      <div class="triptych-placeholder"><span class="mock-prompt">CL-USER&gt;</span><span class="mock-caret">▌</span><br>LISP WORKBENCH</div>
-      <span class="triptych-label">workbench</span>
-    </div>
-    <div class="media-stage triptych-cell" role="img" aria-label="Neon Tetris game" data-preview="assets/neon-tetris.gif">
+    <div class="media-stage duo-cell" role="img" aria-label="Neon Tetris game" data-preview="assets/neon-tetris.gif">
       <div class="triptych-placeholder"><span style="font-size:1.6rem">⬛⬜⬜⬛</span><br>NEON TETRIS</div>
       <span class="triptych-label">neon-tetris</span>
     </div>

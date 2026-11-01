@@ -6,13 +6,12 @@ building terminal user interfaces in Common Lisp. Applications run in the
 normal terminal screen below your prompt, and the terminal and its scrollback
 are restored exactly when they exit.
 
+#+HTML: <p align="center"><img src="website/assets/workbench.gif" alt="Lisp Workbench" width="100%"></p>
 #+HTML: <table><tr>
-#+HTML: <td width="33%"><img src="website/assets/tmux-glider.gif" alt="Tmux Glider"></td>
-#+HTML: <td width="34%"><img src="website/assets/workbench.gif" alt="Lisp Workbench"></td>
-#+HTML: <td width="33%"><img src="website/assets/neon-tetris.gif" alt="Neon Tetris"></td>
+#+HTML: <td width="50%"><img src="website/assets/tmux-glider.gif" alt="Tmux Glider" width="100%"></td>
+#+HTML: <td width="50%"><img src="website/assets/neon-tetris.gif" alt="Neon Tetris" width="100%"></td>
 #+HTML: </tr><tr>
 #+HTML: <td align="center"><em>tmux-glider</em></td>
-#+HTML: <td align="center"><em>workbench</em></td>
 #+HTML: <td align="center"><em>neon-tetris</em></td>
 #+HTML: </tr></table>
 
@@ -176,6 +175,20 @@ How it fits together:
   Framework logging is off while the application runs; pass
   =:log-file "counter.log"= to =run-counter= to keep it.
 
+=defapplication= uses patch-based state updates. For a simpler
+model-replacement style closer to canonical Elm/TEA, use =deftea-app=:
+
+#+begin_src lisp
+(deftea-app counter
+  :init       #'init        ; () → (values model commands)
+  :transition #'transition  ; (msg model) → (values next-model commands)
+  :view       #'view-fn)    ; model → dsl-tree
+#+end_src
+
+=transition= receives and returns the model directly instead of patches;
+Ctrl-C quits by default. =deftea-app= wraps into =defapplication= under the
+hood, so the same runtime drives both.
+
 Next steps: the [[file:docs/longform/01-foundations-and-elm-architecture.md][foundations]] chapter explains the architecture,
 [[file:docs/longform/02-core-principles-widgets-and-patterns.md][widgets and patterns]] covers layout, widgets and effects, the
 [[file:examples/README.md][examples]] show complete applications, and the
@@ -218,6 +231,112 @@ sessions of the maintained examples; more are on [[https://elmtui.fkr.dev/][the 
 - Transactional state updates with observers and undo/redo.
 - CSS-like selector, cascade, variable, and property handling.
 - Maintained interactive examples and a standalone image packager.
+
+** Effects and asynchronous commands
+
+The =update= (or =transition=) function can return /commands/ alongside state
+changes.  Commands are asynchronous operations whose results re-enter the
+message loop.  The primary constructor is =cmd-async=:
+
+#+begin_src lisp
+(cmd-async #'fetch-weather
+  :args '("Berlin")
+  :on-complete (lambda (result) `(:weather-arrived :data ,result))
+  :on-error    (lambda (condition) `(:weather-failed :err ,condition))
+  :timeout     10)
+#+end_src
+
+With =defapplication=, return commands through =make-update-result=:
+
+#+begin_src lisp
+(make-update-result :patches `(((:loading) t))
+                    :commands (list (cmd-async ...)))
+#+end_src
+
+With =deftea-app=, return them as the second value from =transition=:
+
+#+begin_src lisp
+(defun transition (msg model)
+  (values (list* :loading t model)
+          (list (cmd-async ...))))
+#+end_src
+
+Also available: =cmd-async-with-retry=, =cmd-recurring=, =cmd-batch=, and
+=cmd-batch-await=.  The =async-weather= example demonstrates the full
+pattern.  See [[file:docs/longform/02-core-principles-widgets-and-patterns.md][widgets and patterns]] for the complete effects API.
+
+** Custom widgets
+
+=defcomponent= defines reusable widgets with their own local state, message
+handlers and view function:
+
+#+begin_src lisp
+(defcomponent my-label ()
+  (:state (text "" :type string)
+          (style nil))
+  (:init (props self-id-path)
+    (list :text (getf props :text "")))
+  (:update (message local-state app-state self-id-path)
+    (:set-text (new-text)
+      (values `(((:text) ,new-text)) nil)))
+  (:view (local-state app-state self-id-path children)
+    `(:text :id :label
+      :content ,(getf local-state :text)
+      :style ,(getf local-state :style))))
+#+end_src
+
+Update handlers use keyword dispatch and return =(values patches commands)=.
+Shipped widgets (=label=, =scroll-panel=, =button-enhanced=, …) are built
+the same way.  See [[file:docs/longform/02-core-principles-widgets-and-patterns.md][widgets and patterns]] for the component contract.
+
+** Standalone binaries
+
+=elmtui-packager= builds self-contained SBCL executables from any ElmTUI
+application.  No CLPM, ASDF, or source tree needed at runtime.
+
+#+begin_src sh
+# Build the packager tool itself (once):
+clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+  --eval '(require :asdf)' --eval '(asdf:make :elmtui-packager)'
+
+# Package an example as a standalone binary:
+./elmtui-packager -s elmtui-examples \
+  -E elmtui.examples.minimal:run-minimal -o ./minimal
+
+# Run it anywhere — no Lisp toolchain required:
+./minimal
+#+end_src
+
+Flags:
+
+| Flag | Short | Description |
+|------+-------+-------------|
+| =--system= | =-s= | ASDF system(s) to load before dumping (repeatable) |
+| =--file= | =-f= | Lisp file(s) to load before dumping (repeatable) |
+| =--eval= | =-e= | Form(s) to evaluate before dumping (repeatable) |
+| =--entry= | =-E= | Entry function for the image, e.g. =my-app:run= (required) |
+| =--output= | =-o= | Output binary path (required) |
+
+SBCL with =:sb-core-compression= compresses the image automatically (zstd,
+level 9).  The packager requires SBCL; other implementations are not yet
+supported.
+
+** Tmux integration
+
+ElmTUI auto-detects tmux and captures the styled visible-pane content to
+prefill the virtual buffer, so applications render as overlays atop existing
+terminal content.  The contract:
+
+- Normal screen only — the alternate screen is never used.
+- Scrollback is preserved; the terminal is restored exactly on exit.
+- Resize events are handled as transactions.
+- No idle writes; only changed cells are painted.
+
+No special user setup is needed — run your application inside tmux and the
+framework handles the rest.  The platform API (=tmux-available-p=,
+=capture-pane-string=, =capture-screen-string=) is in the
+=elmtui.platform.*= packages.  See
+[[file:docs/tmux-normal-screen-contract.md][the tmux normal-screen contract]] for the full specification.
 
 * Repository systems
 
