@@ -179,5 +179,6 @@
                 (:file "platform/driver" :depends-on ("core/system-events" "pipeline"))
 
 
+                (:file "keys")
                 (:file "elmtui")
                 (:file "core/public-api-docstrings")))

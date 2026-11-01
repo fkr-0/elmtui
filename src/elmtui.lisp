@@ -35,8 +35,11 @@ QUIT-REQUESTED-P or the KEY-EVENT accessors.")
    #:make-update-result #:state-ref
    #:patch #:patch* #:quit-result
    #:key-pressed-p #:quit-requested-p
+   ;; Deprecated in 0.6.0; use KEY-EVENT-PARTS or import from ELMTUI.KEYS.
+   ;; Will be removed from this package in 0.7.0.
    #:key-event #:key-event-p #:key-event-key #:key-event-char
-   #:key-event-modifiers #:key-event-parts
+   #:key-event-modifiers
+   #:key-event-parts
    ;; Async commands
    #:cmd-async
    ;; Style presets

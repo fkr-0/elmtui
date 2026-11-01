@@ -1,4 +1,4 @@
-(uiop:define-package :elmtui.examples.async-weather (:use :cl) (:import-from :elmtui.app #:defapplication) (:import-from :elmtui.core.async #:cmd-async) (:import-from :elmtui.core.event-types #:key-event #:key-event-key #:key-event-char) (:import-from :elmtui.state.api #:make-update-result #:state-ref) (:export #:run-async-weather #:weather-init #:weather-update #:weather-view #:weather-url-encode #:weather-geocode-url #:weather-forecast-url #:weather-parse-geocodes #:weather-parse-forecast #:*weather-transport*))
+(uiop:define-package :elmtui.examples.async-weather (:use :cl) (:import-from :elmtui.app #:defapplication) (:import-from :elmtui.core.async #:cmd-async) (:import-from :elmtui.keys #:key-event #:key-event-key #:key-event-char) (:import-from :elmtui.state.api #:make-update-result #:state-ref) (:export #:run-async-weather #:weather-init #:weather-update #:weather-view #:weather-url-encode #:weather-geocode-url #:weather-forecast-url #:weather-parse-geocodes #:weather-parse-forecast #:*weather-transport*))
 (in-package :elmtui.examples.async-weather)
 (defparameter *weather-city* "Berlin")
 (defparameter *weather-transport* nil)

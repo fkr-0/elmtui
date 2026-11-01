@@ -5,7 +5,7 @@
   (:import-from :elmtui.app #:defapplication)
   (:import-from :elmtui.app.api #:run-application)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
-  (:import-from :elmtui.core.event-types #:key-event #:key-event-key #:key-event-char)
+  (:import-from :elmtui.keys #:key-event #:key-event-key #:key-event-char)
   (:export #:run-fzf-finder #:run-fzf-on-stdin #:main))
 
 (in-package :elmtui.examples.fzf-finder)

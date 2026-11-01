@@ -36,7 +36,7 @@
                 #:key-event->normalized-key
                 #:normalized-key->string)
 
-  (:import-from :elmtui.core.event-types #:key-event)
+  (:import-from :elmtui.keys #:key-event)
   (:import-from :elmtui.ui.widgets.layout #:layout) ; Import the layout component
   (:export
    #:run-key-tester-app
@@ -83,7 +83,7 @@
                         (member (first message) '(:keyevent :key-event) :test #'eq))
                    (getf (rest message) :event))))
          (key (and event (key-event-key event)))
-         (char (and event (elmtui.core.event-types:key-event-char event)))
+         (char (and event (elmtui.keys:key-event-char event)))
          (mods (and event (key-event-modifiers event))))
     (cond
       ((or (and event (member key '(:q #\q #\Q) :test #'eql))

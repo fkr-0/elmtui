@@ -10,8 +10,8 @@
   (:import-from :elmtui.app.tea-core #:deftea-app)
   (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
   (:import-from :cl-styles.selector #:cls> #:type>)
-  (:import-from :elmtui.core.event-types
-                #:key-event #:key-event-parts)
+  (:import-from :elmtui.keys #:key-event)
+  (:import-from :elmtui.core.event-types #:key-event-parts)
   (:export
     :run-rainbow-example-app
     :rainbow-content-view

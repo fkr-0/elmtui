@@ -3,8 +3,8 @@
 (uiop:define-package :elmtui.examples.scroll-panel-demo
   (:use :cl)
   (:import-from :elmtui.app.tea-core #:deftea-app)
-  (:import-from :elmtui.core.event-types
-                #:key-event #:key-event-key #:key-event-parts)
+  (:import-from :elmtui.keys #:key-event #:key-event-key)
+  (:import-from :elmtui.core.event-types #:key-event-parts)
   (:export #:run-scroll-panel-demo #:main))
 
 (in-package :elmtui.examples.scroll-panel-demo)

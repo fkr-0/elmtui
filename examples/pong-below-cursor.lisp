@@ -2,8 +2,8 @@
   (:use :cl :log4cl)
   (:import-from :alexandria #:clamp)
   (:import-from :elmtui.app.tea-core #:deftea-app)
-  (:import-from :elmtui.core.event-types
-                #:key-event #:key-event-key #:key-event-parts)
+  (:import-from :elmtui.keys #:key-event #:key-event-key)
+  (:import-from :elmtui.core.event-types #:key-event-parts)
   (:export #:run-pong-below-cursor
            #:pong-transition
            #:pong-view

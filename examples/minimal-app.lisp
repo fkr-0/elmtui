@@ -1,8 +1,8 @@
 (uiop:define-package :elmtui.examples.minimal
   (:use :cl :log4cl)
   (:import-from :elmtui.app.tea-core #:deftea-app)
-  (:import-from :elmtui.core.event-types
-                #:key-event #:key-event-parts)
+  (:import-from :elmtui.keys #:key-event)
+  (:import-from :elmtui.core.event-types #:key-event-parts)
   (:export #:run-minimal))
 
 (in-package :elmtui.examples.minimal)

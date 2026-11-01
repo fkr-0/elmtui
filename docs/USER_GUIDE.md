@@ -279,6 +279,55 @@ nodes.
 
 ## Keyboard Input and Keymaps
 
+### Key Event Handling
+
+For most key handling in update or transition functions, use one of the
+two facade helpers:
+
+- **`key-event-parts`** -- returns `(values KEY CHAR MODIFIERS)` for any
+  key event (struct or legacy plist). This is the recommended way to
+  inspect a key event.
+- **`key-pressed-p`** -- a predicate that matches by `:char`, `:key`,
+  and/or `:modifiers`. Use it when you only need to recognise specific
+  keys.
+
+```lisp
+;; Recommended: destructure with key-event-parts
+(defun my-transition (message model)
+  (multiple-value-bind (key char mods) (elmtui:key-event-parts message)
+    (cond
+      ((eq key :escape) (list :should-quit t))
+      ((and char (char= char #\q)) (list :should-quit t))
+      (t model))))
+
+;; Or use key-pressed-p for single-key checks
+(defun my-transition (message model)
+  (cond
+    ((elmtui:key-pressed-p message :key :escape) (list :should-quit t))
+    ((elmtui:quit-requested-p message)           (list :should-quit t))
+    (t model)))
+```
+
+**Low-level struct accessors** (`key-event-key`, `key-event-char`,
+`key-event-modifiers`, `key-event-p`, and the `key-event` type itself)
+are available from the `elmtui.keys` package. They are useful when you
+need to work directly with the `key-event` struct -- for example,
+constructing events in tests or writing custom key normalisation.
+
+```lisp
+;; Import low-level accessors from elmtui.keys
+(:import-from :elmtui.keys
+              #:key-event #:key-event-p #:key-event-key
+              #:key-event-char #:key-event-modifiers
+              #:make-key-event)
+```
+
+These five symbols remain exported from the `elmtui` facade for backward
+compatibility, but they will move exclusively to `elmtui.keys` in 0.7.0.
+New code that needs direct struct access should import from `elmtui.keys`.
+
+### Keymaps
+
 The keymap system (`elmtui.keymaps`) normalizes key events and dispatches actions/messages via contexts.
 
 Two recommended patterns:
