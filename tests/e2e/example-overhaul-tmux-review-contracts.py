@@ -5,11 +5,8 @@ One run exercises executable API docs, SGR parsing, the hard prohibition on
 alternate-screen mode and two physical-terminal acceptance contracts: the real
 B2 focus box and lossless reverse resize. Nothing is skipped or opt-in.
 
-The two acceptance contracts describe features the normal-screen design does
-not yet provide (see docs/tmux-normal-screen-contract.md), so they are declared
-``expectedFailure``: they execute on every run, and the run reports an
-"unexpected success" (non-zero exit) the moment one starts passing, which is
-the cue to delete the decorator. They are open P0 defects, never a PASS.
+Both acceptance contracts are release gates (formerly open P0 defects, see
+docs/tmux-normal-screen-contract.md). A failure here blocks release.
 
 Run:
   python3 tests/e2e/example-overhaul-tmux-review-contracts.py
@@ -104,7 +101,6 @@ class PhysicalOverlayAndScrollbackAcceptance(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    #@unittest.expectedFailure  # open P0: B2 paints a panel preview, not the pane cell
     def test_b2_surrounds_exact_real_pane_cell(self):
         """B2 must paint actual screen coordinates (5,6), not a panel preview."""
         gate = Options.output / "physical-b2.start"
@@ -136,13 +132,21 @@ class PhysicalOverlayAndScrollbackAcceptance(unittest.TestCase):
             self.assertEqual(after[6][4:7], f"│{old_glyph}│",
                              "B2 target must retain its own captured glyph")
             self.assertEqual(after[7][4:7], "└─┘", "B2 bottom border at real pane cell")
+            # Moving B2 must revert its previous border cells to the underlay.
+            app.key("Right")
+            app.key("Right")
+            app.expect("Cursor: (7, 6)")
+            moved = app.tmux("capture-pane", "-p", "-t", "app:0.0").stdout.splitlines()
+            for row in (5, 6, 7):
+                self.assertEqual(moved[row][4:6], before[row][4:6],
+                                 f"stale B2 paint left on row {row}")
+            self.assertEqual(moved[5][6:9], "┌─┐", "B2 followed the cursor")
             raw = (app.directory / "terminal.raw").read_bytes()
             for suffix in (b"1049h", b"1049l", b"1047h", b"1047l", b"47h", b"47l"):
                 self.assertNotIn(b"\x1b[?" + suffix, raw)
         finally:
             app.close()
 
-    #@unittest.expectedFailure  # open P0: exit repaint after a shrink overwrites history
     def test_shrink_120x40_to_80x24_preserves_all_history(self):
         """No historical row may disappear when the physical screen shrinks."""
         gate = Options.output / "reverse-shrink.start"

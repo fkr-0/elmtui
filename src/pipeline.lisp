@@ -20,6 +20,9 @@
   (:export
     #:full-view-pipeline
     #:*preserve-underlay*
+    #:*underlay-buffer*
+    #:*underlay-protected-rows*
+    #:underlay-protected-rows
     #:render-pipeline-0-to-5
     #:pre-render-terminal-prep
     #:generate-dsl
@@ -65,6 +68,69 @@
         :height (elmtui.platform.backend.common.virtual-buffer:buffer-height back-buffer)))
 (defvar *preserve-underlay* nil
   "When true, render-to-buffer starts from current front-buffer content and avoids clearing it.")
+
+(defvar *underlay-buffer* nil
+  "Immutable full-pane capture of the cells under a normal-screen application.
+
+When bound together with *PRESERVE-UNDERLAY*, every frame is composited onto
+the region of this buffer under the root viewport instead of onto the previous
+frame. Cells the current frame does not paint therefore revert to their
+captured underlay, so overlays that move (for example a cursor focus box) never
+leave stale paint behind. The driver binds it only while the capture geometry
+matches the live pane.")
+
+(defvar *underlay-protected-rows* 0
+  "Number of top pane rows holding scrollback that tmux pulled back into view.
+
+Those rows are history, not application canvas: the compositor reverts any
+frame paint there to the underlay, so they are never changed, not even
+transiently. Bound by the driver per frame together with *UNDERLAY-BUFFER*.")
+
+(defun underlay-protected-rows ()
+  "Pane rows above which a normal-screen view must not paint (see
+*UNDERLAY-PROTECTED-ROWS*). Snapshot row Y is shown at physical row Y plus this."
+  *underlay-protected-rows*)
+
+(defun %mask-protected-rows (buffer underlay origin-x origin-y)
+  "Revert BUFFER rows lying on protected pane rows to UNDERLAY cells."
+  (let ((rows (min (- *underlay-protected-rows* origin-y)
+                   (elmtui.platform.backend.common.virtual-buffer:buffer-height buffer))))
+    (when (plusp rows)
+      (let ((original (%underlay-region
+                       underlay origin-x origin-y
+                       (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer)
+                       rows)))
+        (when original
+          (dotimes (row rows)
+            (dotimes (col (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer))
+              (let ((cell (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                           original row col)))
+                (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
+                 buffer row col
+                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell)
+                 (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style cell)
+                 :grapheme (elmtui.platform.backend.common.virtual-buffer:buffer-cell-grapheme cell))))))))
+    buffer))
+
+(defun %underlay-region (underlay origin-x origin-y width height)
+  "Return a WIDTHxHEIGHT copy of UNDERLAY starting at ORIGIN-X/ORIGIN-Y, or NIL.
+
+NIL means the requested region does not lie entirely inside UNDERLAY; callers
+must then fall back rather than composite onto misaligned content."
+  (let ((uw (elmtui.platform.backend.common.virtual-buffer:buffer-width underlay))
+        (uh (elmtui.platform.backend.common.virtual-buffer:buffer-height underlay)))
+    (when (and (<= 0 origin-x) (<= 0 origin-y)
+               (<= (+ origin-x width) uw) (<= (+ origin-y height) uh))
+      (let ((region (make-virtual-buffer width height)))
+        (dotimes (row height region)
+          (dotimes (col width)
+            (let ((cell (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                         underlay (+ origin-y row) (+ origin-x col))))
+              (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
+               region row col
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell)
+               (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style cell)
+               :grapheme (elmtui.platform.backend.common.virtual-buffer:buffer-cell-grapheme cell)))))))))
 
 (defun %root-viewport-offset (ctx)
   "Return (values offset-x offset-y) for the root viewport, defaulting to 0."
@@ -187,16 +253,24 @@
       (let* ((rect (ctx-viewport-rect ctx))
               (front (ctx-front-buffer ctx))
               (target-buffer
-                (if (and *preserve-underlay*
-                      front
-                      (= (elmtui.platform.backend.common.virtual-buffer:buffer-width front) (w rect))
-                      (= (elmtui.platform.backend.common.virtual-buffer:buffer-height front) (h rect)))
-                    (copy-virtual-buffer front)
-                    (make-virtual-buffer (w rect) (h rect))))
+                (or (and *preserve-underlay*
+                         *underlay-buffer*
+                         (multiple-value-bind (ox oy) (%root-viewport-offset ctx)
+                           (%underlay-region *underlay-buffer* ox oy (w rect) (h rect))))
+                    (if (and *preserve-underlay*
+                          front
+                          (= (elmtui.platform.backend.common.virtual-buffer:buffer-width front) (w rect))
+                          (= (elmtui.platform.backend.common.virtual-buffer:buffer-height front) (h rect)))
+                        (copy-virtual-buffer front)
+                        (make-virtual-buffer (w rect) (h rect)))))
               (rendered-buffer (render-laid-out-tree-to-buffer
                                  (list (root laid-out-tree))
                                  :buffer target-buffer
                                  :clear-buffer-p (not *preserve-underlay*))))
+        (when (and *preserve-underlay* *underlay-buffer*
+                   (plusp *underlay-protected-rows*))
+          (multiple-value-bind (ox oy) (%root-viewport-offset ctx)
+            (%mask-protected-rows rendered-buffer *underlay-buffer* ox oy)))
         (setf (ctx-back-buffer ctx) rendered-buffer)
         ctx))))
 

@@ -51,7 +51,8 @@
   (:export #:compute-buffer-diff
     #:apply-diff-to-backend
     #:buffers-not-compatible-error
-    #:*compute-buffer-diff-first-call*))
+    #:*compute-buffer-diff-first-call*
+    #:*park-cursor-after-diff*))
 
 (in-package :elmtui.platform.backend.terminal.diff-renderer)
 
@@ -222,6 +223,12 @@ Operations addressing disjoint physical segments remain separate runs."
                 (flush-run)))
             (nreverse result))))))
 
+(defvar *park-cursor-after-diff* nil
+  "When a (ROW . COL) cons, move the cursor there after applying a non-empty diff.
+
+Normal-screen apps park the cursor on pane row 0 so a tmux height shrink deletes
+rows below it instead of scrolling overlay cells into native history.")
+
 (defun apply-diff-to-backend (diff-ops backend-instance
                                terminal-offset-row terminal-offset-col)
   "Apply a list of diff operations (DIFF-OPS) to BACKEND-INSTANCE.
@@ -279,6 +286,10 @@ TERMINAL-OFFSET-ROW/COL shift the canvas so its (0,0) lands on the terminal."
 
     ;; Leave terminal tidy and flush output
     (apply-style-diff backend-instance nil)
+    (when (and diff-ops (consp *park-cursor-after-diff*))
+      (send-sequence backend-instance :cursor-set-position
+                     (1+ (car *park-cursor-after-diff*))
+                     (1+ (cdr *park-cursor-after-diff*))))
     (incf (terminal-output-stats-forced-style-resets stats))
     (when device (cl-inputs.terminal.api:flush-output device))
     (when stream (finish-output stream))
