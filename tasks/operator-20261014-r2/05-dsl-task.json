@@ -1,0 +1,67 @@
+{
+  "dispatchReceipt": {
+    "attempt": "cb49f33ff2e04692a16ad5b00b801d24",
+    "dispatcher_owner": "process:916111:39145821:ocp-ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+    "dispatcher_pid": 916111,
+    "dispatcher_start_ticks": 39145821,
+    "fleet": "chatgpt",
+    "fleet_slot": 3,
+    "lease_id": "f248a0e4-8ebb-4cbd-9901-ea8cbd521b57",
+    "operation_id": null,
+    "priority": 90,
+    "project": "elmtui-clpm",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-05-DSL-REFINE-20261014-R2-cb49f33ff2e0.md",
+    "prompt_id": "elmtui-clpm-05-dsl-refine-20261014-r2",
+    "prompt_sha256": "95b003c57048094117d59b5cb18371751d88cc650b70b3a1fd569a0ca755c255",
+    "repo": "elmtui-clpm",
+    "route_generation": 5,
+    "route_key": "fleet/chatgpt/3",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T08:50:03.750Z",
+    "state": "running",
+    "tab": "D5670642A13A29EBB026C39DBDB4A711",
+    "target_id": "D5670642A13A29EBB026C39DBDB4A711",
+    "task_id": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+    "updated_at": "2026-10-14T08:50:03.750Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429166
+  },
+  "task": {
+    "actorId": "codex-enhance-r2-coordinator",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T08:46:44.972Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+    "laneId": "05-dsl",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 90,
+    "projectId": "elmtui-clpm",
+    "promptId": "elmtui-clpm-05-dsl-refine-20261014-r2",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+        "wsbridge:worker:codex-enhance-r2-coordinator",
+        "wsbridge:session:codex-enhance-r2-20261014",
+        "chatgpt-ops:dispatch-attempt:cb49f33ff2e04692a16ad5b00b801d24",
+        "abc-v2:target:D5670642A13A29EBB026C39DBDB4A711",
+        "abc-v2:route:fleet/chatgpt/3@5"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": [
+        "ELMTUI-CLPM-05-DSL-ENHANCE-20261014",
+        "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+        "wsbridge:work-packet:77f91249-4a76-484e-a6bb-65c50f15ec1c"
+      ]
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T08:50:03.750Z"
+  }
+}

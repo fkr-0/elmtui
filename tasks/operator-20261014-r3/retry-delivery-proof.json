@@ -1,0 +1,82 @@
+[
+  {
+    "url": "https://chatgpt.com/c/6acf873a-deb4-83eb-98e0-be5af0c8b05b",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "CL-EVENTS-01-EVENTS-REVIEW-20261014-R3",
+    "targetId": "962FF0031E0F79ED5BE2272C6EAE9166",
+    "observedTabUrl": "https://chatgpt.com/c/6acf873a-deb4-83eb-98e0-be5af0c8b05b",
+    "nativeState": "running"
+  },
+  {
+    "url": "https://chatgpt.com/c/6acf8759-a3e4-83eb-847e-c13969204fc1",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "CL-INPUT-02-INPUT-REVIEW-20261014-R3",
+    "targetId": "57B67BA20849017C60FD0272E36CD37E",
+    "observedTabUrl": "https://chatgpt.com/c/6acf8759-a3e4-83eb-847e-c13969204fc1",
+    "nativeState": "running"
+  },
+  {
+    "url": "https://chatgpt.com/c/6acf8760-a000-83eb-8979-a2774277a311",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "CL-STATE-03-STATE-REVIEW-20261014-R3",
+    "targetId": "87DA2D103FF7F50BD8DE47FCDF679749",
+    "observedTabUrl": "https://chatgpt.com/c/6acf8760-a000-83eb-8979-a2774277a311",
+    "nativeState": "running"
+  },
+  {
+    "url": "https://chatgpt.com/c/6acf8767-1b78-83eb-8543-933c477e71f3",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "ELMTUI-CLPM-04-STYLES-REVIEW-20261014-R3",
+    "targetId": "E55BAD7C37AAA61BA6F116E7312422AB",
+    "observedTabUrl": "https://chatgpt.com/c/6acf8767-1b78-83eb-8543-933c477e71f3",
+    "nativeState": "running"
+  },
+  {
+    "url": "https://chatgpt.com/c/6acf876e-476c-83ed-a91e-d8c6a7c0675f",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "ELMTUI-CLPM-05-DSL-REVIEW-20261014-R3",
+    "targetId": "1764BE0F1EED35E4E15564D0DF3DD901",
+    "observedTabUrl": "https://chatgpt.com/c/6acf876e-476c-83ed-a91e-d8c6a7c0675f",
+    "nativeState": "running"
+  },
+  {
+    "url": "https://chatgpt.com/c/6acf8776-30cc-83eb-9bb8-729c7beed709",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "ELMTUI-CLPM-06-MACROS-REVIEW-20261014-R3",
+    "targetId": "D6C7CEDB4F8483F8EC1BDFABC215894E",
+    "observedTabUrl": "https://chatgpt.com/c/6acf8776-30cc-83eb-9bb8-729c7beed709",
+    "nativeState": "running"
+  },
+  {
+    "url": "https://chatgpt.com/c/6acf877c-e4c4-83eb-9866-ff2ba89364ed",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "ELMTUI-CLPM-07-TERMINAL-REVIEW-20261014-R3",
+    "targetId": "0534C4853726A89E5A2F59DE1516E88B",
+    "observedTabUrl": "https://chatgpt.com/c/6acf877c-e4c4-83eb-9866-ff2ba89364ed",
+    "nativeState": "running"
+  },
+  {
+    "url": "https://chatgpt.com/c/6acf8783-be38-83ed-80ed-a750fc532a93",
+    "userHeadings": 1,
+    "taskVisible": true,
+    "generating": true,
+    "taskId": "ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2",
+    "targetId": "63AC0903672ACCB1750508B2030D4344",
+    "observedTabUrl": "https://chatgpt.com/c/6acf8783-be38-83ed-80ed-a750fc532a93",
+    "nativeState": "running"
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "taskId": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+    "workspaceId": "ws-cb7a2a3937b624ef7eb781fe9041fd6a",
+    "packetId": "d9acbb95-df02-441b-8980-a960c6e7ee46",
+    "opportunityId": "admitted-4fbbe2c66280b4fdcdf63879",
+    "state": "ready"
+  },
+  {
+    "taskId": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+    "workspaceId": "ws-d6715e0e39ce59f001f9ddbac4a83a47",
+    "packetId": "cec12fe9-f987-41bb-a7e0-af4af5f2780f",
+    "opportunityId": "admitted-71f12a398e39ea19aca7d79c",
+    "state": "ready"
+  },
+  {
+    "taskId": "CL-STATE-03-STATE-REFINE-20261014-R2",
+    "workspaceId": "ws-cab479e1448507a0ebc27fe8f3548e0d",
+    "packetId": "f3a9a705-484a-45d6-b09c-b00bf3360b12",
+    "opportunityId": "admitted-a8e4f3024fe5bf01cc3038c2",
+    "state": "ready"
+  },
+  {
+    "taskId": "ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "packetId": "6cd915dc-17b0-48e0-8833-22848316b2e8",
+    "opportunityId": "admitted-7294fc7f0aa1fdb379de24e3",
+    "state": "ready"
+  },
+  {
+    "taskId": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "packetId": "77f91249-4a76-484e-a6bb-65c50f15ec1c",
+    "opportunityId": "admitted-4bfa9aa10c27601fd1ccab02",
+    "state": "ready"
+  },
+  {
+    "taskId": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "packetId": "98da5d14-916a-48d2-9bec-094a3b6d4634",
+    "opportunityId": "admitted-c43cd714bba199b9f1e0b143",
+    "state": "ready"
+  },
+  {
+    "taskId": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "packetId": "d304ad30-e992-45a8-b6e9-d20486ab82c9",
+    "opportunityId": "admitted-cde2eddcd807d900fd0c6c17",
+    "state": "ready"
+  },
+  {
+    "taskId": "ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "packetId": "cd7de258-7320-4397-ae3f-9c06d9d71ac1",
+    "opportunityId": "admitted-0cfeba1dc84236b83695de82",
+    "state": "ready"
+  }
+]

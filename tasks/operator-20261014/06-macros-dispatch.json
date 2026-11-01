@@ -1,0 +1,114 @@
+{
+  "receipt": {
+    "attempt": "2b06d9cdc8f64fcf81ffc8b6a2180e49",
+    "dispatcher_owner": "process:666154:38983971:ocp-ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+    "dispatcher_pid": 666154,
+    "dispatcher_start_ticks": 38983971,
+    "fleet": "chatgpt",
+    "fleet_slot": 1,
+    "lease_id": "415669d8-a339-4984-8fe7-e1fd699ef8d8",
+    "operation_id": null,
+    "priority": 80,
+    "project": "elmtui-clpm",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-06-MACROS-ENHANCE-20261014-2b06d9cdc8f6.md",
+    "prompt_id": "elmtui-clpm-06-macros-enhance-20261014",
+    "prompt_sha256": "2835e82493c1679a778616ec18c3ef196c351bcd17e3d8710050b7b17525f51b",
+    "repo": "elmtui-clpm",
+    "route_generation": 4,
+    "route_key": "fleet/chatgpt/1",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T08:23:03.666Z",
+    "state": "running",
+    "tab": "881D579DEF58A4A7C9062672BC89EC1C",
+    "target_id": "881D579DEF58A4A7C9062672BC89EC1C",
+    "task_id": "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+    "updated_at": "2026-10-14T08:23:03.666Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429161
+  },
+  "rendered": {
+    "prompt": {
+      "body": "@projmgrauth\nSet repo: elmtui.lisp\n\n# ElmTUI macro hygiene and authoring contracts\n\nCanonical project: elmtui-clpm\nExact intended root: /home/user/code/lisp/elmtui.lisp\nTask purpose: 06-macros, enhancement wave 20261014. The dispatcher binds the exact task ID; recover it from the governed handoff, never manufacture one.\n\nOwn src/ui/defcomponent.lisp, src/app/application.lisp, src/app/tea-core.lisp and existing tests/defcomponent-tests.lisp, tests/application-extension-tests.lisp, tests/application-init-tests.lisp, tests/app-tests.lisp. Do not edit DSL resolver/builtins, libraries, shared ASDF manifests, README, common terminal harness or unrelated runtime. Preserve deletion docs/release-history-purge.md.\nTrace defcomponent, defapplication, defmodule, defapplication-contracted, deftea-app and their generated code/registries. Audit macro argument validation, once-only evaluation and order for caller forms, lexical hygiene/gensyms, package-qualified identities, documentation/declarations, structured expansion-time errors, compile-file availability under eval-when, class/state-slot inheritance, repeated definition/reload registry freshness, and optional keyword defaults/NIL semantics. Do not assume all arguments are evaluated expressions: derive the syntax/form contract from current API and usage first. Narrowly refactor duplicated parsing/validation only when it improves an actual demonstrated contract without changing supported expansions.\nAdd expansion-level tests and real cold compile-file/load fixture tests in a fresh temporary package/process so same-image helpers cannot mask phase errors. Include lexical symbol collision, side-effect counting/order, invalid options, inheritance override and safe redefinition tests. Run existing consumer/example macro tests and framework suite. Test behaviors of generated applications, not just matching printed macroexpansions. Write lane-local docs/operator-macros-20261014.md with tested authoring examples, generated API/lifecycle and migration notes. Keep public signatures compatible; route required cross-lane DSL protocol changes to a serialized successor.\n\nYou are the senior Common Lisp maintainer responsible for delivering implementation, meaningful regression tests, and reviewable evidence. The user authorizes local fixes and refinements in the stated scope. Work autonomously through investigation, implementation, validation, required independent review, and evidence-backed continuation. Do not stop at suggestions or an audit report.\n\nOperating contract:\n- Resolve the exact Git root, HEAD, branch, local instructions, project identity, dirty files, active path claims, existing task/checkpoint results, and effective bridge.yml before writing. Task state running alone is not liveness. Reuse completed work and avoid competing with active ownership. Preserve unrelated dirty state; never reset, clean, delete user work, or rewrite history. Do not push, tag, release, or publish externally under this task.\n- Activate authenticated project filesystem tools; establish a fresh agent session and retain its binding where required. Adopt or admit and bind the exact canonical task/packet, begin it, and obey transactional mutations, leases, stale-write checks, and independent review. Missing ordinary packet metadata is routine setup, not a reason to refuse work. Respect explicit nonrecoverable admission or ownership denials. A browser response is not filesystem implementation.\n- Inspect contracts and establish a fresh baseline before editing. Reproduce concrete gaps with failing tests, then make the smallest coherent repair. Use balanced expression edits for Lisp/ASDF and verify cold reader/compiler/load behavior. Prefer existing CLOS protocols and standard CL idioms over hidden globals, eval, string-generated code, or needless new layers. Preserve public compatibility or provide an explicit tested migration.\n- Tests must detect observable incorrect behavior, including boundaries and failures. Do not increase assertion counts by duplicating checks, substitute mocks for claimed live behavior, suppress warnings broadly, weaken thresholds, exclude hard-to-test owned source, or call a skipped test passed. Run focused checks first, then the affected full suites once after final edits; retain exact commands, revisions, pass/fail/skip counts, logs and artifacts.\n- Record a gap ledger: source/contract, reproduction, severity, repair, regression evidence, and remaining work. Historical TODOs and old reports are leads, not current proof. Finish each concrete phase with a durable checkpoint and the configured typed phase result containing changed paths, baseline/final evidence, residual blockers and review references. Submit required independent review, address its findings, and do not self-approve.\n\nAutonomous continuation:\nContinue useful in-scope work within the current phase. Before context exhaustion, checkpoint exact progress, claims, transaction state, commands, failures, and the next executable action. After the configured review gate, if evidence shows acceptance remains unmet, admit one idempotent canonical successor carrying the same bounded scope, predecessor/result references, exact residual acceptance and dependency prerequisites; queue and dispatch through the installed native OCP surface when allowed. If promotion requires an operator gate, leave that exact successor ready with the actual gate reason. Never use retired prolonged/next.md or chain schedulers, recursively resend yourself, create parallel duplicate successors, invent authority, or perform endless audit-only rounds. No-progress continuation must name a concrete blocker and what changes it. Stop only at reviewed acceptance or an evidenced external/ownership blocker.\n\nReport implementation, local tests, live terminal tests, hosted CI, badge availability, and review as separate evidence layers. Leave Org-roam STATUS/TODO projection with AGENTIC conventions through the supported workflow; avoid duplicating an automatic phase-result projection.\n",
+      "createdAt": "2026-10-14T08:21:56.249Z",
+      "id": "elmtui-clpm-06-macros-enhance-20261014",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "elmtui-clpm",
+        "enhancement"
+      ],
+      "title": "ElmTUI macro hygiene and authoring contracts",
+      "updatedAt": "2026-10-14T08:21:56.249Z"
+    },
+    "rendered": {
+      "body": "@projmgrauth\nSet repo: elmtui.lisp\n\n# ElmTUI macro hygiene and authoring contracts\n\nCanonical project: elmtui-clpm\nExact intended root: /home/user/code/lisp/elmtui.lisp\nTask purpose: 06-macros, enhancement wave 20261014. The dispatcher binds the exact task ID; recover it from the governed handoff, never manufacture one.\n\nOwn src/ui/defcomponent.lisp, src/app/application.lisp, src/app/tea-core.lisp and existing tests/defcomponent-tests.lisp, tests/application-extension-tests.lisp, tests/application-init-tests.lisp, tests/app-tests.lisp. Do not edit DSL resolver/builtins, libraries, shared ASDF manifests, README, common terminal harness or unrelated runtime. Preserve deletion docs/release-history-purge.md.\nTrace defcomponent, defapplication, defmodule, defapplication-contracted, deftea-app and their generated code/registries. Audit macro argument validation, once-only evaluation and order for caller forms, lexical hygiene/gensyms, package-qualified identities, documentation/declarations, structured expansion-time errors, compile-file availability under eval-when, class/state-slot inheritance, repeated definition/reload registry freshness, and optional keyword defaults/NIL semantics. Do not assume all arguments are evaluated expressions: derive the syntax/form contract from current API and usage first. Narrowly refactor duplicated parsing/validation only when it improves an actual demonstrated contract without changing supported expansions.\nAdd expansion-level tests and real cold compile-file/load fixture tests in a fresh temporary package/process so same-image helpers cannot mask phase errors. Include lexical symbol collision, side-effect counting/order, invalid options, inheritance override and safe redefinition tests. Run existing consumer/example macro tests and framework suite. Test behaviors of generated applications, not just matching printed macroexpansions. Write lane-local docs/operator-macros-20261014.md with tested authoring examples, generated API/lifecycle and migration notes. Keep public signatures compatible; route required cross-lane DSL protocol changes to a serialized successor.\n\nYou are the senior Common Lisp maintainer responsible for delivering implementation, meaningful regression tests, and reviewable evidence. The user authorizes local fixes and refinements in the stated scope. Work autonomously through investigation, implementation, validation, required independent review, and evidence-backed continuation. Do not stop at suggestions or an audit report.\n\nOperating contract:\n- Resolve the exact Git root, HEAD, branch, local instructions, project identity, dirty files, active path claims, existing task/checkpoint results, and effective bridge.yml before writing. Task state running alone is not liveness. Reuse completed work and avoid competing with active ownership. Preserve unrelated dirty state; never reset, clean, delete user work, or rewrite history. Do not push, tag, release, or publish externally under this task.\n- Activate authenticated project filesystem tools; establish a fresh agent session and retain its binding where required. Adopt or admit and bind the exact canonical task/packet, begin it, and obey transactional mutations, leases, stale-write checks, and independent review. Missing ordinary packet metadata is routine setup, not a reason to refuse work. Respect explicit nonrecoverable admission or ownership denials. A browser response is not filesystem implementation.\n- Inspect contracts and establish a fresh baseline before editing. Reproduce concrete gaps with failing tests, then make the smallest coherent repair. Use balanced expression edits for Lisp/ASDF and verify cold reader/compiler/load behavior. Prefer existing CLOS protocols and standard CL idioms over hidden globals, eval, string-generated code, or needless new layers. Preserve public compatibility or provide an explicit tested migration.\n- Tests must detect observable incorrect behavior, including boundaries and failures. Do not increase assertion counts by duplicating checks, substitute mocks for claimed live behavior, suppress warnings broadly, weaken thresholds, exclude hard-to-test owned source, or call a skipped test passed. Run focused checks first, then the affected full suites once after final edits; retain exact commands, revisions, pass/fail/skip counts, logs and artifacts.\n- Record a gap ledger: source/contract, reproduction, severity, repair, regression evidence, and remaining work. Historical TODOs and old reports are leads, not current proof. Finish each concrete phase with a durable checkpoint and the configured typed phase result containing changed paths, baseline/final evidence, residual blockers and review references. Submit required independent review, address its findings, and do not self-approve.\n\nAutonomous continuation:\nContinue useful in-scope work within the current phase. Before context exhaustion, checkpoint exact progress, claims, transaction state, commands, failures, and the next executable action. After the configured review gate, if evidence shows acceptance remains unmet, admit one idempotent canonical successor carrying the same bounded scope, predecessor/result references, exact residual acceptance and dependency prerequisites; queue and dispatch through the installed native OCP surface when allowed. If promotion requires an operator gate, leave that exact successor ready with the actual gate reason. Never use retired prolonged/next.md or chain schedulers, recursively resend yourself, create parallel duplicate successors, invent authority, or perform endless audit-only rounds. No-progress continuation must name a concrete blocker and what changes it. Stop only at reviewed acceptance or an evidenced external/ownership blocker.\n\nReport implementation, local tests, live terminal tests, hosted CI, badge availability, and review as separate evidence layers. Leave Org-roam STATUS/TODO projection with AGENTIC conventions through the supported workflow; avoid duplicating an automatic phase-result projection.\n",
+      "tags": [
+        "elmtui-clpm",
+        "enhancement"
+      ],
+      "title": "ElmTUI macro hygiene and authoring contracts"
+    },
+    "task": {
+      "actorId": "chatgpt-ops",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T08:21:56.349Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+      "laneId": "06-macros-20261014",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 80,
+      "projectId": "elmtui-clpm",
+      "promptId": "elmtui-clpm-06-macros-enhance-20261014",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [
+          "chatgpt-ops:task-admission"
+        ],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": []
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T08:21:56.451Z"
+    }
+  },
+  "task": {
+    "actorId": "chatgpt-ops",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T08:21:56.349Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+    "laneId": "06-macros-20261014",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 80,
+    "projectId": "elmtui-clpm",
+    "promptId": "elmtui-clpm-06-macros-enhance-20261014",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [
+        "chatgpt-ops:task-admission"
+      ],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "chatgpt-ops:dispatch-attempt:2b06d9cdc8f64fcf81ffc8b6a2180e49",
+        "abc-v2:target:881D579DEF58A4A7C9062672BC89EC1C",
+        "abc-v2:route:fleet/chatgpt/1@4"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": []
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T08:23:03.666Z"
+  }
+}

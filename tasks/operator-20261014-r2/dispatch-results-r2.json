@@ -1,0 +1,784 @@
+[
+  {
+    "taskId": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+    "state": "running",
+    "result": {
+      "dispatchReceipt": {
+        "attempt": "5e8ab1720c154ecda943606b89ece2a6",
+        "dispatcher_owner": "process:896666:39134782:ocp-CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+        "dispatcher_pid": 896666,
+        "dispatcher_start_ticks": 39134782,
+        "fleet": "chatgpt",
+        "fleet_slot": 0,
+        "lease_id": "86f18621-544f-461a-9b1c-a3fe5b8af5cb",
+        "operation_id": null,
+        "priority": 90,
+        "project": "cl-events",
+        "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-EVENTS-01-EVENTS-REFINE-20261014-R2-5e8ab1720c15.md",
+        "prompt_id": "cl-events-01-events-refine-20261014-r2",
+        "prompt_sha256": "fcbb7637aa6bc9b20d8212e2a7ee1c1b15f12000ea065ee1eadfa7de667e2281",
+        "repo": "elmtui.lisp",
+        "route_generation": 4,
+        "route_key": "fleet/chatgpt/0",
+        "source": "ocp-canary",
+        "started_at": "2026-10-14T08:48:24.616Z",
+        "state": "running",
+        "tab": "2443B9F664A937CCAF471301938C4953",
+        "target_id": "2443B9F664A937CCAF471301938C4953",
+        "task_id": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+        "updated_at": "2026-10-14T08:48:24.616Z",
+        "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+        "window_id": 774429159
+      },
+      "task": {
+        "actorId": "codex-enhance-r2-coordinator-events",
+        "archivedAt": null,
+        "createdAt": "2026-10-14T08:46:16.446Z",
+        "finishReason": null,
+        "finishedAt": null,
+        "id": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+        "laneId": "01-events",
+        "operationId": null,
+        "policyVersion": "1",
+        "priority": 90,
+        "projectId": "cl-events",
+        "promptId": "cl-events-01-events-refine-20261014-r2",
+        "promptSetId": null,
+        "references": {
+          "authorityRefs": [],
+          "checkpointRefs": [],
+          "continuationRefs": [],
+          "evidenceRefs": [
+            "wsbridge:presence:b84684d4-e319-4a5e-bf13-830382520027",
+            "wsbridge:worker:codex-enhance-r2-coordinator-events",
+            "wsbridge:session:codex-enhance-r2-20261014-events",
+            "chatgpt-ops:dispatch-attempt:5e8ab1720c154ecda943606b89ece2a6",
+            "abc-v2:target:2443B9F664A937CCAF471301938C4953",
+            "abc-v2:route:fleet/chatgpt/0@4"
+          ],
+          "noteRefs": [],
+          "resultRefs": [],
+          "sourceRefs": [
+            "CL-EVENTS-01-EVENTS-ENHANCE-20261014",
+            "wsbridge:workspace:ws-cb7a2a3937b624ef7eb781fe9041fd6a",
+            "wsbridge:work-packet:d9acbb95-df02-441b-8980-a960c6e7ee46"
+          ]
+        },
+        "state": "running",
+        "terminalClassification": null,
+        "updatedAt": "2026-10-14T08:48:24.616Z"
+      }
+    }
+  },
+  {
+    "taskId": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+    "state": "running",
+    "result": {
+      "dispatchReceipt": {
+        "attempt": "c0589517ebeb4672bec045029d43a858",
+        "dispatcher_owner": "process:896666:39134782:ocp-CL-INPUT-02-INPUT-REFINE-20261014-R2",
+        "dispatcher_pid": 896666,
+        "dispatcher_start_ticks": 39134782,
+        "fleet": "chatgpt",
+        "fleet_slot": 3,
+        "lease_id": "fd93eb5d-339b-48f7-a561-a6f012014d5e",
+        "operation_id": null,
+        "priority": 90,
+        "project": "cl-input",
+        "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-INPUT-02-INPUT-REFINE-20261014-R2-c0589517ebeb.md",
+        "prompt_id": "cl-input-02-input-refine-20261014-r2",
+        "prompt_sha256": "5813dd072c8b3d4514712c3bcfbc902d3c7b3bbc8008aa16cd755ce4b2560f11",
+        "repo": "elmtui.lisp",
+        "route_generation": 4,
+        "route_key": "fleet/chatgpt/3",
+        "source": "ocp-canary",
+        "started_at": "2026-10-14T08:48:14.954Z",
+        "state": "running",
+        "tab": "0E2E8017BAFD79E5219DCE8A0B16E5E7",
+        "target_id": "0E2E8017BAFD79E5219DCE8A0B16E5E7",
+        "task_id": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+        "updated_at": "2026-10-14T08:48:14.954Z",
+        "url": "https://chatgpt.com/c/6acf41cc-ef0c-83ed-9ee8-e9064526b7d5",
+        "window_id": 774429166
+      },
+      "task": {
+        "actorId": "codex-enhance-r2-coordinator-input",
+        "archivedAt": null,
+        "createdAt": "2026-10-14T08:46:41.312Z",
+        "finishReason": null,
+        "finishedAt": null,
+        "id": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+        "laneId": "02-input",
+        "operationId": null,
+        "policyVersion": "1",
+        "priority": 90,
+        "projectId": "cl-input",
+        "promptId": "cl-input-02-input-refine-20261014-r2",
+        "promptSetId": null,
+        "references": {
+          "authorityRefs": [],
+          "checkpointRefs": [],
+          "continuationRefs": [],
+          "evidenceRefs": [
+            "wsbridge:presence:adbbb188-ff03-44c2-8ece-0f76aedd3c84",
+            "wsbridge:worker:codex-enhance-r2-coordinator-input",
+            "wsbridge:session:codex-enhance-r2-20261014-input",
+            "chatgpt-ops:dispatch-attempt:c0589517ebeb4672bec045029d43a858",
+            "abc-v2:target:0E2E8017BAFD79E5219DCE8A0B16E5E7",
+            "abc-v2:route:fleet/chatgpt/3@4"
+          ],
+          "noteRefs": [],
+          "resultRefs": [],
+          "sourceRefs": [
+            "CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+            "wsbridge:workspace:ws-d6715e0e39ce59f001f9ddbac4a83a47",
+            "wsbridge:work-packet:cec12fe9-f987-41bb-a7e0-af4af5f2780f"
+          ]
+        },
+        "state": "running",
+        "terminalClassification": null,
+        "updatedAt": "2026-10-14T08:48:14.954Z"
+      }
+    }
+  },
+  {
+    "taskId": "CL-STATE-03-STATE-REFINE-20261014-R2",
+    "exitCode": 0,
+    "result": {
+      "receipt": {
+        "attempt": "14dad8bf8edd4fd6924499b460b22662",
+        "dispatcher_owner": "process:912392:39144190:ocp-CL-STATE-03-STATE-REFINE-20261014-R2",
+        "dispatcher_pid": 912392,
+        "dispatcher_start_ticks": 39144190,
+        "fleet": "chatgpt",
+        "fleet_slot": 1,
+        "lease_id": "37ee1edb-c8fb-4959-bdb2-46d85d4625ff",
+        "operation_id": null,
+        "priority": 90,
+        "project": "cl-state",
+        "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-STATE-03-STATE-REFINE-20261014-R2-14dad8bf8edd.md",
+        "prompt_id": "cl-state-03-state-refine-20261014-r2",
+        "prompt_sha256": "a3b01898a6fe4c5226ef1596f2b4cfebd232b5a790d76e2f1027c5fe3de317db",
+        "repo": "elmtui.lisp",
+        "route_generation": 5,
+        "route_key": "fleet/chatgpt/1",
+        "source": "ocp-canary",
+        "started_at": "2026-10-14T08:49:47.795Z",
+        "state": "running",
+        "tab": "B78D58E4F8C642BF7ECDE4A62152F6E2",
+        "target_id": "B78D58E4F8C642BF7ECDE4A62152F6E2",
+        "task_id": "CL-STATE-03-STATE-REFINE-20261014-R2",
+        "updated_at": "2026-10-14T08:49:47.795Z",
+        "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+        "window_id": 774429161
+      },
+      "rendered": {
+        "prompt": {
+          "body": "# State coverage shortfall and transaction model refinements\n\nEffective workflow project ID: cl-state\nExact open_workspace root: /home/user/code/lisp/cl-state\nWorkspace ID: ws-cab479e1448507a0ebc27fe8f3548e0d\nCanonical task: CL-STATE-03-STATE-REFINE-20261014-R2\nPredecessor: CL-STATE-03-STATE-ENHANCE-20261014\nWrite scope: src/**, tests/**, scripts/**, .github/workflows/ci.yml, README.md, docs/refinement-r2-20261014.md\n\nPrior packet d78be851-8f69-43a4-929a-ae9037b77262 is now BLOCKED by coordinator using recover_work_packet action block, preserving committed transaction 138c759e-c709-4dfb-b7d4-e6d2e3bbeda9 and all pre-existing dirty changes; no rollback occurred. This exact successor owns continuation; do not rerun old packet recovery or revert changes. Prior worker added rejection for owned source with zero instrumented expressions, Python gate 6/6 passed and cold ASDF passed, but relied on OLD coverage 2572/3237=79.46% below unchanged 85% floor. First archive old reports and obtain fresh source-hash-bound instrumentation in a separate owned directory. Target missed behavior with independent model-based transaction rollback/nesting, CAS revision conflicts before any mutation, observer reentrancy/error/commit ordering, undo/redo atomic history, patch composition/inversion and mutable alias isolation. Use deterministic concurrent barriers and an independent oracle. Review legitimacy of package-only vs runtime zero-expression inventory; no denominator manipulation. Complete actual >=85% expression coverage through tests and real repairs, preserving thresholds and source inventory. Do not touch consumer copy or foreign active claims.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "createdAt": "2026-10-14T08:45:34.675Z",
+          "id": "cl-state-03-state-refine-20261014-r2",
+          "origin": "agent_api",
+          "revision": 1,
+          "tags": [
+            "refinement"
+          ],
+          "title": "State coverage shortfall and transaction model refinements",
+          "updatedAt": "2026-10-14T08:45:34.675Z"
+        },
+        "rendered": {
+          "body": "# State coverage shortfall and transaction model refinements\n\nEffective workflow project ID: cl-state\nExact open_workspace root: /home/user/code/lisp/cl-state\nWorkspace ID: ws-cab479e1448507a0ebc27fe8f3548e0d\nCanonical task: CL-STATE-03-STATE-REFINE-20261014-R2\nPredecessor: CL-STATE-03-STATE-ENHANCE-20261014\nWrite scope: src/**, tests/**, scripts/**, .github/workflows/ci.yml, README.md, docs/refinement-r2-20261014.md\n\nPrior packet d78be851-8f69-43a4-929a-ae9037b77262 is now BLOCKED by coordinator using recover_work_packet action block, preserving committed transaction 138c759e-c709-4dfb-b7d4-e6d2e3bbeda9 and all pre-existing dirty changes; no rollback occurred. This exact successor owns continuation; do not rerun old packet recovery or revert changes. Prior worker added rejection for owned source with zero instrumented expressions, Python gate 6/6 passed and cold ASDF passed, but relied on OLD coverage 2572/3237=79.46% below unchanged 85% floor. First archive old reports and obtain fresh source-hash-bound instrumentation in a separate owned directory. Target missed behavior with independent model-based transaction rollback/nesting, CAS revision conflicts before any mutation, observer reentrancy/error/commit ordering, undo/redo atomic history, patch composition/inversion and mutable alias isolation. Use deterministic concurrent barriers and an independent oracle. Review legitimacy of package-only vs runtime zero-expression inventory; no denominator manipulation. Complete actual >=85% expression coverage through tests and real repairs, preserving thresholds and source inventory. Do not touch consumer copy or foreign active claims.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "tags": [
+            "refinement"
+          ],
+          "title": "State coverage shortfall and transaction model refinements"
+        },
+        "task": {
+          "actorId": "codex-enhance-r2-coordinator-state",
+          "archivedAt": null,
+          "createdAt": "2026-10-14T08:46:42.430Z",
+          "finishReason": null,
+          "finishedAt": null,
+          "id": "CL-STATE-03-STATE-REFINE-20261014-R2",
+          "laneId": "03-state",
+          "operationId": null,
+          "policyVersion": "1",
+          "priority": 90,
+          "projectId": "cl-state",
+          "promptId": "cl-state-03-state-refine-20261014-r2",
+          "promptSetId": null,
+          "references": {
+            "authorityRefs": [],
+            "checkpointRefs": [],
+            "continuationRefs": [],
+            "evidenceRefs": [
+              "wsbridge:presence:7066df5c-315c-4d37-a34d-06d716415d5f",
+              "wsbridge:worker:codex-enhance-r2-coordinator-state",
+              "wsbridge:session:codex-enhance-r2-20261014-state"
+            ],
+            "noteRefs": [],
+            "resultRefs": [],
+            "sourceRefs": [
+              "CL-STATE-03-STATE-ENHANCE-20261014",
+              "wsbridge:workspace:ws-cab479e1448507a0ebc27fe8f3548e0d",
+              "wsbridge:work-packet:f3a9a705-484a-45d6-b09c-b00bf3360b12"
+            ]
+          },
+          "state": "queued",
+          "terminalClassification": null,
+          "updatedAt": "2026-10-14T08:47:51.384Z"
+        }
+      },
+      "task": {
+        "actorId": "codex-enhance-r2-coordinator-state",
+        "archivedAt": null,
+        "createdAt": "2026-10-14T08:46:42.430Z",
+        "finishReason": null,
+        "finishedAt": null,
+        "id": "CL-STATE-03-STATE-REFINE-20261014-R2",
+        "laneId": "03-state",
+        "operationId": null,
+        "policyVersion": "1",
+        "priority": 90,
+        "projectId": "cl-state",
+        "promptId": "cl-state-03-state-refine-20261014-r2",
+        "promptSetId": null,
+        "references": {
+          "authorityRefs": [],
+          "checkpointRefs": [],
+          "continuationRefs": [],
+          "evidenceRefs": [
+            "wsbridge:presence:7066df5c-315c-4d37-a34d-06d716415d5f",
+            "wsbridge:worker:codex-enhance-r2-coordinator-state",
+            "wsbridge:session:codex-enhance-r2-20261014-state",
+            "chatgpt-ops:dispatch-attempt:14dad8bf8edd4fd6924499b460b22662",
+            "abc-v2:target:B78D58E4F8C642BF7ECDE4A62152F6E2",
+            "abc-v2:route:fleet/chatgpt/1@5"
+          ],
+          "noteRefs": [],
+          "resultRefs": [],
+          "sourceRefs": [
+            "CL-STATE-03-STATE-ENHANCE-20261014",
+            "wsbridge:workspace:ws-cab479e1448507a0ebc27fe8f3548e0d",
+            "wsbridge:work-packet:f3a9a705-484a-45d6-b09c-b00bf3360b12"
+          ]
+        },
+        "state": "running",
+        "terminalClassification": null,
+        "updatedAt": "2026-10-14T08:49:47.795Z"
+      }
+    },
+    "error": ""
+  },
+  {
+    "taskId": "ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+    "exitCode": 0,
+    "result": {
+      "receipt": {
+        "attempt": "90d6d5ec017846d5b7e053213940c186",
+        "dispatcher_owner": "process:914278:39145046:ocp-ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+        "dispatcher_pid": 914278,
+        "dispatcher_start_ticks": 39145046,
+        "fleet": "chatgpt",
+        "fleet_slot": 2,
+        "lease_id": "29b94585-4486-4710-92ab-a1c5d6abeb65",
+        "operation_id": null,
+        "priority": 90,
+        "project": "elmtui-clpm",
+        "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2-90d6d5ec0178.md",
+        "prompt_id": "elmtui-clpm-04-styles-refine-20261014-r2",
+        "prompt_sha256": "62a5052757f18867ce4110cc6a0e7ca4c252fd4112dc5a76d748d3b633b3bd52",
+        "repo": "elmtui-clpm",
+        "route_generation": 5,
+        "route_key": "fleet/chatgpt/2",
+        "source": "ocp-canary",
+        "started_at": "2026-10-14T08:49:55.534Z",
+        "state": "running",
+        "tab": "41C9799F72D87B900F94EF26C33E596A",
+        "target_id": "41C9799F72D87B900F94EF26C33E596A",
+        "task_id": "ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+        "updated_at": "2026-10-14T08:49:55.534Z",
+        "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+        "window_id": 774429163
+      },
+      "rendered": {
+        "prompt": {
+          "body": "# Styles fail-open pipeline and cascade refinement\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2\nPredecessor: CL-STYLES-04-STYLES-ENHANCE-20261014\nWrite scope: cl-styles/coverage.lisp, cl-styles/src/**, cl-styles/tests/**, cl-styles/scripts/**, cl-styles/.github/workflows/ci.yml, cl-styles/README.md, cl-styles/docs/refinement-r2-20261014.md\n\nCorrection: actual accessible cl-styles standalone Git checkout is the nested cl-styles directory; the persisted /home/user/code/lisp/cl-styles handle has no current local directory. Prior worker hit an OCP project mismatch and changed nothing. This task is deliberately governed by parent elmtui-clpm with only cl-styles-relative paths; open the parent workspace for task/packet, execute tests in the nested Git root, and preserve its independence. Do not edit root runtime, coverage, README, ASDF or submodule gitlink.\nPrior 218/218 CLPM tests pass. Concrete defects remain: coverage.lisp ignores suite result and exits 0, emits only HTML while CI requires LCOV/JSON, no enforced measured threshold, no README measured badge. Repair in that order with failed-suite and missing/malformed/stale/zero-covered report tests. Use SBCL 2.6.2/CLPM reproducibility and all owned runtime source. Set measured baseline ratchet honestly and emit per-file totals and source provenance; CI publication config must depend only on successful trusted branch verification with scoped permissions. Do not actually publish. Then test real specificity/source-order/inline/shorthand/variable fallback/cycle and tree mutation gaps, comparing an independent simple cascade oracle. Retain documented correctness-first recomputation; no speculative caching or browser CSS implementation.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "createdAt": "2026-10-14T08:45:34.775Z",
+          "id": "elmtui-clpm-04-styles-refine-20261014-r2",
+          "origin": "agent_api",
+          "revision": 1,
+          "tags": [
+            "refinement"
+          ],
+          "title": "Styles fail-open pipeline and cascade refinement",
+          "updatedAt": "2026-10-14T08:45:34.775Z"
+        },
+        "rendered": {
+          "body": "# Styles fail-open pipeline and cascade refinement\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2\nPredecessor: CL-STYLES-04-STYLES-ENHANCE-20261014\nWrite scope: cl-styles/coverage.lisp, cl-styles/src/**, cl-styles/tests/**, cl-styles/scripts/**, cl-styles/.github/workflows/ci.yml, cl-styles/README.md, cl-styles/docs/refinement-r2-20261014.md\n\nCorrection: actual accessible cl-styles standalone Git checkout is the nested cl-styles directory; the persisted /home/user/code/lisp/cl-styles handle has no current local directory. Prior worker hit an OCP project mismatch and changed nothing. This task is deliberately governed by parent elmtui-clpm with only cl-styles-relative paths; open the parent workspace for task/packet, execute tests in the nested Git root, and preserve its independence. Do not edit root runtime, coverage, README, ASDF or submodule gitlink.\nPrior 218/218 CLPM tests pass. Concrete defects remain: coverage.lisp ignores suite result and exits 0, emits only HTML while CI requires LCOV/JSON, no enforced measured threshold, no README measured badge. Repair in that order with failed-suite and missing/malformed/stale/zero-covered report tests. Use SBCL 2.6.2/CLPM reproducibility and all owned runtime source. Set measured baseline ratchet honestly and emit per-file totals and source provenance; CI publication config must depend only on successful trusted branch verification with scoped permissions. Do not actually publish. Then test real specificity/source-order/inline/shorthand/variable fallback/cycle and tree mutation gaps, comparing an independent simple cascade oracle. Retain documented correctness-first recomputation; no speculative caching or browser CSS implementation.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "tags": [
+            "refinement"
+          ],
+          "title": "Styles fail-open pipeline and cascade refinement"
+        },
+        "task": {
+          "actorId": "codex-enhance-r2-coordinator",
+          "archivedAt": null,
+          "createdAt": "2026-10-14T08:46:43.933Z",
+          "finishReason": null,
+          "finishedAt": null,
+          "id": "ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+          "laneId": "04-styles",
+          "operationId": null,
+          "policyVersion": "1",
+          "priority": 90,
+          "projectId": "elmtui-clpm",
+          "promptId": "elmtui-clpm-04-styles-refine-20261014-r2",
+          "promptSetId": null,
+          "references": {
+            "authorityRefs": [],
+            "checkpointRefs": [],
+            "continuationRefs": [],
+            "evidenceRefs": [
+              "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+              "wsbridge:worker:codex-enhance-r2-coordinator",
+              "wsbridge:session:codex-enhance-r2-20261014"
+            ],
+            "noteRefs": [],
+            "resultRefs": [],
+            "sourceRefs": [
+              "CL-STYLES-04-STYLES-ENHANCE-20261014",
+              "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+              "wsbridge:work-packet:6cd915dc-17b0-48e0-8833-22848316b2e8"
+            ]
+          },
+          "state": "queued",
+          "terminalClassification": null,
+          "updatedAt": "2026-10-14T08:47:53.610Z"
+        }
+      },
+      "task": {
+        "actorId": "codex-enhance-r2-coordinator",
+        "archivedAt": null,
+        "createdAt": "2026-10-14T08:46:43.933Z",
+        "finishReason": null,
+        "finishedAt": null,
+        "id": "ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+        "laneId": "04-styles",
+        "operationId": null,
+        "policyVersion": "1",
+        "priority": 90,
+        "projectId": "elmtui-clpm",
+        "promptId": "elmtui-clpm-04-styles-refine-20261014-r2",
+        "promptSetId": null,
+        "references": {
+          "authorityRefs": [],
+          "checkpointRefs": [],
+          "continuationRefs": [],
+          "evidenceRefs": [
+            "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+            "wsbridge:worker:codex-enhance-r2-coordinator",
+            "wsbridge:session:codex-enhance-r2-20261014",
+            "chatgpt-ops:dispatch-attempt:90d6d5ec017846d5b7e053213940c186",
+            "abc-v2:target:41C9799F72D87B900F94EF26C33E596A",
+            "abc-v2:route:fleet/chatgpt/2@5"
+          ],
+          "noteRefs": [],
+          "resultRefs": [],
+          "sourceRefs": [
+            "CL-STYLES-04-STYLES-ENHANCE-20261014",
+            "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+            "wsbridge:work-packet:6cd915dc-17b0-48e0-8833-22848316b2e8"
+          ]
+        },
+        "state": "running",
+        "terminalClassification": null,
+        "updatedAt": "2026-10-14T08:49:55.534Z"
+      }
+    },
+    "error": ""
+  },
+  {
+    "taskId": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+    "exitCode": 0,
+    "result": {
+      "receipt": {
+        "attempt": "cb49f33ff2e04692a16ad5b00b801d24",
+        "dispatcher_owner": "process:916111:39145821:ocp-ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+        "dispatcher_pid": 916111,
+        "dispatcher_start_ticks": 39145821,
+        "fleet": "chatgpt",
+        "fleet_slot": 3,
+        "lease_id": "f248a0e4-8ebb-4cbd-9901-ea8cbd521b57",
+        "operation_id": null,
+        "priority": 90,
+        "project": "elmtui-clpm",
+        "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-05-DSL-REFINE-20261014-R2-cb49f33ff2e0.md",
+        "prompt_id": "elmtui-clpm-05-dsl-refine-20261014-r2",
+        "prompt_sha256": "95b003c57048094117d59b5cb18371751d88cc650b70b3a1fd569a0ca755c255",
+        "repo": "elmtui-clpm",
+        "route_generation": 5,
+        "route_key": "fleet/chatgpt/3",
+        "source": "ocp-canary",
+        "started_at": "2026-10-14T08:50:03.750Z",
+        "state": "running",
+        "tab": "D5670642A13A29EBB026C39DBDB4A711",
+        "target_id": "D5670642A13A29EBB026C39DBDB4A711",
+        "task_id": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+        "updated_at": "2026-10-14T08:50:03.750Z",
+        "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+        "window_id": 774429166
+      },
+      "rendered": {
+        "prompt": {
+          "body": "# DSL independent-review corrections and bounded authoring\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-05-DSL-REFINE-20261014-R2\nPredecessor: ELMTUI-CLPM-05-DSL-ENHANCE-20261014\nWrite scope: src/ui/dsl-resolution.lisp, src/ui/dsl-type-builtins.lisp, tests/dsl-resolution-tests.lisp, tests/dsl-resolve-tests.lisp, tests/dsl-props-normalization-tests.lisp, tests/base-dsl-tests.lisp, docs/operator-dsl-20261014.md\n\nPrior packet c789d40e-afc1-420e-85fd-431289e3ffc6 submitted resolver/list-cycle guards; 8397 pass, 6 opt-in skips, 0 fail independently rerun by coordinator. Independent review found default public list-specialized dsl-type validates only the CDR spine then recursively calls dsl-type on CAR without carrying a visited-type set. A list whose CAR refers to itself bypasses resolve-dsl-type's local guard. The coordinator retained a timeout-bounded direct-call reproducer in tasks/operator-20261014-r2; read its start marker and exit status. Correct that direct public path with a bounded structured diagnostic, not only the resolver wrapper. Test resolve-dsl-type AND direct dsl-type entrypoints with cyclic CAR, multi-object cycle, circular CDR, deeply nested finite lists, keyword/base aliases, custom methods, duplicate props, explicit NIL and sharing. Clarify and validate malformed property semantics at the appropriate constructor boundary without breaking intentional legacy append precedence. Avoid global no-applicable-method interception. Export/document typed condition accessors only if they are intended public contract and cover them. Use fresh-package/cold-load evidence and don't assume recursive depth is bounded merely because cyclic identity is caught. Honor original review revision ownership first: acquire resume_revision_work_packet when eligible or this successor's narrow fresh packet only after original has no active claim. Independent reviewer must recheck before acceptance.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "createdAt": "2026-10-14T08:45:34.876Z",
+          "id": "elmtui-clpm-05-dsl-refine-20261014-r2",
+          "origin": "agent_api",
+          "revision": 1,
+          "tags": [
+            "refinement"
+          ],
+          "title": "DSL independent-review corrections and bounded authoring",
+          "updatedAt": "2026-10-14T08:45:34.876Z"
+        },
+        "rendered": {
+          "body": "# DSL independent-review corrections and bounded authoring\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-05-DSL-REFINE-20261014-R2\nPredecessor: ELMTUI-CLPM-05-DSL-ENHANCE-20261014\nWrite scope: src/ui/dsl-resolution.lisp, src/ui/dsl-type-builtins.lisp, tests/dsl-resolution-tests.lisp, tests/dsl-resolve-tests.lisp, tests/dsl-props-normalization-tests.lisp, tests/base-dsl-tests.lisp, docs/operator-dsl-20261014.md\n\nPrior packet c789d40e-afc1-420e-85fd-431289e3ffc6 submitted resolver/list-cycle guards; 8397 pass, 6 opt-in skips, 0 fail independently rerun by coordinator. Independent review found default public list-specialized dsl-type validates only the CDR spine then recursively calls dsl-type on CAR without carrying a visited-type set. A list whose CAR refers to itself bypasses resolve-dsl-type's local guard. The coordinator retained a timeout-bounded direct-call reproducer in tasks/operator-20261014-r2; read its start marker and exit status. Correct that direct public path with a bounded structured diagnostic, not only the resolver wrapper. Test resolve-dsl-type AND direct dsl-type entrypoints with cyclic CAR, multi-object cycle, circular CDR, deeply nested finite lists, keyword/base aliases, custom methods, duplicate props, explicit NIL and sharing. Clarify and validate malformed property semantics at the appropriate constructor boundary without breaking intentional legacy append precedence. Avoid global no-applicable-method interception. Export/document typed condition accessors only if they are intended public contract and cover them. Use fresh-package/cold-load evidence and don't assume recursive depth is bounded merely because cyclic identity is caught. Honor original review revision ownership first: acquire resume_revision_work_packet when eligible or this successor's narrow fresh packet only after original has no active claim. Independent reviewer must recheck before acceptance.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "tags": [
+            "refinement"
+          ],
+          "title": "DSL independent-review corrections and bounded authoring"
+        },
+        "task": {
+          "actorId": "codex-enhance-r2-coordinator",
+          "archivedAt": null,
+          "createdAt": "2026-10-14T08:46:44.972Z",
+          "finishReason": null,
+          "finishedAt": null,
+          "id": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+          "laneId": "05-dsl",
+          "operationId": null,
+          "policyVersion": "1",
+          "priority": 90,
+          "projectId": "elmtui-clpm",
+          "promptId": "elmtui-clpm-05-dsl-refine-20261014-r2",
+          "promptSetId": null,
+          "references": {
+            "authorityRefs": [],
+            "checkpointRefs": [],
+            "continuationRefs": [],
+            "evidenceRefs": [
+              "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+              "wsbridge:worker:codex-enhance-r2-coordinator",
+              "wsbridge:session:codex-enhance-r2-20261014"
+            ],
+            "noteRefs": [],
+            "resultRefs": [],
+            "sourceRefs": [
+              "ELMTUI-CLPM-05-DSL-ENHANCE-20261014",
+              "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+              "wsbridge:work-packet:77f91249-4a76-484e-a6bb-65c50f15ec1c"
+            ]
+          },
+          "state": "queued",
+          "terminalClassification": null,
+          "updatedAt": "2026-10-14T08:47:54.172Z"
+        }
+      },
+      "task": {
+        "actorId": "codex-enhance-r2-coordinator",
+        "archivedAt": null,
+        "createdAt": "2026-10-14T08:46:44.972Z",
+        "finishReason": null,
+        "finishedAt": null,
+        "id": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+        "laneId": "05-dsl",
+        "operationId": null,
+        "policyVersion": "1",
+        "priority": 90,
+        "projectId": "elmtui-clpm",
+        "promptId": "elmtui-clpm-05-dsl-refine-20261014-r2",
+        "promptSetId": null,
+        "references": {
+          "authorityRefs": [],
+          "checkpointRefs": [],
+          "continuationRefs": [],
+          "evidenceRefs": [
+            "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+            "wsbridge:worker:codex-enhance-r2-coordinator",
+            "wsbridge:session:codex-enhance-r2-20261014",
+            "chatgpt-ops:dispatch-attempt:cb49f33ff2e04692a16ad5b00b801d24",
+            "abc-v2:target:D5670642A13A29EBB026C39DBDB4A711",
+            "abc-v2:route:fleet/chatgpt/3@5"
+          ],
+          "noteRefs": [],
+          "resultRefs": [],
+          "sourceRefs": [
+            "ELMTUI-CLPM-05-DSL-ENHANCE-20261014",
+            "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+            "wsbridge:work-packet:77f91249-4a76-484e-a6bb-65c50f15ec1c"
+          ]
+        },
+        "state": "running",
+        "terminalClassification": null,
+        "updatedAt": "2026-10-14T08:50:03.750Z"
+      }
+    },
+    "error": ""
+  },
+  {
+    "taskId": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+    "exitCode": 0,
+    "result": {
+      "receipt": {
+        "attempt": "259e7ca3f70a4841a04d888f6d7be203",
+        "dispatcher_owner": "process:918192:39146647:ocp-ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+        "dispatcher_pid": 918192,
+        "dispatcher_start_ticks": 39146647,
+        "fleet": "chatgpt",
+        "fleet_slot": 0,
+        "lease_id": "5181e7e6-6510-4800-ace4-65e1ee081d90",
+        "operation_id": null,
+        "priority": 90,
+        "project": "elmtui-clpm",
+        "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2-259e7ca3f70a.md",
+        "prompt_id": "elmtui-clpm-06-macros-refine-20261014-r2",
+        "prompt_sha256": "cd83e65834b8c5bac4ae291c0f2cf0ae5c3b634f9f74805954d8d7ed7d0b69e2",
+        "repo": "elmtui-clpm",
+        "route_generation": 5,
+        "route_key": "fleet/chatgpt/0",
+        "source": "ocp-canary",
+        "started_at": "2026-10-14T08:50:12.197Z",
+        "state": "running",
+        "tab": "46A596832376A5BFDF3810E2F2C91219",
+        "target_id": "46A596832376A5BFDF3810E2F2C91219",
+        "task_id": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+        "updated_at": "2026-10-14T08:50:12.197Z",
+        "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+        "window_id": 774429159
+      },
+      "rendered": {
+        "prompt": {
+          "body": "# Macro implementation after publication repair\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2\nPredecessor: ELMTUI-CLPM-06-MACROS-ENHANCE-20261014\nWrite scope: src/ui/defcomponent.lisp, src/app/application.lisp, src/app/tea-core.lisp, tests/defcomponent-tests.lisp, tests/application-extension-tests.lisp, tests/application-init-tests.lisp, tests/app-tests.lisp, docs/operator-macros-20261014.md\n\nOriginal macro worker did no implementation; its eed1bec9-7e04-4b68-b151-dcb30fb9b4e5 packet was published by coordinator and is being superseded by this prepublished exact successor so no second macro implementer runs. Preserve unrelated DSL/coverage changes. Trace defcomponent, defapplication, defmodule, defapplication-contracted and deftea-app and reproduce compile-time helpers unavailable in fresh compilation, once-only/evaluation-order/hygiene defects, keyword/NIL validation, repeated-definition registry staleness and state-slot inheritance. Distinguish literal macro syntax from caller runtime expressions. Implement narrow fixes, then test actual generated application/component behavior and compile-file/load in separate fresh packages/processes. Include lexical symbol collisions, side-effect counters, declarations/docstrings and redefinition. Eliminate duplicated validation only where contracts remain equivalent; no broad rewrite. No resolver, terminal platform, libraries, README or shared manifest edits. Tests already registered should be extended first. Submit a real typed phase and review request; no repeated baseline-only stops.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "createdAt": "2026-10-14T08:45:34.985Z",
+          "id": "elmtui-clpm-06-macros-refine-20261014-r2",
+          "origin": "agent_api",
+          "revision": 1,
+          "tags": [
+            "refinement"
+          ],
+          "title": "Macro implementation after publication repair",
+          "updatedAt": "2026-10-14T08:45:34.985Z"
+        },
+        "rendered": {
+          "body": "# Macro implementation after publication repair\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2\nPredecessor: ELMTUI-CLPM-06-MACROS-ENHANCE-20261014\nWrite scope: src/ui/defcomponent.lisp, src/app/application.lisp, src/app/tea-core.lisp, tests/defcomponent-tests.lisp, tests/application-extension-tests.lisp, tests/application-init-tests.lisp, tests/app-tests.lisp, docs/operator-macros-20261014.md\n\nOriginal macro worker did no implementation; its eed1bec9-7e04-4b68-b151-dcb30fb9b4e5 packet was published by coordinator and is being superseded by this prepublished exact successor so no second macro implementer runs. Preserve unrelated DSL/coverage changes. Trace defcomponent, defapplication, defmodule, defapplication-contracted and deftea-app and reproduce compile-time helpers unavailable in fresh compilation, once-only/evaluation-order/hygiene defects, keyword/NIL validation, repeated-definition registry staleness and state-slot inheritance. Distinguish literal macro syntax from caller runtime expressions. Implement narrow fixes, then test actual generated application/component behavior and compile-file/load in separate fresh packages/processes. Include lexical symbol collisions, side-effect counters, declarations/docstrings and redefinition. Eliminate duplicated validation only where contracts remain equivalent; no broad rewrite. No resolver, terminal platform, libraries, README or shared manifest edits. Tests already registered should be extended first. Submit a real typed phase and review request; no repeated baseline-only stops.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "tags": [
+            "refinement"
+          ],
+          "title": "Macro implementation after publication repair"
+        },
+        "task": {
+          "actorId": "codex-enhance-r2-coordinator",
+          "archivedAt": null,
+          "createdAt": "2026-10-14T08:46:45.953Z",
+          "finishReason": null,
+          "finishedAt": null,
+          "id": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+          "laneId": "06-macros",
+          "operationId": null,
+          "policyVersion": "1",
+          "priority": 90,
+          "projectId": "elmtui-clpm",
+          "promptId": "elmtui-clpm-06-macros-refine-20261014-r2",
+          "promptSetId": null,
+          "references": {
+            "authorityRefs": [],
+            "checkpointRefs": [],
+            "continuationRefs": [],
+            "evidenceRefs": [
+              "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+              "wsbridge:worker:codex-enhance-r2-coordinator",
+              "wsbridge:session:codex-enhance-r2-20261014"
+            ],
+            "noteRefs": [],
+            "resultRefs": [],
+            "sourceRefs": [
+              "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+              "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+              "wsbridge:work-packet:98da5d14-916a-48d2-9bec-094a3b6d4634"
+            ]
+          },
+          "state": "queued",
+          "terminalClassification": null,
+          "updatedAt": "2026-10-14T08:47:54.899Z"
+        }
+      },
+      "task": {
+        "actorId": "codex-enhance-r2-coordinator",
+        "archivedAt": null,
+        "createdAt": "2026-10-14T08:46:45.953Z",
+        "finishReason": null,
+        "finishedAt": null,
+        "id": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+        "laneId": "06-macros",
+        "operationId": null,
+        "policyVersion": "1",
+        "priority": 90,
+        "projectId": "elmtui-clpm",
+        "promptId": "elmtui-clpm-06-macros-refine-20261014-r2",
+        "promptSetId": null,
+        "references": {
+          "authorityRefs": [],
+          "checkpointRefs": [],
+          "continuationRefs": [],
+          "evidenceRefs": [
+            "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+            "wsbridge:worker:codex-enhance-r2-coordinator",
+            "wsbridge:session:codex-enhance-r2-20261014",
+            "chatgpt-ops:dispatch-attempt:259e7ca3f70a4841a04d888f6d7be203",
+            "abc-v2:target:46A596832376A5BFDF3810E2F2C91219",
+            "abc-v2:route:fleet/chatgpt/0@5"
+          ],
+          "noteRefs": [],
+          "resultRefs": [],
+          "sourceRefs": [
+            "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+            "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+            "wsbridge:work-packet:98da5d14-916a-48d2-9bec-094a3b6d4634"
+          ]
+        },
+        "state": "running",
+        "terminalClassification": null,
+        "updatedAt": "2026-10-14T08:50:12.197Z"
+      }
+    },
+    "error": ""
+  },
+  {
+    "taskId": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+    "exitCode": 0,
+    "result": {
+      "receipt": {
+        "attempt": "f03c5ac6208c41a7934f0f6e1a82b28a",
+        "dispatcher_owner": "process:920248:39147489:ocp-ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+        "dispatcher_pid": 920248,
+        "dispatcher_start_ticks": 39147489,
+        "fleet": "chatgpt",
+        "fleet_slot": 1,
+        "lease_id": "ee41a81d-3d08-44ba-9c01-059342e5ba1e",
+        "operation_id": null,
+        "priority": 90,
+        "project": "elmtui-clpm",
+        "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2-f03c5ac6208c.md",
+        "prompt_id": "elmtui-clpm-07-terminal-refine-20261014-r2",
+        "prompt_sha256": "cb9b3af53fde426e2accbece555c9b72efb30af359805c3663b6e52c761a6e37",
+        "repo": "elmtui-clpm",
+        "route_generation": 6,
+        "route_key": "fleet/chatgpt/1",
+        "source": "ocp-canary",
+        "started_at": "2026-10-14T08:50:19.486Z",
+        "state": "running",
+        "tab": "6CD654F23761B74CB1B18F9FE8581E65",
+        "target_id": "6CD654F23761B74CB1B18F9FE8581E65",
+        "task_id": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+        "updated_at": "2026-10-14T08:50:19.486Z",
+        "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+        "window_id": 774429161
+      },
+      "rendered": {
+        "prompt": {
+          "body": "# Terminal ownership and bottom-row restoration repairs\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2\nPredecessor: ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014\nWrite scope: src/platform/**, src/view/**, src/ui/widgets/root-viewport.lisp, src/ui/widgets/viewport.lisp, src/ui/widgets/scroll-panel.lisp, examples/wifi-menu.lisp, examples/neon/**, tests/e2e/**, scripts/test-terminal-apps.py, tests/terminal-lifecycle-tests.lisp, tests/root-viewport-tests.lisp, tests/cleanup-regression-tests.lisp, docs/refinement-terminal-r2-20261014.md\n\nThis runtime-owning successor closes qualification's actual failing terminal seams. Prior artifacts: test-output/qualification-07-bottom-row.log (2/2 FAIL, expected Wi-Fi title row 16 gets ROW-29), qualification-07-restoration.log (1/2 FAIL expected 24 scroll-up operations gets 0), qualification-07-native-urxvt.log (2 screenshot errors). Coordinator independently reran python3 tests/e2e/test-bottom-row.py: both FAIL, artifacts test-output/bottom-row-e2e-5aef8ce6. Unit framework baseline still 8397 pass, 6 skips. Trace reservation startup CPR/anchor/viewport geometry, per-run ownership, normal-screen clipping, emitted scroll/restore commands and before/after shell contents. Determine whether obsolete escape-count assumptions or real terminal semantics explain each failure; prove physical screen, cursor, termios and scrollback contracts and repair smallest runtime/harness defect. Do not simply lower expected scroll counts or clear the screen.\nReproduce bottom cursor and tiny/large/tiny resize, normal quit/exception unwind and bounded repeat shutdown. Wi-Fi uses fake nmcli only; slow-command double-Enter must show exactly one in-flight command. Native urxvt/private Xvfb screenshot failure requires explicit display/window/readiness ownership diagnosis, bounded capture and framebuffer evidence rather than skipped screenshots counted as success. Preserve passing Game of Life PTY, tmux geometry and scrollback cases. Do not edit macro/DSL files, library code, root coverage/README/CI or root shared ASDF; coordinate any common harness changes only within this owned scope. Deliver narrow regression artifact matrix and independent review. Provide final hashes to qualification owner for final combined rerun.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "createdAt": "2026-10-14T08:45:35.088Z",
+          "id": "elmtui-clpm-07-terminal-refine-20261014-r2",
+          "origin": "agent_api",
+          "revision": 1,
+          "tags": [
+            "refinement"
+          ],
+          "title": "Terminal ownership and bottom-row restoration repairs",
+          "updatedAt": "2026-10-14T08:45:35.088Z"
+        },
+        "rendered": {
+          "body": "# Terminal ownership and bottom-row restoration repairs\n\nEffective workflow project ID: elmtui-clpm\nExact open_workspace root: /home/user/code/lisp/elmtui.lisp\nWorkspace ID: ws-eedc8a91cdd62c5e2154b51540292ca8\nCanonical task: ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2\nPredecessor: ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014\nWrite scope: src/platform/**, src/view/**, src/ui/widgets/root-viewport.lisp, src/ui/widgets/viewport.lisp, src/ui/widgets/scroll-panel.lisp, examples/wifi-menu.lisp, examples/neon/**, tests/e2e/**, scripts/test-terminal-apps.py, tests/terminal-lifecycle-tests.lisp, tests/root-viewport-tests.lisp, tests/cleanup-regression-tests.lisp, docs/refinement-terminal-r2-20261014.md\n\nThis runtime-owning successor closes qualification's actual failing terminal seams. Prior artifacts: test-output/qualification-07-bottom-row.log (2/2 FAIL, expected Wi-Fi title row 16 gets ROW-29), qualification-07-restoration.log (1/2 FAIL expected 24 scroll-up operations gets 0), qualification-07-native-urxvt.log (2 screenshot errors). Coordinator independently reran python3 tests/e2e/test-bottom-row.py: both FAIL, artifacts test-output/bottom-row-e2e-5aef8ce6. Unit framework baseline still 8397 pass, 6 skips. Trace reservation startup CPR/anchor/viewport geometry, per-run ownership, normal-screen clipping, emitted scroll/restore commands and before/after shell contents. Determine whether obsolete escape-count assumptions or real terminal semantics explain each failure; prove physical screen, cursor, termios and scrollback contracts and repair smallest runtime/harness defect. Do not simply lower expected scroll counts or clear the screen.\nReproduce bottom cursor and tiny/large/tiny resize, normal quit/exception unwind and bounded repeat shutdown. Wi-Fi uses fake nmcli only; slow-command double-Enter must show exactly one in-flight command. Native urxvt/private Xvfb screenshot failure requires explicit display/window/readiness ownership diagnosis, bounded capture and framebuffer evidence rather than skipped screenshots counted as success. Preserve passing Game of Life PTY, tmux geometry and scrollback cases. Do not edit macro/DSL files, library code, root coverage/README/CI or root shared ASDF; coordinate any common harness changes only within this owned scope. Deliver narrow regression artifact matrix and independent review. Provide final hashes to qualification owner for final combined rerun.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+          "tags": [
+            "refinement"
+          ],
+          "title": "Terminal ownership and bottom-row restoration repairs"
+        },
+        "task": {
+          "actorId": "codex-enhance-r2-coordinator",
+          "archivedAt": null,
+          "createdAt": "2026-10-14T08:46:46.971Z",
+          "finishReason": null,
+          "finishedAt": null,
+          "id": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+          "laneId": "07-terminal",
+          "operationId": null,
+          "policyVersion": "1",
+          "priority": 90,
+          "projectId": "elmtui-clpm",
+          "promptId": "elmtui-clpm-07-terminal-refine-20261014-r2",
+          "promptSetId": null,
+          "references": {
+            "authorityRefs": [],
+            "checkpointRefs": [],
+            "continuationRefs": [],
+            "evidenceRefs": [
+              "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+              "wsbridge:worker:codex-enhance-r2-coordinator",
+              "wsbridge:session:codex-enhance-r2-20261014"
+            ],
+            "noteRefs": [],
+            "resultRefs": [],
+            "sourceRefs": [
+              "ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014",
+              "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+              "wsbridge:work-packet:d304ad30-e992-45a8-b6e9-d20486ab82c9"
+            ]
+          },
+          "state": "queued",
+          "terminalClassification": null,
+          "updatedAt": "2026-10-14T08:47:55.484Z"
+        }
+      },
+      "task": {
+        "actorId": "codex-enhance-r2-coordinator",
+        "archivedAt": null,
+        "createdAt": "2026-10-14T08:46:46.971Z",
+        "finishReason": null,
+        "finishedAt": null,
+        "id": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+        "laneId": "07-terminal",
+        "operationId": null,
+        "policyVersion": "1",
+        "priority": 90,
+        "projectId": "elmtui-clpm",
+        "promptId": "elmtui-clpm-07-terminal-refine-20261014-r2",
+        "promptSetId": null,
+        "references": {
+          "authorityRefs": [],
+          "checkpointRefs": [],
+          "continuationRefs": [],
+          "evidenceRefs": [
+            "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+            "wsbridge:worker:codex-enhance-r2-coordinator",
+            "wsbridge:session:codex-enhance-r2-20261014",
+            "chatgpt-ops:dispatch-attempt:f03c5ac6208c41a7934f0f6e1a82b28a",
+            "abc-v2:target:6CD654F23761B74CB1B18F9FE8581E65",
+            "abc-v2:route:fleet/chatgpt/1@6"
+          ],
+          "noteRefs": [],
+          "resultRefs": [],
+          "sourceRefs": [
+            "ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014",
+            "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+            "wsbridge:work-packet:d304ad30-e992-45a8-b6e9-d20486ab82c9"
+          ]
+        },
+        "state": "running",
+        "terminalClassification": null,
+        "updatedAt": "2026-10-14T08:50:19.486Z"
+      }
+    },
+    "error": ""
+  }
+]

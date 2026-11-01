@@ -1,0 +1,114 @@
+{
+  "receipt": {
+    "attempt": "40961be1191a402dbe430808001fae90",
+    "dispatcher_owner": "process:660518:38981166:ocp-CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+    "dispatcher_pid": 660518,
+    "dispatcher_start_ticks": 38981166,
+    "fleet": "chatgpt",
+    "fleet_slot": 1,
+    "lease_id": "81e88558-1d61-4bcf-99f5-6e322e6b3cf9",
+    "operation_id": null,
+    "priority": 80,
+    "project": "cl-inputs",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-INPUTS-02-INPUTS-ENHANCE-20261014-40961be1191a.md",
+    "prompt_id": "cl-inputs-02-inputs-enhance-20261014",
+    "prompt_sha256": "22112b6a87f2d24219e4e35a499e376a42d926d944e6141eed4167affd508ea3",
+    "repo": "cl-inputs",
+    "route_generation": 3,
+    "route_key": "fleet/chatgpt/1",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T08:22:36.241Z",
+    "state": "running",
+    "tab": "71B48D790F96677D6A84F4612F32CBC9",
+    "target_id": "71B48D790F96677D6A84F4612F32CBC9",
+    "task_id": "CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+    "updated_at": "2026-10-14T08:22:36.241Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429161
+  },
+  "rendered": {
+    "prompt": {
+      "body": "@projmgrauth\nSet repo: elmtui.lisp\n\n# Input protocol gaps and honest coverage\n\nCanonical project: cl-inputs\nExact intended root: /home/user/code/lisp/elmtui.lisp/cl-inputs\nTask purpose: 02-inputs, enhancement wave 20261014. The dispatcher binds the exact task ID; recover it from the governed handoff, never manufacture one.\n\nWrite authority available locally is /home/user/code/lisp/elmtui.lisp/cl-inputs (standalone Git root, HEAD b9d0cbec; bridge identity cl-input). Resolve any newer registered standalone checkout before writing and report the chosen root. README already has a measured badge; CI gate currently says executable-line coverage >=49%, with tests/coverage_gate.py and coverage.lisp. Inspect prior October 11 research/audit checkpoints and use their verified conclusions, without duplicating an active worker.\nAudit incremental UTF-8/escape decoding across arbitrary fragmentation, malformed/truncated input, paste overflow bounds, ESC ambiguity deadlines, response register-before-write/correlation expiry and FIFO, preservation of unrelated user keys, sink backpressure, owned vs borrowed device cleanup, nested raw-mode restoration, EOF/cancel/error and async worker shutdown. README explicitly says TTY size is cached and dynamic SIGWINCH is not implemented: implement actual current-size discovery on the owning API and bounded resize delivery only if a concrete consumer contract can be tested, preserving ownership; otherwise document the exact residual gap rather than claiming support. Keep cl-events optional through cl-inputs/events; no root framework edits.\nRun standalone core, optional adapter with explicitly discoverable cl-events, python3 tests/pty-e2e.py, python3 tests/tmux-terminal-apps.py --timeout 20, and available termios regression. Preserve the single legitimate no-controlling-TTY skip and report it. Improve coverage through boundary tests rather than lowering its 49% floor; validate malformed/absent/missing-source coverage gate behavior and badge publication failure paths.\n\nYou are the senior Common Lisp maintainer responsible for delivering implementation, meaningful regression tests, and reviewable evidence. The user authorizes local fixes and refinements in the stated scope. Work autonomously through investigation, implementation, validation, required independent review, and evidence-backed continuation. Do not stop at suggestions or an audit report.\n\nOperating contract:\n- Resolve the exact Git root, HEAD, branch, local instructions, project identity, dirty files, active path claims, existing task/checkpoint results, and effective bridge.yml before writing. Task state running alone is not liveness. Reuse completed work and avoid competing with active ownership. Preserve unrelated dirty state; never reset, clean, delete user work, or rewrite history. Do not push, tag, release, or publish externally under this task.\n- Activate authenticated project filesystem tools; establish a fresh agent session and retain its binding where required. Adopt or admit and bind the exact canonical task/packet, begin it, and obey transactional mutations, leases, stale-write checks, and independent review. Missing ordinary packet metadata is routine setup, not a reason to refuse work. Respect explicit nonrecoverable admission or ownership denials. A browser response is not filesystem implementation.\n- Inspect contracts and establish a fresh baseline before editing. Reproduce concrete gaps with failing tests, then make the smallest coherent repair. Use balanced expression edits for Lisp/ASDF and verify cold reader/compiler/load behavior. Prefer existing CLOS protocols and standard CL idioms over hidden globals, eval, string-generated code, or needless new layers. Preserve public compatibility or provide an explicit tested migration.\n- Tests must detect observable incorrect behavior, including boundaries and failures. Do not increase assertion counts by duplicating checks, substitute mocks for claimed live behavior, suppress warnings broadly, weaken thresholds, exclude hard-to-test owned source, or call a skipped test passed. Run focused checks first, then the affected full suites once after final edits; retain exact commands, revisions, pass/fail/skip counts, logs and artifacts.\n- Record a gap ledger: source/contract, reproduction, severity, repair, regression evidence, and remaining work. Historical TODOs and old reports are leads, not current proof. Finish each concrete phase with a durable checkpoint and the configured typed phase result containing changed paths, baseline/final evidence, residual blockers and review references. Submit required independent review, address its findings, and do not self-approve.\n\nAutonomous continuation:\nContinue useful in-scope work within the current phase. Before context exhaustion, checkpoint exact progress, claims, transaction state, commands, failures, and the next executable action. After the configured review gate, if evidence shows acceptance remains unmet, admit one idempotent canonical successor carrying the same bounded scope, predecessor/result references, exact residual acceptance and dependency prerequisites; queue and dispatch through the installed native OCP surface when allowed. If promotion requires an operator gate, leave that exact successor ready with the actual gate reason. Never use retired prolonged/next.md or chain schedulers, recursively resend yourself, create parallel duplicate successors, invent authority, or perform endless audit-only rounds. No-progress continuation must name a concrete blocker and what changes it. Stop only at reviewed acceptance or an evidenced external/ownership blocker.\n\nReport implementation, local tests, live terminal tests, hosted CI, badge availability, and review as separate evidence layers. Leave Org-roam STATUS/TODO projection with AGENTIC conventions through the supported workflow; avoid duplicating an automatic phase-result projection.\n\nCoverage acceptance:\nProvide a prominent README badge backed by reproducible measurements and a linked report, with a documented metric (SB-COVER executable lines or expressions, explicitly distinguished), covered/total counts, per-file breakdown, source revision and reproducible command. Instrument all owned runtime source before forced compilation, disable instrumentation for tests/dependencies, clear stale data, and ensure unexecuted source contributes to the denominator. Never average per-file percentages or use docstring/assertion counts as code coverage. Fail closed on test failure, missing/empty/malformed reports, denominator drift, unsupported compiler capability, and threshold regression. Add negative-path tests for the gate. Reuse a correct existing workflow; repair defects rather than installing competing infrastructure. Ratchet from an honestly measured baseline and prioritize meaningful coverage of highest-risk gaps; retain any existing stronger gate. CI uploads reports even on failure, but a configured publication job may publish badge data only following successful trusted default-branch verification with minimum scoped permissions. Do not execute an external publish/push now: identify hosted availability as pending unless independently observed. Verify README endpoint matches the repository/branch/artifact contract. Document exclusions and portability boundaries precisely.\n",
+      "createdAt": "2026-10-14T08:21:54.573Z",
+      "id": "cl-inputs-02-inputs-enhance-20261014",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "cl-inputs",
+        "enhancement"
+      ],
+      "title": "Input protocol gaps and honest coverage",
+      "updatedAt": "2026-10-14T08:21:54.573Z"
+    },
+    "rendered": {
+      "body": "@projmgrauth\nSet repo: elmtui.lisp\n\n# Input protocol gaps and honest coverage\n\nCanonical project: cl-inputs\nExact intended root: /home/user/code/lisp/elmtui.lisp/cl-inputs\nTask purpose: 02-inputs, enhancement wave 20261014. The dispatcher binds the exact task ID; recover it from the governed handoff, never manufacture one.\n\nWrite authority available locally is /home/user/code/lisp/elmtui.lisp/cl-inputs (standalone Git root, HEAD b9d0cbec; bridge identity cl-input). Resolve any newer registered standalone checkout before writing and report the chosen root. README already has a measured badge; CI gate currently says executable-line coverage >=49%, with tests/coverage_gate.py and coverage.lisp. Inspect prior October 11 research/audit checkpoints and use their verified conclusions, without duplicating an active worker.\nAudit incremental UTF-8/escape decoding across arbitrary fragmentation, malformed/truncated input, paste overflow bounds, ESC ambiguity deadlines, response register-before-write/correlation expiry and FIFO, preservation of unrelated user keys, sink backpressure, owned vs borrowed device cleanup, nested raw-mode restoration, EOF/cancel/error and async worker shutdown. README explicitly says TTY size is cached and dynamic SIGWINCH is not implemented: implement actual current-size discovery on the owning API and bounded resize delivery only if a concrete consumer contract can be tested, preserving ownership; otherwise document the exact residual gap rather than claiming support. Keep cl-events optional through cl-inputs/events; no root framework edits.\nRun standalone core, optional adapter with explicitly discoverable cl-events, python3 tests/pty-e2e.py, python3 tests/tmux-terminal-apps.py --timeout 20, and available termios regression. Preserve the single legitimate no-controlling-TTY skip and report it. Improve coverage through boundary tests rather than lowering its 49% floor; validate malformed/absent/missing-source coverage gate behavior and badge publication failure paths.\n\nYou are the senior Common Lisp maintainer responsible for delivering implementation, meaningful regression tests, and reviewable evidence. The user authorizes local fixes and refinements in the stated scope. Work autonomously through investigation, implementation, validation, required independent review, and evidence-backed continuation. Do not stop at suggestions or an audit report.\n\nOperating contract:\n- Resolve the exact Git root, HEAD, branch, local instructions, project identity, dirty files, active path claims, existing task/checkpoint results, and effective bridge.yml before writing. Task state running alone is not liveness. Reuse completed work and avoid competing with active ownership. Preserve unrelated dirty state; never reset, clean, delete user work, or rewrite history. Do not push, tag, release, or publish externally under this task.\n- Activate authenticated project filesystem tools; establish a fresh agent session and retain its binding where required. Adopt or admit and bind the exact canonical task/packet, begin it, and obey transactional mutations, leases, stale-write checks, and independent review. Missing ordinary packet metadata is routine setup, not a reason to refuse work. Respect explicit nonrecoverable admission or ownership denials. A browser response is not filesystem implementation.\n- Inspect contracts and establish a fresh baseline before editing. Reproduce concrete gaps with failing tests, then make the smallest coherent repair. Use balanced expression edits for Lisp/ASDF and verify cold reader/compiler/load behavior. Prefer existing CLOS protocols and standard CL idioms over hidden globals, eval, string-generated code, or needless new layers. Preserve public compatibility or provide an explicit tested migration.\n- Tests must detect observable incorrect behavior, including boundaries and failures. Do not increase assertion counts by duplicating checks, substitute mocks for claimed live behavior, suppress warnings broadly, weaken thresholds, exclude hard-to-test owned source, or call a skipped test passed. Run focused checks first, then the affected full suites once after final edits; retain exact commands, revisions, pass/fail/skip counts, logs and artifacts.\n- Record a gap ledger: source/contract, reproduction, severity, repair, regression evidence, and remaining work. Historical TODOs and old reports are leads, not current proof. Finish each concrete phase with a durable checkpoint and the configured typed phase result containing changed paths, baseline/final evidence, residual blockers and review references. Submit required independent review, address its findings, and do not self-approve.\n\nAutonomous continuation:\nContinue useful in-scope work within the current phase. Before context exhaustion, checkpoint exact progress, claims, transaction state, commands, failures, and the next executable action. After the configured review gate, if evidence shows acceptance remains unmet, admit one idempotent canonical successor carrying the same bounded scope, predecessor/result references, exact residual acceptance and dependency prerequisites; queue and dispatch through the installed native OCP surface when allowed. If promotion requires an operator gate, leave that exact successor ready with the actual gate reason. Never use retired prolonged/next.md or chain schedulers, recursively resend yourself, create parallel duplicate successors, invent authority, or perform endless audit-only rounds. No-progress continuation must name a concrete blocker and what changes it. Stop only at reviewed acceptance or an evidenced external/ownership blocker.\n\nReport implementation, local tests, live terminal tests, hosted CI, badge availability, and review as separate evidence layers. Leave Org-roam STATUS/TODO projection with AGENTIC conventions through the supported workflow; avoid duplicating an automatic phase-result projection.\n\nCoverage acceptance:\nProvide a prominent README badge backed by reproducible measurements and a linked report, with a documented metric (SB-COVER executable lines or expressions, explicitly distinguished), covered/total counts, per-file breakdown, source revision and reproducible command. Instrument all owned runtime source before forced compilation, disable instrumentation for tests/dependencies, clear stale data, and ensure unexecuted source contributes to the denominator. Never average per-file percentages or use docstring/assertion counts as code coverage. Fail closed on test failure, missing/empty/malformed reports, denominator drift, unsupported compiler capability, and threshold regression. Add negative-path tests for the gate. Reuse a correct existing workflow; repair defects rather than installing competing infrastructure. Ratchet from an honestly measured baseline and prioritize meaningful coverage of highest-risk gaps; retain any existing stronger gate. CI uploads reports even on failure, but a configured publication job may publish badge data only following successful trusted default-branch verification with minimum scoped permissions. Do not execute an external publish/push now: identify hosted availability as pending unless independently observed. Verify README endpoint matches the repository/branch/artifact contract. Document exclusions and portability boundaries precisely.\n",
+      "tags": [
+        "cl-inputs",
+        "enhancement"
+      ],
+      "title": "Input protocol gaps and honest coverage"
+    },
+    "task": {
+      "actorId": "chatgpt-ops",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T08:21:54.677Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+      "laneId": "02-inputs-20261014",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 80,
+      "projectId": "cl-inputs",
+      "promptId": "cl-inputs-02-inputs-enhance-20261014",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [
+          "chatgpt-ops:task-admission"
+        ],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": []
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T08:21:54.783Z"
+    }
+  },
+  "task": {
+    "actorId": "chatgpt-ops",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T08:21:54.677Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+    "laneId": "02-inputs-20261014",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 80,
+    "projectId": "cl-inputs",
+    "promptId": "cl-inputs-02-inputs-enhance-20261014",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [
+        "chatgpt-ops:task-admission"
+      ],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "chatgpt-ops:dispatch-attempt:40961be1191a402dbe430808001fae90",
+        "abc-v2:target:71B48D790F96677D6A84F4612F32CBC9",
+        "abc-v2:route:fleet/chatgpt/1@3"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": []
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T08:22:36.241Z"
+  }
+}

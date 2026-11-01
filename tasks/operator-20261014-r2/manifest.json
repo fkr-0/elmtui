@@ -1,0 +1,218 @@
+[
+  {
+    "project": "cl-events",
+    "lane": "01-events",
+    "root": "/home/user/code/lisp/cl-events",
+    "workspaceId": "ws-cb7a2a3937b624ef7eb781fe9041fd6a",
+    "title": "Events concurrency contracts and gate review",
+    "scope": [
+      "src/**",
+      "tests/**",
+      "scripts/coverage_gate.py",
+      "scripts/test_coverage_gate.py",
+      "README.md",
+      "docs/refinement-r2-20261014.md"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/01-events.md",
+    "promptId": "cl-events-01-events-refine-20261014-r2",
+    "taskId": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+    "priority": 90,
+    "predecessor": "CL-EVENTS-01-EVENTS-ENHANCE-20261014",
+    "acceptance": [
+      "Demonstrated defect repaired with meaningful regression tests",
+      "Focused and affected full checks pass with honest evidence",
+      "Durable phase submission and independent review requested"
+    ]
+  },
+  {
+    "project": "cl-input",
+    "lane": "02-input",
+    "root": "/home/user/code/lisp/elmtui.lisp/cl-inputs",
+    "workspaceId": "ws-d6715e0e39ce59f001f9ddbac4a83a47",
+    "title": "Input lifecycle, resize contract and measured coverage",
+    "scope": [
+      "src/**",
+      "tests/**",
+      "coverage.lisp",
+      ".github/workflows/ci.yml",
+      "README.md",
+      "docs/refinement-r2-20261014.md"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/02-input.md",
+    "promptId": "cl-input-02-input-refine-20261014-r2",
+    "taskId": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+    "priority": 90,
+    "predecessor": "CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+    "acceptance": [
+      "Demonstrated defect repaired with meaningful regression tests",
+      "Focused and affected full checks pass with honest evidence",
+      "Durable phase submission and independent review requested"
+    ]
+  },
+  {
+    "project": "cl-state",
+    "lane": "03-state",
+    "root": "/home/user/code/lisp/cl-state",
+    "workspaceId": "ws-cab479e1448507a0ebc27fe8f3548e0d",
+    "title": "State coverage shortfall and transaction model refinements",
+    "scope": [
+      "src/**",
+      "tests/**",
+      "scripts/**",
+      ".github/workflows/ci.yml",
+      "README.md",
+      "docs/refinement-r2-20261014.md"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/03-state.md",
+    "promptId": "cl-state-03-state-refine-20261014-r2",
+    "taskId": "CL-STATE-03-STATE-REFINE-20261014-R2",
+    "priority": 90,
+    "predecessor": "CL-STATE-03-STATE-ENHANCE-20261014",
+    "acceptance": [
+      "Demonstrated defect repaired with meaningful regression tests",
+      "Focused and affected full checks pass with honest evidence",
+      "Durable phase submission and independent review requested"
+    ]
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "04-styles",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "title": "Styles fail-open pipeline and cascade refinement",
+    "scope": [
+      "cl-styles/coverage.lisp",
+      "cl-styles/src/**",
+      "cl-styles/tests/**",
+      "cl-styles/scripts/**",
+      "cl-styles/.github/workflows/ci.yml",
+      "cl-styles/README.md",
+      "cl-styles/docs/refinement-r2-20261014.md"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/04-styles.md",
+    "promptId": "elmtui-clpm-04-styles-refine-20261014-r2",
+    "taskId": "ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+    "priority": 90,
+    "predecessor": "CL-STYLES-04-STYLES-ENHANCE-20261014",
+    "acceptance": [
+      "Demonstrated defect repaired with meaningful regression tests",
+      "Focused and affected full checks pass with honest evidence",
+      "Durable phase submission and independent review requested"
+    ]
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "05-dsl",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "title": "DSL independent-review corrections and bounded authoring",
+    "scope": [
+      "src/ui/dsl-resolution.lisp",
+      "src/ui/dsl-type-builtins.lisp",
+      "tests/dsl-resolution-tests.lisp",
+      "tests/dsl-resolve-tests.lisp",
+      "tests/dsl-props-normalization-tests.lisp",
+      "tests/base-dsl-tests.lisp",
+      "docs/operator-dsl-20261014.md"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/05-dsl.md",
+    "promptId": "elmtui-clpm-05-dsl-refine-20261014-r2",
+    "taskId": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+    "priority": 90,
+    "predecessor": "ELMTUI-CLPM-05-DSL-ENHANCE-20261014",
+    "acceptance": [
+      "Demonstrated defect repaired with meaningful regression tests",
+      "Focused and affected full checks pass with honest evidence",
+      "Durable phase submission and independent review requested"
+    ]
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "06-macros",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "title": "Macro implementation after publication repair",
+    "scope": [
+      "src/ui/defcomponent.lisp",
+      "src/app/application.lisp",
+      "src/app/tea-core.lisp",
+      "tests/defcomponent-tests.lisp",
+      "tests/application-extension-tests.lisp",
+      "tests/application-init-tests.lisp",
+      "tests/app-tests.lisp",
+      "docs/operator-macros-20261014.md"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/06-macros.md",
+    "promptId": "elmtui-clpm-06-macros-refine-20261014-r2",
+    "taskId": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+    "priority": 90,
+    "predecessor": "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+    "acceptance": [
+      "Demonstrated defect repaired with meaningful regression tests",
+      "Focused and affected full checks pass with honest evidence",
+      "Durable phase submission and independent review requested"
+    ]
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "07-terminal",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "title": "Terminal ownership and bottom-row restoration repairs",
+    "scope": [
+      "src/platform/**",
+      "src/view/**",
+      "src/ui/widgets/root-viewport.lisp",
+      "src/ui/widgets/viewport.lisp",
+      "src/ui/widgets/scroll-panel.lisp",
+      "examples/wifi-menu.lisp",
+      "examples/neon/**",
+      "tests/e2e/**",
+      "scripts/test-terminal-apps.py",
+      "tests/terminal-lifecycle-tests.lisp",
+      "tests/root-viewport-tests.lisp",
+      "tests/cleanup-regression-tests.lisp",
+      "docs/refinement-terminal-r2-20261014.md"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/07-terminal.md",
+    "promptId": "elmtui-clpm-07-terminal-refine-20261014-r2",
+    "taskId": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+    "priority": 90,
+    "predecessor": "ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014",
+    "acceptance": [
+      "Demonstrated defect repaired with meaningful regression tests",
+      "Focused and affected full checks pass with honest evidence",
+      "Durable phase submission and independent review requested"
+    ]
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "08-coverage",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "workspaceId": "ws-eedc8a91cdd62c5e2154b51540292ca8",
+    "title": "Generated coverage badge and final framework qualification",
+    "scope": [
+      "scripts/coverage.lisp",
+      "scripts/coverage-gate.py",
+      "scripts/run-coverage-warning-clean.sh",
+      "scripts/coverage-badge*",
+      ".github/workflows/ci.yml",
+      "README.org",
+      "tests/test_coverage_gate.py",
+      "tests/test_coverage_badge.py",
+      "docs/operator-qualification-20261014.md",
+      "docs/refinement-coverage-r2-20261014.md",
+      "docs/assets/coverage*"
+    ],
+    "taskId": "ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2",
+    "promptId": "elmtui-clpm-08-coverage-refine-20261014-r2",
+    "priority": 75,
+    "predecessor": "ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014",
+    "acceptance": [
+      "Successful measurement generates honest badge/report/provenance; failed run cannot publish stale data",
+      "Fail-closed gate, inventory and badge negative regressions pass",
+      "Final integration evidence at stable source hashes, independent review and honest residual blockers"
+    ],
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r2/08-coverage.md"
+  }
+]

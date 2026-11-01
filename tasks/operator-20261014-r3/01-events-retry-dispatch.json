@@ -1,0 +1,123 @@
+{
+  "receipt": {
+    "attempt": "f28ed670379f4f0fa885a3038805f031",
+    "dispatcher_owner": "process:71900:113206:ocp-CL-EVENTS-01-EVENTS-REVIEW-20261014-R3",
+    "dispatcher_pid": 71900,
+    "dispatcher_start_ticks": 113206,
+    "fleet": "chatgpt",
+    "fleet_slot": 2,
+    "lease_id": "bfe83299-29f6-4616-8ec4-af19c5dc7316",
+    "operation_id": null,
+    "priority": 85,
+    "project": "cl-events",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-EVENTS-01-EVENTS-REVIEW-20261014-R3-f28ed670379f.md",
+    "prompt_id": "cl-events-01-events-review-20261014-r3",
+    "prompt_sha256": "991381cb04d2812b3a6de31a445ffbd47b0ed04f24cb8c2ed00da565ebde6e37",
+    "repo": "elmtui.lisp",
+    "route_generation": 2,
+    "route_key": "fleet/chatgpt/2",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T13:44:27.762Z",
+    "state": "running",
+    "tab": "962FF0031E0F79ED5BE2272C6EAE9166",
+    "target_id": "962FF0031E0F79ED5BE2272C6EAE9166",
+    "task_id": "CL-EVENTS-01-EVENTS-REVIEW-20261014-R3",
+    "updated_at": "2026-10-14T13:44:27.762Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429301
+  },
+  "rendered": {
+    "prompt": {
+      "body": "@projmgrauth\nSet repo: cl-events\nExact root: /home/user/code/lisp/cl-events\nCanonical predecessor: CL-EVENTS-01-EVENTS-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nIndependently review cancellation-registration unwind, deterministic concurrency and measured badge provenance. Prior worker reports 1677 checks and 1124/1301 executable lines (86.40%); verify at current hashes. Inspect select partial registration, cancellation precedence, task-scope sibling failure/reaping and promise terminal races with barriers and bounded joins. The consumer submodule is older; document exact commit divergence, do not update its pin in this lane.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "createdAt": "2026-10-14T13:39:46.089Z",
+      "id": "cl-events-01-events-review-20261014-r3",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "01-events independent review and autonomous gap closure",
+      "updatedAt": "2026-10-14T13:39:46.089Z"
+    },
+    "rendered": {
+      "body": "@projmgrauth\nSet repo: cl-events\nExact root: /home/user/code/lisp/cl-events\nCanonical predecessor: CL-EVENTS-01-EVENTS-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nIndependently review cancellation-registration unwind, deterministic concurrency and measured badge provenance. Prior worker reports 1677 checks and 1124/1301 executable lines (86.40%); verify at current hashes. Inspect select partial registration, cancellation precedence, task-scope sibling failure/reaping and promise terminal races with barriers and bounded joins. The consumer submodule is older; document exact commit divergence, do not update its pin in this lane.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "01-events independent review and autonomous gap closure"
+    },
+    "task": {
+      "actorId": "chatgpt-ops",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T13:39:46.200Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "CL-EVENTS-01-EVENTS-REVIEW-20261014-R3",
+      "laneId": "01-events-review-r3",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 85,
+      "projectId": "cl-events",
+      "promptId": "cl-events-01-events-review-20261014-r3",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [
+          "chatgpt-ops:task-admission",
+          "chatgpt-ops:ocp-dispatch-receipt:CL-EVENTS-01-EVENTS-REVIEW-20261014-R3:6cc6eb5bc56e4e8a8a98123a0ef166a5",
+          "chatgpt-ops:retry"
+        ],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [
+          "chatgpt-ops:dispatch-attempt:6cc6eb5bc56e4e8a8a98123a0ef166a5",
+          "abc-v2:target:F1B6843DFABA6489C50B78E709D363B9",
+          "abc-v2:route:fleet/chatgpt/1@2"
+        ],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": []
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T13:44:20.424Z"
+    }
+  },
+  "task": {
+    "actorId": "chatgpt-ops",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T13:39:46.200Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "CL-EVENTS-01-EVENTS-REVIEW-20261014-R3",
+    "laneId": "01-events-review-r3",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 85,
+    "projectId": "cl-events",
+    "promptId": "cl-events-01-events-review-20261014-r3",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [
+        "chatgpt-ops:task-admission",
+        "chatgpt-ops:ocp-dispatch-receipt:CL-EVENTS-01-EVENTS-REVIEW-20261014-R3:6cc6eb5bc56e4e8a8a98123a0ef166a5",
+        "chatgpt-ops:retry"
+      ],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "chatgpt-ops:dispatch-attempt:6cc6eb5bc56e4e8a8a98123a0ef166a5",
+        "abc-v2:target:F1B6843DFABA6489C50B78E709D363B9",
+        "abc-v2:route:fleet/chatgpt/1@2",
+        "chatgpt-ops:dispatch-attempt:f28ed670379f4f0fa885a3038805f031",
+        "abc-v2:target:962FF0031E0F79ED5BE2272C6EAE9166",
+        "abc-v2:route:fleet/chatgpt/2@2"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": []
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T13:44:27.762Z"
+  }
+}

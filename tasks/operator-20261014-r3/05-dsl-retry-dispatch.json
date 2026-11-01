@@ -1,0 +1,112 @@
+{
+  "receipt": {
+    "attempt": "3f5a25377e5e4add91d6b33f5f06cd98",
+    "dispatcher_owner": "process:77490:118439:ocp-ELMTUI-CLPM-05-DSL-REVIEW-20261014-R3",
+    "dispatcher_pid": 77490,
+    "dispatcher_start_ticks": 118439,
+    "fleet": "chatgpt",
+    "fleet_slot": 2,
+    "lease_id": "38a7b879-ad83-43da-b10e-53290f2688dc",
+    "operation_id": null,
+    "priority": 85,
+    "project": "elmtui-clpm",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-05-DSL-REVIEW-20261014-R3-3f5a25377e5e.md",
+    "prompt_id": "elmtui-clpm-05-dsl-review-20261014-r3",
+    "prompt_sha256": "08cbd37d2277f162afb2d93a610afc8d14cba22e2525fe05b7be0eddc519f37b",
+    "repo": "elmtui-clpm",
+    "route_generation": 3,
+    "route_key": "fleet/chatgpt/2",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T13:45:19.081Z",
+    "state": "running",
+    "tab": "1764BE0F1EED35E4E15564D0DF3DD901",
+    "target_id": "1764BE0F1EED35E4E15564D0DF3DD901",
+    "task_id": "ELMTUI-CLPM-05-DSL-REVIEW-20261014-R3",
+    "updated_at": "2026-10-14T13:45:19.081Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429301
+  },
+  "rendered": {
+    "prompt": {
+      "body": "@projmgrauth\nSet repo: elmtui-clpm\nExact root: /home/user/code/lisp/elmtui.lisp\nCanonical predecessor: ELMTUI-CLPM-05-DSL-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nOwn ONLY src/ui/dsl-resolution.lisp, src/ui/dsl-type-builtins.lisp and their existing DSL test/docs paths. Independently verify both public dsl-type and resolve-dsl-type on cyclic CAR/CDR, multi-node cycles and bounded deep forms in fresh timeout-bounded CLPM processes. Dirty code now claims depth-512 guards; prove termination and typed diagnostics without breaking aliases/custom methods, duplicate property precedence, explicit NIL or caller sharing. Request changes on concrete failures and route the exact governed revision owner to implementation.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "createdAt": "2026-10-14T13:39:47.786Z",
+      "id": "elmtui-clpm-05-dsl-review-20261014-r3",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "05-dsl independent review and autonomous gap closure",
+      "updatedAt": "2026-10-14T13:39:47.786Z"
+    },
+    "rendered": {
+      "body": "@projmgrauth\nSet repo: elmtui-clpm\nExact root: /home/user/code/lisp/elmtui.lisp\nCanonical predecessor: ELMTUI-CLPM-05-DSL-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nOwn ONLY src/ui/dsl-resolution.lisp, src/ui/dsl-type-builtins.lisp and their existing DSL test/docs paths. Independently verify both public dsl-type and resolve-dsl-type on cyclic CAR/CDR, multi-node cycles and bounded deep forms in fresh timeout-bounded CLPM processes. Dirty code now claims depth-512 guards; prove termination and typed diagnostics without breaking aliases/custom methods, duplicate property precedence, explicit NIL or caller sharing. Request changes on concrete failures and route the exact governed revision owner to implementation.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "05-dsl independent review and autonomous gap closure"
+    },
+    "task": {
+      "actorId": "chatgpt-ops",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T13:39:47.889Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "ELMTUI-CLPM-05-DSL-REVIEW-20261014-R3",
+      "laneId": "05-dsl-review-r3",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 85,
+      "projectId": "elmtui-clpm",
+      "promptId": "elmtui-clpm-05-dsl-review-20261014-r3",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [
+          "chatgpt-ops:task-admission"
+        ],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": []
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T13:39:48.004Z"
+    }
+  },
+  "task": {
+    "actorId": "chatgpt-ops",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T13:39:47.889Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "ELMTUI-CLPM-05-DSL-REVIEW-20261014-R3",
+    "laneId": "05-dsl-review-r3",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 85,
+    "projectId": "elmtui-clpm",
+    "promptId": "elmtui-clpm-05-dsl-review-20261014-r3",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [
+        "chatgpt-ops:task-admission"
+      ],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "chatgpt-ops:dispatch-attempt:3f5a25377e5e4add91d6b33f5f06cd98",
+        "abc-v2:target:1764BE0F1EED35E4E15564D0DF3DD901",
+        "abc-v2:route:fleet/chatgpt/2@3"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": []
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T13:45:19.081Z"
+  }
+}

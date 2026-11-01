@@ -1,0 +1,112 @@
+{
+  "receipt": {
+    "attempt": "55c3c3d0f87a4d0da1dc14598e723ea7",
+    "dispatcher_owner": "process:78962:119861:ocp-ELMTUI-CLPM-07-TERMINAL-REVIEW-20261014-R3",
+    "dispatcher_pid": 78962,
+    "dispatcher_start_ticks": 119861,
+    "fleet": "chatgpt",
+    "fleet_slot": 0,
+    "lease_id": "991cbdef-13fd-49f8-92a9-e15550bfa234",
+    "operation_id": null,
+    "priority": 85,
+    "project": "elmtui-clpm",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-07-TERMINAL-REVIEW-20261014-R3-55c3c3d0f87a.md",
+    "prompt_id": "elmtui-clpm-07-terminal-review-20261014-r3",
+    "prompt_sha256": "d01a8a5a226c2f67139ba3903fd84ffeccb89e1f68be1e92bc27b4dbde2ed51e",
+    "repo": "elmtui-clpm",
+    "route_generation": 4,
+    "route_key": "fleet/chatgpt/0",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T13:45:33.709Z",
+    "state": "running",
+    "tab": "0534C4853726A89E5A2F59DE1516E88B",
+    "target_id": "0534C4853726A89E5A2F59DE1516E88B",
+    "task_id": "ELMTUI-CLPM-07-TERMINAL-REVIEW-20261014-R3",
+    "updated_at": "2026-10-14T13:45:33.709Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429252
+  },
+  "rendered": {
+    "prompt": {
+      "body": "@projmgrauth\nSet repo: elmtui-clpm\nExact root: /home/user/code/lisp/elmtui.lisp\nCanonical predecessor: ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nOwn ONLY predecessor terminal scope in tasks/operator-20261014-r2/manifest.json. Existing checkpoint is blocked on recovery metadata: transactionIds exists but restore-and-requeue expects singular transactionId. Preserve transaction 6c9999ca-4ae5-445c-b09a-de0ec3658433 and dirty fixes; use supported reconcile/recovery, never hand-edit DB or rollback unowned work. Prior read-only bottom-row/neon/Wi-Fi gates pass; whole-frame OCR misses a visibly present menu, cropped OCR recognizes it. Repair geometry/contrast-aware oracle from actual PNGs while retaining full-frame and before/after restoration proof. Test tiny-large-tiny, slow double Enter exactly one command, exception unwind, repeated bounded shutdown, termios/cursor/surrounding-screen. Resolve Life pause glyph by semantic evidence, not greenwashing.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "createdAt": "2026-10-14T13:39:48.650Z",
+      "id": "elmtui-clpm-07-terminal-review-20261014-r3",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "07-terminal independent review and autonomous gap closure",
+      "updatedAt": "2026-10-14T13:39:48.650Z"
+    },
+    "rendered": {
+      "body": "@projmgrauth\nSet repo: elmtui-clpm\nExact root: /home/user/code/lisp/elmtui.lisp\nCanonical predecessor: ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nOwn ONLY predecessor terminal scope in tasks/operator-20261014-r2/manifest.json. Existing checkpoint is blocked on recovery metadata: transactionIds exists but restore-and-requeue expects singular transactionId. Preserve transaction 6c9999ca-4ae5-445c-b09a-de0ec3658433 and dirty fixes; use supported reconcile/recovery, never hand-edit DB or rollback unowned work. Prior read-only bottom-row/neon/Wi-Fi gates pass; whole-frame OCR misses a visibly present menu, cropped OCR recognizes it. Repair geometry/contrast-aware oracle from actual PNGs while retaining full-frame and before/after restoration proof. Test tiny-large-tiny, slow double Enter exactly one command, exception unwind, repeated bounded shutdown, termios/cursor/surrounding-screen. Resolve Life pause glyph by semantic evidence, not greenwashing.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "07-terminal independent review and autonomous gap closure"
+    },
+    "task": {
+      "actorId": "chatgpt-ops",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T13:39:48.754Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "ELMTUI-CLPM-07-TERMINAL-REVIEW-20261014-R3",
+      "laneId": "07-terminal-review-r3",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 85,
+      "projectId": "elmtui-clpm",
+      "promptId": "elmtui-clpm-07-terminal-review-20261014-r3",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [
+          "chatgpt-ops:task-admission"
+        ],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": []
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T13:39:48.864Z"
+    }
+  },
+  "task": {
+    "actorId": "chatgpt-ops",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T13:39:48.754Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "ELMTUI-CLPM-07-TERMINAL-REVIEW-20261014-R3",
+    "laneId": "07-terminal-review-r3",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 85,
+    "projectId": "elmtui-clpm",
+    "promptId": "elmtui-clpm-07-terminal-review-20261014-r3",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [
+        "chatgpt-ops:task-admission"
+      ],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "chatgpt-ops:dispatch-attempt:55c3c3d0f87a4d0da1dc14598e723ea7",
+        "abc-v2:target:0534C4853726A89E5A2F59DE1516E88B",
+        "abc-v2:route:fleet/chatgpt/0@4"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": []
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T13:45:33.709Z"
+  }
+}

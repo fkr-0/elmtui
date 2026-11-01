@@ -1,0 +1,112 @@
+{
+  "receipt": {
+    "attempt": "b1d7aaf87dc74b0cb779816c4cf99289",
+    "dispatcher_owner": "process:74776:116318:ocp-CL-INPUT-02-INPUT-REVIEW-20261014-R3",
+    "dispatcher_pid": 74776,
+    "dispatcher_start_ticks": 116318,
+    "fleet": "chatgpt",
+    "fleet_slot": 3,
+    "lease_id": "1d05a7cf-3799-4820-86d3-5244f8ac7c4c",
+    "operation_id": null,
+    "priority": 85,
+    "project": "cl-input",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-INPUT-02-INPUT-REVIEW-20261014-R3-b1d7aaf87dc7.md",
+    "prompt_id": "cl-input-02-input-review-20261014-r3",
+    "prompt_sha256": "940e8a76646d263640cf9113e190c9baebbe63eee5fac5796aa4cb0e17a731de",
+    "repo": "elmtui.lisp",
+    "route_generation": 2,
+    "route_key": "fleet/chatgpt/3",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T13:44:58.418Z",
+    "state": "running",
+    "tab": "57B67BA20849017C60FD0272E36CD37E",
+    "target_id": "57B67BA20849017C60FD0272E36CD37E",
+    "task_id": "CL-INPUT-02-INPUT-REVIEW-20261014-R3",
+    "updated_at": "2026-10-14T13:44:58.418Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429303
+  },
+  "rendered": {
+    "prompt": {
+      "body": "@projmgrauth\nSet repo: cl-input\nExact root: /home/user/code/lisp/elmtui.lisp/cl-inputs\nCanonical predecessor: CL-INPUT-02-INPUT-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nIndependently review descriptor-backed TIOCGWINSZ and opt-in resize observation, keyboard survival and device ownership. Prior worker reports 921 checks/1 skip and core coverage 2234/4242=52.66%, excluding uninstrumented optional adapter. Close meaningful failure/unwind regressions and instrument the optional events adapter using a compatible discoverable events system; explicitly preserve distinction between core and all-owned coverage. Re-run kernel PTY resize 113x37 then 97x29 and private tmux lifecycle. Never steal terminal replies or fabricate LCOV hits.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "createdAt": "2026-10-14T13:39:46.512Z",
+      "id": "cl-input-02-input-review-20261014-r3",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "02-input independent review and autonomous gap closure",
+      "updatedAt": "2026-10-14T13:39:46.512Z"
+    },
+    "rendered": {
+      "body": "@projmgrauth\nSet repo: cl-input\nExact root: /home/user/code/lisp/elmtui.lisp/cl-inputs\nCanonical predecessor: CL-INPUT-02-INPUT-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nIndependently review descriptor-backed TIOCGWINSZ and opt-in resize observation, keyboard survival and device ownership. Prior worker reports 921 checks/1 skip and core coverage 2234/4242=52.66%, excluding uninstrumented optional adapter. Close meaningful failure/unwind regressions and instrument the optional events adapter using a compatible discoverable events system; explicitly preserve distinction between core and all-owned coverage. Re-run kernel PTY resize 113x37 then 97x29 and private tmux lifecycle. Never steal terminal replies or fabricate LCOV hits.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "02-input independent review and autonomous gap closure"
+    },
+    "task": {
+      "actorId": "chatgpt-ops",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T13:39:46.622Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "CL-INPUT-02-INPUT-REVIEW-20261014-R3",
+      "laneId": "02-input-review-r3",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 85,
+      "projectId": "cl-input",
+      "promptId": "cl-input-02-input-review-20261014-r3",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [
+          "chatgpt-ops:task-admission"
+        ],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": []
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T13:39:46.726Z"
+    }
+  },
+  "task": {
+    "actorId": "chatgpt-ops",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T13:39:46.622Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "CL-INPUT-02-INPUT-REVIEW-20261014-R3",
+    "laneId": "02-input-review-r3",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 85,
+    "projectId": "cl-input",
+    "promptId": "cl-input-02-input-review-20261014-r3",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [
+        "chatgpt-ops:task-admission"
+      ],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "chatgpt-ops:dispatch-attempt:b1d7aaf87dc74b0cb779816c4cf99289",
+        "abc-v2:target:57B67BA20849017C60FD0272E36CD37E",
+        "abc-v2:route:fleet/chatgpt/3@2"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": []
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T13:44:58.418Z"
+  }
+}

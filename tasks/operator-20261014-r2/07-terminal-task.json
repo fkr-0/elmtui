@@ -1,0 +1,67 @@
+{
+  "dispatchReceipt": {
+    "attempt": "f03c5ac6208c41a7934f0f6e1a82b28a",
+    "dispatcher_owner": "process:920248:39147489:ocp-ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+    "dispatcher_pid": 920248,
+    "dispatcher_start_ticks": 39147489,
+    "fleet": "chatgpt",
+    "fleet_slot": 1,
+    "lease_id": "ee41a81d-3d08-44ba-9c01-059342e5ba1e",
+    "operation_id": null,
+    "priority": 90,
+    "project": "elmtui-clpm",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2-f03c5ac6208c.md",
+    "prompt_id": "elmtui-clpm-07-terminal-refine-20261014-r2",
+    "prompt_sha256": "cb9b3af53fde426e2accbece555c9b72efb30af359805c3663b6e52c761a6e37",
+    "repo": "elmtui-clpm",
+    "route_generation": 6,
+    "route_key": "fleet/chatgpt/1",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T08:50:19.486Z",
+    "state": "running",
+    "tab": "6CD654F23761B74CB1B18F9FE8581E65",
+    "target_id": "6CD654F23761B74CB1B18F9FE8581E65",
+    "task_id": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+    "updated_at": "2026-10-14T08:50:19.486Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429161
+  },
+  "task": {
+    "actorId": "codex-enhance-r2-coordinator",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T08:46:46.971Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+    "laneId": "07-terminal",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 90,
+    "projectId": "elmtui-clpm",
+    "promptId": "elmtui-clpm-07-terminal-refine-20261014-r2",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+        "wsbridge:worker:codex-enhance-r2-coordinator",
+        "wsbridge:session:codex-enhance-r2-20261014",
+        "chatgpt-ops:dispatch-attempt:f03c5ac6208c41a7934f0f6e1a82b28a",
+        "abc-v2:target:6CD654F23761B74CB1B18F9FE8581E65",
+        "abc-v2:route:fleet/chatgpt/1@6"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": [
+        "ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014",
+        "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+        "wsbridge:work-packet:d304ad30-e992-45a8-b6e9-d20486ab82c9"
+      ]
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T08:50:19.486Z"
+  }
+}

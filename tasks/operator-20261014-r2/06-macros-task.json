@@ -1,0 +1,67 @@
+{
+  "dispatchReceipt": {
+    "attempt": "259e7ca3f70a4841a04d888f6d7be203",
+    "dispatcher_owner": "process:918192:39146647:ocp-ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+    "dispatcher_pid": 918192,
+    "dispatcher_start_ticks": 39146647,
+    "fleet": "chatgpt",
+    "fleet_slot": 0,
+    "lease_id": "5181e7e6-6510-4800-ace4-65e1ee081d90",
+    "operation_id": null,
+    "priority": 90,
+    "project": "elmtui-clpm",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2-259e7ca3f70a.md",
+    "prompt_id": "elmtui-clpm-06-macros-refine-20261014-r2",
+    "prompt_sha256": "cd83e65834b8c5bac4ae291c0f2cf0ae5c3b634f9f74805954d8d7ed7d0b69e2",
+    "repo": "elmtui-clpm",
+    "route_generation": 5,
+    "route_key": "fleet/chatgpt/0",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T08:50:12.197Z",
+    "state": "running",
+    "tab": "46A596832376A5BFDF3810E2F2C91219",
+    "target_id": "46A596832376A5BFDF3810E2F2C91219",
+    "task_id": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+    "updated_at": "2026-10-14T08:50:12.197Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429159
+  },
+  "task": {
+    "actorId": "codex-enhance-r2-coordinator",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T08:46:45.953Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+    "laneId": "06-macros",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 90,
+    "projectId": "elmtui-clpm",
+    "promptId": "elmtui-clpm-06-macros-refine-20261014-r2",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "wsbridge:presence:31d49e14-c336-49de-88a8-53db95f63bd2",
+        "wsbridge:worker:codex-enhance-r2-coordinator",
+        "wsbridge:session:codex-enhance-r2-20261014",
+        "chatgpt-ops:dispatch-attempt:259e7ca3f70a4841a04d888f6d7be203",
+        "abc-v2:target:46A596832376A5BFDF3810E2F2C91219",
+        "abc-v2:route:fleet/chatgpt/0@5"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": [
+        "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+        "wsbridge:workspace:ws-eedc8a91cdd62c5e2154b51540292ca8",
+        "wsbridge:work-packet:98da5d14-916a-48d2-9bec-094a3b6d4634"
+      ]
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T08:50:12.197Z"
+  }
+}

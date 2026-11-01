@@ -1,0 +1,123 @@
+{
+  "receipt": {
+    "attempt": "5e8ab1720c154ecda943606b89ece2a6",
+    "dispatcher_owner": "process:896666:39134782:ocp-CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+    "dispatcher_pid": 896666,
+    "dispatcher_start_ticks": 39134782,
+    "fleet": "chatgpt",
+    "fleet_slot": 0,
+    "lease_id": "86f18621-544f-461a-9b1c-a3fe5b8af5cb",
+    "operation_id": null,
+    "priority": 90,
+    "project": "cl-events",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-EVENTS-01-EVENTS-REFINE-20261014-R2-5e8ab1720c15.md",
+    "prompt_id": "cl-events-01-events-refine-20261014-r2",
+    "prompt_sha256": "fcbb7637aa6bc9b20d8212e2a7ee1c1b15f12000ea065ee1eadfa7de667e2281",
+    "repo": "elmtui.lisp",
+    "route_generation": 4,
+    "route_key": "fleet/chatgpt/0",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T08:48:24.616Z",
+    "state": "running",
+    "tab": "2443B9F664A937CCAF471301938C4953",
+    "target_id": "2443B9F664A937CCAF471301938C4953",
+    "task_id": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+    "updated_at": "2026-10-14T08:48:24.616Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429159
+  },
+  "rendered": {
+    "prompt": {
+      "body": "# Events concurrency contracts and gate review\n\nEffective workflow project ID: cl-events\nExact open_workspace root: /home/user/code/lisp/cl-events\nWorkspace ID: ws-cb7a2a3937b624ef7eb781fe9041fd6a\nCanonical task: CL-EVENTS-01-EVENTS-REFINE-20261014-R2\nPredecessor: CL-EVENTS-01-EVENTS-ENHANCE-20261014\nWrite scope: src/**, tests/**, scripts/coverage_gate.py, scripts/test_coverage_gate.py, README.md, docs/refinement-r2-20261014.md\n\nPrior worker repaired stale-badge retention; Python 6/6 and standalone 1675/1675 passed, measured 1123/1300 executable lines=86.38%, 85% floor. Review those two dirty gate files without overwriting the untracked bridge.yml. It did not complete concurrency refinement. Target low-coverage protocols/types/lifecycle/messaging through exported behavior, and deterministic select register/rescan/unwind, cancellation precedence, task-scope sibling error and reaping, promise terminal races, pubsub blocked subscriber/unsubscribe failure paths. Use controlled barriers/injected clocks and bounded thread counts, not sleeps or repeated baseline checks. Preserve source-order select fairness and one-shot loop lifecycle. Do not edit ElmTUI pinned copy. Verify gate removes stale badge only within its owned output and never claims publication on failure. Submit implementation and request genuinely independent review through workflow, not an unavailable review backend repeated forever.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+      "createdAt": "2026-10-14T08:45:34.474Z",
+      "id": "cl-events-01-events-refine-20261014-r2",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "refinement"
+      ],
+      "title": "Events concurrency contracts and gate review",
+      "updatedAt": "2026-10-14T08:45:34.474Z"
+    },
+    "rendered": {
+      "body": "# Events concurrency contracts and gate review\n\nEffective workflow project ID: cl-events\nExact open_workspace root: /home/user/code/lisp/cl-events\nWorkspace ID: ws-cb7a2a3937b624ef7eb781fe9041fd6a\nCanonical task: CL-EVENTS-01-EVENTS-REFINE-20261014-R2\nPredecessor: CL-EVENTS-01-EVENTS-ENHANCE-20261014\nWrite scope: src/**, tests/**, scripts/coverage_gate.py, scripts/test_coverage_gate.py, README.md, docs/refinement-r2-20261014.md\n\nPrior worker repaired stale-badge retention; Python 6/6 and standalone 1675/1675 passed, measured 1123/1300 executable lines=86.38%, 85% floor. Review those two dirty gate files without overwriting the untracked bridge.yml. It did not complete concurrency refinement. Target low-coverage protocols/types/lifecycle/messaging through exported behavior, and deterministic select register/rescan/unwind, cancellation precedence, task-scope sibling error and reaping, promise terminal races, pubsub blocked subscriber/unsubscribe failure paths. Use controlled barriers/injected clocks and bounded thread counts, not sleeps or repeated baseline checks. Preserve source-order select fairness and one-shot loop lifecycle. Do not edit ElmTUI pinned copy. Verify gate removes stale badge only within its owned output and never claims publication on failure. Submit implementation and request genuinely independent review through workflow, not an unavailable review backend repeated forever.\n\nExecute implementation, regression evidence, durable typed submission and independent review, not another baseline-only audit. This is an evidence-backed successor to the first enhancement wave; read its exact response, packet/checkpoint, changed files and tests before editing. Preserve all prior dirty work and the unrelated docs/release-history-purge.md deletion. No push, release, tag, external publication, history rewrite or cleanup is authorized.\n\nUse open_workspace with the exact root below, not workspace_brief's nearest registered parent projection. Start a genuinely fresh unique worker/session and retain the returned agentBinding; do not reuse another worker's binding or repeatedly retry an expired one. The coordinator pre-admits and publishes this exact task's bounded packet where the workflow exists. Inspect canonical task binding and current packet/claims, reserve only the handed-off opportunity, begin and renew it, use transactional stale-write protected mutations, checkpoint with transaction IDs, and submit a typed result. Project identity is the effective workflow project ID below, not necessarily the registered display alias. Reconcile ordinary packet metadata automatically; honor actual ownership conflicts. Do not start an unrelated highest-priority packet. If publication is still needed, perform the authorized resolve_runtime_opportunity publish or hand back the exact packet/decision; never stop at vague missing metadata.\n\nEdit balanced Lisp forms and validate cold read/compile/load. Reproduce each defect with a bounded failing test, repair narrowly, run meaningful error/unwind/boundary tests and affected full suites at final source hashes. Distinguish local checks, real PTY/tmux/urxvt, hosted CI, public badge availability and review. Report exact commands, exit codes, pass/fail/skips, source inventories/revisions and artifacts. Never weaken thresholds, omit zero-covered owned files, count assertions as coverage, or change a terminal expectation merely to get green. Keep one executable gap ledger and one idempotent in-scope successor after configured review for evidenced residual work, with predecessor/result refs and precise scope. No endless audits, duplicate sends or fabricated completion. A missing OpenCode backend is not the only route to independent review: use the governed independent reviewer queue and a separate authenticated ChatGPT reviewer worker; never self-approve. Stop at reviewed acceptance or an exact nonrecoverable blocker.\n",
+      "tags": [
+        "refinement"
+      ],
+      "title": "Events concurrency contracts and gate review"
+    },
+    "task": {
+      "actorId": "codex-enhance-r2-coordinator-events",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T08:46:16.446Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+      "laneId": "01-events",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 90,
+      "projectId": "cl-events",
+      "promptId": "cl-events-01-events-refine-20261014-r2",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [
+          "wsbridge:presence:b84684d4-e319-4a5e-bf13-830382520027",
+          "wsbridge:worker:codex-enhance-r2-coordinator-events",
+          "wsbridge:session:codex-enhance-r2-20261014-events"
+        ],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": [
+          "CL-EVENTS-01-EVENTS-ENHANCE-20261014",
+          "wsbridge:workspace:ws-cb7a2a3937b624ef7eb781fe9041fd6a",
+          "wsbridge:work-packet:d9acbb95-df02-441b-8980-a960c6e7ee46"
+        ]
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T08:47:37.190Z"
+    }
+  },
+  "task": {
+    "actorId": "codex-enhance-r2-coordinator-events",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T08:46:16.446Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+    "laneId": "01-events",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 90,
+    "projectId": "cl-events",
+    "promptId": "cl-events-01-events-refine-20261014-r2",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "wsbridge:presence:b84684d4-e319-4a5e-bf13-830382520027",
+        "wsbridge:worker:codex-enhance-r2-coordinator-events",
+        "wsbridge:session:codex-enhance-r2-20261014-events",
+        "chatgpt-ops:dispatch-attempt:5e8ab1720c154ecda943606b89ece2a6",
+        "abc-v2:target:2443B9F664A937CCAF471301938C4953",
+        "abc-v2:route:fleet/chatgpt/0@4"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": [
+        "CL-EVENTS-01-EVENTS-ENHANCE-20261014",
+        "wsbridge:workspace:ws-cb7a2a3937b624ef7eb781fe9041fd6a",
+        "wsbridge:work-packet:d9acbb95-df02-441b-8980-a960c6e7ee46"
+      ]
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T08:48:24.616Z"
+  }
+}

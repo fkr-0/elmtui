@@ -1,0 +1,67 @@
+{
+  "dispatchReceipt": {
+    "attempt": "c0589517ebeb4672bec045029d43a858",
+    "dispatcher_owner": "process:896666:39134782:ocp-CL-INPUT-02-INPUT-REFINE-20261014-R2",
+    "dispatcher_pid": 896666,
+    "dispatcher_start_ticks": 39134782,
+    "fleet": "chatgpt",
+    "fleet_slot": 3,
+    "lease_id": "fd93eb5d-339b-48f7-a561-a6f012014d5e",
+    "operation_id": null,
+    "priority": 90,
+    "project": "cl-input",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/CL-INPUT-02-INPUT-REFINE-20261014-R2-c0589517ebeb.md",
+    "prompt_id": "cl-input-02-input-refine-20261014-r2",
+    "prompt_sha256": "5813dd072c8b3d4514712c3bcfbc902d3c7b3bbc8008aa16cd755ce4b2560f11",
+    "repo": "elmtui.lisp",
+    "route_generation": 4,
+    "route_key": "fleet/chatgpt/3",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T08:48:14.954Z",
+    "state": "running",
+    "tab": "0E2E8017BAFD79E5219DCE8A0B16E5E7",
+    "target_id": "0E2E8017BAFD79E5219DCE8A0B16E5E7",
+    "task_id": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+    "updated_at": "2026-10-14T08:48:14.954Z",
+    "url": "https://chatgpt.com/c/6acf41cc-ef0c-83ed-9ee8-e9064526b7d5",
+    "window_id": 774429166
+  },
+  "task": {
+    "actorId": "codex-enhance-r2-coordinator-input",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T08:46:41.312Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+    "laneId": "02-input",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 90,
+    "projectId": "cl-input",
+    "promptId": "cl-input-02-input-refine-20261014-r2",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "wsbridge:presence:adbbb188-ff03-44c2-8ece-0f76aedd3c84",
+        "wsbridge:worker:codex-enhance-r2-coordinator-input",
+        "wsbridge:session:codex-enhance-r2-20261014-input",
+        "chatgpt-ops:dispatch-attempt:c0589517ebeb4672bec045029d43a858",
+        "abc-v2:target:0E2E8017BAFD79E5219DCE8A0B16E5E7",
+        "abc-v2:route:fleet/chatgpt/3@4"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": [
+        "CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+        "wsbridge:workspace:ws-d6715e0e39ce59f001f9ddbac4a83a47",
+        "wsbridge:work-packet:cec12fe9-f987-41bb-a7e0-af4af5f2780f"
+      ]
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T08:48:14.954Z"
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "receipt": {
+    "attempt": "8e9e950f30584816b666779db7cb6e4a",
+    "dispatcher_owner": "process:76460:117716:ocp-ELMTUI-CLPM-04-STYLES-REVIEW-20261014-R3",
+    "dispatcher_pid": 76460,
+    "dispatcher_start_ticks": 117716,
+    "fleet": "chatgpt",
+    "fleet_slot": 1,
+    "lease_id": "33677e57-d354-4634-91d3-73decc058687",
+    "operation_id": null,
+    "priority": 85,
+    "project": "elmtui-clpm",
+    "prompt_file": "/home/user/code/chatgpt-tooling/instance-state/ocp-prompts/ELMTUI-CLPM-04-STYLES-REVIEW-20261014-R3-8e9e950f3058.md",
+    "prompt_id": "elmtui-clpm-04-styles-review-20261014-r3",
+    "prompt_sha256": "7cc3932f7afad60aef9100ea3746f5408c5de418610a6e8d9c29ce85a34d874d",
+    "repo": "elmtui-clpm",
+    "route_generation": 3,
+    "route_key": "fleet/chatgpt/1",
+    "source": "ocp-canary",
+    "started_at": "2026-10-14T13:45:12.600Z",
+    "state": "running",
+    "tab": "E55BAD7C37AAA61BA6F116E7312422AB",
+    "target_id": "E55BAD7C37AAA61BA6F116E7312422AB",
+    "task_id": "ELMTUI-CLPM-04-STYLES-REVIEW-20261014-R3",
+    "updated_at": "2026-10-14T13:45:12.600Z",
+    "url": "https://chatgpt.com/c/local-chatgpt%3A15cb7ae7-efd1-4d5b-9071-1c5cec486abb",
+    "window_id": 774429299
+  },
+  "rendered": {
+    "prompt": {
+      "body": "@projmgrauth\nSet repo: elmtui-clpm\nExact root: /home/user/code/lisp/elmtui.lisp\nCanonical predecessor: ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nOwn ONLY cl-styles subtree. Independently review unfinished dirty coverage.lisp replacement and gate tests/scripts. Complete real report/count JSON/LCOV, failing FiveAM propagation, inventory protection, success-only generated README badge and CI configuration. Reproduce missing report, stale endpoint, below threshold and zero-covered-source behavior. Add deterministic cascade/specificity/inheritance/explicit-NIL/property precedence regressions and repair demonstrated gaps. Never edit root coverage files or other libraries.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "createdAt": "2026-10-14T13:39:47.377Z",
+      "id": "elmtui-clpm-04-styles-review-20261014-r3",
+      "origin": "agent_api",
+      "revision": 1,
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "04-styles independent review and autonomous gap closure",
+      "updatedAt": "2026-10-14T13:39:47.377Z"
+    },
+    "rendered": {
+      "body": "@projmgrauth\nSet repo: elmtui-clpm\nExact root: /home/user/code/lisp/elmtui.lisp\nCanonical predecessor: ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2\n\nAct as a senior Common Lisp maintainer and independent reviewer. This is a review-first continuation of authorized enhancement work, not permission to duplicate a running implementation lane. Read exact predecessor prompt, packet, latest checkpoints, review verdicts, source diff, git status and path claims before doing work. Previously running OCP labels are not liveness: their browser targets disappeared in the current fleet. Do not replay the original send or complete partial tasks. Recover/adopt the exact predecessor using canonical evidence when supported; if no recovery is possible, report the exact failure and preserve work. For review use a separate eligible reviewer lease, never self-approve. Any implementation must get its own admitted bounded packet after old claims have released.\n\nOwn ONLY cl-styles subtree. Independently review unfinished dirty coverage.lisp replacement and gate tests/scripts. Complete real report/count JSON/LCOV, failing FiveAM propagation, inventory protection, success-only generated README badge and CI configuration. Reproduce missing report, stale endpoint, below threshold and zero-covered-source behavior. Add deterministic cascade/specificity/inheritance/explicit-NIL/property precedence regressions and repair demonstrated gaps. Never edit root coverage files or other libraries.\n\nAutonomy contract: implement necessary narrow corrections without asking about routine setup. Retain returned agentBinding, use transactional stale-write protection, renew claims, checkpoint transaction identity in the schema accepted by installed recovery tools, and submit typed phase evidence. If independent review finds remaining defects, create one idempotent, non-overlapping successor keyed by predecessor plus defect/source digest, publish/admit/dispatch through native OCP after required review. Include exact acceptance criteria, source paths, reproducer and result references. Continue while each phase makes measurable progress; stop at reviewed acceptance or an exact nonrecoverable blocker. Never repeat audit-only phases or self-prolong without an evidenced residual.\n\nCoverage is executable line/expression counts, never assertion counts. Generate README badge from successful measured report with named metric, complete owned-source denominator, source hashes and CI provenance. Failed tests/gate invalidate new endpoint; never lower existing threshold or silently remove zero-covered sources. Distinguish local generated output from verified hosted availability. No pushes, releases, tags, history rewrites, cleanup or external publication are authorized.\n\nPreserve unrelated dirty work, pinned consumer libraries and docs/release-history-purge.md deletion. Root capacity is four active workers; scoped styles/DSL/macros/terminal are serialized by admission and claims, final coverage task ELMTUI-CLPM-08-COVERAGE-REFINE-20261014-R2 owns root CI/README/coverage. Use the existing pending coverage task; do not create another coverage owner. Coordinate shared ASDF registration through its owner. Meaningful tests must fail before repairs and pass after; run affected full suites at stable hashes. Final evidence: commands/exit codes, pass/fail/skips, reviewed diff/source digest, measured counts, badge artifact, independent verdict, typed durable result and one precise remaining-work ledger.\n",
+      "tags": [
+        "elmtui-review"
+      ],
+      "title": "04-styles independent review and autonomous gap closure"
+    },
+    "task": {
+      "actorId": "chatgpt-ops",
+      "archivedAt": null,
+      "createdAt": "2026-10-14T13:39:47.473Z",
+      "finishReason": null,
+      "finishedAt": null,
+      "id": "ELMTUI-CLPM-04-STYLES-REVIEW-20261014-R3",
+      "laneId": "04-styles-review-r3",
+      "operationId": null,
+      "policyVersion": "1",
+      "priority": 85,
+      "projectId": "elmtui-clpm",
+      "promptId": "elmtui-clpm-04-styles-review-20261014-r3",
+      "promptSetId": null,
+      "references": {
+        "authorityRefs": [
+          "chatgpt-ops:task-admission"
+        ],
+        "checkpointRefs": [],
+        "continuationRefs": [],
+        "evidenceRefs": [],
+        "noteRefs": [],
+        "resultRefs": [],
+        "sourceRefs": []
+      },
+      "state": "queued",
+      "terminalClassification": null,
+      "updatedAt": "2026-10-14T13:39:47.589Z"
+    }
+  },
+  "task": {
+    "actorId": "chatgpt-ops",
+    "archivedAt": null,
+    "createdAt": "2026-10-14T13:39:47.473Z",
+    "finishReason": null,
+    "finishedAt": null,
+    "id": "ELMTUI-CLPM-04-STYLES-REVIEW-20261014-R3",
+    "laneId": "04-styles-review-r3",
+    "operationId": null,
+    "policyVersion": "1",
+    "priority": 85,
+    "projectId": "elmtui-clpm",
+    "promptId": "elmtui-clpm-04-styles-review-20261014-r3",
+    "promptSetId": null,
+    "references": {
+      "authorityRefs": [
+        "chatgpt-ops:task-admission"
+      ],
+      "checkpointRefs": [],
+      "continuationRefs": [],
+      "evidenceRefs": [
+        "chatgpt-ops:dispatch-attempt:8e9e950f30584816b666779db7cb6e4a",
+        "abc-v2:target:E55BAD7C37AAA61BA6F116E7312422AB",
+        "abc-v2:route:fleet/chatgpt/1@3"
+      ],
+      "noteRefs": [],
+      "resultRefs": [],
+      "sourceRefs": []
+    },
+    "state": "running",
+    "terminalClassification": null,
+    "updatedAt": "2026-10-14T13:45:12.600Z"
+  }
+}

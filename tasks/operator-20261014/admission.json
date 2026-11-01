@@ -1,0 +1,93 @@
+[
+  {
+    "project": "cl-events",
+    "lane": "01-events",
+    "root": "/home/user/code/lisp/cl-events",
+    "title": "Standalone events coverage and concurrency gaps",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014/01-events.md",
+    "promptId": "cl-events-01-events-enhance-20261014",
+    "taskId": "CL-EVENTS-01-EVENTS-ENHANCE-20261014",
+    "priority": 85,
+    "catalog": 0,
+    "admit": 0,
+    "render": 0
+  },
+  {
+    "project": "cl-inputs",
+    "lane": "02-inputs",
+    "root": "/home/user/code/lisp/elmtui.lisp/cl-inputs",
+    "title": "Input protocol gaps and honest coverage",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014/02-inputs.md",
+    "promptId": "cl-inputs-02-inputs-enhance-20261014",
+    "taskId": "CL-INPUTS-02-INPUTS-ENHANCE-20261014",
+    "priority": 80,
+    "catalog": 0,
+    "admit": 0,
+    "render": 0
+  },
+  {
+    "project": "cl-state",
+    "lane": "03-state",
+    "root": "/home/user/code/lisp/cl-state",
+    "title": "State coverage and transactional feature gaps",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014/03-state.md",
+    "promptId": "cl-state-03-state-enhance-20261014",
+    "taskId": "CL-STATE-03-STATE-ENHANCE-20261014",
+    "priority": 80,
+    "catalog": 0,
+    "admit": 0,
+    "render": 0
+  },
+  {
+    "project": "cl-styles",
+    "lane": "04-styles",
+    "root": "/home/user/code/lisp/elmtui.lisp/cl-styles",
+    "title": "Styles coverage runner repair and cascade gaps",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014/04-styles.md",
+    "promptId": "cl-styles-04-styles-enhance-20261014",
+    "taskId": "CL-STYLES-04-STYLES-ENHANCE-20261014",
+    "priority": 85,
+    "catalog": 0,
+    "admit": 0,
+    "render": 0
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "05-dsl",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "title": "ElmTUI DSL resolution and normalization refinement",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014/05-dsl.md",
+    "promptId": "elmtui-clpm-05-dsl-enhance-20261014",
+    "taskId": "ELMTUI-CLPM-05-DSL-ENHANCE-20261014",
+    "priority": 80,
+    "catalog": 0,
+    "admit": 0,
+    "render": 0
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "06-macros",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "title": "ElmTUI macro hygiene and authoring contracts",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014/06-macros.md",
+    "promptId": "elmtui-clpm-06-macros-enhance-20261014",
+    "taskId": "ELMTUI-CLPM-06-MACROS-ENHANCE-20261014",
+    "priority": 80,
+    "catalog": 0,
+    "admit": 0,
+    "render": 0
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "07-qualification",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "title": "ElmTUI coverage badge and full application qualification",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014/07-qualification.md",
+    "promptId": "elmtui-clpm-07-qualification-enhance-20261014",
+    "taskId": "ELMTUI-CLPM-07-QUALIFICATION-ENHANCE-20261014",
+    "priority": 85,
+    "catalog": 0,
+    "admit": 0,
+    "render": 0
+  }
+]

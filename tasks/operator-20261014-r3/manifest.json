@@ -1,0 +1,72 @@
+[
+  {
+    "project": "cl-events",
+    "lane": "01-events",
+    "root": "/home/user/code/lisp/cl-events",
+    "predecessor": "CL-EVENTS-01-EVENTS-REFINE-20261014-R2",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r3/01-events.md",
+    "promptId": "cl-events-01-events-review-20261014-r3",
+    "taskId": "CL-EVENTS-01-EVENTS-REVIEW-20261014-R3",
+    "priority": 85
+  },
+  {
+    "project": "cl-input",
+    "lane": "02-input",
+    "root": "/home/user/code/lisp/elmtui.lisp/cl-inputs",
+    "predecessor": "CL-INPUT-02-INPUT-REFINE-20261014-R2",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r3/02-input.md",
+    "promptId": "cl-input-02-input-review-20261014-r3",
+    "taskId": "CL-INPUT-02-INPUT-REVIEW-20261014-R3",
+    "priority": 85
+  },
+  {
+    "project": "cl-state",
+    "lane": "03-state",
+    "root": "/home/user/code/lisp/cl-state",
+    "predecessor": "CL-STATE-03-STATE-REFINE-20261014-R2",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r3/03-state.md",
+    "promptId": "cl-state-03-state-review-20261014-r3",
+    "taskId": "CL-STATE-03-STATE-REVIEW-20261014-R3",
+    "priority": 85
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "04-styles",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "predecessor": "ELMTUI-CLPM-04-STYLES-REFINE-20261014-R2",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r3/04-styles.md",
+    "promptId": "elmtui-clpm-04-styles-review-20261014-r3",
+    "taskId": "ELMTUI-CLPM-04-STYLES-REVIEW-20261014-R3",
+    "priority": 85
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "05-dsl",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "predecessor": "ELMTUI-CLPM-05-DSL-REFINE-20261014-R2",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r3/05-dsl.md",
+    "promptId": "elmtui-clpm-05-dsl-review-20261014-r3",
+    "taskId": "ELMTUI-CLPM-05-DSL-REVIEW-20261014-R3",
+    "priority": 85
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "06-macros",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "predecessor": "ELMTUI-CLPM-06-MACROS-REFINE-20261014-R2",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r3/06-macros.md",
+    "promptId": "elmtui-clpm-06-macros-review-20261014-r3",
+    "taskId": "ELMTUI-CLPM-06-MACROS-REVIEW-20261014-R3",
+    "priority": 85
+  },
+  {
+    "project": "elmtui-clpm",
+    "lane": "07-terminal",
+    "root": "/home/user/code/lisp/elmtui.lisp",
+    "predecessor": "ELMTUI-CLPM-07-TERMINAL-REFINE-20261014-R2",
+    "prompt": "/home/user/code/lisp/elmtui.lisp/tasks/operator-20261014-r3/07-terminal.md",
+    "promptId": "elmtui-clpm-07-terminal-review-20261014-r3",
+    "taskId": "ELMTUI-CLPM-07-TERMINAL-REVIEW-20261014-R3",
+    "priority": 85
+  }
+]

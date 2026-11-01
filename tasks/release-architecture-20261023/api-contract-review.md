@@ -1,0 +1,14 @@
+@projmgrauth
+Set repo: elmtui-clpm (/home/user/code/lisp/elmtui.lisp).
+INDEPENDENT READ-ONLY REVIEW ASSIGNMENT. Use chatgpt-operator and ws-bridge governance.
+Existing canonical implementation OCP identity ELMTUI-CLPM-API-CONTRACT-20261023-458838; exact packet c3366d96-f5ca-4356-bda6-5e1914a6a3c4, currently awaiting_review. Do NOT create a duplicate implementation task, next.md, or alternate review packet.
+You are a different reviewer from author chatgpt-api-contract-458838. Adopt/reserve the existing awaiting-review work packet with select_and_reserve_review_packet, inspect the exact six changed implementation files, and submit a typed independent review verdict (approve/request_changes/reject) using submit_review_verdict with executable findings. Respect actively dirty shared checkout; DO NOT modify ANY source files as reviewer.
+Six files: src/view/memo.lisp, src/core/loop.lisp, src/view/core.lisp, tests/api-contract-tests.lisp, elmtui-api-contract-tests.asd, docs/architecture/api-support-levels.md.
+Mandatory falsification/review:
+1. Re-run clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:test-system "elmtui-api-contract-tests")' and investigate warnings/coverage.
+2. Check if this standalone test system is in clpmfile and registered in the default elmtui-tests.asd / scripts/run-tests-clpm.lisp / CI; missing wiring is a probable P1 release-acceptance gap.
+3. Inspect MEMO weak-key cache registry: strong reference to original FN via *cache-stats* and strong cache lists stored under original FN keys can retain caches of otherwise-discarded wrappers. Propose small safe fix/weak references and a falsifying regression if confirmed. Check symbol function designators, selective invalidation with custom keys and cached NIL.
+4. Review start-loop: previously ignored :fps/:wait regardless of value. New errors for nondefault values can break callers during patch-level upgrades; decide whether to retain compatibility via documented inert/deprecated options and regression.
+5. Review memoize-component PROPS list forwarding, stats side effects, no alternate screen / normal terminal invariants, and root facade exports; avoid invented optimization claims.
+6. Inspect git diff and clean full-suite warning-clean log; reproduce focused code defects with non-mutating child process snippets or temporary files outside tracked checkout only.
+Record a concise severity-ranked verdict with exact file/line and test commands. Be candid: 47/47 focused passing does not imply root runner executes suite. Don't accept a packet when review blockers exist. Submit the formal verdict through ws-bridge; no commit, push or release.

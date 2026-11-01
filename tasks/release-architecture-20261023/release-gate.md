@@ -1,0 +1,7 @@
+@projmgrauth
+Set repo: elmtui-clpm
+Exact repository: /home/user/code/lisp/elmtui.lisp
+CANONICAL WORK: ELMTUI-ARCH-RELEASE-GATE-R1-20261023. Priority 95.
+Autonomous release correctness/qualification worker. Exact OCP task, governed ws-bridge packet and claims; inspect dirty paths and active claims before touching files; no next.md.
+MISSION: On review of 2026-10-22 live release-check, 8128 checks / 8094 pass / 28 fail / 6 skip, all 28 appear to cascade from nonexistent scripts/tmux-slider.lisp (maintained example is examples/tmux-slider.lisp). Find and repair actual loader/package reference at narrowest correct layer rather than skipping tests. Audit maintained examples ASDF discovery and test smoke, verify warning-clean root suite after fix. Then audit frozen-release gates: clean recursive clone from remote pins, terminal lifecycle PTY qualification, mini editor Ctrl+S/unsaved quit, Workbench, packaging, docs/version/tag, but do not claim success without evidence. Do not edit src/platform/tmux-capture.lisp or tests/tmux-capture*.lisp (owned by main session), cl-* submodules, source API files, ASDF root elmtui.asd (owned by core-slim lane), or style-related files. Coordinate any overlap in project notes and prefer test runner/example load paths.
+Deliver: actual loader regression fix plus tests, detailed release gate evidence with exact exit statuses, checkpoint and independent review. Do not publish/push/move v0.2.0.
