@@ -146,36 +146,32 @@
                    (ignore-errors (parse-number pct-str))))))))))
 
 (defun generate-ascii-report ()
-  "Generate and display an ASCII coverage summary."
-  (format t "~&~%=== Coverage Summary ===~%~%")
-  (format t "~&~A ~A~%"
-    (format nil "~32A" "File")
-    (format nil "~10@A" "Coverage"))
-  (format t "~&~A~%" (make-string 44 :initial-element #\-))
+  "Report location only; the checked weighted summary is emitted by the gate."
+  (format t "~&SB-COVER report: ~A~%" *coverage-dir*))
 
-  (let ((files (uiop:directory-files *coverage-dir* "*.html"))
+(defun primary-source-files ()
+  "Return all Lisp source pathnames from the primary ASDF system tree."
+  (let ((files nil))
+    (labels ((visit (component)
+               (typecase component
+                 (asdf:cl-source-file
+                  (push (asdf:component-pathname component) files))
+                 (asdf:module
+                  (mapc #'visit (asdf:component-children component))))))
+      (visit (asdf:find-system "elmtui")))
+    (sort (remove-duplicates files :test #'equal) #'string< :key #'namestring)))
 
-         (total-coverage 0.0)
-         (file-count 0))
-
-    (format t "~&Processing ~A coverage files...~%" (length files))
-    (dolist (file (sort files #'string< :key #'pathname-name))
-      (let* ((name (pathname-name file))
-              (coverage (or (parse-coverage-file file) 0.0)))
-        (when (and (not (string= name "cover-index"))
-                (plusp coverage))
-          (format t "~&~A ~10,1F%~%"
-            (format nil "~32A"
-              (subseq name 0 (min 32 (length name))))
-            coverage)
-          (incf total-coverage coverage)
-          (incf file-count))))
-
-    (format t "~&~A~%" (make-string 44 :initial-element #\-))
-    (when (plusp file-count)
-      (format t "~&~A ~10,1F%~%~%"
-        (format nil "~32A" "AVERAGE")
-        (/ total-coverage file-count)))))
+(defun write-primary-inventory ()
+  "Publish the ASDF system inventory used to reject coverage denominator drift."
+  (let ((files (primary-source-files)))
+    (unless files (error "Primary ASDF system yielded no source files"))
+    (with-open-file (stream (merge-pathnames "primary-sources.txt" *coverage-dir*)
+                      :direction :output :if-exists :supersede)
+      (dolist (file files)
+        (unless (uiop:string-prefix-p (namestring (truename *root*)) (namestring (truename file)))
+          (error "Primary source escapes repository: ~A" file))
+        (format stream "~A~%" (enough-namestring (truename file) (truename *root*)))))
+    (format t "~&Primary ASDF Lisp sources: ~D~%" (length files))))
 
 ;;; ----------------------------------------------------------------------------
 ;;; Main Coverage Workflow
@@ -195,9 +191,26 @@
       (format t ";; Blacklist: ~{~A~^, ~}~%~%"
         (mapcar #'uiop:native-namestring blacklist))
 
+      ;; Instrumented and ordinary FASLs must not overwrite one another while
+      ;; another developer process is compiling the same primary sources.
+      ;; Configure this before loading dependencies so they remain uninstrumented.
+      (let ((cache (uiop:getenv "ELMTUI_COVERAGE_FASL_DIR")))
+        (when cache
+          (asdf:initialize-output-translations
+           `(:output-translations (t (,cache :implementation))
+             :ignore-inherited-configuration))
+          (format t "~&;; Isolated coverage FASL cache: ~A~%" cache)))
+
+      ;; Compile/load dependency systems before enabling global SB-COVER.
+      ;; A cold CI runner must not instrument bundled libraries incidentally.
+      (let ((*package* (find-package :cl-user)))
+        (dolist (dependency (asdf:system-depends-on (asdf:find-system "elmtui")))
+          (asdf:load-system dependency)))
+
       ;; Setup
       (setup-coverage)
       (prepare-coverage-directory)
+      (sb-cover:clear-coverage)
 
       ;; ASDF compilation inherits *PACKAGE*. Keep project/test compilation out
       ;; of ELMTUI.COVERAGE so reusable FASLs do not capture this script package.
@@ -208,10 +221,21 @@
         (handler-bind ((sb-kernel:redefinition-warning #'muffle-warning))
           (asdf:load-system "elmtui" :force t))
 
+        (write-primary-inventory)
+
+        ;; Tests and optional dependencies are not part of the primary metric.
+        (teardown-coverage)
+
         ;; Load tests without forcing recompilation.
         (format t "~%;; Loading test system...~%")
         (handler-bind ((sb-kernel:redefinition-warning #'muffle-warning))
-          (asdf:load-system "elmtui-tests" :force nil)))
+          (asdf:load-system "elmtui-tests" :force nil)
+          ;; E4 coverage-only release regressions are part of the CI coverage gate;
+          ;; absence or load error is fatal instead of silently omitting the suite.
+          ;; These tests are loaded after instrumentation is disabled.
+          (load (merge-pathnames "tests/coverage-release-quality-20261027.lisp" *root*))
+          (unless (find-package :elmtui.tests.coverage-release-20261027)
+            (error "E4 release quality suite failed to register"))))
 
       ;; Run tests
       (format t "~%;; Running test suite...~%~%")
@@ -237,9 +261,6 @@
             ;; not a warning to be ignored by the command wrapper.
             (generate-ascii-report)
             (format t "~&HTML Report: ~A~%~%" index-path))
-
-          ;; Cleanup
-          (teardown-coverage)
 
           ;; Exit with appropriate code.
           (uiop:quit (if test-result 0 1)))))
