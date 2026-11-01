@@ -50,6 +50,7 @@ LOCAL_GATES = {
     "normal-screen resize history": "tmux-normal-compositor-resize.py",
     "example shutdown sweep": "all-examples-shutdown-restoration.py",
     "packager tool executable": "packager-executable.py",
+    "README quickstart": "readme-quickstart.py",
 }
 def cmd(*args: str, cwd: Path | None = None, env=None, timeout=180) -> str:
     result = subprocess.run(args, cwd=cwd, env=env, check=True,

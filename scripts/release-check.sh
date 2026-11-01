@@ -199,6 +199,8 @@ run_gate normal_screen_resize python3 tests/e2e/tmux-normal-compositor-resize.py
 # Every launcher example must restore stty, cursor and history on quit.
 run_gate example_shutdown_sweep python3 tests/e2e/all-examples-shutdown-restoration.py
 run_gate packager_tool_executable python3 tests/e2e/packager-executable.py
+# The README Quickstart application must run exactly as documented.
+run_gate readme_quickstart python3 tests/e2e/readme-quickstart.py
 run_gate site_tests python3 -m unittest discover -s tests -p test_prepare_site.py -v
 run_gate coverage_negative python3 -m unittest discover -s tests -p test_coverage_gate.py -v
 run_gate badge_negative python3 -m unittest discover -s tests -p test_coverage_badge.py -v
