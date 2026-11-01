@@ -75,13 +75,28 @@
  (<= #xe0100 n #xe01ef) (= n #x200d) (= n #x20e3)
  (<= #x1f3fb n #x1f3ff))))
 
+(defun %regional-indicator-p (char)
+  (<= #x1f1e6 (char-code char) #x1f1ff))
+
+(defun %regional-indicator-paired-at-p (text index)
+  "Regional indicators spanning INDEX pair iff the left RI run length is odd."
+  (and (> index 0) (< index (length text))
+       (%regional-indicator-p (char text (1- index)))
+       (%regional-indicator-p (char text index))
+       (let ((count 0))
+         (loop for i downfrom (1- index) to 0
+               while (%regional-indicator-p (char text i))
+               do (incf count))
+         (oddp count))))
+
 (defun %next-grapheme (text index)
  (let ((end (length text)) (i (1+ index)))
  (loop while (< i end)
  for current = (char text i)
  for before = (char text (1- i))
  while (and (not (char= current #\Newline))
- (or (%combining-p current) (= (char-code before) #x200d)))
+ (or (%combining-p current) (= (char-code before) #x200d)
+     (%regional-indicator-paired-at-p text i)))
  do (incf i))
  i))
 
@@ -94,6 +109,8 @@
  (or (%combining-p (char text i))
  (= (char-code (char text (1- i))) #x200d)))
  do (decf i))
+ (when (%regional-indicator-paired-at-p text i)
+   (decf i))
  i)))
 
 (defun editor-backspace (state)
@@ -156,23 +173,13 @@
  (when index (%history-load state index))
  index))
 
-(defun %wide-p (char)
- (let ((n (char-code char)))
- (or (<= #x1100 n #x115f) (<= #x2329 n #x232a)
- (<= #x2e80 n #xa4cf) (<= #xac00 n #xd7a3) (<= #xf900 n #xfaff)
- (<= #xfe10 n #xfe19) (<= #xfe30 n #xfe6f)
- (<= #xff00 n #xff60) (<= #xffe0 n #xffe6)
- (<= #x1f000 n #x1ffff) (<= #x20000 n #x3fffd))))
-
 (defun %cluster-cells (text start end column)
  (if (char= (char text start) #\Tab)
  (- 8 (mod column 8))
- (let ((width 0))
- (loop for i from start below end
- for character = (char text i) do
- (unless (%combining-p character)
- (setf width (max width (if (%wide-p character) 2 1)))))
- (max 1 width))))
+ ;; Use the renderer's cluster-width estimate (including emoji variation
+ ;; selectors and paired flags), rather than a second wcwidth table.
+ (max 1 (elmtui.view.layout.size-utils:terminal-string-width
+         (subseq text start end)))))
 
 (defun editor-resize (state columns)
  "Change terminal-cell width without moving the logical cursor."

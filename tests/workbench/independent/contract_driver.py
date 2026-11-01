@@ -1,7 +1,10 @@
 """Execute black-box Common Lisp API assertions in an isolated CLPM/SBCL process.
 
-No test imports or patches the implementation. Each invocation loads sources
-directly and passes one Lisp expression as an argv item (never via a shell).
+No test imports or patches the implementation. Each invocation loads the base
+``elmtui`` system (the Workbench modules reuse its renderer width function
+rather than carrying a second wcwidth table), then loads the Workbench module
+sources directly from this checkout and passes one Lisp expression as an argv
+item (never via a shell).
 The currently active owner may still change an API; failures are reported
 rather than silently treated as skips.
 """
@@ -26,7 +29,7 @@ def required_tools() -> str | None:
     return next((tool for tool in ("clpm", "sbcl") if not shutil.which(tool)), None)
 
 
-def run_lisp(names: tuple[str, ...], form: str, *, timeout: float = 16.0):
+def run_lisp(names: tuple[str, ...], form: str, *, timeout: float = 90.0):
     """Return a completed subprocess; raises on missing source or timeout."""
     paths = [LISP_MODULES[name] for name in names]
     missing = [str(path.relative_to(ROOT)) for path in paths if not path.is_file()]
@@ -37,6 +40,8 @@ def run_lisp(names: tuple[str, ...], form: str, *, timeout: float = 16.0):
         "clpm", "bundle", "exec", "--with-client", "sbcl", "--",
         "--noinform", "--non-interactive", "--no-sysinit", "--no-userinit",
         "--eval", "(require :asdf)",
+        "--eval", "(setf *compile-verbose* nil *load-verbose* nil)",
+        "--eval", '(asdf:load-system "elmtui")',
     ]
     for path in paths:
         args.extend(["--load", str(path)])

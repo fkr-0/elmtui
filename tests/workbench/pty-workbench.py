@@ -108,10 +108,12 @@ def exercise(size, folder):
         # Frame diffs are fragmented; the submitted source is not guaranteed
         # to appear as one contiguous run of output bytes. Assert the value
         # was painted at terminal column 3 and the transcript got its prompt.
+        # Native text rows may send their two-space indent in the same run;
+        # either encoding must still place the value at exactly column 3.
         evaluated = capture(master, 3, b"\x1b[4;3H3")
         output.extend(evaluated)
         must(b"COMMON-LISP-USER>" in evaluated and
-             re.search(rb"\x1b\[\d+;3H3", evaluated), "REPL evaluation", output)
+             re.search(rb"\x1b\[\d+;(?:3H3|1H  3)", evaluated), "REPL evaluation", output)
         os.write(master, b"(car")
         output.extend(capture(master, .18))
         os.write(master, b"\x00")

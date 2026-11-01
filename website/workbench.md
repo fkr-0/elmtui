@@ -49,7 +49,7 @@ Expected controls in the current implementation:
 | Ctrl+D | Exit on empty editor |
 
 !!! warning "Release qualification"
-    Targeted Workbench PTY smoke tests have passed during ongoing development, after earlier startup and terminal-restoration failures were diagnosed. The Workbench is already integrated with ElmTUI's model/update/view and now renders native styled ASCII spans through flex text children. The earlier blank frame came from a rejected `:white-space` style declaration, not incorrect flex coordinates. Grapheme/cell-width presentation, full Lisp syntax highlighting, and an authentic screenshot remain release gates. The Workbench is **included as a release target**, but the final pinned release build still requires independent startup, evaluation, completion, resize, idle-output and terminal-restoration qualification. See [release status](release.md).
+    The Workbench uses ElmTUI's model/update/view runtime and native flex panes for transcript, editor, completion and inspector. It has no application-owned character-grid painter. Styled Unicode, wide/combining text, cursor placement and completion above the editor have local rendered-buffer and PTY regression coverage. It does not provide full Lisp syntax highlighting. The final pinned release build still requires qualification at its exact source/submodule revisions, and an authentic screenshot remains pending. See [release status](release.md).
 
 ## What it demonstrates
 

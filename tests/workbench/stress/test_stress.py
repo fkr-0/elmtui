@@ -44,6 +44,9 @@ def run_probe(modules: tuple[str, ...], body: str, *, timeout: float = TIMEOUT):
         "clpm", "bundle", "exec", "--with-client", "sbcl", "--",
         "--noinform", "--non-interactive", "--no-sysinit", "--no-userinit",
         "--eval", "(require :asdf)",
+        "--eval", "(setf *compile-verbose* nil *load-verbose* nil)",
+        # The Workbench modules reuse the renderer's width function.
+        "--eval", '(asdf:load-system "elmtui")',
     ]
     for module in modules:
         args.extend(("--load", str(MODULES[module])))
@@ -343,18 +346,18 @@ class BoundedStress(unittest.TestCase):
         self.assert_probe(("inspector",), INSPECTOR_PROBE.replace(":ROUNDS", str(ROUNDS)))
 
 
-# These are real-application gates, not fake fixture substitutes. W5 currently
-# has no launcher; a populated variable must point to a real workbench process.
-_REAL_CMD = os.environ.get("ELMTUI_WORKBENCH_TEST_CMD", "").strip()
+# Real-application gate, not a fixture substitute. The launcher defaults to the
+# repository REPL; ELMTUI_WORKBENCH_TEST_CMD may name another real workbench.
+_REAL_CMD = (os.environ.get("ELMTUI_WORKBENCH_TEST_CMD", "").strip()
+             or "./scripts/examples.sh run repl")
 
 
-@unittest.skipUnless(_REAL_CMD, "NOT RUN: no W5 real workbench launcher / command")
 class WorkbenchApplicationStress(unittest.TestCase):
     def test_repeat_start_exit_burst_keys_and_resize(self):
         sys.path.insert(0, str(ROOT / "tests/workbench/independent"))
         from pty_driver import PrivateTmuxPTY
-        if not PrivateTmuxPTY.available():
-            self.skipTest("NOT RUN: private tmux/stty unavailable")
+        self.assertTrue(PrivateTmuxPTY.available(),
+                        "private tmux/stty are required for this test")
         for iteration in range(2):
             with self.subTest(restart=iteration):
                 with PrivateTmuxPTY(shlex.split(_REAL_CMD), cols=80, rows=24,
