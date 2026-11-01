@@ -119,10 +119,7 @@
                                                 (:file "label")
                                                 (:file "textinput")
                                                 (:file "grid-container")
-                                                (:file "keytester")
-                                                (:file "keytester-map")
                                                 (:file "listbox")
-                                                (:file "counter")
                                                 (:file "scrollable-container")
                                                 (:file "scroll-panel")
                                                 (:file "modal-dialog")))
@@ -180,7 +177,6 @@
                 (:file "platform/driver" :depends-on ("core/system-events" "pipeline"))
 
 
-                (:file "dev/dev")
                 (:file "elmtui")
                 (:file "core/public-api-docstrings"))
   ;; Build a binary:
