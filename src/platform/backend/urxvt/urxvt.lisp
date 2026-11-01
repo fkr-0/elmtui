@@ -4,7 +4,7 @@
   (:import-from :cl-inputs.device.api #:make-device)
   (:import-from :elmtui.platform.backend.terminal #:make-terminal-instance-for-device)
   (:import-from :elmtui.core.errors #:signal-backend-operation-failed)
-  (:export #:initialize-backend))
+  (:export ))
 
 (in-package :elmtui.backend.urxvt)
 

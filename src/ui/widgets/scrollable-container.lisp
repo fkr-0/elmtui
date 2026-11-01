@@ -10,7 +10,7 @@
                 #:defwidget-view
                 #:with-widget-model
                 #:widget-focused-p)
-  (:export #:scrollable-container-model #:make-scrollable-container-model ; Struct and constructor
+  (:export #:scrollable-container-model  ; Struct and constructor
            ;; Accessors
            #:scrollable-container-model-id
            #:scrollable-container-model-scroll-top

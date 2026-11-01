@@ -17,13 +17,10 @@
     #:with-defaults
     #:make-default-context
     #:validate-default-value
-    #:default-registry
     #:default-spec
-    #:default-value
-    #:default-type
-    #:default-documentation
-    #:default-fallback
-    #:default-validator))
+    
+    
+    ))
 
 (in-package :elmtui.core.defaults)
 

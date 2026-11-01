@@ -24,10 +24,21 @@
         ((macro-function symbol) :macro)
         ((fboundp symbol) :function)
         ((boundp symbol) :variable)
+        ((nth-value 1 (macroexpand-1 symbol)) :symbol-macro)
         ;; DEFVAR without a value: a declared special variable, not a phantom.
         ((eq (sb-int:info :variable :kind symbol) :special) :special-variable)
         ((find-class symbol nil) :class)
-        ((ignore-errors (sb-ext:valid-type-specifier-p symbol)) :type)))
+        ((ignore-errors (sb-ext:valid-type-specifier-p symbol)) :type)
+        ;; Names of registered message schemas and state models are
+        ;; identifiers (registry keys), not callable bindings.
+        ((registered-name-p symbol) :registered-name)))
+
+(defun registered-name-p (symbol)
+  (loop for (registry package) in '(("*MESSAGE-SCHEMAS*" "ELMTUI.STATE.MSG")
+                                    ("*STATE-SCHEMAS*" "ELMTUI.STATE.MODEL"))
+        for table = (let ((var (find-symbol registry package)))
+                      (and var (boundp var) (symbol-value var)))
+        thereis (and (hash-table-p table) (nth-value 1 (gethash symbol table)))))
 
 (defun elmtui-packages ()
   (sort (remove-if-not (lambda (p) (eql 0 (search "ELMTUI" (package-name p))))

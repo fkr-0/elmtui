@@ -8,7 +8,7 @@
   (:import-from :elmtui.core.conditions
                 ;; :signal-condition
                 )
-  (:export #:with-interruptable-signal #:cond-message #:interrupt-payload)) ; Added interrupt-payload
+  (:export #:with-interruptable-signal #:cond-message )) ; Added interrupt-payload
 (in-package :elmtui.core.threads)
 
 

@@ -35,13 +35,12 @@
    #:ui-node-children
    #:ui-node-props
    #:styled-ui-node
-   :make-styled-node       ; Constructor
-   :copy-styled-node       ; Copier
+          ; Constructor
+          ; Copier
    :apply-stylesheet-to-tree ; Main styling function
-   :style-value             ; Helper to get computed style value
+                ; Helper to get computed style value
    :styles                  ; Re-export from style-lib.api
-   :mark-tree-dirty-for-styling
-   :with-attributes))
+   ))
 (in-package :elmtui.view.styled)
 ;;;-----------------------------------------------------------------------------
 ;;; Styled UI Node Class

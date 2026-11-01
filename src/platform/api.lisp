@@ -26,7 +26,6 @@
     ;; Display & Screen Management
     :get-screen-dimensions
     :clear-screen
-    :with-terminal-output
     :flush-output
     :set-cursor-visibility
     :set-cursor-position

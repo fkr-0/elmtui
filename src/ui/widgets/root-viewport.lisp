@@ -15,7 +15,6 @@
   (:export #:root-viewport
     #:make-root-viewport
     #:anchor-type
-    #:compute-anchor-offset
     #:compute-view-size))
 
 (in-package :elmtui.ui.widgets.root-viewport)

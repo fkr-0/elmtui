@@ -84,7 +84,6 @@
     #:terminal-output-stats-chars-written
     #:terminal-output-stats-forced-style-resets
 
-    #:render-ui-tree-to-buffer
     #:write-output
     #:get-screen-dimensions
     #:send-sequence
@@ -99,12 +98,9 @@
     #:write-style-to-stream
     #:write-style-reset-to-stream
     #:style-to-terminal-style
-    #:terminal-instance-canvas
-    #:make-terminal-canvas
-    #:initialize-terminal-canvas
-    #:get-canvas-viewport
+    
+    
     ;; #:apply-canvas-to-buffer ; Used internally by render-and-present
-    #:restore-terminal-state
     ;; New generic method implementations are implicitly exported by their generic definitions
     #:make-terminal-instance-for-device
     #:*terminal-debug-phase*

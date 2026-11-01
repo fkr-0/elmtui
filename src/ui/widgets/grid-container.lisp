@@ -9,7 +9,7 @@
                 #:init #:update #:view #:destroy #:make-state-patch)
   (:import-from :elmtui.state.api #:make-update-result #:get-path #:state-ref
                 #:update-result-patches #:update-result-commands)
-  (:export #:grid-container))
+  (:export ))
 
 (in-package :elmtui.ui.widgets.grid-container)
 

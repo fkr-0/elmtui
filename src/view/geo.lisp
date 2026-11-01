@@ -9,15 +9,15 @@
                 #:log-info
                 #:log-warn)
   (:export #:=? #:area #:area< #:contains-p #:normalize!
-           #:rectangle-union #:border #:bounding-box #:circle
-           #:corner #:dim #:dim-length #:dim-pos #:flip #:grow-view!
+           #:rectangle-union #:border  
+           #:corner #:dim #:dim-length #:dim-pos  #:grow-view!
            #:h #:line #:make-pos #:make-rectangle #:make-size
-           #:move! #:overlap #:polygon #:pos #:rect-diff #:rectangle
+           #:move! #:overlap  #:pos #:rect-diff #:rectangle
            #:pos-x #:pos-y #:rectangle-size #:rectangle-pos
            #:clamp
            #:rectangle-union-list
-           #:resize-dimension! #:rotate #:scale #:shrink-view!
-           #:size #:translate #:triangle #:valid-p #:w #:x #:x2 #:y
+           #:resize-dimension!   #:shrink-view!
+           #:size   #:valid-p #:w #:x #:x2 #:y
            #:y2))
 (in-package :elmtui.view.geo)
 

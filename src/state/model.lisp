@@ -17,7 +17,7 @@
    #:transaction-id #:transaction-patches
    #:transaction-pre-hooks #:transaction-post-hooks
    #:transaction-rollback #:transaction-timestamp
-   #:transaction-description #:transaction-source
+   #:transaction-description 
    ;; Transaction management
    #:transaction #:make-transaction #:transaction-p
    ;; State utilities

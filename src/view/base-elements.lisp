@@ -29,7 +29,7 @@
    #:to-dsl #:dsl->objects #:map-elements #:find-elements-by-type
    #:base-dsl-p #:element-type-p #:valid-property-p #:validate-base-dsl
    #:validate-dsl-element #:validate-content-model #:validate-children
-   #:property-exists-p #:expand-base-dsl #:expand-dsl-element
+    #:expand-base-dsl #:expand-dsl-element
    #:normalize-base-dsl #:dsl-element-type #:dsl-properties #:dsl-children
    #:make-dsl-element #:update-dsl-element
    #:find-elements-by-type #:find-element-by-id #:map-dsl-elements
