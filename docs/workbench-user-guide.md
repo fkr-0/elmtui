@@ -50,5 +50,4 @@ as `:bold t` are now propagated by the terminal style converter, too.
 syntax highlighting of arbitrary Unicode (combining marks, wide glyphs,
 emoji/ZWJ, tabs). Rows containing non-ASCII currently use a single ElmTUI
 text node to avoid splitting glyph clusters. There is no raw ANSI painter
-in Workbench. For the defect, verification and remaining work, see
-[the REPL composition note](reviews/repl-layout-native-composition-20261022.md). Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and normal-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.
+in Workbench. Display-cell alignment of combining marks, grapheme clusters, and emoji remains a release-qualification gate. The `:root-viewport` controls terminal lifecycle, and normal-screen/termios cleanup must be checked against actual PTY traces. Evaluation cancellation does not forcibly interrupt user code.
