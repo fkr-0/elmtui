@@ -14,6 +14,15 @@ The project follows semantic versioning from the first published release.
 - `cmd-async` now exported from the `elmtui` facade package.
 - `defapplication` and `deftea-app` accept `:handle-quit` (default `t`) for automatic quit handling.
 - `defapplication` accepts `:anchor` and `:height` directly, generating the root viewport DSL when `:root-component-dsl` is omitted.
+- `elmtui:app-model` accessor: extracts the user model from a `deftea-app`
+  application state, so `defcomponent` children can read the model without
+  depending on the internal `:tea-model` CL-STATE key.
+- `deftea-app` now accepts an optional `:root-component-dsl` keyword to host
+  `defcomponent` children in its root viewport DSL tree.
+- "Choosing your constructor" section in docs/USER_GUIDE.md documenting when
+  to use `deftea-app` vs `defapplication` and how to host components.
+- Two new examples: `tea-counter-component` (counter with display component)
+  and `tea-list-detail` (list navigation with detail-panel component).
 
 ### Changed
 

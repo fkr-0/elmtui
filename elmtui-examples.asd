@@ -33,4 +33,6 @@
                (:file "input-selector")
                (:file "dirli")
                (:file "wifi-menu")
-               (:file "wifi-inline")))
+               (:file "wifi-inline")
+               (:file "tea-counter-component")
+               (:file "tea-list-detail")))

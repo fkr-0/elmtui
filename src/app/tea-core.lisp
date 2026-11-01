@@ -13,9 +13,28 @@
   (:import-from :elmtui.core.globals #:*applications*)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:export
-    #:deftea-app))
+    #:deftea-app
+    #:app-model))
 
 (in-package :elmtui.app.tea-core)
+
+(defun app-model (app-state)
+  "Return the user model from a DEFTEA-APP application state.
+
+APP-STATE is the CL-STATE application-state object that components receive in
+their :UPDATE and :VIEW clauses. In a DEFTEA-APP application the user's model
+is stored under the :TEA-MODEL key; this function extracts it.
+
+Use this in DEFCOMPONENT :VIEW and :UPDATE clauses to read the app model
+without depending on the internal :TEA-MODEL key:
+
+  (:view (local-state app-state id-path children)
+    (let ((model (elmtui:app-model app-state)))
+      ...))
+
+Returns the user model object, or NIL if the key is absent (e.g. when the
+component is hosted by a DEFAPPLICATION that does not use :TEA-MODEL)."
+  (state-ref app-state :tea-model))
 
 (defun %ensure-root-keyword (id)
   "Internal helper.
@@ -42,6 +61,7 @@ Signals an error for all other types."
                        (root-viewport-id :root-viewport)
                        (anchor :below-cursor)
                        height
+                       root-component-dsl
                        (handle-quit t))
   "Define a supported minimal direct-transition TEA application and RUN-NAME.
 
@@ -63,12 +83,13 @@ Syntax:
     :transition TRANSITION-FN
     :view       VIEW-FN
     &key
-      :subscriptions      SUBS-FN
-      :command-processor  CMD-FN
-      :root-viewport-id   ROOT-ID
-      :anchor             ANCHOR      ; default :BELOW-CURSOR
-      :height             ROWS        ; default: sized by the content
-      :handle-quit        BOOL)       ; default T; auto-handle :APP-QUIT-REQUESTED
+      :subscriptions        SUBS-FN
+      :command-processor    CMD-FN
+      :root-viewport-id     ROOT-ID
+      :root-component-dsl   DSL         ; override auto-generated DSL
+      :anchor               ANCHOR      ; default :BELOW-CURSOR
+      :height               ROWS        ; default: sized by the content
+      :handle-quit          BOOL)       ; default T; auto-handle :APP-QUIT-REQUESTED
 
 Required arguments:
 
@@ -145,6 +166,20 @@ Optional keywords:
       APP-CONFIG — optional configuration object (may be NIL)
 
     For a minimal TEA app you can omit this entirely.
+
+  :ROOT-COMPONENT-DSL
+    An optional DSL tree that overrides the auto-generated root viewport
+    DSL. Use this to place DEFCOMPONENT children inside a DEFTEA-APP
+    application. When provided, the user's :VIEW function output is
+    ignored and the DSL tree governs the component layout. Components in
+    the tree receive the CL-STATE application state in their :UPDATE and
+    :VIEW clauses; use (ELMTUI:APP-MODEL APP-STATE) to read the user
+    model.
+
+    Example:
+      :root-component-dsl '(:root-viewport :id :root :anchor :below-cursor
+                            :height 5
+                            :children ((:my-display :id :display)))
 
   :ROOT-VIEWPORT-ID
     A symbol, keyword, or string naming the logical root viewport.
@@ -247,9 +282,11 @@ Contracts / validation:
        ;; --------------------------------------------------------------
        (defapplication ,name
          :root-viewport-id ,root-key
-         :root-component-dsl '(:root-viewport :id ,root-key :anchor ,anchor
-                               ,@(when height `(:height ,height))
-                               :child-dsl-spec (:view nil))
+         :root-component-dsl ,(if root-component-dsl
+                                  root-component-dsl
+                                  `'(:root-viewport :id ,root-key :anchor ,anchor
+                                    ,@(when height `(:height ,height))
+                                    :child-dsl-spec (:view nil)))
          :initial-state-fn ',tea-init
          :update-fn ',tea-update
          :view-fn ',tea-view

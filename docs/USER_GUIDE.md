@@ -60,6 +60,81 @@ The normative runtime vocabulary is `INIT`, `TRANSITION`, `VIEW`, and
 `SUBSCRIPTIONS`. `deftea-app` expands into `defapplication` with
 `:strict-elm` state semantics.
 
+### Choosing your constructor
+
+Both constructors lower to the same runtime, so the choice is about
+ergonomics and how much of CL-STATE you want to manage directly.
+
+**Use `deftea-app` when:**
+
+- Your state is a single opaque model (a plist, struct, or other value).
+- Your transition function returns a whole new model instead of patches.
+- You want the simplest possible TEA loop.
+- You host a few `defcomponent` children that read the app model with
+  `app-model` (see below).
+
+**Use `defapplication` when:**
+
+- You need deep component trees with independent local state managed by
+  CL-STATE (nested paths, transactions, scoped contexts).
+- Your update function works with patches (`make-update-result :patches ...`)
+  and reads state with `state-ref`.
+- You want CLI/binary configuration, custom keymaps, or selectable
+  `:transactional` / `:strict-elm` commit semantics.
+- Components need fine-grained access to the application state tree.
+
+### Hosting components in `deftea-app`
+
+A `deftea-app` stores the user model under the `:tea-model` key of the
+CL-STATE application state. Components receive the full application state
+object in their `:update` and `:view` clauses. To read the user model
+from a component, call `elmtui:app-model`:
+
+```lisp
+(elmtui:app-model app-state)  ;=> the user's model plist (or NIL)
+```
+
+To place components in a `deftea-app`, pass the `:root-component-dsl`
+keyword with a DSL tree that includes component nodes. When provided,
+this overrides the auto-generated root viewport:
+
+```lisp
+;; 1. Define a component that reads the app model
+(defcomponent count-display (component)
+  (:state
+    (label "Count" :type string))
+  (:view (local-state app-state id-path children)
+    (let* ((model (elmtui:app-model app-state))
+           (count (if model (getf model :count 0) 0)))
+      `(:text :id ,(id-from-path id-path)
+         :content ,(format nil "~A: ~A" (getf local-state :label) count)))))
+
+;; 2. Define the app with the component in its DSL tree
+(deftea-app my-counter
+  :init       #'counter-init
+  :transition #'counter-transition
+  :view       #'counter-view
+  :root-component-dsl '(:root-viewport :id :root-viewport
+                         :anchor :below-cursor :height 5
+                         :children
+                         ((:count-display :id :display
+                           :initial-label "Score"))))
+```
+
+The transition function manages the model as usual (pure model
+replacement); the component's `:view` reads the model via `app-model`
+and renders it. This keeps logic in the transition and presentation in
+the component.
+
+When `:root-component-dsl` is omitted, `deftea-app` auto-generates a
+simple viewport that renders the output of your `:view` function
+directly, which is the default behavior for apps without components.
+
+`app-model` returns NIL when the application state does not contain a
+`:tea-model` key (for example, when the component is used inside a plain
+`defapplication`). Components that check for NIL before using the model
+work in both constructors.
+
 ## State and Updates
 
 - Use `elmtui:make-update-result` to return patches and commands from
