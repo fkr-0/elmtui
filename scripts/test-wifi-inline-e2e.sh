@@ -54,7 +54,7 @@ printf '==> building standalone wifi-inline example image\n'
 clpm bundle exec --with-client sbcl -- \
   --noinform --non-interactive \
   --eval '(require :asdf)' \
-  --eval '(asdf:load-system :elmtui-tools)' \
+  --eval '(asdf:load-system :elmtui-examples-cli)' \
   --eval "(elmtui.examples.runner::build-example-binary \"wifi-inline\" :output-path #P\"${BINARY}\" :backend-type :terminal)" \
   >"${TMP_DIR}/build.stdout" 2>"${TMP_DIR}/build.stderr"
 [[ -x "${BINARY}" ]] || { cat "${TMP_DIR}/build.stderr" >&2; exit 1; }

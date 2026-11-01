@@ -45,7 +45,8 @@
 
 (defapplication minimal
   :root-component-dsl
-  '(:root-viewport :id :minimal-root :anchor :below-cursor :child-dsl-spec (:view nil))
+  '(:root-viewport :id :minimal-root :anchor :below-cursor :height 3
+    :child-dsl-spec (:view nil))
   :view-fn #'minimal-view
   :update-fn #'minimal-update
   :root-viewport-id :minimal-root

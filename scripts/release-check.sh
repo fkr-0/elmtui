@@ -192,6 +192,13 @@ run_gate neon clpm bundle exec --with-client sbcl -- --noinform --non-interactiv
 run_gate neon_pty python3 tests/e2e/test-neon-terminal-restoration.py
 run_gate terminal_tmux python3 scripts/test-terminal-apps.py --terminal tmux --output "$receipt_dir/terminal-tmux"
 run_gate terminal_urxvt xvfb-run -a python3 scripts/test-terminal-apps.py --terminal urxvt --output "$receipt_dir/terminal-urxvt"
+# Normal-screen tmux contracts: physical B2 overlay and lossless resize history.
+run_gate normal_screen_contracts python3 tests/e2e/example-overhaul-tmux-review-contracts.py
+run_gate normal_screen_hover python3 tests/e2e/tmux-hover-defect-regressions.py
+run_gate normal_screen_resize python3 tests/e2e/tmux-normal-compositor-resize.py
+# Every launcher example must restore stty, cursor and history on quit.
+run_gate example_shutdown_sweep python3 tests/e2e/all-examples-shutdown-restoration.py
+run_gate packager_tool_executable python3 tests/e2e/packager-executable.py
 run_gate site_tests python3 -m unittest discover -s tests -p test_prepare_site.py -v
 run_gate coverage_negative python3 -m unittest discover -s tests -p test_coverage_gate.py -v
 run_gate badge_negative python3 -m unittest discover -s tests -p test_coverage_badge.py -v

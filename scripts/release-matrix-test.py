@@ -45,6 +45,11 @@ LOCAL_GATES = {
     "cold install": "release-matrix-test.py cold",
     "public pins": "release-matrix-test.py pins",
     "strict docs": "mkdocs build --strict",
+    "normal-screen B2/resize contracts": "example-overhaul-tmux-review-contracts.py",
+    "normal-screen hover regressions": "tmux-hover-defect-regressions.py",
+    "normal-screen resize history": "tmux-normal-compositor-resize.py",
+    "example shutdown sweep": "all-examples-shutdown-restoration.py",
+    "packager tool executable": "packager-executable.py",
 }
 def cmd(*args: str, cwd: Path | None = None, env=None, timeout=180) -> str:
     result = subprocess.run(args, cwd=cwd, env=env, check=True,
