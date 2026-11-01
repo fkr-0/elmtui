@@ -458,7 +458,7 @@ should be treated as the same subscription (keyed by path)."
            (progn
              (reconcile-model-subscriptions
               (lambda (_m) (declare (ignore _m))
-                (list '(:process (:command ("printf" "line1\nline2\nline3\n")
+                (list '(:process (:command ("printf" "line1\\nline2\\nline3\\n")
                                   :on-output (:out)
                                   :on-exit (:done)))))
               nil table)

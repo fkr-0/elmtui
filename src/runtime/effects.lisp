@@ -201,7 +201,8 @@ Returns (values width height) or (values 80 24) on failure."
   "Poll PATH for mtime changes, delivering MESSAGE via SENDER.
 STOP-FLAG is a cons whose car is checked each iteration."
   (let ((last-mtime nil)
-        (last-exists nil))
+        (last-exists nil)
+        (baseline-done nil))
     (loop
       (when (car stop-flag) (return))
       (handler-case
@@ -209,6 +210,11 @@ STOP-FLAG is a cons whose car is checked each iteration."
                  (mtime (when exists
                           (file-write-date (truename exists)))))
             (cond
+              ;; First poll — record baseline without firing events
+              ((not baseline-done)
+               (setf baseline-done t
+                     last-exists (if exists t nil)
+                     last-mtime mtime))
               ;; File appeared
               ((and exists (not last-exists))
                (setf last-exists t last-mtime mtime)
@@ -227,12 +233,7 @@ STOP-FLAG is a cons whose car is checked each iteration."
                (setf last-exists nil last-mtime nil)
                (when sender
                  (funcall sender (append message (list :path (namestring path)
-                                                       :event :deleted)))))
-              ;; First poll — record baseline
-              ((and exists (null last-mtime))
-               (setf last-exists t last-mtime mtime))
-              ((and (not exists) (null last-exists))
-               (setf last-exists nil))))
+                                                       :event :deleted)))))))
         (error (e)
           (log-warn "RUNTIME-EFFECTS: file-watch poll error for ~S: ~A" path e)))
       (sleep poll-interval))))

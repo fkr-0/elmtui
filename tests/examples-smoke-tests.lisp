@@ -3,7 +3,8 @@
   (:import-from :elmtui.app.api
                 #:app-config-p
                 #:app-config-root-component-dsl
-                #:app-config-view-fn-sym)
+                #:app-config-view-fn-sym
+                #:app-config-state-semantics)
   (:export #:examples-smoke-tests))
 
 (in-package :elmtui.tests.examples-smoke)
@@ -313,13 +314,16 @@
             (let ((root-entry (elmtui.state.api:state-ref
                                 state (list :components root-id))))
               (is-true root-entry "Canonical viewport exists for ~A" example-name))
-            (dolist (entry '((:terminal-size (100 35)) (:size-known t)
-                              (:pos-known t) (:first-ready-done t)
-                              (:cursor-pos (1 1)) (:width 100)
-                              (:height 30) (:offset-x 0) (:offset-y 0)))
-              (setf (elmtui.state.api:state-ref
-                      state (list :components root-id (first entry)))
-                    (second entry)))
+            (let ((vp-patches
+                    (loop for (key val) in '((:terminal-size (100 35)) (:size-known t)
+                                              (:pos-known t) (:first-ready-done t)
+                                              (:cursor-pos (1 1)) (:width 100)
+                                              (:height 30) (:offset-x 0) (:offset-y 0))
+                          collect (list (list :components root-id key) val))))
+              (setf state
+                    (if (eq (app-config-state-semantics config) :strict-elm)
+                        (cl-state.patch:apply-patches-persistent state vp-patches)
+                        (progn (cl-state.patch:apply-patches state vp-patches) state))))
             (let* ((rect (elmtui.view.geo:make-rectangle
                            :pos (elmtui.view.geo:make-pos :x 0 :y 0)
                            :size (elmtui.view.geo:make-size :w 100 :h 35)))
@@ -347,10 +351,12 @@
                                    (second (assoc name *maintained-examples* :test #'string=)))
                            package))
              (state (funcall (symbol-function init-symbol)))
+             (view-arg (if (eq (app-config-state-semantics config) :strict-elm)
+                           (elmtui.state.api:state-ref state :tea-model)
+                           state))
              (view (symbol-function (find-symbol view-name package)))
-             (first-view (funcall view state))
-             (second-view (funcall view state)))
-        (declare (ignore config))
+             (first-view (funcall view view-arg))
+             (second-view (funcall view view-arg)))
         (is (equal first-view second-view)
             "Unchanged state must give stable DSL for ~A" name)
         (is (search title (prin1-to-string first-view) :test #'char-equal)
@@ -400,13 +406,13 @@
   "Printable keys carry :CHAR even when KEY is not a character."
   (asdf:load-system :elmtui-examples)
   (let* ((pkg (find-package :elmtui.examples.root-viewport-test-app))
-         (update (symbol-function (find-symbol "ROOT-VIEWPORT-TEST-UPDATE" pkg)))
+         (update (symbol-function (find-symbol "%TEA-UPDATE-ROOT-VIEWPORT-TEST-APP" pkg)))
          (result (funcall update
                           (elmtui.core.event-types:make-key-event
                            :key :character :char #\q)
-                          '(:offset-x 0 :offset-y 0))))
-    (is (equal '(((:should-quit) t))
-               (elmtui.state.api:ur-patches result)))))
+                          '(:tea-model (:offset-x 0 :offset-y 0) :should-quit nil))))
+    (is (find '((:should-quit) t) (elmtui.state.api:ur-patches result)
+              :test #'equal))))
 
 (defun %buffer-text (buffer)
   (with-output-to-string (stream)

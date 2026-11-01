@@ -376,36 +376,28 @@ Example:
                    (stop-condition (getf (cdr cmd) :stop-condition))
                    (max-iterations (getf (cdr cmd) :max-iterations)))
 
-               ;; Create a thread that will periodically run the function
-               (let ((thread
+               ;; Capture sender so the thread sees it even when
+               ;; dynamic bindings aren't inherited (bt v1).
+               (let* ((sender *app-sender*)
+                      (thread
                        (bt:make-thread
                         (lambda ()
                           (let ((iterations 0))
                             (loop
-                              ;; Check if we should stop
                               (when (and (not (minusp max-iterations))
                                          (>= iterations max-iterations))
                                 (return))
-
-                              ;; Check custom stop condition if provided
                               (when (and stop-condition (funcall stop-condition))
                                 (return))
-
-                              ;; Run the function
                               (handler-case
                                   (let ((result (apply function args)))
-                                    ;; Send result as a message if on-message is provided
                                     (when on-message
                                       (let ((message (funcall on-message result)))
                                         (when message
-                                          (funcall *app-sender* message)))))
+                                          (funcall sender message)))))
                                 (error (e)
                                   (log:error "Error in recurring task ~A: ~A" task-id e)))
-
-                              ;; Increment iterations
                               (incf iterations)
-
-                              ;; Sleep until next execution
                               (sleep interval))))
                         :name (format nil "Recurring-Task-~A" task-id))))
 

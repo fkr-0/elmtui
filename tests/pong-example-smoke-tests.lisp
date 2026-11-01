@@ -32,12 +32,12 @@
 
 (test pong-example-update-view-quit-smoke
   (load-system :elmtui-examples)
-  (let* ((init-fn (%fn :elmtui.examples.pong-below-cursor "%INITIAL-STATE"))
-         (update-fn (%fn :elmtui.examples.pong-below-cursor "PONG-UPDATE"))
-         (view-fn (%fn :elmtui.examples.pong-below-cursor "PONG-VIEW"))
+  (let* ((init-fn (%fn :elmtui.examples.pong-below-cursor "%TEA-INIT-PONG-BELOW-CURSOR-APP"))
+         (update-fn (%fn :elmtui.examples.pong-below-cursor "%TEA-UPDATE-PONG-BELOW-CURSOR-APP"))
+         (view-fn (%fn :elmtui.examples.pong-below-cursor "%TEA-VIEW-PONG-BELOW-CURSOR-APP"))
          (state (funcall init-fn))
          (tick-result (funcall update-fn '(:tick) state))
-         (quit-result (funcall update-fn (make-key-event :key #\q) state))
+         (quit-result (funcall update-fn (make-key-event :key :character :char #\q) state))
          (view (funcall view-fn state))
          (quit-patches (ur-patches quit-result)))
     (is (listp state))

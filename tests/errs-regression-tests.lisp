@@ -132,12 +132,13 @@
 
 (test minimal-update-handles-non-cons-messages
   (%load-example "minimal-app")
-  (let ((update-fn (%pkg-fn "ELMTUI.EXAMPLES.MINIMAL" "MINIMAL-UPDATE")))
+  (let ((update-fn (%pkg-fn "ELMTUI.EXAMPLES.MINIMAL" "%TEA-UPDATE-MINIMAL")))
     (is-true (typep (funcall update-fn
                              (elmtui.core.event-types:make-key-event :key :enter)
-                             '(:last-key "before"))
+                             '(:tea-model (:last-key "before") :should-quit nil))
                     'update-result))
-    (is-true (typep (funcall update-fn :unknown-message '(:last-key "before"))
+    (is-true (typep (funcall update-fn :unknown-message
+                             '(:tea-model (:last-key "before") :should-quit nil))
                     'update-result))))
 
 (test focus-simple-listbox-dispatch-returns-patch-without-mutating-state
