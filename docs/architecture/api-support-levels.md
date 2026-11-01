@@ -14,6 +14,12 @@ symbols or change ASDF dependency direction.
 | Backend | Runtime/terminal backend writers | elmtui.platform.backend.*, virtual buffers, renderer, elmtui.core.loop | Advanced contracts; distinguish backend-specific behavior; test affected integrations |
 | Compatibility/experimental | Historical facades and partially implemented utilities | root :elmtui reexports, elmtui.view.memo, elmtui.view.core:VIEW-DIFF | Keep old qualified symbols for now; document precise semantics and limitations |
 
+**Known defects (0.3.1, see [the API review](../reviews/api-review-20261101.md)):**
+`DEFTEA-APP` applications do not run in a terminal (only `DEFAPPLICATION` is
+usable to run applications); the root `:elmtui` facade's re-exports are shadowed
+by fresh unbound symbols; and 328 exported symbols across 27 packages have no
+binding (`scripts/audit-api-bindings.lisp`).
+
 ## Concrete contracts tightened
 
 - `elmtui.view.memo:MEMO` uses a cache per returned wrapper. Previously
