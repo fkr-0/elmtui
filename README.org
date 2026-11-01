@@ -1,38 +1,134 @@
 #+title: ElmTUI
 #+subtitle: Elm-style terminal user interfaces for Common Lisp
 
+ElmTUI is an Elm-architecture (model, message, update, view) toolkit for
+building terminal user interfaces in Common Lisp. Applications run in the
+normal terminal screen below your prompt, and the terminal and its scrollback
+are restored exactly when they exit.
+
 * Status
 
 #+HTML: <a href="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml/badge.svg?branch=main"></a>
 #+HTML: <a href="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml"><img alt="SB-COVER primary expression coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffkr-0%2Felmtui%2Fcoverage-data%2Fcoverage.json"></a>
 
-The coverage badge is published by CI only from a fully green release gate on
-=main= (=publish-coverage= job, =coverage-data= branch); a failing gate deletes
-its endpoint first, so it can never refresh the badge. Before the first such
-run the endpoint does not exist and the badge shows as unavailable. A
-passing local run writes the same figure to =coverage/coverage-badge.svg= and
-=coverage/endpoint.json=. Latest local measurement (2026-10-26):
-22,318/40,199 SB-COVER expressions (55.52%) in all 88 Lisp source files of the
-primary =elmtui= ASDF system. The enforced minimum is 55.0%; generated provenance
-records the exact source hashes of the measured checkout. It is not the separate
-public-docstring coverage metric. Generate the linked local
-[[file:coverage/cover-index.html][per-file HTML report]] and [[file:coverage/coverage-summary.csv][weighted count CSV]] by running
-=scripts/run-coverage-warning-clean.sh=. The reviewed primary-source baseline is [[file:docs/assets/coverage-primary-sources.txt][versioned here]]; update it only after reviewing ASDF source inventory changes. Hosted badge data remains pending
-trusted default-branch CI verification. See
-[[file:docs/reviews/coverage-improvement-20261026.md][coverage qualification evidence and limitations]].
+The latest release is [[https://github.com/fkr-0/elmtui/releases/tag/v0.3.1][0.3.1]]. It is qualified on SBCL on
+POSIX terminals; other Common Lisp implementations are not yet supported,
+because parts of the toolkit use SB-POSIX and SB-MOP. ElmTUI is pre-1.0:
+minor versions may change the API (see the [[file:CHANGELOG.md][changelog]]), and
+[[file:docs/reviews/api-review-20261101.md][the 0.3.1 API review]] lists the known problems with the exported API.
 
-ElmTUI's main and examples ASDF systems declare =0.3.1=. Existing
-release tags (such as =v0.2.0=) are immutable and are never moved; a
-=v0.3.1= tag is cut only after the release gate passes on the final
-commit. The optional Workbench ASDF system still declares =0.1.0=;
-that component version is distinct and requires a packaging decision before
-public tagging. See the release checklist for the remaining gates.
+The coverage badge shows SB-COVER expression coverage of the primary =elmtui=
+system. CI publishes it only from a fully green release gate on =main=;
+=scripts/run-coverage-warning-clean.sh= produces the same figure and a
+per-file report locally (see
+[[file:docs/reviews/coverage-improvement-20261026.md][coverage qualification evidence]]).
 
-The core runtime, maintained examples, and four reusable support libraries are
-covered by independent ASDF test systems.  The current supported development
-platform is SBCL on a POSIX terminal environment.  Other Common Lisp
-implementations have not yet been qualified because parts of the toolkit use
-SBCL facilities such as SB-POSIX and SB-MOP.
+* Quickstart
+
+You need SBCL, [[https://www.clpm.dev/][CLPM]], git, and a terminal with ANSI support. tmux is
+optional.
+
+** Install
+
+#+begin_src sh
+git clone --recurse-submodules https://github.com/fkr-0/elmtui.git
+cd elmtui
+clpm bundle install
+#+end_src
+
+Run the commands below from the repository root; the CLPM bundle makes the
+ElmTUI systems and their dependencies visible to ASDF.
+
+** Try the examples
+
+#+begin_src sh
+scripts/examples.sh list
+scripts/examples.sh run neon-tetris   # A/D move, W rotate, S drop, Q quits
+scripts/examples.sh run repl          # the Lisp Workbench; Ctrl-D quits
+#+end_src
+
+** Your first application
+
+Save this as =counter.lisp=:
+
+#+name: quickstart-counter
+#+begin_src lisp
+(uiop:define-package :counter
+  (:use :cl)
+  (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.core.event-types #:key-event #:key-event-char)
+  (:export #:run-counter))
+(in-package :counter)
+
+;; ElmTUI logs through log4cl; keep log lines off the screen the app draws on.
+(log4cl:remove-all-appenders log4cl:*root-logger*)
+
+(defun initial-state ()
+  (list :count 0 :should-quit nil))
+
+(defun update (message state)
+  "Return the state changes MESSAGE causes, as patches."
+  (let ((char (and (typep message 'key-event) (key-event-char message)))
+        (count (state-ref state :count 0)))
+    (cond
+      ((eql char #\+) (make-update-result :patches `(((:count) ,(1+ count)))))
+      ((eql char #\-) (make-update-result :patches `(((:count) ,(1- count)))))
+      ((or (eql char #\q)
+           (and (consp message) (eq (first message) :app-quit-requested)))
+       (make-update-result :patches '(((:should-quit) t))))
+      (t (make-update-result)))))
+
+(defun view (state)
+  `(:container
+    :id :root
+    :style (:display :block :width 34 :height 3 :padding 1)
+    :children
+    ((:text :id :count
+      :content ,(format nil "Count: ~D   (+/- change, q quits)"
+                        (state-ref state :count 0))))))
+
+(defapplication counter
+  :root-component-dsl '(:root-viewport :id :counter-root
+                        :anchor :below-cursor :height 3
+                        :child-dsl-spec (:view nil))
+  :root-viewport-id :counter-root
+  :initial-state-fn #'initial-state
+  :update-fn #'update
+  :view-fn #'view)
+#+end_src
+
+Run it:
+
+#+begin_src sh
+clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+  --eval '(require :asdf)' --eval '(asdf:load-system "elmtui")' \
+  --load counter.lisp --eval '(counter:run-counter)'
+#+end_src
+
+How it fits together:
+
+- =initial-state= returns the model, a plist.
+- =update= receives each message and the current state. It never changes
+  the state itself; it returns =make-update-result= with /patches/, pairs of
+  a state path and a new value, which the runtime applies. Key presses arrive
+  as =key-event= objects; Ctrl-C arrives as =(:app-quit-requested)=, and
+  setting =:should-quit= ends the application.
+- =view= is a pure function from state to a declarative UI tree
+  (=:container=, =:text=, …) with CSS-like styles.
+- =defapplication= wires them together and defines =run-counter=. The root
+  viewport is drawn below the cursor and needs an explicit =:height=.
+
+Next steps: the [[file:docs/longform/01-foundations-and-elm-architecture.md][foundations]] chapter explains the architecture,
+[[file:docs/longform/02-core-principles-widgets-and-patterns.md][widgets and patterns]] covers layout, widgets and effects, the
+[[file:examples/README.md][examples]] show complete applications, and the
+[[https://elmtui.fkr.dev/][documentation site]] has the generated API reference.
+
+** Development setup
+
+The main =clpmfile= contains only runtime and test dependencies. SLY/Slynk is
+kept in =dev/clpmfile= and installed by the =bridge.yml= =slynk= command.
+To run the test suites and the release gate, see [[*Testing][Testing]].
 
 * ElmTUI Workbench — flagship release example
 
@@ -44,11 +140,10 @@ lifecycle. Workbench evaluation is trusted, in-process Common Lisp — not a
 sandbox — and Slynk is optional rather than a core runtime requirement.
 
 #+begin_src sh
-clpm bundle exec --with-client sbcl -- \\
-  --noinform --non-interactive --load examples/workbench.lisp
+scripts/examples.sh run repl
 #+end_src
 
-See [[file:docs/workbench-user-guide.md][Workbench user guide]] and [[file:docs/release-0.1.0-checklist.md][0.2.0 release qualification gates (legacy filename)]]. The recordings below are real
+See the [[file:docs/workbench-user-guide.md][Workbench user guide]]. The recordings below are real
 sessions of the maintained examples; more are on [[https://elmtui.fkr.dev/][the project website]].
 
 [[file:website/assets/workbench.gif]]
@@ -90,105 +185,6 @@ The complete ownership rules are documented in
 For developer utility APIs, runnable examples and limitations, see
 [[file:docs/developer-tools.md][the developer tools guide]].
 
-* Requirements
-
-- SBCL.
-- CLPM for the checked-in dependency workflow.
-- A POSIX-like environment for the terminal backend.
-- A terminal with ANSI control-sequence support for interactive applications.
-
-Tmux is optional.  Live tmux integration tests run only when explicitly enabled
-inside a tmux session.
-
-* Setup
-
-Install the repository bundle:
-
-#+begin_src sh
-clpm bundle install
-#+end_src
-
-Load the core system:
-
-#+begin_src sh
-clpm bundle exec --with-client sbcl -- \
-  --noinform --non-interactive \
-  --eval '(require :asdf)' \
-  --eval '(asdf:load-system "elmtui")'
-#+end_src
-
-For development, the repository must be visible to ASDF. Running through the
-CLPM bundle from the repository root already establishes the expected source
-registry. The main =clpmfile= contains only runtime and test dependencies;
-SLY/Slynk is isolated in =dev/clpmfile= and is installed automatically by the
-=bridge.yml= =slynk= command.
-
-* Minimal application shape
-
-ElmTUI applications define an initial state, an update function, a view
-function, and a root viewport.  This reduced example follows the API used by
-=examples/minimal-app.lisp=:
-
-#+begin_src lisp
-(uiop:define-package :example.hello
-  (:use :cl)
-  (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
-  (:import-from :elmtui.core.event-types
-                #:key-event #:key-event-char #:key-event-key)
-  (:export #:run-hello))
-
-(in-package :example.hello)
-
-(defun initial-state ()
-  (list :should-quit nil :last-key "-"))
-
-(defun update (message state)
-  (declare (ignore state))
-  (cond
-    ((and (consp message) (eq (first message) :keyevent))
-     (make-update-result
-      :patches `(((:last-key) ,(getf (rest message) :key "-")))))
-    ((typep message 'key-event)
-     (make-update-result
-      :patches `(((:last-key) ,(or (key-event-char message)
-                                   (key-event-key message) "-")))))
-    ((and (consp message) (eq (first message) :app-quit-requested))
-     (make-update-result :patches '(((:should-quit) t))))
-    (t (make-update-result))))
-
-(defun view (state)
-  `(:container
-    :id :root
-    :style (:display :block :width 30 :height 3 :padding 1)
-    :children
-    ((:text :id :label
-      :content ,(format nil "Last key: ~A"
-                        (state-ref state :last-key "-"))))))
-
-(defapplication hello
-  :root-component-dsl
-  '(:root-viewport
-    :id :hello-root
-    :anchor :below-cursor
-    :child-dsl-spec (:view nil))
-  :root-viewport-id :hello-root
-  :initial-state-fn #'initial-state
-  :update-fn #'update
-  :view-fn #'view)
-#+end_src
-
-=DEFAPPLICATION= generates the application runner, here =RUN-HELLO=.
-The example was compiled under CLPM/SBCL on 2026-10-09; it is not a substitute
-for interactive terminal lifecycle/PTY qualification.  It is the
-normative full application constructor selected for ElmTUI's next stable major
-version; production applications should start here.  This example uses the
-transactional commit engine; =:state-semantics :strict-elm= selects the frozen
-replacement-snapshot engine without changing the update/patch contract.
-=DEFTEA-APP= remains supported as the smaller direct-transition teaching/small-app
-adapter and lowers to the same runtime transition vocabulary.  The foundations
-chapter below specifies that compatibility boundary precisely.
-
 * Documentation website
 
 The documentation site at [[https://elmtui.fkr.dev/][elmtui.fkr.dev]] is built with MkDocs Material from a curated set of
@@ -202,8 +198,8 @@ python3 -m mkdocs serve
 #+end_src
 
 The site media are recorded from real example sessions by
-=scripts/record-demo-media.py=; see [[file:website/assets/README.md][website/assets/README.md]]. The release gates, including the licensing and Workbench PTY checks, are in
-[[file:docs/release-0.1.0-checklist.md][the 0.2.0 release checklist (legacy filename)]].
+=scripts/record-demo-media.py=; see [[file:website/assets/README.md][website/assets/README.md]]. The release gates are recorded in
+[[file:docs/release-checklist.md][the release checklist]].
 
 * Documentation
 
@@ -235,8 +231,8 @@ scripts/check-docstrings.sh
 #+end_src
 
 The default audit is a debt ratchet: it fails if public documentation coverage
-regresses. On 2026-10-26 this gate passed at 90.2% coverage
-(1,819 unique exported symbols; 178 missing docstrings). This is not the
+regresses. For 0.3.1 it passes at 90.3% coverage
+(1,840 documented-or-missing bindings; 178 missing docstrings). This is not the
 same as complete API documentation.  To require every supported exported binding to have documentation
 metadata, use the strict target:
 
@@ -338,10 +334,11 @@ checkout with =git submodule update --init --recursive=.
 * Release information
 
 - [[file:CHANGELOG.md][CHANGELOG.md]] records release-visible changes.
-- [[file:docs/release-checklist.md][docs/release-checklist.md]] defines the first-release gate.
-- Upstream source: [[https://github.com/fkr-0/elmtui][github.com/fkr-0/elmtui]].  The four reusable libraries
-  are published independently under the same GitHub account.  A new ElmTUI
-  release and signing policy still require qualification and approval.
+- [[file:docs/release-checklist.md][docs/release-checklist.md]] records the release gate; releases are tagged
+  only on commits that pass =scripts/release-check.sh= in CI.
+- Releases and their notes: [[https://github.com/fkr-0/elmtui/releases][github.com/fkr-0/elmtui/releases]].  The four reusable
+  libraries are published independently under the same GitHub account.
+  Signed release artifacts are not provided yet.
 
 * License
 
