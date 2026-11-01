@@ -132,6 +132,10 @@ rather than silently replacing an existing unreadable file.
 | `wifi-menu.lisp` | Live NetworkManager Wi-Fi selection driven by `nmcli` |
 | `wifi-inline.lisp` | Inline below-cursor Wi-Fi scanner driven by `nmcli` |
 | `pong-below-cursor.lisp` | Inline animation below the current cursor |
+| `tea-counter-component.lisp` | `deftea-app` hosting a `defcomponent` child via `app-model` |
+| `tea-list-detail.lisp` | `deftea-app` list navigation with a component detail view |
+| `tea-destructured-init.lisp` | `defcomponent` with destructured `:init` props |
+| `file-watcher.lisp` | `:file-watch` subscription with polling-based change detection |
 
 The old nested `examples/dirlister_poc/` prototype has been retired. It had an
 invalid program entry point and duplicated the maintained `dirli.lisp` example.

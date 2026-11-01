@@ -38,6 +38,10 @@
     ("root-viewport-test-app" "ROOT-VIEWPORT-TEST-APP")
     ("scroll-panel-demo" "SCROLL-PANEL-DEMO-APP")
     ("tmux-idle-screensaver" "TMUX-IDLE-APP")
+    ("tea-counter-component" "TEA-COUNTER-COMPONENT")
+    ("tea-list-detail" "TEA-LIST-DETAIL")
+    ("tea-destructured-init" "TEA-DESTRUCTURED-INIT")
+    ("file-watcher" "FILE-WATCHER-APP")
     ("wifi-menu" "WIFI-MENU-APP")
     ("wifi-inline" "WIFI-INLINE-APP")))
 
