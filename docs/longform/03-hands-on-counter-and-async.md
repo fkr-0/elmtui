@@ -2,8 +2,15 @@
 
 This chapter starts with the smallest useful TEA application and then extends the same state-machine thinking to asynchronous I/O. It intentionally uses the supported minimal `deftea-app` adapter so the transition is visible without the full application configuration surface. For production/new next-major applications, `defapplication` is the normative constructor; the concepts and runtime transition contract taught here are the same.
 
-The runnable code paths in this chapter were smoke-loaded under CLPM/SBCL on
-2026-10-09. Ellipses and named transport adapters in illustrative fragments
+> **Known issue in 0.3.1:** the update, view and test code in this chapter is
+> correct and its tests pass, but `RUN-PURE-COUNTER`, the runner `deftea-app`
+> generates, does not yet work in a terminal: nothing is drawn, and quitting
+> signals a type error (see the [API review](../reviews/api-review-20261101.md)).
+> To run an application today, use `defapplication` as in the
+> [Quickstart](../../README.org#quickstart).
+
+The code paths in this chapter were loaded and their tests run under CLPM/SBCL;
+the runner itself is affected by the known issue above. Ellipses and named transport adapters in illustrative fragments
 are placeholders, not a complete network client. The first goal is not a visually elaborate terminal. It is to make the application's semantics so obvious that update behavior can be tested before a terminal exists.
 
 ## 1. Build the counter as a state machine first
@@ -121,7 +128,7 @@ synthetic test event
 async/effect completion
 ```
 
-The built-in `elmtui.ui.widgets.counter:counter` demonstrates component-local keyboard routing: `+`/`=` dispatch `:increment`, `-` dispatches `:decrement`, and Enter dispatches `:reset` to the component path.
+The `elmtui.ui.widgets.counter:counter` component from the optional `elmtui-example-widgets` system (no longer part of the core `elmtui` system since 0.3.0) demonstrates component-local keyboard routing: `+`/`=` dispatch `:increment`, `-` dispatches `:decrement`, and Enter dispatches `:reset` to the component path.
 
 For an application-level pure counter, keep the application update vocabulary the same and translate keys to those messages at the input/keymap boundary. Do not make the update function inspect raw terminal bytes.
 
