@@ -66,7 +66,11 @@ class TerminalApp:
             command = list(self.command)
         # Capture errors separately: log strings must never satisfy screen checks.
         script = self.directory / 'launch.sh'
-        script.write_text('#!/bin/sh\ncd ' + shlex.quote(str(ROOT)) + '\n'
+        # A Ctrl-C delivered to the pane's foreground process group must not
+        # kill this wrapper: dash (Ubuntu's /bin/sh) exits on SIGINT once the
+        # child finishes, unlike bash. A trapped signal keeps the wrapper alive
+        # to record the exit status; exec restores the default for the app.
+        script.write_text('#!/bin/sh\ntrap : INT\ncd ' + shlex.quote(str(ROOT)) + '\n'
                           + ''.join('export ' + name + '=' + shlex.quote(value) + '\n'
                                     for name, value in self.environment.items())
                           + 'stty -g > ' + shlex.quote(str(self.directory / 'before.stty')) + '\n'
