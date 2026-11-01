@@ -9,18 +9,17 @@ symbols or change ASDF dependency direction.
 
 | Level | Audience | Representative entry points | Compatibility policy |
 |---|---|---|---|
-| Application | Application authors | elmtui.app:DEFAPPLICATION; elmtui.app.tea-core:DEFTEA-APP; application config/TEA model/update/view; elmtui platform runner | Preserve behavior and source compatibility across patch releases |
+| Application | Application authors | the root `elmtui` package (DEFAPPLICATION, DEFTEA-APP, MAKE-UPDATE-RESULT, STATE-REF, KEY-PRESSED-P, QUIT-REQUESTED-P, KEY-EVENT accessors, theme presets), also available from elmtui.app, elmtui.app.tea-core and elmtui.state.api; generated RUN-NAME runners | Preserve behavior and source compatibility across patch releases |
 | Extension | Widget and toolkit integrators | elmtui.ui.* components, keymaps, focus, state and view-node operations | Document contracts; deprecate before breaking changes |
 | Backend | Runtime/terminal backend writers | elmtui.platform.backend.*, virtual buffers, renderer, elmtui.core.loop | Advanced contracts; distinguish backend-specific behavior; test affected integrations |
-| Compatibility/experimental | Historical facades and partially implemented utilities | root :elmtui reexports, elmtui.view.memo, elmtui.view.core:VIEW-DIFF | Keep old qualified symbols for now; document precise semantics and limitations |
+| Compatibility/experimental | Partially implemented utilities | elmtui.view.memo, elmtui.view.core:VIEW-DIFF | Keep old qualified symbols for now; document precise semantics and limitations |
 
-**Known defects (0.3.2, see [the API review](../reviews/api-review-20261101.md)):**
-the root `:elmtui` facade exports fresh unbound symbols instead of the
-framework's, and 88 further exported symbols have no binding
-(`scripts/audit-api-bindings.lisp`; the release gate forbids increases). Both
-are removed in 0.4.0. Fixed in 0.3.2: `DEFTEA-APP` applications run;
-`ELMTUI.STATE`, `ELMTUI.STATE.API` and `ELMTUI.APP.API` export the working
-symbols.
+**Export soundness (0.4.0, see [the API review](../reviews/api-review-20261101.md)):**
+every exported ElmTUI symbol names a binding or a registered message/model
+schema. The release gate's `api_bindings` check
+(`scripts/audit-api-bindings.lisp`) keeps it that way. The root `elmtui`
+package is a curated facade of the Application level; until 0.4.0 it
+exported 127 unbound symbols created by UIOP `:REEXPORT`.
 
 ## Concrete contracts tightened
 

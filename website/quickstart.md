@@ -32,8 +32,9 @@ Save this as `counter.lisp`:
 ```lisp
 (uiop:define-package :counter
   (:use :cl)
-  (:import-from :elmtui.app #:defapplication #:key-pressed-p #:quit-requested-p)
-  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui
+                #:defapplication #:make-update-result #:state-ref
+                #:key-pressed-p #:quit-requested-p)
   (:export #:run-counter))
 (in-package :counter)
 
@@ -97,7 +98,7 @@ msg   -> update(model, msg) -> patches + commands
 commands -> results as messages -> update
 ```
 
-`elmtui.app:defapplication` is the full application constructor. `elmtui.app.tea-core:deftea-app` is a smaller constructor for programs whose update function returns a whole new model instead of patches; it expands into `defapplication`.
+The root `elmtui` package exports the application API used here. `defapplication` is the full application constructor; `deftea-app` is a smaller constructor for programs whose update function returns a whole new model instead of patches; it expands into `defapplication`.
 
 The [foundations](guide/foundations.md) chapter explains the architecture, and the [counter and async tutorial](guide/tutorial.md) shows how to test update functions without a terminal.
 

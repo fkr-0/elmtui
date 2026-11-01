@@ -204,8 +204,21 @@ Breaking (0.4.0):
   `:should-quit`, `RUN-NAME`, the `:height` rule and logging; chapter 01 and
   the Quickstart use them.
 
-0.4.0 (breaking): the root `elmtui` package is a curated facade of the
-application API, and the remaining never-implemented exports are removed.
+0.4.0 (breaking):
+
+- The root `elmtui` package imports and exports 13 application-level symbols
+  (`defapplication`, `deftea-app`, `make-update-result`, `state-ref`,
+  `key-pressed-p`, `quit-requested-p`, `key-event`, `key-event-p`,
+  `key-event-key`, `key-event-char`, `key-event-modifiers`, `dark-theme`,
+  `light-theme`) instead of re-exporting by name; `elmtui:dev-main` and the
+  `elmtui` system's program-op entry point are gone.
+- The 88 remaining unbound exports were removed from 21 packages, including
+  `defmsg`'s undefined `<variant>-p` names, `statechangemsg`,
+  `elmtui.view.core`'s `vbox`/`hbox`/`text`/... helpers, the
+  `elmtui.pipeline` stage names and `elmtui.view.geo` shapes. Registered
+  message and model names (`appmsg`, `form-state`) and symbol macros
+  (`*shutdown-requested*`) are bindings, not phantoms.
+- `api_bindings` now allows 0 unbound exports.
 
 ## Reproduction
 
