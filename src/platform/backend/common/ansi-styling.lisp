@@ -489,7 +489,8 @@ If multiple attributes are requested, return a list of values in order."
        (=? (terminal-style-faint style-1) (terminal-style-faint style-2))
        (=? (terminal-style-blink style-1) (terminal-style-blink style-2))
        (=? (terminal-style-inverse style-1) (terminal-style-inverse style-2))
-       (=? (terminal-style-strike style-1) (terminal-style-strike style-2))))
+       (=? (terminal-style-strike style-1) (terminal-style-strike style-2))
+       (=? (terminal-style-invisible style-1) (terminal-style-invisible style-2))))
 
 (defmethod terminal-style-bg-color-val ((style terminal-style))
   (when (terminal-style-bg-color style)
@@ -574,6 +575,7 @@ If multiple attributes are requested, return a list of values in order."
         (blink (terminal-style-blink update-style))
         (inverse (terminal-style-inverse update-style))
         (strike (terminal-style-strike update-style))
+        (invisible (terminal-style-invisible update-style))
         (delta nil))
     (when (and ;;fg-color-val
            (not (=? fg-color (terminal-style-fg-color style))))
@@ -604,6 +606,9 @@ If multiple attributes are requested, return a list of values in order."
     (when (not (=? strike (terminal-style-strike style)))
       (setf (terminal-style-strike style) strike)
       (push (list :strike strike) delta))
+    (when (not (=? invisible (terminal-style-invisible style)))
+      (setf (terminal-style-invisible style) invisible)
+      (push (list :invisible invisible) delta))
     delta))
 
 ;; (let ((red-fg  (make-terminal-style :fg-color (make-termcolor :simple :red)))

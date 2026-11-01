@@ -15,6 +15,7 @@
     #:measure-node-intrinsic-size
     #:terminal-glyph-width
     #:terminal-string-width
+    #:terminal-string-slice
     #:terminal-graphemes
     #:content-rect-of
     #:compute-layout
@@ -124,11 +125,12 @@ is outside a portable TUI's control."
             for prev = (char text (1- i))
             for code = (char-code ch)
             for previous-code = (char-code prev)
-            for extension = (or (zerop (terminal-glyph-width ch))
-                                (= previous-code #x200d)
-                                (and (<= #x1f1e6 code #x1f1ff)
-                                     (<= #x1f1e6 previous-code #x1f1ff)
-                                     (= 1 (- i start))))
+            for extension = (and (>= code 32) (>= previous-code 32)
+                                 (or (zerop (terminal-glyph-width ch))
+                                     (= previous-code #x200d)
+                                     (and (<= #x1f1e6 code #x1f1ff)
+                                          (<= #x1f1e6 previous-code #x1f1ff)
+                                          (= 1 (- i start)))))
             unless extension
               do (emit i) (setf start i))
       (emit n))
@@ -145,6 +147,26 @@ is outside a portable TUI's control."
               (incf column (- 8 (mod column 8))))
              (t (incf column cells)))
         finally (return (max maximum column))))
+
+(defun terminal-string-slice (text start &optional end)
+  "Slice a single line by display cells in [START, END), preserving graphemes.
+A wide cluster cut at either boundary becomes spaces. Tabs use eight-cell stops;
+a newline ends the line. END defaults to the line's display width."
+  (check-type start (integer 0 *))
+  (when end (check-type end (integer 0 *)))
+  (let ((end (or end (terminal-string-width text))) (column 0))
+    (with-output-to-string (out)
+      (loop for (cluster . cells) in (terminal-graphemes text)
+            until (or (>= column end) (string= cluster (string #\Newline)))
+            for tabp = (string= cluster (string #\Tab))
+            for width = (if tabp (- 8 (mod column 8)) cells)
+            for next = (+ column width)
+            for overlap = (max 0 (- (min next end) (max column start)))
+            do (when (plusp overlap)
+                 (if (and (not tabp) (>= column start) (<= next end))
+                     (write-string cluster out)
+                     (write-string (make-string overlap :initial-element #\Space) out)))
+               (setf column next)))))
 
 (defun %text-wrap (node)
   (elmtui.view.base-elements:text-wrap node))

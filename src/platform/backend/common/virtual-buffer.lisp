@@ -118,8 +118,8 @@ that is: at this point already a character with a style."
    The style can be a plist, a terminal-style object, or nil."
   (let ((processed-style (cond
                            ((null style) nil)
-                           ((typep style 'terminal-style) style)
-                           ((listp style) style) ; Keep as plist for now
+                           ((typep style 'terminal-style) (copy-term-style style))
+                           ((listp style) (style-to-terminal-style style))
                            (t (error "Unsupported style type: ~A" (type-of style))))))
     (%make-buffer-cell :char char :grapheme (and grapheme (copy-seq grapheme))
                        :style (if (null processed-style) nil
@@ -322,7 +322,7 @@ Returns the modified BUFFER."
                               ;; (format t "SET-BUFFER-CELL-AT: Copy result: ~S~%" copied)
                               ;; (format t "SET-BUFFER-CELL-AT: Copy result type: ~S~%" (type-of copied))
                               copied))
-                           ((listp style) (as-plist style))
+                           ((listp style) (style-to-terminal-style style))
                            (t (error "Unsupported style type: ~A" (type-of style))))))
     (with-virtual-buffer-lock (buffer)
       (restart-case

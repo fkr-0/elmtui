@@ -205,7 +205,7 @@ This is useful for ensuring thread safety when accessing shared resources."
        (release-lock ,l))))
 
 (defgeneric scroll (backend n)
-  (:documentation "Scroll the terminal display by N lines. Positive N scrolls down, negative N scrolls up."))
+  (:documentation "Advance the terminal viewport by N lines. Positive N moves the viewport down (content up), making space below; negative N moves it up (content down)."))
 
 (defgeneric clear-below-cursor (backend)
   (:documentation "Clear all content from the cursor position to the end of the screen."))

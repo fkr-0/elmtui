@@ -308,11 +308,13 @@
 
 (defun focus-previous-from-history (focus-manager &key app-state)
   "Sets focus to the previous element in the focus history."
-  (let ((history (focus-manager-focus-history focus-manager)))
-    (when history
-      (let ((prev-focus (pop (focus-manager-focus-history focus-manager))))
-        (setf (focus-manager-focus-history focus-manager) history)
-        (set-focus focus-manager prev-focus :app-state app-state)))))
+  (when (focus-manager-focus-history focus-manager)
+    (let* ((previous (pop (focus-manager-focus-history focus-manager)))
+           (remaining (focus-manager-focus-history focus-manager)))
+      (unwind-protect (set-focus focus-manager previous :app-state app-state)
+        ;; Going back consumes history; SET-FOCUS must not push the departed
+        ;; element and turn repeated history navigation into a two-node cycle.
+        (setf (focus-manager-focus-history focus-manager) remaining)))))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Tab Navigation
@@ -391,23 +393,30 @@
         (+ (* primary-dist 2) secondary-dist)))) ; Example heuristic
 
 (defun %focus-node-props (node)
-  "Return plist properties from either a plist node or Hiccup-style element node."
+  "Return properties from lowered elements, canonical DSL, Hiccup or legacy plists."
   (cond
+    ((typep node 'elmtui.view.base-elements:base-element)
+     (elmtui.view.element:el/props node))
     ((and (listp node) (keywordp (first node))
           (listp (second node)) (keywordp (first (second node))))
      (second node))
+    ((and (listp node) (keywordp (first node)) (oddp (length node)))
+     ;; Canonical nodes have a type tag before their property list.
+     (append (rest node) (getf (rest node) :props)))
     ((and (listp node) (keywordp (first node)))
      node)
     (t nil)))
 
 (defun %focus-node-children (node)
-  "Return children from either a plist node or Hiccup-style element node."
+  "Return children using the same representations as %FOCUS-NODE-PROPS."
   (cond
+    ((typep node 'elmtui.view.base-elements:base-element)
+     (elmtui.view.base-elements:element-children node))
     ((and (listp node) (keywordp (first node))
           (listp (second node)) (keywordp (first (second node))))
      (cddr node))
     ((listp node)
-     (getf node :children))))
+     (getf (%focus-node-props node) :children))))
 
 (defun %focus-node-id (node)
   "Return NODE id without probing unsupported stylable protocol methods."
@@ -693,8 +702,8 @@ position navigation as the fallback when no grid candidate exists."
         (log-debug "component-id: ~A Key event: ~A, normalized: ~A, binding: ~A" component-id key-event normalized-key binding )
         (log-debug "Keymap context: ~A modifiers: ~A focused ~A" keymap-context normalized-key-modifiers focused-element)
         (when binding
-          (handle-key-binding binding :app-state app-state)
-          t))))
+          (return-from handle-key-event-for-component
+            (handle-key-binding binding :app-state app-state))))))
   ;; In a full implementation, this would look up component keymap
   ;; and dispatch to appropriate handler
   nil)
@@ -893,9 +902,7 @@ position navigation as the fallback when no grid candidate exists."
         ;; Typically trigger an action on the focused element
 
         ;; No match - not handled
-        (t nil)))
-    ;; Not a key event
-    nil))
+        (t nil)))))
 
 ;; Top-level key event handler, adapted from legacy focus-integration.lisp
 (defmethod handle-key-event (focus-manager key-event &key app-state ui-tree)
@@ -935,9 +942,10 @@ position navigation as the fallback when no grid candidate exists."
                      (when keymap
                        (maphash
                         (lambda (key binding)
-                          (push (list :key (if (listp key)
-                                               (format nil "~{~A~^ ~}" (mapcar #'normalized-key->string key))
-                                               (normalized-key->string key))
+                          (push (list :key (cond ((stringp key) key)
+                                              ((listp key)
+                                               (format nil "~{~A~^ ~}" (mapcar #'normalized-key->string key)))
+                                              (t (normalized-key->string key)))
                                       :description (getf binding :description "")
                                       :type (getf binding :type)
                                       :source (or (getf binding :source)

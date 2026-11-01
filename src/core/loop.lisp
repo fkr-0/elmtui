@@ -175,8 +175,11 @@ or idle rendering is needed. TIMEOUT is optional and primarily for tests."
     (incf *event-processing-history-count*)))
 
 (defun start-loop (&key (fps 60) (wait t))
-  "Initialize and start the main event loop using the channel-based system."
-  (declare (ignore fps wait)) ; These arguments seem to be unused currently.
+  "Initialize the event-driven channel consumer once and return T.
+Legacy :FPS and :WAIT are deprecated, ignored compatibility arguments.
+They do not configure a frame ticker or alter startup behavior.
+The loop sleeps on the channel and emits no idle frames."
+  (declare (ignore fps wait))
   (log-debug "START-LOOP: Called. *active-event-channels* is currently ~:[NIL~;non-NIL~]."
              *active-event-channels*)
   (unless *active-event-channels*

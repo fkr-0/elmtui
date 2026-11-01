@@ -400,18 +400,20 @@ Signals an error if any slot is missing or of the wrong type."
    This allows user code to work with both hash table and plist storage formats."
   (typecase code-form
     (cons
-      (if (and (eq (first code-form) 'getf)
+      (cond
+        ((eq (first code-form) 'quote) code-form)
+        ((and (eq (first code-form) 'getf)
             (eq (second code-form) local-state-var)
             (>= (length code-form) 3))
         ;; Replace (getf local-state :key default) with (get-state-value :key local-state default)
         (let ((key (third code-form))
                (default (when (>= (length code-form) 4) (fourth code-form))))
-          (if default
+          (if (>= (length code-form) 4)
             `(get-state-value ,key ,local-state-var ,default)
-            `(get-state-value ,key ,local-state-var)))
+            `(get-state-value ,key ,local-state-var))))
         ;; Recursively transform sub-expressions
-        (mapcar (lambda (sub-form) (transform-update-code sub-form local-state-var))
-          code-form)))
+        (t (mapcar (lambda (sub-form) (transform-update-code sub-form local-state-var))
+                   code-form))))
     (otherwise code-form)))
 
 (defun merge-state-slots (inherited-slots local-slots)
@@ -692,8 +694,10 @@ SYNTAX:
                                :patches (append default-patches ctx-patches extra-patches)
                                :commands (append default-commands ctx-commands extra-commands))))))))))
             `(defmethod elmtui.ui.api:update ((self ,component-class-name) message app-state &key id-path)
-               (declare (ignore message app-state id-path))
-               (make-update-result :patches nil :commands nil)))
+               (declare (ignorable message app-state id-path))
+               (if (next-method-p)
+                   (call-next-method)
+                   (make-update-result :patches nil :commands nil))))
 
          ,(if view-clause
             (let* ((view-body-forms (clause-body view-clause))

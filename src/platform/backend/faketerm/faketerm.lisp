@@ -247,6 +247,7 @@
 (defmethod draw-styled-box ((instance faketerm-instance) target-buffer row col height width &key border-style border-color box-char-set style)
   (declare (ignore box-char-set)) ; Not using custom char sets for faketerm yet
   (let* ((stream (faketerm-instance-stream instance))
+          (previous-style (faketerm-instance-current-style instance))
           (effective-style (if border-color
                              (list :fg border-color :attrs (getf style :attrs)) ; Prioritize explicit border-color
                              (or style (faketerm-instance-current-style instance))))
@@ -256,15 +257,25 @@
                    (otherwise '(#\+ #\+ #\+ #\+ #\- #\|))))) ; Default
     (format stream "; DRAW_STYLED_BOX Row: ~D Col: ~D H: ~D W: ~D BorderStyle: ~S BorderColor: ~S Style: ~S~%"
       row col height width border-style border-color effective-style)
-    (apply-style instance effective-style) ; Set current style for subsequent draw-char-at calls
-    (draw-box-outline instance target-buffer row col height width :style effective-style :corners (subseq chars 0 4) :sides (subseq chars 4 6))
-    (apply-style instance (faketerm-instance-current-style instance)) ; Restore previous style
+    (unwind-protect
+         (progn
+           (apply-style instance effective-style)
+           (draw-box-outline instance target-buffer row col height width :style effective-style
+                             :corners (subseq chars 0 4) :sides (subseq chars 4 6)))
+      (apply-style instance previous-style))
     (finish-output stream))
   t)
 
 (defmethod set-cell-style ((instance faketerm-instance) target-buffer row col &key style)
   (let ((stream (faketerm-instance-stream instance)))
     (format stream "; SET_CELL_STYLE Row: ~D Col: ~D Style: ~S~%" row col (or style (faketerm-instance-current-style instance)))
+    (when (and (<= 0 row) (< row (faketerm-instance-height instance))
+               (<= 0 col) (< col (faketerm-instance-width instance)))
+      (let* ((buffer (faketerm-instance-screen-buffer instance))
+             (cell (aref buffer row col)))
+        (setf (aref buffer row col)
+              (make-faketerm-cell :char (faketerm-cell-char cell)
+                                  :style (copy-tree (or style (faketerm-instance-current-style instance)))))))
     (finish-output stream))
   t)
 

@@ -170,9 +170,10 @@
 ;;;-----------------------------------------------------------------------------
 
 (defun view-diff (old-node new-node)
-  "Calculate the minimal set of changes between views.
-   Returns a function that can transform old-node into new-node."
-  ;; TODO: Implement intelligent diffing algorithm
+  "Compatibility-only whole-tree replacement operation, not a minimal diff.
+The terminal's *buffer differ* is a distinct optimized facility. This view
+function ignores OLD-NODE and returns a closure replacing any supplied tree
+with NEW-NODE; use the renderer for efficient physical terminal changes."
   (declare (ignore old-node))
   (lambda (target)
     (declare (ignore target))
