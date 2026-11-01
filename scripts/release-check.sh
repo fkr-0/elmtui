@@ -178,6 +178,9 @@ run_gate whitespace_staged git diff --cached --check
 run_gate cold_compile clpm bundle exec --with-client sbcl -- --noinform --non-interactive --eval '(asdf:compile-system :elmtui :force t)'
 run_gate facade python3 scripts/audit-facade-exports.py
 run_gate docstrings scripts/check-docstrings.sh
+# Exported symbols with no binding may not increase (scripts/audit-api-bindings.lisp).
+run_gate api_bindings env ELMTUI_API_PHANTOM_MAX="${ELMTUI_API_PHANTOM_MAX:-215}" \
+  clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load scripts/audit-api-bindings.lisp
 run_gate standalone_subsystems scripts/test-subproject-bundles.sh
 run_gate integrated_subsystems scripts/test-subsystems.sh
 run_gate warning_clean scripts/run-tests-warning-clean.sh
@@ -201,6 +204,8 @@ run_gate example_shutdown_sweep python3 tests/e2e/all-examples-shutdown-restorat
 run_gate packager_tool_executable python3 tests/e2e/packager-executable.py
 # The README Quickstart application must run exactly as documented.
 run_gate readme_quickstart python3 tests/e2e/readme-quickstart.py
+# DEFTEA-APP applications must run, not only macroexpand.
+run_gate deftea_app python3 tests/e2e/deftea-app-pty.py
 run_gate site_tests python3 -m unittest discover -s tests -p test_prepare_site.py -v
 run_gate coverage_negative python3 -m unittest discover -s tests -p test_coverage_gate.py -v
 run_gate badge_negative python3 -m unittest discover -s tests -p test_coverage_badge.py -v

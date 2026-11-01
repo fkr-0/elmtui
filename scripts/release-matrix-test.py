@@ -51,6 +51,8 @@ LOCAL_GATES = {
     "example shutdown sweep": "all-examples-shutdown-restoration.py",
     "packager tool executable": "packager-executable.py",
     "README quickstart": "readme-quickstart.py",
+    "deftea-app runtime": "deftea-app-pty.py",
+    "API binding ratchet": "audit-api-bindings.lisp",
 }
 def cmd(*args: str, cwd: Path | None = None, env=None, timeout=180) -> str:
     result = subprocess.run(args, cwd=cwd, env=env, check=True,
