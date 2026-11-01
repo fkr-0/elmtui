@@ -11,11 +11,12 @@ are restored exactly when they exit.
 #+HTML: <a href="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml/badge.svg?branch=main"></a>
 #+HTML: <a href="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml"><img alt="SB-COVER primary expression coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffkr-0%2Felmtui%2Fcoverage-data%2Fcoverage.json"></a>
 
-The latest release is [[https://github.com/fkr-0/elmtui/releases/tag/v0.3.1][0.3.1]]. It is qualified on SBCL on
+The latest release is [[https://github.com/fkr-0/elmtui/releases/tag/v0.3.2][0.3.2]]. It is qualified on SBCL on
 POSIX terminals; other Common Lisp implementations are not yet supported,
 because parts of the toolkit use SB-POSIX and SB-MOP. ElmTUI is pre-1.0:
 minor versions may change the API (see the [[file:CHANGELOG.md][changelog]]), and
-[[file:docs/reviews/api-review-20261101.md][the 0.3.1 API review]] lists the known problems with the exported API.
+[[file:docs/reviews/api-review-20261101.md][the API review]] lists the known problems with the exported API and
+their fixes.
 
 The coverage badge shows SB-COVER expression coverage of the primary =elmtui=
 system. CI publishes it only from a fully green release gate on =main=;
@@ -230,7 +231,7 @@ scripts/check-docstrings.sh
 #+end_src
 
 The default audit is a debt ratchet: it fails if public documentation coverage
-regresses. For 0.3.1 it passes at 90.3% coverage
+regresses. For 0.3.2 it passes at 90.3% coverage
 (1,840 documented-or-missing bindings; 178 missing docstrings). This is not the
 same as complete API documentation.  To require every supported exported binding to have documentation
 metadata, use the strict target:

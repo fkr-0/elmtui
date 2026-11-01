@@ -1,5 +1,5 @@
 (asdf:defsystem "elmtui-core-slim-tests"
-  :version "0.3.1"
+  :version "0.3.2"
   :description "Optional module and package compatibility regressions"
   :license "MIT"
   :depends-on (#:elmtui-example-widgets #:fiveam)

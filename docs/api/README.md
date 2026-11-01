@@ -1,4 +1,4 @@
-# ElmTUI 0.3.1 public API documentation
+# ElmTUI 0.3.2 public API documentation
 
 The authoritative API surface is the set of **runtime-exported Common Lisp
 bindings**. The checked-in `generated/api.md` and `generated/api.html` are
