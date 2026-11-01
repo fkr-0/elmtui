@@ -24,6 +24,26 @@ The project follows semantic versioning from the first published release.
 ### Changed
 
 - The website release page announces the published 0.3.1 release.
+- README: a tested Quickstart (install, run the examples, a first
+  `defapplication` counter with `+`/`-`/`q`) replaces the minimal-application,
+  requirements and setup sections; stale status, release and tmux notes and a
+  broken Workbench command were fixed. The website quickstart shows the same
+  application.
+- Long-form docs: the foundations chapter showed an application update taking
+  an update context and calling the unbound `elmtui.state.api:sapply`; it now
+  shows the real `(message state)` patch contract and explains that contexts
+  belong to component updates. The tutorial notes that `deftea-app` runners do
+  not yet work in a terminal and that the counter widget moved to
+  `elmtui-example-widgets`.
+
+### Documentation
+
+- `docs/reviews/api-review-20261101.md`: review of the exported API and its
+  documentation (unbound exports, root facade shadowing, the `deftea-app`
+  runtime failure, missing key/logging helpers) with recommendations.
+- `scripts/audit-api-bindings.lisp` reports exported symbols with no binding.
+- Release gate `readme_quickstart` (`tests/e2e/readme-quickstart.py`) runs the
+  README Quickstart code in tmux and checks the website shows the same code.
 
 ## [0.3.1] - 2026-11-01
 

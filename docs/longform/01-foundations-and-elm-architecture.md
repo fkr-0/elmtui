@@ -124,17 +124,21 @@ It is not, however, unrestricted contextual equivalence against arbitrary Common
 
 ## 3. Why the normal `DEFAPPLICATION` API already feels like Elm
 
-Regular `DEFAPPLICATION` update functions do not normally receive a writable store interface. They receive an update context and state changes are expressed as patches:
+Regular `DEFAPPLICATION` update functions do not receive a writable store interface. They are called with the message and the current application state, read it with `STATE-REF`, and describe changes as patches in their result:
 
 ```lisp
-(defun update (message ctx)
+(defun update (message state)
   (case message
     (:increment
-     (sapply ctx :count #'1+ 0)
-     (make-update-result :handled t))
+     (make-update-result
+      :patches `(((:count) ,(1+ (state-ref state :count 0))))))
     (otherwise
-     (make-update-result :handled t))))
+     (make-update-result))))
 ```
+
+The runtime applies the returned patches when it commits the transition; the update function never changes STATE itself.
+
+Component update functions (`DEFCOMPONENT`, the viewports) work through an *update context* instead: `ELMTUI.STATE.UPDATE:MAKE-UPDATE-CONTEXT` wraps the state, and `SREF`, `SAPPLY` and `SDELETE` from `ELMTUI.STATE.UPDATE` read and record changes against a private draft, for example `(sapply ctx :count #'1+ 0)`. (Use the `ELMTUI.STATE.UPDATE` symbols: `ELMTUI.STATE.API` currently exports unbound symbols with the same names; see the [API review](../reviews/api-review-20261101.md).)
 
 The context owns a draft. That draft is now a deep copy across the supported `cl-state` container graph:
 
@@ -155,7 +159,7 @@ current model
     v
 isolated update draft
     |
-    +-- SREF / SAPPLY / SDELETE
+    +-- patches (applications) / SREF, SAPPLY, SDELETE (components)
     |
     v
 patches + commands
