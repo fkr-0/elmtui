@@ -36,4 +36,5 @@
                (:file "wifi-inline")
                (:file "tea-counter-component")
                (:file "tea-list-detail")
+               (:file "tea-destructured-init")
                (:file "file-watcher")))

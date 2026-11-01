@@ -6,7 +6,22 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Fixed
+
+- `defcomponent` `:view` clause docstring now correctly documents all four
+  parameters: `(local-state app-state id-path children)`. Previously the
+  macro docstring listed only three.
+
 ### Added
+
+- `defcomponent` `:init` clause supports optional props destructuring.
+  When the first parameter is a list instead of a symbol, props are
+  extracted automatically:
+  `(:init ((label count &key style) id-path) ...)`.
+  The old `(:init (props id-path) ...)` syntax is fully backward
+  compatible.
+- New example `examples/tea-destructured-init.lisp` demonstrating the
+  destructured `:init` syntax.
 
 - `patch` and `patch*` convenience constructors for flat-key update results.
 - `quit-result` shorthand for the universal quit response.

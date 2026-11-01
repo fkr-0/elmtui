@@ -311,6 +311,62 @@ Returns a list of plists, each representing a slot:
 ;; Helper to get the body of a clause (everything after the keyword)
 (defun clause-body (clause)
   (cdr clause))
+
+(defun parse-init-destructuring (pattern)
+  "Parse an init destructuring pattern into (positional-symbols keyword-symbols rest-symbol).
+   PATTERN is a list like (label count &key style &rest others).
+   Returns three values: list of positional syms, list of keyword syms, rest sym (or nil)."
+  (let ((positional nil)
+        (keywords nil)
+        (rest-sym nil)
+        (mode :positional))
+    (dolist (item pattern)
+      (cond
+        ((eq item '&key) (setf mode :key))
+        ((eq item '&rest) (setf mode :rest))
+        ((eq item '&allow-other-keys) nil) ; ignore
+        ((eq mode :positional) (push item positional))
+        ((eq mode :key)
+         (if (consp item)
+           ;; (&key (style default-val)) form
+           (push item keywords)
+           (push item keywords)))
+        ((eq mode :rest) (setf rest-sym item))))
+    (values (nreverse positional)
+            (nreverse keywords)
+            rest-sym)))
+
+(defun generate-init-destructuring-bindings (pattern props-var)
+  "Generate LET bindings to destructure PROPS-VAR (a plist) according to PATTERN.
+   Returns a list of (sym form) binding pairs."
+  (multiple-value-bind (positional keywords rest-sym)
+      (parse-init-destructuring pattern)
+    (let ((bindings nil))
+      ;; Positional args: each maps to a keyword derived from its name
+      (dolist (sym positional)
+        (let ((kw (intern (symbol-name sym) :keyword)))
+          (push (list sym `(getf ,props-var ,kw)) bindings)))
+      ;; Keyword args: same mapping, but support (name default) form
+      (dolist (item keywords)
+        (if (consp item)
+          (let* ((sym (first item))
+                 (default (second item))
+                 (kw (intern (symbol-name sym) :keyword)))
+            (push (list sym `(getf ,props-var ,kw ,default)) bindings))
+          (let ((kw (intern (symbol-name item) :keyword)))
+            (push (list item `(getf ,props-var ,kw)) bindings))))
+      ;; &rest captures remaining props
+      (when rest-sym
+        (let ((known-keys (mapcar (lambda (s)
+                                    (intern (symbol-name (if (consp s) (first s) s)) :keyword))
+                            (append positional keywords))))
+          (push (list rest-sym
+                  `(loop for (k v) on ,props-var by #'cddr
+                     unless (member k ',known-keys)
+                     append (list k v)))
+            bindings)))
+      (nreverse bindings))))
+
 (defun ensure-state-slots-strict (slot-spec state)
   "Ensures all declared slots are present and of the correct type in STATE.
 Signals an error if any slot is missing or of the wrong type."
@@ -442,11 +498,15 @@ SYNTAX:
   (:init (props self-id-path)
     (values '(:slot1-name val1) nil))
 
+  ;; or with destructuring:
+  (:init ((label count &key style) self-id-path)
+    (values `(:label ,label :count ,count :style ,style) nil))
+
   (:update (msg state app-state id-path)
     (:increment (amount)
       (values `(:count ,(+ (getf state :count 0) amount)) nil)))
 
-  (:view (local-state-map app-state self-id-path)
+  (:view (local-state-map app-state self-id-path children)
     `(:label :id (elmtui.ui.api:id-from-path self-id-path)
              :text (getf local-state-map :text \"Default Text View\")))
 
@@ -533,41 +593,54 @@ SYNTAX:
             (let* ((init-body-forms (clause-body init-clause))
                     (init-lambda-list (first init-body-forms))
                     (init-user-code (rest init-body-forms))
-                    (id-sym (gensym "ID")))
+                    (id-sym (gensym "ID"))
+                    (props-param (first init-lambda-list))
+                    (destructuring-p (listp props-param))
+                    (props-sym (if destructuring-p (gensym "PROPS") props-param))
+                    (destructuring-bindings (when destructuring-p
+                                              (generate-init-destructuring-bindings
+                                                props-param props-sym)))
+                    (all-destructured-syms (when destructuring-p
+                                             (mapcar #'first destructuring-bindings))))
 
               `(defmethod elmtui.ui.api:init ((self ,component-class-name) &rest initargs &key id-path &allow-other-keys)
                  (declare (ignorable id-path initargs))
                  (let ((,id-sym (elmtui.ui.api:id-from-path id-path))
-                        (,(first init-lambda-list) initargs)
+                        (,props-sym initargs)
                         (,(second init-lambda-list) id-path))
-                   ;; (declare (ignorable ,@(remove nil (rest init-lambda-list))))
-                   (declare (ignorable ,@(remove nil init-lambda-list)))
-                   (destructuring-bind (user-initial-state-plist &rest other-values)
-                     (multiple-value-list (progn ,@init-user-code))
-                     (let* ((user-patches (first other-values))
-                             (user-commands (second other-values))
-                             (final-state-ht (make-hash-table :test 'eq)))
-                       (setf (gethash :type final-state-ht) (cclass-name self))
-                       (setf (gethash :id final-state-ht) ,id-sym)
-                       ,@(loop for slot in parsed-state-slots
-                           for slot-kw = (getf slot :keyword)
-                           for slot-name-sym = (getf slot :name)
-                           for custom-initarg = (getf slot :initarg)
-                           for generated-initarg = (intern (format nil "INITIAL-~A" (symbol-name slot-name-sym)) :keyword)
-                           collect `(setf (gethash ,slot-kw final-state-ht)
-                                      (getf user-initial-state-plist ,slot-kw
-                                        ,(if custom-initarg
-                                           `(or (getf initargs ,custom-initarg)
-                                              (getf initargs ,generated-initarg)
-                                              ,(getf slot :initial-value))
-                                           `(getf initargs ,generated-initarg
-                                              ,(getf slot :initial-value))))))
-                       (loop for (key val) on user-initial-state-plist by #'cddr
-                         unless (find key ',(mapcar (lambda (s) (getf s :keyword)) parsed-state-slots) :test #'eq)
-                         do (setf (gethash key final-state-ht) val))
-                       (values self
-                         (append (list (list id-path final-state-ht)) user-patches)
-                         user-commands))))))
+                   (declare (ignorable ,@(remove nil (list props-sym (second init-lambda-list)))))
+                   ,(let ((core-body
+                            `(destructuring-bind (user-initial-state-plist &rest other-values)
+                               (multiple-value-list (progn ,@init-user-code))
+                               (let* ((user-patches (first other-values))
+                                       (user-commands (second other-values))
+                                       (final-state-ht (make-hash-table :test 'eq)))
+                                 (setf (gethash :type final-state-ht) (cclass-name self))
+                                 (setf (gethash :id final-state-ht) ,id-sym)
+                                 ,@(loop for slot in parsed-state-slots
+                                     for slot-kw = (getf slot :keyword)
+                                     for slot-name-sym = (getf slot :name)
+                                     for custom-initarg = (getf slot :initarg)
+                                     for generated-initarg = (intern (format nil "INITIAL-~A" (symbol-name slot-name-sym)) :keyword)
+                                     collect `(setf (gethash ,slot-kw final-state-ht)
+                                                (getf user-initial-state-plist ,slot-kw
+                                                  ,(if custom-initarg
+                                                     `(or (getf initargs ,custom-initarg)
+                                                        (getf initargs ,generated-initarg)
+                                                        ,(getf slot :initial-value))
+                                                     `(getf initargs ,generated-initarg
+                                                        ,(getf slot :initial-value))))))
+                                 (loop for (key val) on user-initial-state-plist by #'cddr
+                                   unless (find key ',(mapcar (lambda (s) (getf s :keyword)) parsed-state-slots) :test #'eq)
+                                   do (setf (gethash key final-state-ht) val))
+                                 (values self
+                                   (append (list (list id-path final-state-ht)) user-patches)
+                                   user-commands)))))
+                      (if destructuring-p
+                        `(let ,destructuring-bindings
+                           (declare (ignorable ,@all-destructured-syms))
+                           ,core-body)
+                        core-body)))))
             `(defmethod elmtui.ui.api:init ((self ,component-class-name) &rest other-keys &key id-path ,@state-initarg-names &allow-other-keys)
                (declare (ignorable id-path ,@state-initarg-names other-keys))
                (let ((component-id (elmtui.ui.api:id-from-path id-path))

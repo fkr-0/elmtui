@@ -459,3 +459,160 @@
       (is (= 7 (second parent-patch))))
     (when child-patch
       (is (= 7 (second child-patch))))))
+
+;;; ===================================================================
+;;; Init destructuring tests (roadmap item 6)
+;;; ===================================================================
+
+;; Component with destructured init: positional args
+(defcomponent test-init-destructured ()
+  (:state
+   (label "default" :type string)
+   (count 0 :type integer))
+  (:init ((label count) self-id-path)
+    (values `(:label ,label :count ,(or count 0))
+            nil)))
+
+;; Component with destructured init: keyword args
+(defcomponent test-init-destructured-key ()
+  (:state
+   (name "anon" :type string)
+   (style nil))
+  (:init ((name &key style) self-id-path)
+    (values `(:name ,(or name "anon") :style ,style)
+            nil)))
+
+;; Component with destructured init: keyword with default
+(defcomponent test-init-destructured-key-default ()
+  (:state
+   (title "untitled" :type string)
+   (visible nil :type (or null boolean)))
+  (:init ((title &key (visible t)) self-id-path)
+    (values `(:title ,(or title "untitled") :visible ,visible)
+            nil)))
+
+;; Component with destructured init: &rest captures remaining props
+(defcomponent test-init-destructured-rest ()
+  (:state
+   (primary nil)
+   (extras nil :type list))
+  (:init ((primary &rest extras) self-id-path)
+    (values `(:primary ,primary :extras ,extras)
+            nil)))
+
+(test defcomponent-init-old-syntax-still-works
+  "The old (:init (props id-path) ...) syntax continues to work."
+  (let* ((instance (make-instance 'test-with-init))
+         (id-path '(:components :old-syntax-test)))
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :data '(x y z))
+      (is (eq instance returned-instance))
+      (is (= 1 (length patches)))
+      (is (null commands))
+      (let ((state (second (first patches))))
+        (is (equal '(x y z) (gethash :data state)))
+        (is (eq t (gethash :initialized state)))))))
+
+(test defcomponent-init-destructured-positional
+  "(:init ((label count) id-path) ...) destructures props plist."
+  (let* ((instance (make-instance 'test-init-destructured))
+         (id-path '(:components :destr-pos)))
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :label "Hello" :count 42)
+      (is (eq instance returned-instance))
+      (is (= 1 (length patches)))
+      (is (null commands))
+      (let ((state (second (first patches))))
+        (is (string= "Hello" (gethash :label state)))
+        (is (= 42 (gethash :count state)))))))
+
+(test defcomponent-init-destructured-keyword
+  "(:init ((name &key style) id-path) ...) destructures keyword args."
+  (let* ((instance (make-instance 'test-init-destructured-key))
+         (id-path '(:components :destr-key)))
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :name "Alice" :style :bold)
+      (is (eq instance returned-instance))
+      (is (= 1 (length patches)))
+      (is (null commands))
+      (let ((state (second (first patches))))
+        (is (string= "Alice" (gethash :name state)))
+        (is (eq :bold (gethash :style state)))))))
+
+(test defcomponent-init-destructured-keyword-default
+  "(&key (visible t)) receives the default when the prop is not passed."
+  (let* ((instance (make-instance 'test-init-destructured-key-default))
+         (id-path '(:components :destr-key-def)))
+    ;; Without :visible — should get default t
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :title "My Title")
+      (declare (ignore commands))
+      (is (eq instance returned-instance))
+      (let ((state (second (first patches))))
+        (is (string= "My Title" (gethash :title state)))
+        (is (eq t (gethash :visible state)))))
+    ;; With explicit :visible nil — should override default
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :title "Other" :visible nil)
+      (declare (ignore commands))
+      (is (eq instance returned-instance))
+      (let ((state (second (first patches))))
+        (is (string= "Other" (gethash :title state)))
+        (is (eq nil (gethash :visible state)))))))
+
+(test defcomponent-init-destructured-missing-props-are-nil
+  "Missing props yield NIL for unbound destructured parameters."
+  (let* ((instance (make-instance 'test-init-destructured))
+         (id-path '(:components :destr-missing)))
+    ;; No :label or :count passed
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path)
+      (declare (ignore commands))
+      (is (eq instance returned-instance))
+      (let ((state (second (first patches))))
+        (is (null (gethash :label state)))
+        (is (= 0 (gethash :count state)))))))  ;; body does (or count 0)
+
+(test defcomponent-init-destructured-rest
+  "&rest captures remaining plist keys not named in the pattern."
+  (let* ((instance (make-instance 'test-init-destructured-rest))
+         (id-path '(:components :destr-rest)))
+    (multiple-value-bind (returned-instance patches commands)
+        (init instance :id-path id-path :primary "main" :extra-a 1 :extra-b 2)
+      (declare (ignore commands))
+      (is (eq instance returned-instance))
+      (let ((state (second (first patches))))
+        (is (string= "main" (gethash :primary state)))
+        ;; extras should contain the remaining props (excluding :id-path and :primary)
+        (let ((extras (gethash :extras state)))
+          (is (listp extras))
+          ;; extras contains everything from initargs except :primary
+          ;; including :id-path, :extra-a, :extra-b
+          (is (not (null (getf extras :extra-a))))
+          (is (= 1 (getf extras :extra-a)))
+          (is (= 2 (getf extras :extra-b))))))))
+
+(test defcomponent-view-receives-four-args-including-children
+  "The :view clause receives (local-state app-state id-path children)."
+  ;; test-with-view already has a 4-param view; verify it runs
+  (let* ((instance (make-instance 'test-with-view))
+         (mock-app-state (make-state :initial
+                           (alexandria:plist-hash-table
+                             `(:components (:test-view (:label "With Children"))))))
+         (id-path '(:components :test-view)))
+    ;; Call view with explicit children
+    (let ((view-result (view instance mock-app-state :id-path id-path
+                         :children '((:text :id :child1 :content "Child")))))
+      (is (listp view-result))
+      (is (eq :div (first view-result))))))
+
+(test defcomponent-view-method-signature-accepts-children-keyword
+  "The generated view method accepts a :children keyword argument."
+  (let* ((instance (make-instance 'test-complete))
+         (mock-app-state (make-state :initial
+                           (alexandria:plist-hash-table
+                             `(:components (:sig-test (:name "sig" :active t))))))
+         (id-path '(:components :sig-test)))
+    ;; Should not error when passed :children
+    (finishes
+      (view instance mock-app-state :id-path id-path :children '((:text :id :c))))))
