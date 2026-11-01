@@ -403,13 +403,32 @@ Returns two values: INSTANCE and CHILD-ID-PATH."
 ;;; UPDATE
 ;;; ---------------------------------------------------------------------------
 
+(defun %placement-height (anchor height rows cursor-row-0 overflow-policy)
+  "Height used to PLACE a cursor-anchored viewport.
+
+Under :TRUNCATE the viewport must never move onto rows the user already owns
+(above a :below-cursor anchor, or below an :above-cursor anchor). Placing with
+the untruncated HEIGHT clamped the top row upward, so the first frame painted
+over existing shell output before the truncation took effect."
+  (if (and (eq overflow-policy :truncate) (plusp rows))
+      (case (normalize-anchor anchor)
+        (:below-cursor (min height (max 1 (- rows cursor-row-0 1))))
+        (:above-cursor (min height (max 1 cursor-row-0)))
+        (otherwise height))
+      height))
+
 (defun %recompute-anchoring (ctx &optional (log? t))
   "Recompute offsets, anchor-pos, growth given current component state in CTX."
   (let* ((anchor (sref ctx :anchor))
           (term-size (or (sref ctx :terminal-size) '(0 0)))
           (cursor-pos (or (sref ctx :cursor-pos) '(1 1)))
           (width  (or (sref ctx :width) 1))
-          (height (or (sref ctx :height) 1)))
+          (height (%placement-height
+                   anchor (or (sref ctx :height) 1) (second term-size)
+                   (%cursor->index (second cursor-pos))
+                   (if (sref ctx :scroll-effect-failed)
+                       :truncate
+                       (sref ctx :overflow-policy :scroll)))))
     ;; In :manual mode we do NOT recompute placement; we only clamp to bounds.
     (when (eq (normalize-anchor anchor) :manual)
       ;; Note: historical quirk — stored offsets may be labelled as

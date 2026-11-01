@@ -42,7 +42,16 @@
     #:tmux-available-p
     #:prefill-backend-from-tmux
     #:save-tmux-capture
-    #:restore-to-tmux-capture)
+    #:saved-tmux-capture
+    #:restore-to-tmux-capture
+    #:make-buffer-from-tmux-styled
+    #:tmux-history-size
+    #:make-normal-screen-ledger
+    #:normal-screen-ledger-launch-history
+    #:normal-screen-ledger-pulled
+    #:normal-screen-reconcile-history
+    #:normal-screen-underlay
+    #:normal-screen-overflow-chunks)
   (:import-from :cl-inputs.device.api)
   (:import-from :elmtui.runtime.protocol
     #:run-application
@@ -273,13 +282,57 @@ This keeps compatibility with older examples that pass app instances."
 (defvar *frame-render-lock* (bt:make-lock "elmtui frame rendering")
   "Serialize complete frames across startup and event-consumer threads.")
 
-(defvar *normal-screen-physical-frames* nil "Committed normal-screen paint regions: row, col, height, width, pane height.")
+(defvar *normal-screen-ledger* nil
+  "Logical normal-screen underlay of the running app; see NORMAL-SCREEN-LEDGER.")
 
-(defun %record-normal-screen-paint (ctx) "Record actual physical paint ownership after a successfully presented frame." (when (and *preserve-underlay* *backend* (elmtui.contracts:ctx-front-buffer ctx)) (let ((buffer (elmtui.contracts:ctx-front-buffer ctx))) (multiple-value-bind (ox oy) (elmtui.pipeline::%root-viewport-offset ctx) (pushnew (list oy ox (elmtui.platform.backend.common.virtual-buffer:buffer-height buffer) (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer) (term-h *backend*)) *normal-screen-physical-frames* :test #'equal)))))
+(defvar *normal-screen-underlay-cache* nil
+  "(WIDTH HEIGHT BUFFER): the ledger's pane view for the last seen geometry.")
 
-(defun %normal-screen-painted-cell-p (row col current-height) "Whether physical ROW/COL was ever painted; rebase by pane bottom on resize. Unowned history and underlay cells must never be changed by shutdown restore." (loop for (y x h w height) in *normal-screen-physical-frames* for projected = (+ y (- current-height height)) thereis (and (<= projected row) (< row (+ projected h)) (<= x col) (< col (+ x w)))))
 
-(defun %render-frame (ctx) (bt:with-lock-held (*frame-render-lock*) (let ((rendered (full-view-pipeline ctx))) (%record-normal-screen-paint rendered) rendered)))
+
+(defun %reconcile-normal-screen-ledger (ledger width height)
+  "Record rows tmux pulled from history onto the pane since launch.
+Captures the live pane only when the history size shows new pulled rows."
+  (let ((launch (normal-screen-ledger-launch-history ledger))
+        (history (tmux-history-size)))
+    (when (and launch history
+               (> (- launch history) (normal-screen-ledger-pulled ledger)))
+      (normal-screen-reconcile-history
+       ledger (make-buffer-from-tmux-styled width height) :history history))
+    ledger))
+
+(defun %live-underlay-buffer ()
+  "Return the pane-sized logical underlay for the current geometry, or NIL.
+
+Reconciles the ledger whenever the geometry changes, so frames composite onto
+the rows tmux actually shows after a resize rather than onto stale cells."
+  (let ((ledger *normal-screen-ledger*))
+    (when (and *preserve-underlay* ledger *backend*)
+      (let ((width (term-w *backend*))
+            (height (term-h *backend*))
+            (cache *normal-screen-underlay-cache*))
+        (if (and cache (eql (first cache) width) (eql (second cache) height))
+            (third cache)
+            (progn
+              (when cache
+                (%reconcile-normal-screen-ledger ledger width height))
+              (let ((underlay (normal-screen-underlay ledger width height)))
+                (setf *normal-screen-underlay-cache* (list width height underlay))
+                underlay)))))))
+
+(defun %render-frame (ctx)
+  "Render and present one frame. Normal-screen apps composite onto the logical
+underlay and park the cursor on pane row 0 after any output, so a tmux height
+shrink deletes bottom rows instead of scrolling painted cells into history."
+  (bt:with-lock-held (*frame-render-lock*)
+    (let* ((elmtui.pipeline:*underlay-buffer* (%live-underlay-buffer))
+           (elmtui.pipeline:*underlay-protected-rows*
+             (if (and elmtui.pipeline:*underlay-buffer* *normal-screen-ledger*)
+                 (normal-screen-ledger-pulled *normal-screen-ledger*)
+                 0))
+           (elmtui.platform.backend.terminal.diff-renderer:*park-cursor-after-diff*
+             (and *preserve-underlay* *normal-screen-ledger* '(0 . 0))))
+      (full-view-pipeline ctx))))
 
 (defun %synchronize-resized-terminal-backend (message)
   "Apply real resize geometry before layout and before shutdown restoration.
@@ -747,70 +800,52 @@ APP-SPEC: property list describing the app, must contain :command-processor-fn, 
 
 (defun %resynchronize-live-tmux-geometry (backend) "Prefer actual tmux pane cells to stale PTY ioctl dimensions after resize." (when (and backend (tmux-available-p) (typep backend 'elmtui.platform.backend.terminal:terminal-instance)) (handler-case (let* ((raw (uiop:run-program ' ("tmux" "display-message" "-p" "#{pane_width} #{pane_height}") :output :string)) (parts (remove "" (uiop:split-string (string-trim ' (#\Space #\Tab #\Newline) raw) :separator ' (#\Space #\Tab)) :test #'string=)) (width (and (= (length parts) 2) (parse-integer (first parts) :junk-allowed nil))) (height (and (= (length parts) 2) (parse-integer (second parts) :junk-allowed nil)))) (when (and width height (plusp width) (plusp height) (or (/= width (term-w backend)) (/= height (term-h backend)))) (handle-backend-resize backend width height) (setf *previous-frame-buffer* nil))) (error (condition) (log-warn "Tmux pane geometry probe failed: ~A" condition)))) backend)
 
-(defun %normal-screen-row-signature (buffer row width) "Text of a physical row; trim trailing screen padding only." (string-right-trim (list (code-char 32)) (coerce (loop for col below width collect (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at buffer row col))) 'string)))
 
-(defun %normal-screen-row-alignment (saved painted width) "Map immutable original rows into resized pane rows using unpainted anchors." (let ((best-shift 0) (best-match-count 0) (sh (elmtui.platform.backend.common.virtual-buffer:buffer-height saved)) (ph (elmtui.platform.backend.common.virtual-buffer:buffer-height painted))) (loop for shift from (- sh) to ph do (let ((matches 0)) (loop for row below sh for actual = (+ row shift) when (and (<= 0 actual) (< actual ph) (not (%normal-screen-painted-cell-p actual 0 ph)) (let ((original (%normal-screen-row-signature saved row width)) (observed (%normal-screen-row-signature painted actual width))) (and (plusp (length original)) (string= original observed)))) do (incf matches)) (when (> matches best-match-count) (setf best-match-count matches best-shift shift)))) (if (>= best-match-count 2) best-shift 0)))
 
 (defun %restore-saved-tmux-capture-on-backend (backend)
-  "Reconcile the actual tmux pane with saved styled cells at physical positions.
-The layout-stage frame is viewport-local and cannot be used as a pane diff."
+  "Rewrite the logical normal-screen underlay onto the live tmux pane.
+
+The pane shows the top rows of the ledger's logical underlay (see
+NORMAL-SCREEN-LEDGER). Shutdown repaints those rows, then appends any logical
+rows a height shrink deleted by scrolling the restored pane, which moves the
+rows above them into native history. The final history therefore matches the
+pre-launch history row for row. The layout-stage frame is viewport-local and
+is never used as a pane diff."
   (%resynchronize-live-tmux-geometry backend)
-  (let* ((saved elmtui.platform.tmux::*saved-tmux-capture*)
+  (let* ((saved (saved-tmux-capture))
+         (ledger (or *normal-screen-ledger*
+                     (and saved (make-normal-screen-ledger saved :launch-history nil))))
          (tw (term-w backend))
          (th (term-h backend))
-         (painted (and saved (tmux-available-p)
-                       (elmtui.platform.tmux:make-buffer-from-tmux-styled tw th))))
-    (when (and saved painted)
-      (let* ((sw (elmtui.platform.backend.common.virtual-buffer:buffer-width saved))
-             (sh (elmtui.platform.backend.common.virtual-buffer:buffer-height saved))
-             (pw (elmtui.platform.backend.common.virtual-buffer:buffer-width painted))
-             (ph (elmtui.platform.backend.common.virtual-buffer:buffer-height painted))
-             (width (min sw pw tw))
-             (height (min sh ph th))
-             (row-alignment (%normal-screen-row-alignment saved painted width)))
-        (when (and (plusp width) (plusp height))
-          (let ((before (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer width height))
-                (after (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer width height)))
-            (loop for row below height do
-              (loop for col below width do
-                (let* ((physical-row (+ row (- ph height)))
-                       (source-row (- physical-row row-alignment))
-                       (now (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
-                             painted physical-row col))
-                       (old (if (<= 0 source-row (1- sh))
-                                (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
-                                 saved source-row col)
-                                now)))
-                  (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
-                   before row col
-                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char now)
-                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style now))
-                  (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
-                   after row col
-                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char
-                    (if (%normal-screen-painted-cell-p (+ row (- th height)) col th)
-                        old now))
-                   (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style
-                    (if (%normal-screen-painted-cell-p (+ row (- th height)) col th)
-                        old now))))))
-            (handler-case
-                (progn
-                  (apply-diff-to-backend (compute-buffer-diff before after)
-                                         backend (- th height) 0)
-                  ;; Restore the original physical row mapping *after* all
-                  ;; painted cells have been replaced. Scroll the already
-                  ;; restored normal pane, never a pane containing overlays.
-                  (when (and (not (zerop row-alignment))
-                             (< (abs row-alignment) th))
-                    (elmtui.platform.api:scroll backend row-alignment)))
-              (error (condition)
-                (log-warn "DRIVER: tmux physical pane restore failed: ~A" condition)))
-            (let ((pos *last-cursor-pos*))
-              (when (and (consp pos) (integerp (car pos)) (integerp (cdr pos)))
-                (set-cursor-position backend
-                                     (max 0 (min (+ (car pos) (- th sh)) (1- th)))
-                                     (max 0 (min (cdr pos) (1- tw))))))
-            t))))))
+         (live (and ledger (tmux-available-p) (plusp tw) (plusp th)
+                    (make-buffer-from-tmux-styled tw th))))
+    (when (and ledger live)
+      (%reconcile-normal-screen-ledger ledger tw th)
+      (let ((target (normal-screen-underlay ledger tw th live))
+            (scrolled 0))
+        (handler-case
+            (progn
+              (apply-diff-to-backend (compute-buffer-diff live target) backend 0 0)
+              (dolist (chunk (normal-screen-overflow-chunks ledger th tw))
+                (let ((rows (elmtui.platform.backend.common.virtual-buffer:buffer-height chunk)))
+                  (set-cursor-position backend (1- th) 0)
+                  (elmtui.platform.api:scroll backend rows)
+                  (apply-diff-to-backend
+                   (compute-buffer-diff
+                    (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer tw rows)
+                    chunk)
+                   backend (- th rows) 0)
+                  (incf scrolled rows))))
+          (error (condition)
+            (log-warn "DRIVER: tmux physical pane restore failed: ~A" condition)))
+        (let ((pos *last-cursor-pos*))
+          (when (and (consp pos) (integerp (car pos)) (integerp (cdr pos)))
+            (set-cursor-position
+             backend
+             (max 0 (min (- (+ (car pos) (normal-screen-ledger-pulled ledger)) scrolled)
+                         (1- th)))
+             (max 0 (min (cdr pos) (1- tw))))))
+        t))))
 
 (defun %set-alternate-screen-mode (backend enabled-p)
   "Enter or leave terminal alternate screen mode for a maintained terminal backend.
@@ -948,7 +983,8 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
     *startup-presentation-deferred* t
     *focus-manager* nil
     *preserve-underlay* nil
-    *normal-screen-physical-frames* nil
+    *normal-screen-ledger* nil
+    *normal-screen-underlay-cache* nil
     *use-alternate-screen* nil
     *runtime-phase* :booting
     elmtui.core.globals:*app-state* nil
@@ -1056,6 +1092,7 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
               (when snapshot
                 ;; Save for restore on exit (seamless return to original state)
                 (save-tmux-capture snapshot)
+                (setf *normal-screen-ledger* (make-normal-screen-ledger snapshot))
                 ;; Prefill is a committed front frame for incremental diff.
                 (setf *previous-frame-buffer* snapshot))))
 

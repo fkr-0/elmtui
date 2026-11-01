@@ -45,7 +45,19 @@
     #:save-tmux-capture
     #:restore-to-tmux-capture
     #:has-saved-tmux-capture
-    #:clear-saved-tmux-capture))
+    #:saved-tmux-capture
+    #:clear-saved-tmux-capture
+    #:tmux-history-size
+    #:normal-screen-ledger
+    #:normal-screen-ledger-p
+    #:make-normal-screen-ledger
+    #:normal-screen-ledger-pulled
+    #:normal-screen-ledger-logical-height
+    #:normal-screen-ledger-prepend-rows
+    #:normal-screen-reconcile-history
+    #:normal-screen-underlay
+    #:normal-screen-ledger-launch-history
+    #:normal-screen-overflow-chunks))
 
 (in-package :elmtui.platform.tmux)
 
@@ -725,6 +737,11 @@ shrink."
   "Check if there is a saved tmux capture available for restoration."
   (not (null *saved-tmux-capture*)))
 
+(defun saved-tmux-capture ()
+  "Return the saved visible-pane capture buffer or NIL. Callers must treat it as
+read-only: it is the immutable underlay used for compositing and restoration."
+  *saved-tmux-capture*)
+
 (defun save-tmux-capture (buffer)
   "Copy a bounded visible-pane cell BUFFER into the saved slot. This does not
 snapshot tmux scrollback or protect history from later resize-induced
@@ -757,3 +774,111 @@ recovers native scrollback."
                              (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell)
                              (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style cell))))))))
   buffer)
+
+
+;;;----------------------------------------------------------------
+;;; Normal-screen underlay ledger
+;;;----------------------------------------------------------------
+;;;
+;;; While a normal-screen app runs, the driver parks the terminal cursor on
+;;; pane row 0 after every frame. tmux then resizes the pane without touching
+;;; scrollback: a height shrink deletes rows below the cursor (bottom rows),
+;;; a height grow appends blank rows or pulls rows that an *earlier* resize
+;;; scrolled off back down from history onto the top of the pane. The visible
+;;; pane therefore always shows the top rows of one LOGICAL underlay:
+;;;
+;;;   [rows pulled back from history] ++ [rows captured at launch]
+;;;
+;;; The ledger records that sequence. Frames composite onto its top rows, and
+;;; shutdown rewrites it, scrolling any rows the pane can no longer show into
+;;; native history, so the final history equals the pre-launch history.
+;;; Limitation: tmux reflow of lines wider than a new pane width is not
+;;; modelled; such rows are truncated rather than re-wrapped.
+
+(defstruct (normal-screen-ledger
+            (:constructor %make-normal-screen-ledger (logical launch-history)))
+  "Logical normal-screen underlay rows and the tmux history size at launch."
+  (logical nil :type (or null virtual-terminal-buffer))
+  (launch-history nil :type (or null integer))
+  (pulled 0 :type (integer 0 *)))
+
+(defun tmux-history-size ()
+  "Return the scrollback line count of the target pane, or NIL when unknown."
+  (let ((raw (apply #'%run-tmux "display-message" "-p"
+                    (append (%target-args) (list "#{history_size}")))))
+    (and raw (parse-integer (string-trim '(#\Space #\Tab #\Newline #\Return) raw)
+                            :junk-allowed t))))
+
+(defun %copy-buffer-rows (source source-row destination destination-row count)
+  "Copy COUNT rows of cells between buffers over their shared width."
+  (let ((width (min (buffer-width source) (buffer-width destination))))
+    (dotimes (i count destination)
+      (dotimes (col width)
+        (let ((cell (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at
+                     source (+ source-row i) col)))
+          (set-buffer-cell-at
+           destination (+ destination-row i) col
+           (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell)
+           (elmtui.platform.backend.common.virtual-buffer:buffer-cell-style cell)
+           :grapheme (elmtui.platform.backend.common.virtual-buffer:buffer-cell-grapheme cell)))))))
+
+(defun make-normal-screen-ledger (saved &key (launch-history (tmux-history-size)))
+  "Start a ledger from SAVED, the styled visible pane captured before launch."
+  (check-type saved virtual-terminal-buffer)
+  (%make-normal-screen-ledger (copy-virtual-buffer saved) launch-history))
+
+(defun normal-screen-ledger-logical-height (ledger)
+  (buffer-height (normal-screen-ledger-logical ledger)))
+
+(defun normal-screen-ledger-prepend-rows (ledger rows count)
+  "Prepend the top COUNT rows of ROWS as pristine lines tmux pulled from history."
+  (when (plusp count)
+    (let* ((old (normal-screen-ledger-logical ledger))
+           (count (min count (buffer-height rows)))
+           (new (make-virtual-buffer (max (buffer-width old) (buffer-width rows))
+                                     (+ count (buffer-height old)))))
+      (%copy-buffer-rows rows 0 new 0 count)
+      (%copy-buffer-rows old 0 new count (buffer-height old))
+      (setf (normal-screen-ledger-logical ledger) new)
+      (incf (normal-screen-ledger-pulled ledger) count)))
+  ledger)
+
+(defun normal-screen-reconcile-history (ledger live &key (history (tmux-history-size)))
+  "Account for scrollback rows that tmux pulled onto the top of the pane.
+
+LIVE is a fresh capture of the current pane. Rows pulled since the last call are
+the top rows of LIVE: they come straight from history and were never painted."
+  (let ((launch (normal-screen-ledger-launch-history ledger)))
+    (when (and launch history live)
+      (let ((fresh (- (- launch history) (normal-screen-ledger-pulled ledger))))
+        (when (plusp fresh)
+          (normal-screen-ledger-prepend-rows ledger live fresh)))))
+  ledger)
+
+(defun normal-screen-underlay (ledger width height &optional fallback)
+  "Return the WIDTHxHEIGHT pane view of LEDGER's logical underlay.
+
+Cells outside the logical rows or columns come from FALLBACK (a buffer of the
+same size, normally the live pane) when given, and are blank otherwise."
+  (let* ((logical (normal-screen-ledger-logical ledger))
+         (rows (min height (buffer-height logical)))
+         (view (if fallback (copy-virtual-buffer fallback)
+                   (make-virtual-buffer width height))))
+    (%copy-buffer-rows logical 0 view 0 rows)
+    view))
+
+(defun normal-screen-overflow-chunks (ledger height width)
+  "Return logical rows beyond a HEIGHT-row pane as WIDTH-wide buffers of at most
+HEIGHT rows each, in order.
+
+These are rows a shrink deleted from the bottom of the pane. Shutdown appends
+each chunk by scrolling the pane, which moves the rows above into history."
+  (let* ((logical (normal-screen-ledger-logical ledger))
+         (total (buffer-height logical))
+         (chunks '()))
+    (loop for start from height below total by (max 1 height)
+          for count = (min height (- total start))
+          do (let ((chunk (make-virtual-buffer width count)))
+               (%copy-buffer-rows logical start chunk 0 count)
+               (push chunk chunks)))
+    (nreverse chunks)))

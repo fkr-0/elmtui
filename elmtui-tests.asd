@@ -79,6 +79,7 @@
                                (:file "tmux-capture-tests")
                                (:file "tmux-capture-integration-tests")
                                (:file "tmux-restore-tests")
+                               (:file "normal-screen-overlay-tests")
                                (:file "tmux-examples-smoke-tests")
                                (:file "pong-example-smoke-tests")
                                ;; Commented out until proper tests for actual APIs are written

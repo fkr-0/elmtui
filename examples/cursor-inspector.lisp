@@ -18,6 +18,11 @@
 
 (defvar *inspector-launch-title* "CURSOR INSPECTOR")
 
+(defvar *inspector-physical-overlay* nil
+  "True when the launch owns a full-pane viewport over a captured tmux underlay.
+Only then can B2 be painted on the real pane cell; otherwise the inspector
+stays a bounded bottom-left panel and B2 remains a PREVIEW.")
+
 (defun %visible-pane-lines (content) "Convert a tmux -p pane snapshot into rows, excluding its final delimiter." (let ((lines (uiop:split-string (or content "") :separator ' (#\Newline)))) (when (and lines (string= (car (last lines)) "")) (setf lines (butlast lines))) (coerce lines 'vector)))
 
 (defun %capture (mode)
@@ -42,6 +47,7 @@
           :pane-lines pane :screen-lines scrollback
           :mode mode :lines (if (eq mode :screen) scrollback pane)
           :title *inspector-launch-title*
+          :physical-overlay *inspector-physical-overlay*
           :cursor-x 0 :cursor-y 0
           :status (if available "Snapshot captured before UI launch"
                       "No tmux session; inspect a local demonstration instead")
@@ -262,6 +268,74 @@ unstyled, out-of-range, or unparseable cells; column widths are approximate."
 clipped at the left boundary. This is not a physical terminal overlay; wide
 glyphs use a placeholder." (let* ((cell (%inspected-cell line column)) (target (second cell)) (width (third cell)) (glyph (if (= width 1) (first cell) "◇")) (window-start (max 0 (- target 20))) (relative (- target window-start)) (has-left (> relative 0)) (left-column (if has-left (1- relative) 0)) (top-offset (make-string left-column :initial-element #\Space)) (prefix (%slice-columns line window-start left-column)) (suffix (%slice-columns line (+ target width 1) 34))) (list (concatenate 'string top-offset (if has-left "┌─┐" "─┐")) (concatenate 'string prefix (if has-left "│" "") glyph "│" suffix) (concatenate 'string top-offset (if has-left "└─┘" "─┘")))))
 
+(defun %b2-physical-geometry (x y cell-width term-w term-h)
+  "Return the clipped physical B2 frame around pane cell X,Y as a plist.
+
+:TOP and :BOTTOM are border rows or NIL when clipped by the pane edge; :LEFT
+and :RIGHT are border columns or NIL. The interior spans CELL-WIDTH columns
+from X and is never painted, so the selected glyph keeps its captured style.
+Returns NIL when X,Y lies outside the pane."
+  (when (and (< -1 x term-w) (< -1 y term-h))
+    (list :top (and (plusp y) (1- y))
+          :bottom (and (< (1+ y) term-h) (1+ y))
+          :left (and (plusp x) (1- x))
+          :right (and (< (+ x cell-width) term-w) (+ x cell-width))
+          :x x :y y :width cell-width)))
+
+(defun %b2-rows-occupied (geometry)
+  "Inclusive first and last physical rows painted by GEOMETRY."
+  (values (or (getf geometry :top) (getf geometry :y))
+          (or (getf geometry :bottom) (getf geometry :y))))
+
+(defun %overlay-spacer (width height)
+  "An unpainted layout cell: no content and no background, so the underlay
+shows through."
+  `(:container :style (:width ,(max 1 width) :height ,height :padding 0)))
+
+(defun %overlay-row (term-w segments)
+  "One physical row built from (COLUMN . DSL-OR-WIDTH) SEGMENTS in column order.
+An integer segment is an unpainted gap of that many columns."
+  (let ((children '()) (col 0))
+    (loop for (start . item) in segments
+          do (when (> start col)
+               (push (%overlay-spacer (- start col) 1) children)
+               (setf col start))
+             (if (integerp item)
+                 (progn (push (%overlay-spacer item 1) children)
+                        (incf col item))
+                 (progn (push item children)
+                        (incf col (getf (getf (rest item) :style) :width 1)))))
+    `(:container :style (:display :flex :flex-direction :row :width ,term-w
+                         :height 1 :padding 0 :gap 0)
+      :children ,(nreverse children))))
+
+(defun %b2-border-text (content)
+  `(:text :content ,content
+          :style (:fg-color :cyan :bold t :width ,(length content) :height 1)))
+
+(defun %b2-physical-rows (geometry term-w)
+  "Return (ROW . DSL) entries painting only the B2 border cells of GEOMETRY."
+  (destructuring-bind (&key top bottom left right x y width) geometry
+    (let* ((start (or left x))
+           (run (make-string width :initial-element #\─))
+           (rows '()))
+      (flet ((edge (l r) (concatenate 'string (if left l "") run (if right r ""))))
+        (when top
+          (push (cons top (%overlay-row term-w
+                                        (list (cons start (%b2-border-text (edge "┌" "┐"))))))
+                rows))
+        (push (cons y (%overlay-row
+                       term-w
+                       (append (when left (list (cons left (%b2-border-text "│"))))
+                               (list (cons x width))
+                               (when right (list (cons right (%b2-border-text "│")))))))
+              rows)
+        (when bottom
+          (push (cons bottom (%overlay-row term-w
+                                           (list (cons start (%b2-border-text (edge "└" "┘"))))))
+                rows)))
+      (nreverse rows))))
+
 (defun %b1-line (content)
   "One 72-cell tooltip row with exact left/right Unicode boundaries."
   (let* ((clipped (%slice-columns content 0 68))
@@ -269,7 +343,7 @@ glyphs use a placeholder." (let* ((cell (%inspected-cell line column)) (target (
                                :initial-element #\Space)))
     (concatenate 'string "│ " clipped padding " │")))
 
-(defun cursor-inspector-view (state)
+(defun %inspector-panel-children (state &key (preview t))
   (let* ((lines (state-ref state :lines #()))
          (row (state-ref state :cursor-y 0))
          (col (state-ref state :cursor-x 0))
@@ -286,11 +360,7 @@ glyphs use a placeholder." (let* ((cell (%inspected-cell line column)) (target (
          (fg (getf style :fg))
          (bg (getf style :bg))
          (attrs (getf style :attrs)))
-    `(:container :id :inspector-frame
-       :style (:display :flex :flex-direction :column
-               :width 76 :height 12 :padding 0 :gap 0)
-       :children
-       ((:text :content ,(format nil "~A ~A  |  B2 focus / B1 style"
+    `((:text :content ,(format nil "~A ~A  |  B2 focus / B1 style"
                                  title (if tmux? "[TMUX]" "[NO-TMUX]"))
                :style (:fg-color :cyan :bold t))
         (:text :content ,(%slice-columns
@@ -299,12 +369,13 @@ glyphs use a placeholder." (let* ((cell (%inspected-cell line column)) (target (
                :style (:fg-color :yellow))
         (:text :content ,(%slice-columns (%snapshot-row lines row col t) 0 72)
                :style (:fg-color :green))
-        (:text :content ,(format nil "  ~A" (first b2))
-               :style (:fg-color :cyan))
-        (:text :content ,(format nil "  ~A" (second b2))
-               :style (:fg-color :white :bold t))
-        (:text :content ,(format nil "  ~A" (third b2))
-               :style (:fg-color :cyan))
+        ,@(when preview
+            `((:text :content ,(format nil "  ~A" (first b2))
+                     :style (:fg-color :cyan))
+              (:text :content ,(format nil "  ~A" (second b2))
+                     :style (:fg-color :white :bold t))
+              (:text :content ,(format nil "  ~A" (third b2))
+                     :style (:fg-color :cyan))))
         (:text :content "┌─ B1 / GLYPH + STYLE ───────────────────────────────────────────┐"
                :style (:fg-color :cyan))
         (:text :content ,(%b1-line
@@ -327,18 +398,100 @@ glyphs use a placeholder." (let* ((cell (%inspected-cell line column)) (target (
         (:text :content "└──────────────────────────────────────────────────────────────────────┘"
                :style (:fg-color :cyan))
         (:text :content "arrows/hjkl move | p pane / s scrollback | r refresh | q/Esc quit"
-               :style (:fg-color :yellow))))))
+               :style (:fg-color :yellow)))))
+
+(defun %inspector-terminal-size (state lines)
+  "Live pane size tracked by the root viewport, falling back to the snapshot."
+  (let ((size (elmtui.utils:get-path '(:components :root :terminal-size) state nil)))
+    (if (and (consp size) (integerp (first size)) (integerp (second size))
+             (plusp (first size)) (plusp (second size)))
+        (values (first size) (second size))
+        (values 80 (max 1 (length lines))))))
+
+(defun %physical-overlay-view (state)
+  "Full-pane frame: B2 on the real pane cell, the panel on the far side of it.
+
+Only B2 border cells and panel rows are painted; every other pane cell is an
+unpainted spacer and keeps its captured underlay. Rows tmux pulled back from
+scrollback after a resize sit above the snapshot (UNDERLAY-PROTECTED-ROWS):
+snapshot row Y is shown at physical row Y plus that offset, and nothing is
+placed on the protected rows."
+  (let* ((lines (state-ref state :lines #()))
+         (x (state-ref state :cursor-x 0))
+         (y (state-ref state :cursor-y 0))
+         (cell (%inspected-cell (%plain-line (%raw-line lines y)) x))
+         (protected (elmtui.pipeline:underlay-protected-rows)))
+    (multiple-value-bind (term-w term-h) (%inspector-terminal-size state lines)
+      (let* ((physical (eq (state-ref state :mode :pane) :pane))
+             (panel (%inspector-panel-children state :preview (not physical)))
+             (panel-h (length panel))
+             ;; Scrollback rows are not pane rows: only PANE mode has a
+             ;; physical cell to frame; SCROLLBACK keeps the in-panel PREVIEW.
+             (geometry (and physical
+                            (%b2-physical-geometry (second cell) (+ y protected)
+                                                   (third cell) term-w term-h)))
+             (panel-top (- term-h panel-h))
+             (entries '()))
+        (when geometry
+          (multiple-value-bind (first-row last-row) (%b2-rows-occupied geometry)
+            (flet ((collides-p (top) (and (<= top last-row)
+                                          (<= first-row (+ top panel-h -1)))))
+              (cond ((not (collides-p panel-top)))
+                    ((and (<= (+ protected panel-h) term-h)
+                          (not (collides-p protected)))
+                     (setf panel-top protected))
+                    (t (setf geometry nil))))))
+        (when (>= panel-top 0)
+          (push (list panel-top panel-h
+                      `(:container :id :inspector-panel
+                        :style (:display :flex :flex-direction :column
+                                :width ,(min 76 term-w) :height ,panel-h
+                                :padding 0 :gap 0)
+                        :children ,panel))
+                entries))
+        (when geometry
+          (dolist (row (%b2-physical-rows geometry term-w))
+            (push (list (car row) 1 (cdr row)) entries)))
+        (setf entries (sort entries #'< :key #'first))
+        (let ((children '()) (row 0))
+          (loop for (start height dsl) in entries
+                do (when (> start row)
+                     (push (%overlay-spacer 1 (- start row)) children))
+                   (push dsl children)
+                   (setf row (+ start height)))
+          `(:container :id :inspector-frame
+            :style (:display :flex :flex-direction :column
+                    :width ,term-w :height ,term-h :padding 0 :gap 0)
+            :children ,(nreverse children)))))))
+
+(defun cursor-inspector-view (state)
+  (if (state-ref state :physical-overlay nil)
+      (%physical-overlay-view state)
+      `(:container :id :inspector-frame
+         :style (:display :flex :flex-direction :column
+                 :width 76 :height 12 :padding 0 :gap 0)
+         :children ,(%inspector-panel-children state))))
 
 (defapplication cursor-inspector-app :root-viewport-id :root :root-component-dsl ' (:root-viewport :id :root :anchor :bottom-left :overflow-policy :truncate :width 80 :height 13 :blank-on-exit nil :child-dsl-spec (:view nil)) :initial-state-fn #'initial-inspector-state :update-fn #'cursor-inspector-update :view-fn #'cursor-inspector-view)
+
+(defapplication cursor-inspector-overlay-app :root-viewport-id :root :root-component-dsl ' (:root-viewport :id :root :anchor :top-left :overflow-policy :truncate :blank-on-exit nil :child-dsl-spec (:view nil)) :initial-state-fn #'initial-inspector-state :update-fn #'cursor-inspector-update :view-fn #'cursor-inspector-view)
 
 (defun run-cursor-inspector (&key (prefill-from-tmux t)
                                   (tmux-mode :pane) (backend-type :terminal)
                                   (title "CURSOR INSPECTOR"))
   "Inspect the original pane in the normal screen buffer, never alternate."
-  (let ((*inspector-launch-mode* tmux-mode)
-        (*inspector-launch-title* title))
-    (run-cursor-inspector-app
-     :platform backend-type
-     :platform-options (list :prefill-from-tmux prefill-from-tmux
-                             :tmux-prefill-mode tmux-mode
-                             :use-alternate-screen nil))))
+  (let* ((overlay (and prefill-from-tmux (eq tmux-mode :pane)
+                       (eq backend-type :terminal) (tmux-available-p)))
+         (*inspector-launch-mode* tmux-mode)
+         (*inspector-launch-title* title)
+         (*inspector-physical-overlay* overlay)
+         (options (list :prefill-from-tmux prefill-from-tmux
+                        :tmux-prefill-mode tmux-mode
+                        :use-alternate-screen nil)))
+    ;; A full-pane viewport is only safe over a captured underlay; without one
+    ;; it would blank the user's screen, so fall back to the bounded panel.
+    (if overlay
+        (run-cursor-inspector-overlay-app :platform backend-type
+                                          :platform-options options)
+        (run-cursor-inspector-app :platform backend-type
+                                  :platform-options options))))
