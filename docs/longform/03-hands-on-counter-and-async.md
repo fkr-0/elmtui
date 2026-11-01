@@ -2,15 +2,10 @@
 
 This chapter starts with the smallest useful TEA application and then extends the same state-machine thinking to asynchronous I/O. It intentionally uses the supported minimal `deftea-app` adapter so the transition is visible without the full application configuration surface. For production/new next-major applications, `defapplication` is the normative constructor; the concepts and runtime transition contract taught here are the same.
 
-> **Known issue in 0.3.1:** the update, view and test code in this chapter is
-> correct and its tests pass, but `RUN-PURE-COUNTER`, the runner `deftea-app`
-> generates, does not yet work in a terminal: nothing is drawn, and quitting
-> signals a type error (see the [API review](../reviews/api-review-20261101.md)).
-> To run an application today, use `defapplication` as in the
-> [Quickstart](../../README.org#quickstart).
-
-The code paths in this chapter were loaded and their tests run under CLPM/SBCL;
-the runner itself is affected by the known issue above. Ellipses and named transport adapters in illustrative fragments
+The counter code in this chapter is exercised under CLPM/SBCL, and
+`deftea-app` runners are run in a real terminal by the release gate
+(`tests/e2e/deftea-app-pty.py`). In ElmTUI 0.3.1 `deftea-app` runners did not
+work in a terminal; that was fixed in 0.3.2. Ellipses and named transport adapters in illustrative fragments
 are placeholders, not a complete network client. The first goal is not a visually elaborate terminal. It is to make the application's semantics so obvious that update behavior can be tested before a terminal exists.
 
 ## 1. Build the counter as a state machine first
@@ -112,7 +107,7 @@ The macro creates:
 RUN-PURE-COUNTER
 ```
 
-The generated runner delegates to the normal ElmTUI application runtime. The generated runner's default platform selector is `:terminal`. `:transition` is the canonical spelling; legacy `:update` remains accepted only for compatibility.
+Run it with `(run-pure-counter)`; Ctrl-C quits. The generated runner delegates to the normal ElmTUI application runtime: `deftea-app` expands into `defapplication`, keeping the model under one key of the application state. The generated runner's default platform selector is `:terminal`. `:transition` is the canonical spelling; legacy `:update` remains accepted only for compatibility.
 
 For application code, keep `INIT-COUNTER`, `UPDATE-COUNTER`, and `VIEW-COUNTER` named and separately testable. The `deftea-app` form should remain a compact wiring declaration for this minimal path; move to `defapplication` when the application needs the production state/component/CLI/keymap surface.
 
@@ -141,7 +136,17 @@ A conceptual keymap is:
 q      -> quit/shutdown message
 ```
 
-The exact placement of those bindings depends on whether the counter is an application action or a focused component action.
+The exact placement of those bindings depends on whether the counter is an application action or a focused component action. The smallest version translates keys inside the transition, so the update vocabulary stays the same:
+
+```lisp
+(defun update-counter-keys (message model)
+  (cond ((elmtui.app:key-pressed-p message :char #\+) (update-counter :increment model))
+        ((elmtui.app:key-pressed-p message :char #\-) (update-counter :decrement model))
+        ((elmtui.app:key-pressed-p message :char #\r) (update-counter :reset model))
+        (t (update-counter message model))))
+```
+
+Pass `#'update-counter-keys` as `:transition`; returning a model plist with `:should-quit t` ends the application.
 
 ## 6. The first useful tests
 

@@ -32,27 +32,23 @@ Save this as `counter.lisp`:
 ```lisp
 (uiop:define-package :counter
   (:use :cl)
-  (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.app #:defapplication #:key-pressed-p #:quit-requested-p)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
-  (:import-from :elmtui.core.event-types #:key-event #:key-event-char)
   (:export #:run-counter))
 (in-package :counter)
-
-;; ElmTUI logs through log4cl; keep log lines off the screen the app draws on.
-(log4cl:remove-all-appenders log4cl:*root-logger*)
 
 (defun initial-state ()
   (list :count 0 :should-quit nil))
 
 (defun update (message state)
   "Return the state changes MESSAGE causes, as patches."
-  (let ((char (and (typep message 'key-event) (key-event-char message)))
-        (count (state-ref state :count 0)))
+  (let ((count (state-ref state :count 0)))
     (cond
-      ((eql char #\+) (make-update-result :patches `(((:count) ,(1+ count)))))
-      ((eql char #\-) (make-update-result :patches `(((:count) ,(1- count)))))
-      ((or (eql char #\q)
-           (and (consp message) (eq (first message) :app-quit-requested)))
+      ((key-pressed-p message :char #\+)
+       (make-update-result :patches `(((:count) ,(1+ count)))))
+      ((key-pressed-p message :char #\-)
+       (make-update-result :patches `(((:count) ,(1- count)))))
+      ((or (key-pressed-p message :char #\q) (quit-requested-p message))
        (make-update-result :patches '(((:should-quit) t))))
       (t (make-update-result)))))
 
@@ -88,9 +84,9 @@ Press `+` and `-` to change the count and `q` to quit. The terminal and its scro
 How it fits together:
 
 - `initial-state` returns the model, a plist.
-- `update` receives each message and the current state. It never changes the state itself; it returns `make-update-result` with *patches* (pairs of a state path and a new value), which the runtime applies. Key presses arrive as `key-event` objects; Ctrl-C arrives as `(:app-quit-requested)`, and setting `:should-quit` ends the application.
+- `update` receives each message and the current state. It never changes the state itself; it returns `make-update-result` with *patches* (pairs of a state path and a new value), which the runtime applies. `key-pressed-p` matches key presses (by `:char`, `:key` such as `:up`, and `:modifiers`); `quit-requested-p` recognises Ctrl-C. Setting `:should-quit` ends the application.
 - `view` is a pure function from state to a declarative UI tree (`:container`, `:text`, …) with CSS-like styles.
-- `defapplication` wires them together and defines `run-counter`. The root viewport is drawn below the cursor and needs an explicit `:height`.
+- `defapplication` wires them together and defines `run-counter`. The root viewport is drawn below the cursor and needs an explicit `:height`. Framework logging is off while the application runs; pass `:log-file "counter.log"` to `run-counter` to keep it.
 
 The key contract is:
 
@@ -101,7 +97,7 @@ msg   -> update(model, msg) -> patches + commands
 commands -> results as messages -> update
 ```
 
-`elmtui.app:defapplication` is the application constructor to use. `elmtui.app.tea-core:deftea-app`, a smaller direct-model-replacement constructor, is currently unable to run applications in a terminal (see the [API review](https://github.com/fkr-0/elmtui/blob/main/docs/reviews/api-review-20261101.md)).
+`elmtui.app:defapplication` is the full application constructor. `elmtui.app.tea-core:deftea-app` is a smaller constructor for programs whose update function returns a whole new model instead of patches; it expands into `defapplication`.
 
 The [foundations](guide/foundations.md) chapter explains the architecture, and the [counter and async tutorial](guide/tutorial.md) shows how to test update functions without a terminal.
 
