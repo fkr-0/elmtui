@@ -24,6 +24,7 @@
                                (:file "coverage-backend-behavior-tests")
                                (:file "coverage-defaults-behavior-tests")
                                (:file "application-init-tests")
+                               (:file "tea-app-component-tests")
                                (:file "application-extension-tests")
                                (:file "component-init-tests")
                                (:file "rendering-pipeline-tests")

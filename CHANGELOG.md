@@ -6,6 +6,18 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Added
+
+- `elmtui:app-model` accessor: extracts the user model from a `deftea-app`
+  application state, so `defcomponent` children can read the model without
+  depending on the internal `:tea-model` CL-STATE key.
+- `deftea-app` now accepts an optional `:root-component-dsl` keyword to host
+  `defcomponent` children in its root viewport DSL tree.
+- "Choosing your constructor" section in docs/USER_GUIDE.md documenting when
+  to use `deftea-app` vs `defapplication` and how to host components.
+- Two new examples: `tea-counter-component` (counter with display component)
+  and `tea-list-detail` (list navigation with detail-panel component).
+
 ## [0.4.1] - 2026-11-01
 
 ### Documentation

@@ -18,7 +18,7 @@ return MAKE-UPDATE-RESULT, and recognise input with KEY-PRESSED-P and
 QUIT-REQUESTED-P or the KEY-EVENT accessors.")
   (:import-from :elmtui.app
                 #:defapplication #:key-pressed-p #:quit-requested-p)
-  (:import-from :elmtui.app.tea-core #:deftea-app)
+  (:import-from :elmtui.app.tea-core #:deftea-app #:app-model)
   (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:import-from :elmtui.core.event-types
                 #:key-event #:key-event-p #:key-event-key #:key-event-char
@@ -26,7 +26,7 @@ QUIT-REQUESTED-P or the KEY-EVENT accessors.")
   (:import-from :elmtui.style.presets #:dark-theme #:light-theme)
   (:export
    ;; Defining applications
-   #:defapplication #:deftea-app
+   #:defapplication #:deftea-app #:app-model
    ;; Update functions
    #:make-update-result #:state-ref
    #:key-pressed-p #:quit-requested-p
