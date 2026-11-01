@@ -135,6 +135,45 @@ directly, which is the default behavior for apps without components.
 `defapplication`). Components that check for NIL before using the model
 work in both constructors.
 
+### Component init destructuring
+
+The `:init` clause of `defcomponent` receives a props plist and the ID
+path. By default you extract values manually with `getf`:
+
+```lisp
+(:init (props self-id-path)
+  (values `(:label ,(getf props :label "default")) nil))
+```
+
+When the first parameter is a list instead of a symbol, `defcomponent`
+destructures the props plist for you:
+
+```lisp
+;; Positional: extracts :label and :count from the props plist
+(:init ((label count) self-id-path)
+  (values `(:label ,label :count ,(or count 0)) nil))
+
+;; Keyword with default value
+(:init ((name &key (visible t)) self-id-path)
+  (values `(:name ,name :visible ,visible) nil))
+```
+
+This is macro-time sugar; the generated method still receives a flat
+plist. Missing props are `NIL` unless a default is specified. The old
+symbol syntax is fully backward compatible.
+
+### Component view clause
+
+The `:view` clause receives four parameters: local state, application
+state, the component's ID path, and children:
+
+```lisp
+(:view (local-state app-state id-path children)
+  `(:container :id ,(id-from-path id-path)
+    :children ((:text :id :label :content ,(getf local-state :text))
+               ,@children)))
+```
+
 ## State and Updates
 
 - Use `elmtui:make-update-result` to return patches and commands from

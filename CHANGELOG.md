@@ -14,6 +14,12 @@ The project follows semantic versioning from the first published release.
   code that ignored the progress parameter can now drop it; code that
   uses progress adds `:progress t`.
 
+### Fixed
+
+- `defcomponent` `:view` clause docstring now correctly documents all four
+  parameters: `(local-state app-state id-path children)`. Previously the
+  macro docstring listed only three.
+
 ### Added
 
 - `elmtui.keys` secondary package for low-level key-event struct accessors
@@ -23,6 +29,14 @@ The project follows semantic versioning from the first published release.
 - "Key Event Handling" section in `docs/USER_GUIDE.md` documenting the
   recommended `key-event-parts` path, `elmtui.keys` for low-level access,
   and the deprecation timeline.
+- `defcomponent` `:init` clause supports optional props destructuring.
+  When the first parameter is a list instead of a symbol, props are
+  extracted automatically:
+  `(:init ((label count &key style) id-path) ...)`.
+  The old `(:init (props id-path) ...)` syntax is fully backward
+  compatible.
+- New example `examples/tea-destructured-init.lisp` demonstrating the
+  destructured `:init` syntax.
 - `patch` and `patch*` convenience constructors for flat-key update results.
 - `quit-result` shorthand for the universal quit response.
 - `key-event-parts` unified key-event destructuring (handles both struct and legacy plist forms).

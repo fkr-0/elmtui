@@ -28,12 +28,46 @@ defines them with the `defcomponent` macro.
 - **`:state`** — declares local state slots with initial values and
   optional type/documentation annotations.
 - **`:init`** — called with props and the component's ID path. Returns
-  `(values initial-local-state commands)`.
+  `(values initial-local-state commands)`. The props parameter can be a
+  plain symbol (receives the raw plist) or a destructuring list (binds
+  named props automatically; see below).
 - **`:update`** — dispatches on message keywords. Each handler receives
   destructured arguments and returns `(values patches commands)`.
   Patches update local state; commands are async effects.
 - **`:view`** — receives local state, application state, the ID path,
   and children. Returns a DSL tree.
+
+## Init destructuring
+
+By default, the first parameter of `:init` is a symbol that receives the
+raw props plist — you extract values with `getf`:
+
+```lisp
+(:init (props self-id-path)
+  (values `(:label ,(getf props :label "default")) nil))
+```
+
+When the first parameter is a **list**, `defcomponent` destructures the
+props plist automatically. Each symbol maps to a keyword derived from its
+name:
+
+```lisp
+;; Positional: (label count) extracts :label and :count
+(:init ((label count) self-id-path)
+  (values `(:label ,label :count ,(or count 0)) nil))
+
+;; Keywords with defaults: (&key (visible t))
+(:init ((name &key (visible t)) self-id-path)
+  (values `(:name ,name :visible ,visible) nil))
+
+;; &rest captures remaining plist entries
+(:init ((primary &rest extras) self-id-path)
+  (values `(:primary ,primary :extras ,extras) nil))
+```
+
+The destructuring is purely syntactic sugar at macro-expansion time.
+Missing props yield `NIL` (or the specified default for `&key` entries).
+The old plain-symbol syntax continues to work unchanged.
 
 ## Example: a label widget
 
