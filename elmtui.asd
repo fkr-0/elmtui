@@ -50,10 +50,11 @@
                 ;; ----------------------------------------------------------------
                 ;; 2) View contracts/base protocol
                 ;; ----------------------------------------------------------------
+                (:file "ui/styles")
                 (:file "view/geo")
                 (:file "view/position")
                 (:file "view/api")
-                (:file "view/base-elements" :depends-on ("view/api" "view/geo"))
+                (:file "view/base-elements" :depends-on ("view/api" "view/geo" "ui/styles"))
                 (:file "view/element-protocol" :depends-on ("view/base-elements"))
 
                 ;; ----------------------------------------------------------------

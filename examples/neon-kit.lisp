@@ -4,6 +4,7 @@
   (:import-from :elmtui.core.event-types
                 #:key-event #:key-event-key #:key-event-char
                 #:key-event-modifiers)
+  (:import-from :elmtui.ui.styles #:defstyle)
   (:export #:event-key #:pressed-p #:control-p #:quit-message-p
            #:screen #:line #:clip #:numbered-line))
 (in-package :elmtui.examples.neon-kit)
@@ -46,28 +47,49 @@
 (defun numbered-line (index text &key (width 54))
   (format nil " │ ~2,'0D │ ~VA │" (1+ index) width (clip text width)))
 
-(defun %palette (role)
+;;;--------------------------------------------------------------
+;;; Named style classes for the neon screen roles.
+;;; Previously every row carried an inline :style plist repeating
+;;; the same fg-color / bg-color / bold triple.  With defstyle the
+;;; role palette is defined once and referenced by :class.
+;;;--------------------------------------------------------------
+
+(defstyle :neon-screen (:display :flex :flex-direction :column :gap 0 :padding 0))
+
+(defstyle :neon-title  (:height 1 :fg-color (97 233 250)  :bg-color (18 34 57) :bold t))
+(defstyle :neon-accent (:height 1 :fg-color (248 199 115) :bg-color (10 17 31) :bold t))
+(defstyle :neon-signal (:height 1 :fg-color (103 245 206) :bg-color (10 17 31) :bold t))
+(defstyle :neon-muted  (:height 1 :fg-color (125 143 169) :bg-color (10 17 31) :bold nil))
+(defstyle :neon-border (:height 1 :fg-color (140 114 231) :bg-color (10 17 31) :bold nil))
+(defstyle :neon-danger (:height 1 :fg-color (254 124 149) :bg-color (10 17 31) :bold t))
+(defstyle :neon-footer (:height 1 :fg-color (190 171 250) :bg-color (18 25 45) :bold nil))
+(defstyle :neon-body   (:height 1 :fg-color (216 225 242) :bg-color (10 17 31) :bold nil))
+
+(defun %role-class (role)
+  "Map a role keyword to its neon style class."
   (case role
-    (:title (values '(97 233 250) '(18 34 57) t))
-    (:accent (values '(248 199 115) '(10 17 31) t))
-    (:signal (values '(103 245 206) '(10 17 31) t))
-    (:muted (values '(125 143 169) '(10 17 31) nil))
-    (:border (values '(140 114 231) '(10 17 31) nil))
-    (:danger (values '(254 124 149) '(10 17 31) t))
-    (:footer (values '(190 171 250) '(18 25 45) nil))
-    (otherwise (values '(216 225 242) '(10 17 31) nil))))
+    (:title  :neon-title)
+    (:accent :neon-accent)
+    (:signal :neon-signal)
+    (:muted  :neon-muted)
+    (:border :neon-border)
+    (:danger :neon-danger)
+    (:footer :neon-footer)
+    (otherwise :neon-body)))
 
 (defun screen (id lines &key (width 74) (height 24))
   "Render stable, individually styled rows through ElmTUI's diff presenter.
-No raw ANSI and no terminal output occurs here."
+No raw ANSI and no terminal output occurs here.
+
+Each row's colour palette is defined once as a named style class via
+DEFSTYLE; the per-row :width override is the only inline property."
   `(:container :id ,id
-     :style (:display :flex :flex-direction :column
-             :width ,width :height ,height :gap 0 :padding 0)
+     :class :neon-screen
+     :style (:width ,width :height ,height)
      :children
      ,(loop for (content . role) in lines
             for i from 0
-            collect (multiple-value-bind (fg bg strong) (%palette role)
-                      `(:text :id ,(intern (format nil "NEON-ROW-~D" i) :keyword)
-                         :content ,(clip content width)
-                         :style (:width ,width :height 1 :fg-color ,fg
-                                 :bg-color ,bg :bold ,strong))))))
+            collect `(:text :id ,(intern (format nil "NEON-ROW-~D" i) :keyword)
+                       :content ,(clip content width)
+                       :class ,(%role-class role)
+                       :style (:width ,width)))))

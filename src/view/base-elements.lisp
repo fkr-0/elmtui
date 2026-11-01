@@ -12,6 +12,7 @@
   (:import-from #:elmtui.view.api #:styled-ui-node #:ui-node-props)
 
   (:import-from :elmtui.view.api #:layout-node #:ui-node-children #:ui-node-type)
+  (:import-from :elmtui.ui.styles #:resolve-node-styles)
   (:export
    ;; Base class & common accessors
    #:base-element #:element-id #:element-children
@@ -717,7 +718,9 @@ Avoids running validation during initialize-instance to keep control over timing
       ((and (listp dsl) (keywordp (first dsl)))
        (destructuring-bind (type &rest props) dsl
 
-         (let* ((props (normalize-dsl-props props)))
+         (let* ((props (normalize-dsl-props props))
+                ;; Resolve :class style classes into :style before filtering.
+                (props (resolve-node-styles props)))
            (let* ((class (element-class type)))
              (unless class
                (error "Unknown DSL element type: ~A" type))

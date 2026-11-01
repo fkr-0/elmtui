@@ -23,10 +23,22 @@ The project follows semantic versioning from the first published release.
   to use `deftea-app` vs `defapplication` and how to host components.
 - Two new examples: `tea-counter-component` (counter with display component)
   and `tea-list-detail` (list navigation with detail-panel component).
+- `defstyle` macro and `:class` property on DSL nodes for named style
+  classes. Define reusable style plists with `(defstyle :name (...))` and
+  apply them with `:class :name` or `:class (:name1 :name2)`. Inline
+  `:style` still wins on conflict.
+- Eight built-in style presets: `:flex-row`, `:flex-column`, `:bold`,
+  `:dim`, `:centered`, `:padded`, `:bordered`, `:bordered-rounded`.
+- `apply-theme` for batch-registering named styles from a theme plist.
+- `resolve-style-class` exported from the `elmtui` facade for programmatic
+  style lookup.
+- "Style Classes" section in `docs/USER_GUIDE.md`.
 
 ### Changed
 
 - Migrated simple examples to `deftea-app` to demonstrate the minimal application constructor.
+- Refactored `examples/neon-kit.lisp` to use `defstyle` and `:class`
+  instead of repeating inline palette styles on every row.
 
 ## [0.4.1] - 2026-11-01
 

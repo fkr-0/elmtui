@@ -26,6 +26,8 @@ QUIT-REQUESTED-P or the KEY-EVENT accessors.")
                 #:key-event-modifiers #:key-event-parts)
   (:import-from :elmtui.core.async #:cmd-async)
   (:import-from :elmtui.style.presets #:dark-theme #:light-theme)
+  (:import-from :elmtui.ui.styles
+                #:defstyle #:resolve-style-class #:apply-theme)
   (:export
    ;; Defining applications
    #:defapplication #:deftea-app #:app-model
@@ -38,4 +40,6 @@ QUIT-REQUESTED-P or the KEY-EVENT accessors.")
    ;; Async commands
    #:cmd-async
    ;; Style presets
-   #:dark-theme #:light-theme))
+   #:dark-theme #:light-theme
+   ;; Style classes
+   #:defstyle #:resolve-style-class #:apply-theme))
