@@ -1,6 +1,7 @@
 # ElmTUI normal-screen tmux overlay contract
 
-**Status (2026-10-09): PARTIAL — hover release qualification fails.** This is
+**Status (2026-10-31): P0 GATES PASS — physical B2 and lossless resize are
+qualified in real tmux; P1 items below remain open.** This is
 the normative behavior contract for cursor inspector B1/B2, slider, and other
 in-place tmux examples. Requirements and verified implementation are kept
 separate.
@@ -42,9 +43,18 @@ reposition *without scrolling*. Wide and combining glyphs require an
 explicit continuation-cell policy. Initial selection must use the actual
 tmux cursor coordinates rather than hard-coded (0,0).
 
-**Current limitation:** The existing B2 helper only produces a three-row
-panel PREVIEW. It does not paint the real selected cell and has no
-physical border reconciliation.
+**Implementation (2026-10-31):** when launched over a captured tmux
+underlay in PANE mode, the inspector runs a full-pane root viewport
+(`cursor-inspector-overlay-app`). Its view paints only the B2 border cells
+at the real pane coordinates and the inspector panel; every other cell is an
+unpainted layout spacer. The panel moves to the top when it would cover B2.
+SCROLLBACK mode has no physical cell and keeps the in-panel PREVIEW, as does
+the bounded panel app used without a tmux underlay (a full-pane viewport
+without an underlay would blank the user's screen).
+
+The compositor (`elmtui.pipeline:*underlay-buffer*`) starts every frame
+from the captured underlay instead of the previous frame, so a moved B2
+leaves no stale border cells.
 
 ## B1 tooltip contract
 
@@ -70,7 +80,32 @@ metadata rows can disappear or shift. Fixed/follow anchoring is also missing.
 | prefill-backend-from-tmux-styled | Populate front/back and return separate styled snapshot | Cannot protect rows displaced by shrinking |
 | save-tmux-capture | Copy visible virtual buffer | Not full history |
 | restore-to-tmux-capture | Copy saved cells back into virtual buffer | No terminal repaint or scrollback recovery |
-| Driver shutdown diff | Attempt physical-cell restoration | Reverse shrink still corrupts scrollback |
+| normal-screen ledger | Logical underlay: rows tmux pulled from history ++ launch capture | Width reflow of over-wide rows is not modelled |
+| Driver shutdown restore | Repaint the logical underlay, scroll shrink-deleted rows back into history | Requires the cursor-parking invariant below |
+
+### Resize transaction (2026-10-31)
+
+tmux resizes relative to the cursor: a height shrink first **deletes rows
+below the cursor**, then scrolls the rest off the top into history; a height
+grow pulls previously scrolled lines (`hscrolled`, which counts *every* line
+ever scrolled into history) back down onto the pane top. Leaving the cursor
+mid-pane therefore destroyed bottom rows, and leaving it on the last row
+pushed overlay cells into history.
+
+The driver now parks the cursor on pane row 0 after every frame that wrote
+output. A shrink then only deletes bottom rows and never touches history; a
+grow only appends blank rows or pulls *pristine* history rows. The
+`normal-screen-ledger` records pulled rows (from the change in
+`#{history_size}`) so the pane always shows the top rows of
+`[pulled history] ++ [launch capture]`:
+
+- frames composite onto that logical underlay;
+- pulled rows are **protected**: the compositor reverts any paint on them
+  (`*underlay-protected-rows*`), and views can offset snapshot rows by
+  `underlay-protected-rows`;
+- shutdown repaints the logical rows in place, then appends rows a shrink
+  deleted by scrolling, which moves the rows above them into native history
+  in their original order and with their original SGR.
 
 The real tmux pane can differ from the cached PTY/backend dimensions.
 The driver probes actual pane geometry before restoring but still cannot
@@ -95,10 +130,19 @@ python3 tests/e2e/example-overhaul-tmux.py
 
 The review suite runs every test on every invocation; nothing is skipped or
 opt-in. The two full release criteria (actual B2 coordinates and reverse-resize
-preservation) are declared `expectedFailure` because they are open P0 defects:
-the run stays green only while they keep failing and turns red with an
-"unexpected success" as soon as one is fixed, which is the cue to remove the
-decorator. An expected failure is never release approval.
+preservation) are ordinary assertions and block release when red. Unit
+regressions for the ledger, compositor, protected rows, cursor parking,
+shrink restore and B2 layout live in `tests/normal-screen-overlay-tests.lisp`.
+
+### Evidence, 2026-10-31
+
+- Review contracts 5/5, including strict physical B2 at (5,6), stale-border
+  removal after moving, and 120x40 -> 80x24 with 70/70 unique markers.
+- `tmux-hover-defect-regressions.py` 9/9 (was 6/9), both resize directions
+  with exact styled history; `tmux-normal-compositor-resize.py` 2/2 (was
+  1/2) across 70x22 / 100x35 / 48x12 / 100x35 with protected history intact
+  at every step; `example-overhaul-tmux.py` 7/7 (was 6/7).
+- Root FiveAM suite 0 failures, 0 skips.
 
 ### Evidence, 2026-10-09
 
@@ -115,11 +159,12 @@ These results qualify components, **not the hover feature**.
 
 ## Work remaining / independent acceptance
 
-**P0:** Provenance-preserving normal-screen compositor and scrollback-safe
-resize/shutdown for both directions (70/70 unique markers and exact SGR).
+**Done (2026-10-31):** underlay compositor and scrollback-safe
+resize/shutdown in both directions; B2 border over the exact real selected
+cell with the panel kept clear of it.
 
-**P0:** B2 Unicode border over the exact real selected cell; independent
-positioned B1 with no target occlusion or history mutation.
+**P1:** Independently positioned B1 tooltip (fixed / cursor-following);
+modelling tmux reflow for rows wider than a shrunken pane.
 
 **P1:** Unicode combining/wide continuation, independent cursor-follow
 collision/clamping, user-visible coordinates/statistics, and removal of
