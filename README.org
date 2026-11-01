@@ -517,5 +517,4 @@ checkout with =git submodule update --init --recursive=.
 
 ElmTUI and its reusable =cl-events=, =cl-inputs=, =cl-state=, and
 =cl-styles= libraries are licensed under MIT.  See the root =LICENSE= and
-each library’s own =LICENSE= file. Earlier ElmTUI GPL-3.0-only revisions
-remain available under their original license; this change is not retroactive.
+each library’s own =LICENSE= file. 
