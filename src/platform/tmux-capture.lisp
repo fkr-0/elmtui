@@ -27,6 +27,8 @@
   (:import-from :elmtui.platform.backend.common.ansi-styling
     #:style-to-terminal-style)
   (:export
+    #:*tmux-socket*
+    #:*tmux-target*
     #:tmux-available-p
     #:capture-pane-string
     #:capture-screen-string
@@ -66,26 +68,42 @@
   "Locate the tmux binary using the current process PATH."
   (%find-program-on-path "tmux"))
 
+(defvar *tmux-socket* nil
+  "When non-NIL, the socket path of the tmux server to query instead of the
+ambient one named by $TMUX. This lets callers (and tests) capture from a
+server they own without being inside tmux themselves.")
+
+(defvar *tmux-target* nil
+  "When non-NIL, the tmux target pane passed as -t to capture commands instead
+of the ambient pane ($TMUX_PANE).")
+
 (defun tmux-available-p ()
-  "Return true when tmux is available and current process is running inside tmux."
+  "Return true when tmux is available and a tmux server can be addressed:
+either *TMUX-SOCKET* is set or the process is running inside tmux."
   (and (%tmux-program)
-       (not (null (or (getenv "TMUX_PANE")
+       (not (null (or *tmux-socket*
+                      (getenv "TMUX_PANE")
                       (getenv "TMUX"))))))
 
 (defun %run-tmux (&rest args)
-  "Execute tmux with ARGS and return its stdout as a string."
+  "Return tmux stdout only on success; never treat stderr as captured cells."
   (when (tmux-available-p)
     (handler-case
-      (run-program (cons (%tmux-program) args)
+      (run-program (append (list (%tmux-program))
+                           (when *tmux-socket* (list "-S" *tmux-socket*))
+                           args)
         :output :string
         :input nil
-        :error :output
-        :ignore-error-status t)
+        :error-output :string)
       (error () nil))))
 
 ;;;----------------------------------------------------------------
 ;;; Capture utilities
 ;;;----------------------------------------------------------------
+
+(defun %target-args ()
+  "Extra tmux arguments selecting *TMUX-TARGET*, or none for the ambient pane."
+  (when *tmux-target* (list "-t" *tmux-target*)))
 
 (defun %split-string-keep-empty (content separator)
   "Split CONTENT by SEPARATOR, preserving empty segments."
@@ -107,8 +125,8 @@ The -e flag ensures escape sequences are included for style preservation."
   (case mode
     ;; Include tmux history (-S -) so we can prefill large terminal buffers
     ;; from the latest visible lines instead of leaving uncovered regions blank.
-    (:screen (%run-tmux "capture-pane" "-e" "-J" "-p" "-S" "-"))
-    (otherwise (%run-tmux "capture-pane" "-e" "-p" "-S" "-"))))
+    (:screen (apply #'%run-tmux "capture-pane" "-e" "-J" "-p" "-S" "-" (%target-args)))
+    (otherwise (apply #'%run-tmux "capture-pane" "-e" "-p" "-S" "-" (%target-args)))))
 
 (defun capture-screen-string ()
   "Return ANSI-styled tmux pane content including scrollback via
@@ -132,57 +150,92 @@ visible pane."
   "Check if CHAR is the ESC character."
   (char= char #\Escape))
 
+(defun %ansi-control-end (content start)
+  "Return the exclusive end of the ESC sequence at START.
+Incomplete sequences consume the remaining input: no partial OSC/DCS payload
+may become visible text after capture. CSI ends at a final byte 0x40..0x7e,
+OSC at BEL or ST, and string controls at ST."
+  (let* ((length (length content))
+         (next (and (< (1+ start) length)
+                    (aref content (1+ start)))))
+    (cond
+      ((null next) length)
+      ((char= next #\[)
+       (or (loop for i from (+ start 2) below length
+                 for code = (char-code (aref content i))
+                 when (<= 64 code 126) return (1+ i))
+           length))
+      ((member next '(#\] #\P #\X #\^ #\_) :test #'char=)
+       (or (loop for i from (+ start 2) below length
+                 for ch = (aref content i)
+                 when (and (char= next #\]) (= (char-code ch) 7))
+                   return (1+ i)
+                 when (and (char= ch #\Escape)
+                           (< (1+ i) length)
+                           (char= (aref content (1+ i)) #\\))
+                   return (+ i 2))
+           length))
+      ;; ESC designations such as ESC ( B have a two-byte introducer.
+      ((member next '(#\( #\) #\* #\+ #\- #\. #\/ #\# #\%)
+               :test #'char=)
+       (min length (+ start 3)))
+      (t (min length (+ start 2))))))
+
+(defun %c1-control-end (content start)
+  "Skip an 8-bit C1 control and any attached payload.
+Tmux typically emits 7-bit ESC forms, but direct fixtures and hostile byte
+streams can contain C1 CSI/OSC/DCS and must not leak their control bodies."
+  (let ((length (length content))
+        (kind (char-code (aref content start))))
+    (cond
+      ((= kind #x9B)
+       (or (loop for i from (1+ start) below length
+                 for code = (char-code (aref content i))
+                 when (<= 64 code 126) return (1+ i))
+           length))
+      ((member kind '(#x90 #x98 #x9D #x9E #x9F))
+       (or (loop for i from (1+ start) below length
+                 for ch = (aref content i)
+                 for code = (char-code ch)
+                 when (or (= code #x9C)
+                          (and (= kind #x9D) (= code 7)))
+                   return (1+ i)
+                 when (and (char= ch #\Escape)
+                           (< (1+ i) length)
+                           (char= (aref content (1+ i)) #\\))
+                   return (+ i 2))
+           length))
+      (t (1+ start)))))
+
 (defun split-by-ansi-sequences (content)
-  "Split CONTENT into segments separated by ANSI escape sequences.
-Returns a list of alternating plain text and ANSI sequences.
-Consecutive plain text segments are merged together."
+  "Split terminal text into literal runs and complete ESC controls.
+This scanner recognizes CSI, OSC, DCS, SOS, PM, APC and designations instead
+of stopping at an alphabetic byte. All controls remain distinct segments;
+PARSE-ANSI-STRING interprets only SGR, never control payloads or titles.
+Unterminated controls are kept together to be discarded by the parser."
   (unless content
     (return-from split-by-ansi-sequences '()))
-  (let ((result '())
-        (current-segment (make-string-output-stream))
-        (in-escape nil)
+  (let ((segments '())
+        (plain-start 0)
         (i 0)
         (len (length content)))
-    (loop
-      (when (>= i len)
-        (let ((seg (get-output-stream-string current-segment)))
-          (when (plusp (length seg))
-            (push seg result)))
-        (return))
-      (let ((char (aref content i)))
-        (cond
-          ((and (not in-escape) (%esc-p char))
-           (let ((seg (get-output-stream-string current-segment)))
-             (when (plusp (length seg))
-               (push seg result)))
-           (setf current-segment (make-string-output-stream))
-           (write-char char current-segment)
-           (setf in-escape t)
-           (incf i))
-          (in-escape
-           (write-char char current-segment)
-           (when (alpha-char-p char)
-             (let ((seg (get-output-stream-string current-segment)))
-               (push seg result))
-             (setf current-segment (make-string-output-stream))
-             (setf in-escape nil))
-           (incf i))
-          (t
-           (write-char char current-segment)
-           (incf i)))))
-    (let ((merged '())
-          (current-plain ""))
-      (dolist (seg (nreverse result))
-        (if (and (> (length seg) 0) (%esc-p (aref seg 0)))
+    (labels ((flush-plain (end)
+               (when (< plain-start end)
+                 (push (subseq content plain-start end) segments))))
+      (loop while (< i len) do
+        (if (or (%esc-p (aref content i))
+                (<= #x80 (char-code (aref content i)) #x9F))
             (progn
-              (when (plusp (length current-plain))
-                (push current-plain merged))
-              (setf current-plain "")
-              (push seg merged))
-            (setf current-plain (concatenate 'string current-plain seg))))
-      (when (plusp (length current-plain))
-        (push current-plain merged))
-      (nreverse merged))))
+              (flush-plain i)
+              (let ((end (if (%esc-p (aref content i))
+                             (%ansi-control-end content i)
+                             (%c1-control-end content i))))
+                (push (subseq content i end) segments)
+                (setf i end
+                      plain-start end)))
+            (incf i)))
+      (flush-plain len))
+    (nreverse segments)))
 
 (defun %sgr-code->color (code kind)
   "Convert SGR color CODE to keyword.
@@ -258,11 +311,20 @@ Returns NIL if the sequence is a reset, or a plist with :fg, :bg, :attrs keys."
     (return-from parse-ansi-sgr nil))
   (unless (and (char= (aref sequence 0) #\Escape)
                (char= (aref sequence 1) #\[)
-               (alpha-char-p (aref sequence (1- (length sequence)))))
+               (char= (aref sequence (1- (length sequence))) #\m))
     (return-from parse-ansi-sgr nil))
   (let* ((end (1- (length sequence)))
          (params (subseq sequence 2 end)))
-    (when (string= params "")
+    ;; Never pass arbitrary CSI strings to PARSE-INTEGER. Only SGR's decimal
+    ;; parameter grammar belongs here; malformed captures keep prior style.
+    (when (or (string= params "")
+              (not (every (lambda (char)
+                            (or (digit-char-p char)
+                                (char= char #\;)))
+                          params))
+              (char= (char params 0) #\;)
+              (char= (char params (1- (length params))) #\;)
+              (search ";;" params))
       (return-from parse-ansi-sgr nil))
     (let* ((parts (loop for start = 0 then (1+ end)
                         while start
@@ -437,8 +499,11 @@ A combined reset/set such as ESC[0;31m clears old attributes first."
         (result '())
         (current-style nil))
     (dolist (seg segments)
-      (if (and (> (length seg) 0) (%esc-p (aref seg 0)))
-          (when (and (>= (length seg) 3)
+      (if (and (> (length seg) 0)
+               (or (%esc-p (aref seg 0))
+                   (<= #x80 (char-code (aref seg 0)) #x9F)))
+          (when (and (%esc-p (aref seg 0))
+                     (>= (length seg) 3)
                      (char= (aref seg 1) #\[)
                      (char= (aref seg (1- (length seg))) #\m))
             (multiple-value-bind (effective reset-p)
@@ -570,7 +635,7 @@ newline terminates the final row; it does not create a phantom extra row."
                                (funcall writer row col #\Space (cdr run)))
                              (incf col)))
                    ((or (< (char-code ch) 32)
-                        (= (char-code ch) 127))
+                        (<= 127 (char-code ch) 159))
                     nil)
                    (t
                     (let ((columns (min width (%tmux-cell-columns ch))))
@@ -589,8 +654,8 @@ newline terminates the final row; it does not create a phantom extra row."
   "Capture only the visible pane; never allocate the full history for prefill.
 Public CAPTURE-PANE-STRING still permits inspecting the entire scrollback."
   (case mode
-    (:screen (%run-tmux "capture-pane" "-e" "-J" "-p"))
-    (otherwise (%run-tmux "capture-pane" "-e" "-p"))))
+    (:screen (apply #'%run-tmux "capture-pane" "-e" "-J" "-p" (%target-args)))
+    (otherwise (apply #'%run-tmux "capture-pane" "-e" "-p" (%target-args)))))
 
 (defun prefill-buffer-from-styled-content (buffer runs width height)
   "Fill BUFFER with the terminal-visible tail of styled RUNS, preserving SGR.
@@ -672,14 +737,18 @@ displacement."
   (setf *saved-tmux-capture* nil))
 
 (defun restore-to-tmux-capture (buffer)
-  "Copy saved cell characters and styles into virtual BUFFER, returning BUFFER. No
-physical repaint, cursor restoration, or tmux scrollback recovery occurs here."
+  "Copy the overlapping saved cell rectangle into virtual BUFFER, returning it.
+Any newly exposed rows/columns after a resize remain untouched; a saved visible
+pane cannot reconstruct them. This never repaints the physical terminal or
+recovers native scrollback."
   (when (and *saved-tmux-capture*
              (typep buffer 'virtual-terminal-buffer))
     (with-virtual-buffer-lock (buffer)
       (let ((saved *saved-tmux-capture*)
-            (width (buffer-width buffer))
-            (height (buffer-height buffer)))
+            (width (min (buffer-width buffer)
+                        (buffer-width *saved-tmux-capture*)))
+            (height (min (buffer-height buffer)
+                         (buffer-height *saved-tmux-capture*))))
         (loop for row from 0 below height
               do (loop for col from 0 below width
                        do (let ((cell (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at saved row col)))

@@ -27,6 +27,52 @@
 (defun %fn (pkg name)
   (symbol-function (find-symbol name (find-package pkg))))
 
+(test tmux-cursor-inspector-loader-is-independent-of-caller-and-fasl-location
+  "Compile from an unrelated script context in a fresh CLPM process.
+The slider package must come from the maintained source tree, not the caller
+or the output FASL directory."
+  (let* ((expr
+           (format nil
+                   "~S"
+                   '(let* ((src (asdf:system-relative-pathname
+                                  :elmtui-examples
+                                  "examples/tmux-cursor-inspector.lisp"))
+                           (fasl (merge-pathnames
+                                  (format nil "elmtui-tmux-loader-~D.fasl"
+                                          (get-universal-time))
+                                  (uiop:temporary-directory))))
+                      (unwind-protect
+                           (progn
+                             (assert (null (find-package :elmtui.examples.tmux-slider)))
+                             (let ((*load-truename*
+                                     (asdf:system-relative-pathname
+                                      :elmtui-examples
+                                      "scripts/run-tests-clpm.lisp")))
+                               (compile-file src :output-file fasl))
+                             (assert (find-package :elmtui.examples.tmux-slider))
+                             (load fasl)
+                             (assert
+                              (fboundp (find-symbol
+                                        "RUN-TMUX-CURSOR-INSPECTOR"
+                                        :elmtui.examples.tmux-cursor-inspector)))
+                             (format t "TMUX-LOADER-PASS~%"))
+                        (when (probe-file fasl) (delete-file fasl))))))
+         (command (list "clpm" "bundle" "exec" "--with-client" "sbcl"
+                        "--" "--noinform" "--non-interactive"
+                        "--eval" "(asdf:load-system :elmtui)"
+                        "--eval" expr)))
+    (multiple-value-bind (stdout stderr status)
+        (uiop:run-program command
+                          :directory (asdf:system-source-directory :elmtui)
+                          :output :string :error-output :string
+                          :ignore-error-status t)
+      (is (eql 0 status)
+          "Isolated source/FASL compile exit status ~A: ~A"
+          status (subseq stderr (max 0 (- (length stderr) 1500))))
+      (is (search "TMUX-LOADER-PASS" stdout)
+          "Isolated loader did not confirm the maintained source: ~A"
+          (subseq stdout (max 0 (- (length stdout) 1500)))))))
+
 (test tmux-examples-load-and-export-entrypoints
   (load-system :elmtui-examples)
   (is (fboundp (find-symbol "RUN-TMUX-HOVER-DEMO" (find-package :elmtui-examples.tmux-hover-demo))))

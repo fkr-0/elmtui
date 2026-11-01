@@ -526,8 +526,18 @@ for state updates, and COMMANDS is a list of render command plists."
                   (multiple-value-bind (computed-w computed-h oy)
                     (compute-view-size (normalize-anchor (sref ctx :anchor)) cols rows effective-r-0)
                     (declare (ignore oy))
-                    (let ((new-w (or (sref ctx :width) computed-w))
-                           (new-h (or (sref ctx :height) computed-h)))
+                    ;; A size this widget computed itself follows the terminal;
+                    ;; a size supplied by the app stays fixed.
+                    (let ((new-w (if (or (null (sref ctx :width)) (sref ctx :auto-width))
+                                   computed-w
+                                   (sref ctx :width)))
+                           (new-h (if (or (null (sref ctx :height)) (sref ctx :auto-height))
+                                   computed-h
+                                   (sref ctx :height))))
+                      (when (or (null (sref ctx :width)) (sref ctx :auto-width))
+                        (setf (sref ctx :auto-width) t))
+                      (when (or (null (sref ctx :height)) (sref ctx :auto-height))
+                        (setf (sref ctx :auto-height) t))
                       (setf (sref ctx :width) new-w)
                       (setf (sref ctx :height) new-h)))))
               (if (eq (normalize-anchor (sref ctx :anchor)) :manual)
@@ -598,8 +608,12 @@ for state updates, and COMMANDS is a list of render command plists."
                     (multiple-value-bind (computed-w computed-h oy)
                       (compute-view-size (normalize-anchor (sref ctx :anchor)) cols rows r-0)
                       (declare (ignore oy))
-                      (unless (sref ctx :width) (setf (sref ctx :width) computed-w))
-                      (unless (sref ctx :height) (setf (sref ctx :height) computed-h)))))
+                      (unless (sref ctx :width)
+                        (setf (sref ctx :width) computed-w
+                              (sref ctx :auto-width) t))
+                      (unless (sref ctx :height)
+                        (setf (sref ctx :height) computed-h
+                              (sref ctx :auto-height) t)))))
                 (unless (eq (normalize-anchor (sref ctx :anchor)) :manual)
                   (multiple-value-bind (oy ox ap growth eff)
                     (%recompute-anchoring ctx nil)
