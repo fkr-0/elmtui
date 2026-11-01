@@ -6,6 +6,43 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+## [0.3.1] - 2026-11-01
+
+### Fixed
+
+- tmux normal-screen mode no longer loses or duplicates scrollback when the
+  pane shrinks and grows while an app runs. The driver keeps a ledger of the
+  logical underlay (rows tmux pulled back from history plus the launch
+  capture), composites every frame over it, parks the cursor at row 0 after
+  each diff and never paints pulled history rows; exit restore is
+  top-anchored and scrolls back rows a shrink deleted.
+- The tmux cursor inspector's B2 box is drawn at physical pane coordinates
+  through a full-pane overlay, offset past protected history rows.
+- A truncated `:below-cursor` root viewport is placed by its truncated
+  height, so `wifi-inline` no longer blanks a history row.
+- `tmux-hover-demo` loads `cursor-inspector` through ASDF from any launcher.
+- The minimal example declares its viewport height, so a dumped binary
+  renders when started on the terminal's last row.
+- The wifi-inline e2e script loads `elmtui-examples-cli` instead of the
+  removed `elmtui-tools` system.
+
+### Added
+
+- Regression suites: `normal-screen-overlay-tests` (ledger, compositor,
+  protected rows, cursor parking, B2 overlay) and the un-xfailed tmux
+  review-contract e2e.
+- Release gates that quit every launcher example and a packager-dumped
+  binary over 70 lines of tmux history and require exit 0, identical stty,
+  a visible cursor and exact scrollback.
+- A CI `publish-coverage` job that publishes the verified SB-COVER figure
+  from a green `main` release gate to the `coverage-data` branch, and README
+  CI and coverage badges. The coverage gate removes stale endpoint data
+  before measuring.
+
+### Known limitations
+
+- tmux width reflow of rows wider than a shrunken pane is not modelled.
+
 ## [0.3.0] - 2026-11-01
 
 ### Repository hygiene and developer entry points

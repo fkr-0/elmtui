@@ -1,7 +1,7 @@
 (in-package :asdf)
 
 (asdf:defsystem "elmtui"
-  :version      "0.3.0"
+  :version      "0.3.1"
   :description  "Elm-style terminal UI toolkit for Common Lisp"
   :author       "ElmTUI contributors"
   :maintainer   "ElmTUI contributors"

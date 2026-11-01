@@ -1,5 +1,5 @@
 (asdf:defsystem "elmtui-example-widgets"
-  :version "0.3.0"
+  :version "0.3.1"
   :description "Optional legacy key tester and counter example components"
   :author "ElmTUI contributors"
   :license "MIT"
