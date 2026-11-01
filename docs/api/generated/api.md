@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1644 of 1822 bindings documented; 178 have no metadata (90.2% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1662 of 1840 bindings documented; 178 have no metadata (90.3% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -4162,7 +4162,7 @@ EXPECTED-REVISION is an optimistic precondition checked atomically before APP is
 reserved. Same-state nesting joins the outer transaction and may repeat the
 same revision precondition; it is not a savepoint. Other supported writers are
 rejected with STATE-TRANSACTION-CONFLICT while the outer body is active.
-Rollback restores logical values, VERSION, log, history, and redo metadata;
+Rollback restores logical values, physical backend, VERSION, log, history, and redo metadata;
 REVISION advances exactly once only after a successful outer commit. Observer
 callbacks run after reservation is released and after all internal locks are
 released.
@@ -10548,6 +10548,33 @@ Kinds: variable
 When true, render-to-buffer starts from current front-buffer content and avoids clearing it.
 ```
 
+## ELMTUI.PIPELINE:*UNDERLAY-BUFFER*
+
+Kinds: variable
+
+```text
+Immutable full-pane capture of the cells under a normal-screen application.
+
+When bound together with *PRESERVE-UNDERLAY*, every frame is composited onto
+the region of this buffer under the root viewport instead of onto the previous
+frame. Cells the current frame does not paint therefore revert to their
+captured underlay, so overlays that move (for example a cursor focus box) never
+leave stale paint behind. The driver binds it only while the capture geometry
+matches the live pane.
+```
+
+## ELMTUI.PIPELINE:*UNDERLAY-PROTECTED-ROWS*
+
+Kinds: variable
+
+```text
+Number of top pane rows holding scrollback that tmux pulled back into view.
+
+Those rows are history, not application canvas: the compositor reverts any
+frame paint there to the underlay, so they are never changed, not even
+transiently. Bound by the driver per frame together with *UNDERLAY-BUFFER*.
+```
+
 ## ELMTUI.PIPELINE:DISPLAY-BUFFER
 
 Kinds: function
@@ -10589,6 +10616,15 @@ _No documentation metadata._
 Kinds: function
 
 _No documentation metadata._
+
+## ELMTUI.PIPELINE:UNDERLAY-PROTECTED-ROWS
+
+Kinds: function
+
+```text
+Pane rows above which a normal-screen view must not paint (see
+*UNDERLAY-PROTECTED-ROWS*). Snapshot row Y is shown at physical row Y plus this.
+```
 
 ## ELMTUI.PLATFORM.API:ACQUIRE-LOCK
 
@@ -11775,6 +11811,17 @@ Kinds: variable
 Obsolete first-frame compatibility flag; use :INITIAL-FRAME-P instead.
 ```
 
+## ELMTUI.PLATFORM.BACKEND.TERMINAL.DIFF-RENDERER:*PARK-CURSOR-AFTER-DIFF*
+
+Kinds: variable
+
+```text
+When a (ROW . COL) cons, move the cursor there after applying a non-empty diff.
+
+Normal-screen apps park the cursor on pane row 0 so a tmux height shrink deletes
+rows below it instead of scrolling overlay cells into native history.
+```
+
 ## ELMTUI.PLATFORM.BACKEND.TERMINAL.DIFF-RENDERER:APPLY-DIFF-TO-BACKEND
 
 Kinds: function
@@ -11925,6 +11972,25 @@ Returns:
   T if the signal function was called, NIL otherwise.
 ```
 
+## ELMTUI.PLATFORM.TMUX:*TMUX-SOCKET*
+
+Kinds: variable
+
+```text
+When non-NIL, the socket path of the tmux server to query instead of the
+ambient one named by $TMUX. This lets callers (and tests) capture from a
+server they own without being inside tmux themselves.
+```
+
+## ELMTUI.PLATFORM.TMUX:*TMUX-TARGET*
+
+Kinds: variable
+
+```text
+When non-NIL, the tmux target pane passed as -t to capture commands instead
+of the ambient pane ($TMUX_PANE).
+```
+
 ## ELMTUI.PLATFORM.TMUX:CAPTURE-LINES
 
 Kinds: function
@@ -11983,6 +12049,96 @@ Kinds: function
 ```text
 Return a new WIDTH-by-HEIGHT styled visible-pane cell grid, or NIL outside tmux.
 Captures only; does not repaint cells or restore history.
+```
+
+## ELMTUI.PLATFORM.TMUX:MAKE-NORMAL-SCREEN-LEDGER
+
+Kinds: function
+
+```text
+Start a ledger from SAVED, the styled visible pane captured before launch.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-LEDGER
+
+Kinds: type
+
+```text
+Logical normal-screen underlay rows and the tmux history size at launch.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-LEDGER-LAUNCH-HISTORY
+
+Kinds: function
+
+```text
+Return the pane's tmux history size when the ledger was created, or NIL.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-LEDGER-LOGICAL-HEIGHT
+
+Kinds: function
+
+```text
+Return the row count of LEDGER's logical underlay (pulled rows + launch capture).
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-LEDGER-P
+
+Kinds: function
+
+```text
+Return true when OBJECT is a NORMAL-SCREEN-LEDGER.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-LEDGER-PREPEND-ROWS
+
+Kinds: function
+
+```text
+Prepend the top COUNT rows of ROWS as pristine lines tmux pulled from history.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-LEDGER-PULLED
+
+Kinds: function
+
+```text
+Return how many history rows tmux has pulled back into the visible pane.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-OVERFLOW-CHUNKS
+
+Kinds: function
+
+```text
+Return logical rows beyond a HEIGHT-row pane as WIDTH-wide buffers of at most
+HEIGHT rows each, in order.
+
+These are rows a shrink deleted from the bottom of the pane. Shutdown appends
+each chunk by scrolling the pane, which moves the rows above into history.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-RECONCILE-HISTORY
+
+Kinds: function
+
+```text
+Account for scrollback rows that tmux pulled onto the top of the pane.
+
+LIVE is a fresh capture of the current pane. Rows pulled since the last call are
+the top rows of LIVE: they come straight from history and were never painted.
+```
+
+## ELMTUI.PLATFORM.TMUX:NORMAL-SCREEN-UNDERLAY
+
+Kinds: function
+
+```text
+Return the WIDTHxHEIGHT pane view of LEDGER's logical underlay.
+
+Cells outside the logical rows or columns come from FALLBACK (a buffer of the
+same size, normally the live pane) when given, and are blank otherwise.
 ```
 
 ## ELMTUI.PLATFORM.TMUX:PARSE-ANSI-SGR
@@ -12061,6 +12217,15 @@ snapshot tmux scrollback or protect history from later resize-induced
 displacement.
 ```
 
+## ELMTUI.PLATFORM.TMUX:SAVED-TMUX-CAPTURE
+
+Kinds: function
+
+```text
+Return the saved visible-pane capture buffer or NIL. Callers must treat it as
+read-only: it is the immutable underlay used for compositing and restoration.
+```
+
 ## ELMTUI.PLATFORM.TMUX:SPLIT-BY-ANSI-SEQUENCES
 
 Kinds: function
@@ -12078,7 +12243,16 @@ Unterminated controls are kept together to be discarded by the parser.
 Kinds: function
 
 ```text
-Return true when tmux is available and current process is running inside tmux.
+Return true when tmux is available and a tmux server can be addressed:
+either *TMUX-SOCKET* is set or the process is running inside tmux.
+```
+
+## ELMTUI.PLATFORM.TMUX:TMUX-HISTORY-SIZE
+
+Kinds: function
+
+```text
+Return the scrollback line count of the target pane, or NIL when unknown.
 ```
 
 ## ELMTUI.PLATFORM.TREE-RENDERER:RENDER-LAID-OUT-TREE-TO-BUFFER
