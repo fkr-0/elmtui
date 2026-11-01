@@ -95,10 +95,11 @@
                ((or (member key '(:escape :q :Q))
                     (member ch '(#\q #\Q)))
                 (quit-result))
-               (t
+               ((or (eq key :space) (eql ch #\Space))
                 (let* ((current (state-ref app-state :orientation :row))
                        (next (if (eq current :row) :column :row)))
-                  (make-update-result :patches `(((:orientation) ,next))))))))
+                  (make-update-result :patches `(((:orientation) ,next)))))
+               (t (make-update-result)))))
       (cond
         ((and (listp message) (eq (first message) :app-quit-requested))
          (quit-result))
@@ -121,6 +122,22 @@
         (t
          (make-update-result))))))
 
+(defun rainbow-terminal-depth ()
+  "Use RGB only when advertised; otherwise use 256 or basic terminal colors."
+  (let ((term (string-downcase (or (uiop:getenv "TERM") "")))
+        (ct (string-downcase (or (uiop:getenv "COLORTERM") ""))))
+    (cond ((or (search "truecolor" ct) (search "24bit" ct)) :truecolor)
+          ((search "256color" term) :indexed)
+          (t :basic))))
+
+(defun rainbow-select-color (value index)
+  "Convert a rainbow color to the supported native DSL token."
+  (ecase (rainbow-terminal-depth)
+    (:truecolor (if (and (consp value) (eq (first value) :rgb))
+                    value (cons :rgb value)))
+    (:indexed (list :256 (nth index '(196 208 226 46 27 54 201))))
+    (:basic (nth index '(:red :yellow :white :green :blue :cyan :magenta)))))
+
 (defun view (state)
   "Small deterministic rainbow with individually colored visible text runs."
   (let ((orientation (state-ref state :orientation :row))
@@ -128,13 +145,13 @@
                    (:rgb 88 220 150) (:rgb 65 175 255) (:rgb 135 118 255)
                    (:rgb 221 111 232))))
     `(:container :id :mini-rainbow-content
-       :style (:display :flex :flex-direction :column :width 54 :height 12)
+       :style (:display :flex :flex-direction :column :box :single :width 54 :height 12)
        :children
        ((:text :id :mini-rainbow-title
                :content "RAINBOW / mini   Space: rotate  |  q: quit"
                :style (:fg-color :cyan :bold t))
         (:text :id :mini-rainbow-direction
-               :content ,(format nil "Direction: ~A" orientation))
+               :content ,(format nil "Direction: ~A | Color mode: ~A" orientation (rainbow-terminal-depth)))
         (:container :id :mini-rainbow-palette
            :style (:display :flex
                    :flex-direction ,(if (eq orientation :row) :row :column)
@@ -145,7 +162,8 @@
                              :id ,(intern (format nil "MINI-STRIPE-~D" index) :keyword)
                              :content ,(if (eq orientation :row) "#######"
                                            (make-string 48 :initial-element #\#))
-                             :style (:fg-color ,color
+                             :style (:fg-color ,(rainbow-select-color color index)
+                                     :bg-color :black
                                      :height 1
                                      :width ,(if (eq orientation :row) 7 48)))))))))
 

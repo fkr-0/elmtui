@@ -243,12 +243,9 @@ python3 tests/e2e/tmux-scrollback-restoration.py
 | `tmux-idle-screensaver.lisp` | Tmux-aware idle application and timer subscriptions |
 | `tmux-slider.lisp` | Animate a styled band over captured pane content |
 
-Tmux examples require a running tmux session. The automated live integration
-checks are gated behind:
-
-```sh
-ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
-```
+Tmux examples require a running tmux session. The automated tmux capture
+checks need none: they create and remove a private tmux server themselves and
+run as part of `scripts/release-check.sh`.
 
 The live-pane animations can be launched intentionally with
 `./scripts/examples.sh run tmux-slider` or `./scripts/examples.sh run tmux-glider`.
@@ -335,7 +332,7 @@ Run the complete Lisp test suite and the broader private-terminal example
 lifecycle suite from the repository root:
 
 ```sh
-./rt.sh
+scripts/run-tests-warning-clean.sh
 python3 tests/e2e/extended-examples-pty.py -v
 ```
 
@@ -345,11 +342,11 @@ on the user's tmux session. Per-case transcripts, frames, terminal settings,
 and exit status are written under
 `/tmp/elmtui-extended-evidence-20261009`.
 
-The live tmux integration gate is intentionally opt-in and uses the current
-tmux environment:
+The tmux capture integration checks run unconditionally against a private tmux
+server, independent of your current tmux environment, as part of:
 
 ```sh
-ELMTUI_RUN_TMUX_INTEGRATION=1 scripts/release-check.sh
+scripts/release-check.sh
 ```
 
 The PTY suite checks timer advancement, frozen frames while paused, exact

@@ -46,11 +46,11 @@ class BottomRow(unittest.TestCase):
         app, calls = self.wifi()
         screen = app.expect("E2E-Guest")
         lines = screen.splitlines()
-        self.assertIn("Wi-Fi / NetworkManager", lines[15],
-                      "20-row menu must reserve 20 rows below the entry cursor")
-        self.assertNotIn("Wi-Fi", "\n".join(lines[:15]))
-        for row in range(21, 36):
-            self.assertTrue(lines[row - 21].startswith("ROW-%02d" % row),
+        self.assertIn("Wi-Fi / NetworkManager", lines[22],
+                      "13-row declared viewport must reserve below the entry cursor")
+        self.assertNotIn("Wi-Fi", "\n".join(lines[:22]))
+        for row in range(14, 36):
+            self.assertTrue(lines[row - 14].startswith("ROW-%02d" % row),
                             "reservation must scroll existing lower rows up intact")
         started = time.monotonic()
         app.finish(key, x_key)
@@ -76,13 +76,12 @@ class BottomRow(unittest.TestCase):
         up_steps = [int(n or b"1") for n in re.findall(rb"\x1b\[(\d*)S", application)]
         down_steps = [int(n or b"1") for n in re.findall(rb"\x1b\[(\d*)T", application)]
         up, down = sum(up_steps), sum(down_steps)
-        self.assertEqual((up, down), (20, 20),
-                         "reserve exactly 20 rows and reverse exactly that reservation")
-        self.assertTrue(all(step == 1 for step in up_steps + down_steps),
-                        "reserve/reverse through one-row scroll operations")
+        self.assertEqual((up, down), (13, 13),
+                         "declared 13-row menu must reserve and reverse its exact height; "
+                         "either batched or one-row CSI scroll encoding is valid")
         erased_cells = re.findall(rb"\x1b\[(\d+);(\d+)H(?:\x1b\[[0-9;]*m)* {80}", application)
         self.assertTrue(erased_cells, "owned menu rectangle must be explicitly erased")
-        self.assertTrue(all(16 <= int(row) <= 35 and int(col) == 9
+        self.assertTrue(all(23 <= int(row) <= 35 and int(col) == 9
                             for row, col in erased_cells),
                         "clear operations must stay inside the owned menu rectangle")
         invocations = [json.loads(line) for line in calls.read_text().splitlines()]

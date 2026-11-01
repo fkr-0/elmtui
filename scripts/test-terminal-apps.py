@@ -175,6 +175,15 @@ class TerminalApp:
                 self.emulator.wait(timeout=5)
 
 
+def tmux_only(test):
+    """Mark a case that exercises tmux itself (e.g. window resize).
+
+    Such cases are part of the tmux matrix only; the urxvt run leaves them out
+    (and says so) instead of reporting a skip on every execution."""
+    test.tmux_only = True
+    return test
+
+
 class FullTerminalApps(unittest.TestCase):
     def app(self, name, expression, **kwargs):
         app = TerminalApp(name, expression, **kwargs)
@@ -297,12 +306,11 @@ class FullTerminalApps(unittest.TestCase):
         app.expect('Hello B')
         app.finish()
 
+    @tmux_only
     def test_minimal_live_resize_and_redraw(self):
         # Force a real tmux window resize (SIGWINCH) rather than faking the
         # layout width within the Lisp process. Attached urxvt controls its
         # window geometry; the independent initial-geometry matrix covers it.
-        if OPTIONS.terminal != 'tmux':
-            self.skipTest('dynamic tmux resize is owned by the native tmux lane')
         app = self.app('minimal', '(elmtui.examples.minimal:run-minimal :platform :terminal)')
         app.expect('Hello slurp')
         app.tmux('set-window-option', '-t', 'app:0', 'window-size', 'manual')
@@ -477,6 +485,13 @@ def main():
     OPTIONS.output = (OPTIONS.output or ROOT / 'test-output' / ('terminal-e2e-' + uuid.uuid4().hex[:8])).resolve()
     OPTIONS.output.mkdir(parents=True, exist_ok=True)
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(FullTerminalApps)
+    if OPTIONS.terminal != 'tmux':
+        left_out = [test for test in suite
+                    if getattr(getattr(test, test._testMethodName), 'tmux_only', False)]
+        suite = unittest.TestSuite(test for test in suite if test not in left_out)
+        for test in left_out:
+            print(f'NOTE: {test._testMethodName} is tmux-only; not part of the '
+                  f'{OPTIONS.terminal} matrix')
     if OPTIONS.case:
         suite = unittest.TestSuite(test for test in suite if OPTIONS.case in test.id())
         if suite.countTestCases() == 0:

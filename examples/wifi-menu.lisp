@@ -16,7 +16,38 @@
 
 (defun wifi-disconnect-argv (network) "Return argv for disconnecting the device carrying NETWORK." (list "nmcli" "--wait" "10" "--colors" "no" "device" "disconnect" (wifi-network-device network)))
 
-(defun %run-command (argv &key input) (uiop:run-program argv :input input :output :string :error-output :output))
+(defparameter +nmcli-command-deadline-seconds+ 25
+  "Maximum wall time for an nmcli child, including scanning and secret input.")
+
+(defparameter +nmcli-output-limit+ 1048576
+  "Reject unexpectedly large nmcli output rather than buffering without a bound.")
+
+(defun %run-command (argv &key input)
+  "Execute argv without a shell, with a deadline and guaranteed child reaping.
+The password, when present, is supplied on stdin, never in argv.  On timeout
+or nonzero status, terminate the process before closing its output stream."
+  (let ((process nil))
+    (unwind-protect
+         (sb-ext:with-timeout +nmcli-command-deadline-seconds+
+           (setf process
+                 (uiop:launch-program argv :input input :output :stream
+                                      :error-output :output :ignore-error-status t))
+           (let* ((output (with-output-to-string (stream)
+                            (loop for character = (read-char (uiop:process-info-output process) nil nil)
+                                  for count from 0
+                                  while character
+                                  do (when (>= count +nmcli-output-limit+)
+                                       (error "NetworkManager output exceeded limit"))
+                                     (write-char character stream))))
+                  (status (uiop:wait-process process)))
+             (unless (eql status 0)
+               (error "NetworkManager command failed (exit ~A)" status))
+             output))
+      (when process
+        (when (uiop:process-alive-p process)
+          (ignore-errors (uiop:terminate-process process :urgent t)))
+        (ignore-errors (uiop:wait-process process))
+        (ignore-errors (close (uiop:process-info-output process)))))))
 
 (defun %scan-wifi (&key rescan) (parse-nmcli-wifi-output (%run-command (wifi-scan-argv :rescan rescan))))
 
@@ -57,7 +88,11 @@ non-hash-table values count as set."
 
 (defun %event-character (event) (or (key-event-char event) (and (characterp (key-event-key event)) (key-event-key event))))
 
-(defun %browse-key-update (event app-state) (let* ((key (key-event-key event)) (networks (%network-list app-state)) (selected (state-ref app-state :selected-index 0)) (network (%selected-network app-state))) (cond ((member key ' (:escape :q #\q #\Q) :test #'eql) (make-update-result :patches ' (((:should-quit) t)))) ((member key ' (:arrow-up :up #\k #\K) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (max 0 (1- selected)))))) ((member key ' (:arrow-down :down #\j #\J) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (if networks (min (1- (length networks)) (1+ selected)) 0))))) ((member key ' (:r #\r #\R) :test #'eql) (make-update-result :patches ' (((:busy) t) ((:status) "Refreshing Wi-Fi networks...")) :commands (list (%scan-command :rescan t)))) ((member key ' (:d #\d #\D) :test #'eql) (if (and network (plusp (length (wifi-network-device network)))) (make-update-result :patches ' (((:busy) t) ((:status) "Disconnecting selected Wi-Fi device...")) :commands (list (%disconnect-command network))) (make-update-result :patches ' (((:status) "No disconnectable Wi-Fi network selected."))))) ((member key ' (:enter :return) :test #'eq) (cond ((null network) (make-update-result :patches ' (((:status) "No Wi-Fi network selected.")))) ((string= (wifi-network-ssid network) "") (make-update-result :patches ' (((:status) "Hidden SSIDs require a named profile and are not changed by this demo.")))) ((%secured-network-p network) (make-update-result :patches ' (((:mode) :password) ((:password) "") ((:status) "Enter the Wi-Fi password; Enter connects, Esc cancels.")))) (t (make-update-result :patches ' (((:busy) t) ((:status) "Connecting to open Wi-Fi network...")) :commands (list (%connect-command network nil)))))) (t (make-update-result)))))
+(defun %browse-key-update (event app-state) (let* ((key (key-event-key event)) (networks (%network-list app-state)) (selected (state-ref app-state :selected-index 0)) (network (%selected-network app-state))) (cond ((member key ' (:escape :q #\q #\Q) :test #'eql) (make-update-result :patches ' (((:should-quit) t)))) ((member key ' (:arrow-up :up #\k #\K) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (max 0 (1- selected)))))) ((member key ' (:arrow-down :down #\j #\J) :test #'eql) (make-update-result :patches (list (list ' (:selected-index) (if networks (min (1- (length networks)) (1+ selected)) 0))))) ((and (%flag-set-p app-state :busy)
+           (or (member key '(:r #\r #\R :d #\d #\D) :test #'eql)
+               (member key '(:enter :return) :test #'eq)))
+      (make-update-result))
+     ((member key ' (:r #\r #\R) :test #'eql) (make-update-result :patches ' (((:busy) t) ((:status) "Refreshing Wi-Fi networks...")) :commands (list (%scan-command :rescan t)))) ((member key ' (:d #\d #\D) :test #'eql) (if (and network (plusp (length (wifi-network-device network)))) (make-update-result :patches ' (((:busy) t) ((:status) "Disconnecting selected Wi-Fi device...")) :commands (list (%disconnect-command network))) (make-update-result :patches ' (((:status) "No disconnectable Wi-Fi network selected."))))) ((member key ' (:enter :return) :test #'eq) (cond ((null network) (make-update-result :patches ' (((:status) "No Wi-Fi network selected.")))) ((string= (wifi-network-ssid network) "") (make-update-result :patches ' (((:status) "Hidden SSIDs require a named profile and are not changed by this demo.")))) ((%secured-network-p network) (make-update-result :patches ' (((:mode) :password) ((:password) "") ((:status) "Enter the Wi-Fi password; Enter connects, Esc cancels.")))) (t (make-update-result :patches ' (((:busy) t) ((:status) "Connecting to open Wi-Fi network...")) :commands (list (%connect-command network nil)))))) (t (make-update-result)))))
 
 (defun %password-key-update (event app-state) (let* ((key (key-event-key event)) (character (%event-character event)) (password (state-ref app-state :password "")) (network (%selected-network app-state))) (cond ((eq key :escape) (make-update-result :patches (quote (((:password) "") ((:should-quit) t))))) ((member key ' (:backspace :delete) :test #'eq) (make-update-result :patches (list (list ' (:password) (if (plusp (length password)) (subseq password 0 (1- (length password))) ""))))) ((member key ' (:enter :return) :test #'eq) (if (or (null network) (zerop (length password))) (make-update-result :patches ' (((:status) "A password is required for this network."))) (let ((command (%connect-command network password))) (make-update-result :patches ' (((:mode) :browse) ((:password) "") ((:busy) t) ((:status) "Connecting through NetworkManager...")) :commands (list command))))) ((and character (graphic-char-p character)) (make-update-result :patches (list (list ' (:password) (concatenate 'string password (string character)))))) (t (make-update-result)))))
 

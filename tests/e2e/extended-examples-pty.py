@@ -37,8 +37,19 @@ class ExtendedExamplesPTY(unittest.TestCase):
     def exit_cleanly(self, app, key=None):
         if key is not None:
             app.key(key, literal=(len(key) == 1))
-        app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen,
-                 "shell resumed after normal exit")
+        # The shell writes exit-code just BEFORE printing the restore marker.
+        # Never treat this short interval as a failed restoration. A marker
+        # may also scroll outside capture-pane, but remains in the PTY trace.
+        marker = b"ELMTUI_E2E_SHELL_RESTORED"
+        trace = app.directory / "terminal.raw"
+        deadline = time.monotonic() + terminal.OPTIONS.timeout
+        while time.monotonic() < deadline:
+            if marker.decode() in app.screen() or (
+                    trace.exists() and marker in trace.read_bytes()):
+                break
+            time.sleep(.05)
+        else:
+            self.fail("Shell restoration marker was never emitted")
         self.assertEqual((app.directory / "exit-code").read_text().strip(), "0")
         self.assertEqual((app.directory / "before.stty").read_text(),
                          (app.directory / "after.stty").read_text())
