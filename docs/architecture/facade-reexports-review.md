@@ -18,17 +18,30 @@ origin visibility. After an *independent, compatibility-aware review*, use
 
 | Classification | Count | Interim decision |
 |---|---:|---|
-| `public-alias-retain` | 941 | Public originating symbols: preserve under 0.2.x ABI; semantic rationale per binding still needs owner review. |
+| `public-alias-retain` | 1071 | Public originating symbols: preserve under 0.2.x ABI; semantic rationale per binding still needs owner review. |
 | `private-origin-compat-review` | 7 | Exports originating from an internal symbol. Preserve existing alias to avoid breakage; individual cases below require contract-owner decision before 0.3/1.0 API reduction. |
 | `legacy-standard-restart` | 2 | `CL:USE-VALUE` is a standardized restart name, not a framework function; preserve existing export aliases until a deliberately announced deprecation. |
-| **Total** | **950** | **No symbol-identity mismatches and no `SB-*` private symbol exports.** |
+| **Total** | **1080** | **No symbol-identity mismatches and no `SB-*` private symbol exports.** |
 
-The **948** re-exports with a project-owned home are therefore partitioned
-into 941 external-origin/public aliases and 7 internal-origin compatibility
+The **1078** re-exports with a project-owned home are therefore partitioned
+into 1071 external-origin/public aliases and 7 internal-origin compatibility
 exceptions. This is a *complete mechanical origin/identity inventory*, not a
 claim that every function's semantics and reason for publication were independently
 reviewed. The CI ratchet preserves the entire compatibility shape until that
 review happens.
+
+## 0.3.2 refresh
+
+ELMTUI.STATE and ELMTUI.STATE.API used UIOP `:REEXPORT`, which exports by
+name only: they exported fresh, unbound symbols instead of the listed
+packages' symbols, invisible to this audit because their home was the
+exporter itself. Switching to `:USE-REEXPORT` added 113 rows (ELMTUI.STATE now
+aliases ELMTUI.STATE.MODEL/MSG/UPDATE and CL-STATE.CORE symbols;
+ELMTUI.STATE.API aliases 14 ELMTUI.STATE.UPDATE symbols) and removed 14 rows
+for the old fresh symbols. ELMTUI.APP:DEFAPPLICATION is now the
+ELMTUI.APP.API symbol, and ELMTUI.STATE re-exports the 17 `<VARIANT>-APPMSG-P`
+predicates DEFMSG defines, which it now exports. See `scripts/audit-api-bindings.lisp` for unbound
+exports.
 
 ## Seven private-origin compatibility exceptions
 

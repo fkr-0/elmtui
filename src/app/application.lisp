@@ -16,8 +16,12 @@
     #:coerce-fn)
   (:import-from #:cl-events.channel #:make-channel)
   (:import-from #:elmtui.core.event-channels #:make-message-channel )
-  (:import-from #:elmtui.core.event-types #:key-event #:key-event-key #:key-event-char)
+  (:import-from #:elmtui.core.event-types #:key-event #:key-event-key #:key-event-char
+                #:key-event-modifiers)
   (:import-from #:elmtui.app.api
+    ;; ELMTUI.APP.API exports DEFAPPLICATION; define the macro on that symbol
+    ;; so ELMTUI.APP:DEFAPPLICATION and ELMTUI.APP.API:DEFAPPLICATION are one.
+    #:defapplication
     #:app-config
     #:make-app-config
     #:app-config-name
@@ -59,7 +63,8 @@
     #:register-keymap
     #:define-keymap-context
     #:process-key-event)
-  (:export #:defapplication #:make-app-config #:get-component-instance
+  (:export #:defapplication #:key-pressed-p #:quit-requested-p
+           #:make-app-config #:get-component-instance
     #:register-message-binding #:define-widget-keymap))
 
 (in-package #:elmtui.app)
@@ -244,6 +249,62 @@ unchanged branches, and returns a frozen replacement snapshot."
 (defvar *%app-log-buffer-file* nil
   "Path to temp log file when --log-buffer mode is active.")
 
+;;; ------------------------------------------------------------------
+;;; Message predicates for application update functions
+;;; ------------------------------------------------------------------
+
+(defparameter +modifier-synonyms+
+  '((:control . :ctrl) (:ctrl . :ctrl) (:meta . :alt) (:alt . :alt)
+    (:shift . :shift) (:super . :super))
+  "Canonical spellings of key modifiers accepted by KEY-PRESSED-P.")
+
+(defun %canonical-modifier (modifier)
+  (or (cdr (assoc modifier +modifier-synonyms+)) modifier))
+
+(defun %message-key-event (message)
+  "Return the KEY-EVENT carried by MESSAGE, or NIL."
+  (cond ((typep message 'key-event) message)
+        ((and (consp message) (eq (first message) :keyevent)
+              (typep (getf (rest message) :event) 'key-event))
+         (getf (rest message) :event))))
+
+(defun key-pressed-p (message &key char key modifiers)
+  "Return true when MESSAGE is a key press matching CHAR, KEY and MODIFIERS.
+
+MESSAGE is any message an update function receives; non-key messages never
+match. CHAR is a character compared with the typed character (case-sensitive,
+so #\\q and #\\Q differ). KEY is a keyword naming a key, such as :UP,
+:ENTER or :ESCAPE, or a list of such keywords any of which matches. When both
+are given, either may match. MODIFIERS is a list of modifiers that must all be
+held, e.g. (:CTRL); :CONTROL and :CTRL, and :META and :ALT, are synonyms. With
+no MODIFIERS the modifier state is not checked.
+
+  (key-pressed-p message :char #\\q)                    ; q
+  (key-pressed-p message :key '(:up :k))                 ; Up arrow or k
+  (key-pressed-p message :char #\\s :modifiers '(:ctrl)) ; Ctrl-S"
+  (let ((event (%message-key-event message)))
+    (when event
+      (let ((event-key (key-event-key event))
+            (event-char (key-event-char event))
+            (held (mapcar #'%canonical-modifier (key-event-modifiers event))))
+        (and (or (and char (or (eql event-char char)
+                               (and (characterp event-key) (eql event-key char))
+                               ;; Control chords may arrive as KEY=#\s with
+                               ;; CHAR=NIL; match those case-insensitively.
+                               (and modifiers (characterp event-key)
+                                    (char-equal event-key char))))
+                 (and key (member event-key (if (listp key) key (list key)))))
+             (every (lambda (m) (member (%canonical-modifier m) held)) modifiers)
+             t)))))
+
+(defun quit-requested-p (message)
+  "Return true when MESSAGE asks the application to quit.
+
+The runtime sends (:APP-QUIT-REQUESTED) for Ctrl-C and for keymap :QUIT
+bindings. An update function normally answers it by patching :SHOULD-QUIT to
+true, which ends the application."
+  (and (consp message) (eq (first message) :app-quit-requested)))
+
 (defun %configure-app-logging (log-file log-buffer)
   "Configure log4cl before running a TUI app.
 Default (no args): silence all logging.
@@ -335,9 +396,23 @@ Arguments:
   :SUBSCRIPTIONS-FN, :COMMAND-PROCESSOR-FN, :STATE-SEMANTICS, CLI/binary
   configuration, and platform options.
 
+Application contract:
+  :INITIAL-STATE-FN returns the initial state as a plist (optionally startup
+  commands as a second value). :UPDATE-FN is called as (UPDATE MESSAGE STATE)
+  with the current application state; it reads with STATE-REF and returns
+  (MAKE-UPDATE-RESULT :PATCHES ((PATH VALUE) ...) :COMMANDS (...)) without
+  changing STATE. Key presses arrive as KEY-EVENT objects (match them with
+  KEY-PRESSED-P); Ctrl-C arrives as (:APP-QUIT-REQUESTED) (QUIT-REQUESTED-P).
+  Patching :SHOULD-QUIT to true ends the application. :VIEW-FN is a pure
+  function of the state returning the DSL tree rendered inside the root
+  viewport. A :BELOW-CURSOR root viewport needs an explicit :HEIGHT.
+
 Returns:
   Macro expansion defining application helpers, configuration, and RUN-NAME;
-  the expansion itself yields NAME.
+  the expansion itself yields NAME. RUN-NAME (interned in the current package,
+  not exported) takes &KEY PLATFORM PLATFORM-OPTIONS ARGV LOG-FILE LOG-BUFFER;
+  logging is silent while the application runs unless LOG-FILE or LOG-BUFFER
+  (or --log-file/--log-buffer in ARGV) is given.
 
 Mutation:
   Macro expansion registers application configuration and generated functions.
@@ -467,7 +542,9 @@ Example:
                                  (cli-args nil)
                                  &allow-other-keys) ; Allow other platform-options
              (declare (ignorable initial-terminal-dimensions initial-cursor-position cli-args))
-            (let* ((initial-state* (copy-list ,state)))
+            (multiple-value-bind (initial-state-plist initial-commands) ,state
+             ;; :INITIAL-STATE-FN may return startup commands as a second value.
+             (let* ((initial-state* (copy-list initial-state-plist)))
                (setf (getf initial-state* :cli) (or cli-args '()))
                (let* ((app-state (make-state :initial (alexandria:plist-hash-table initial-state*))))
                (multiple-value-bind (patches commands)
@@ -480,7 +557,7 @@ Example:
                  ;; (format t "~A ~A~%" app-state patches)
                  (let ((initialized-state
                          (%commit-state-patches app-state patches ,state-semantics)))
-                   (values initialized-state commands))))))
+                   (values initialized-state (append commands initial-commands))))))))
 
 
            ;; --------------------------------------------------------------
@@ -568,7 +645,15 @@ Example:
            ;; RUN-<app>
            ;; --------------------------------------------------------------
            (defun ,run-fn-sym (&key (platform :tty) platform-options argv
+                                log-file log-buffer
                                 &allow-other-keys)
+             ,(format nil "Run the ~(~A~) application until it quits.
+
+Logging is silent by default, so log output never draws over the terminal UI.
+LOG-FILE (or --log-file PATH in ARGV) appends log4cl output to a file;
+LOG-BUFFER (or --log-buffer) buffers it and prints it after the application
+exits. PLATFORM-OPTIONS is passed to the terminal backend; ARGV defaults to
+the process command line." name)
              (let* ((cfg (gethash ',name *applications*))
                      (cli-options (app-config-cli-options cfg))
                      (argv* (or argv #+sbcl (cdr sb-ext:*posix-argv*) #-sbcl nil))
@@ -608,8 +693,8 @@ Example:
                            (:name :log-buffer :long "--log-buffer" :type boolean)))
                        (parsed-log-args (parse-cli-options log-specs argv*)))
                  (%configure-app-logging
-                   (getf parsed-log-args :log-file)
-                   (getf parsed-log-args :log-buffer nil))
+                   (or log-file (getf parsed-log-args :log-file))
+                   (or log-buffer (getf parsed-log-args :log-buffer nil)))
                  (unwind-protect
                    (elmtui.app.api:run-application
                      app-spec-for-driver
