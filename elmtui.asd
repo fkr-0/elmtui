@@ -179,8 +179,4 @@
 
 
                 (:file "elmtui")
-                (:file "core/public-api-docstrings"))
-  ;; Build a binary:
-  :build-operation "program-op"
-  :build-pathname "elmtui"
-  :entry-point "elmtui:dev-main")
+                (:file "core/public-api-docstrings")))

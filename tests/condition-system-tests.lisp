@@ -724,9 +724,9 @@
                           name symbol (package-name home))))))))))
 
 (test no-unreviewed-non-framework-reexports
-  "Only CL:USE-VALUE, the historical restart-name alias, may be exported from outside the framework."
-  (let ((exceptions '(("ELMTUI" "COMMON-LISP" "USE-VALUE")
-                      ("ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER" "COMMON-LISP" "USE-VALUE")))
+  "Only CL:USE-VALUE, the historical restart-name alias, may be exported from outside the framework.
+Since 0.4.0 the curated root ELMTUI package no longer re-exports it."
+  (let ((exceptions '(("ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER" "COMMON-LISP" "USE-VALUE")))
         (found nil)
         (prefixes '("ELMTUI" "CL-EVENTS" "CL-STATE" "CL-INPUTS" "CL-STYLES")))
     (flet ((framework-p (name)
@@ -746,4 +746,4 @@
     (dolist (entry found)
       (is (member entry exceptions :test #'equal)
           (format nil "Unreviewed foreign re-export: ~S" entry)))
-    (is (= 2 (length found)))))
+    (is (= 1 (length found)))))
