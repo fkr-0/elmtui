@@ -137,8 +137,9 @@
                 (:file "runtime/protocol")
                 (:file "runtime/effects")
                 (:file "app/application-extension")
-                (:file "app/tea-core")
                 (:file "app/application")
+                ;; DEFTEA-APP expands into ELMTUI.APP:DEFAPPLICATION.
+                (:file "app/tea-core")
 
                 ;; ----------------------------------------------------------------
                 ;; 8) Style subsystem

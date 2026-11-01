@@ -130,6 +130,68 @@
     (is (eq new (elmtui.view.core:apply-diff
                  old (elmtui.view.core:view-diff old new))))))
 
+(defun %key (&key key char modifiers)
+  (elmtui.core.event-types:make-key-event :type :key-down :key key :char char
+                                          :modifiers modifiers))
+
+(test key-pressed-p-matches-chars-keys-and-modifiers
+  (let ((q (%key :key #\q :char #\q))
+        (up (%key :key :up))
+        (ctrl-s (%key :key #\s :modifiers '(:ctrl))))
+    (is-true (elmtui.app:key-pressed-p q :char #\q))
+    (is-false (elmtui.app:key-pressed-p q :char #\Q))
+    (is-true (elmtui.app:key-pressed-p up :key :up))
+    (is-true (elmtui.app:key-pressed-p up :key '(:down :up)))
+    (is-false (elmtui.app:key-pressed-p up :key :down))
+    (is-true (elmtui.app:key-pressed-p ctrl-s :char #\s :modifiers '(:ctrl)))
+    (is-true (elmtui.app:key-pressed-p ctrl-s :char #\s :modifiers '(:control)))
+    (is-false (elmtui.app:key-pressed-p q :char #\q :modifiers '(:ctrl)))
+    ;; The wrapped form the runtime unwraps for DEFAPPLICATION updates.
+    (is-true (elmtui.app:key-pressed-p (list :keyevent :event q) :char #\q))
+    (is-false (elmtui.app:key-pressed-p '(:terminalresized :width 80) :char #\q))
+    (is-false (elmtui.app:key-pressed-p q))))
+
+(test quit-requested-p-recognises-only-quit-requests
+  (is-true (elmtui.app:quit-requested-p '(:app-quit-requested)))
+  (is-false (elmtui.app:quit-requested-p '(:appshutdown)))
+  (is-false (elmtui.app:quit-requested-p (%key :key #\q :char #\q))))
+
+(test api-package-names-are-the-working-symbols
+  "Re-exporting packages must export the bound symbols, not same-named
+fresh ones (UIOP :REEXPORT only exports by name)."
+  (is (eq 'elmtui.app:defapplication 'elmtui.app.api:defapplication))
+  (is-true (macro-function 'elmtui.app.api:defapplication))
+  (dolist (name '("SREF" "SAPPLY" "SDELETE" "DEFUPDATE" "CMD" "SEND-COMMAND"
+                  "MAKE-UPDATE-CONTEXT" "PROCESS-UPDATE-RESULT"))
+    (is (eq (find-symbol name :elmtui.state.update) (find-symbol name :elmtui.state.api))
+        "elmtui.state.api:~A is not elmtui.state.update:~A" name name)
+    (is (eq (find-symbol name :elmtui.state.update) (find-symbol name :elmtui.state))
+        "elmtui.state:~A is not elmtui.state.update:~A" name name))
+  (is-true (fboundp 'elmtui.state.api:sapply)))
+
+(test deftea-app-lowers-onto-defapplication
+  (let ((expansion (macroexpand-1
+                    '(elmtui.app.tea-core:deftea-app contract-tea-app
+                      :init (lambda () (values '(:n 0) nil))
+                      :transition (lambda (m s) (declare (ignore m)) s)
+                      :view (lambda (s) (declare (ignore s)) '(:text :content "x"))))))
+    (labels ((mentions (form symbol)
+               (or (eq form symbol)
+                   (and (consp form) (or (mentions (car form) symbol)
+                                         (mentions (cdr form) symbol))))))
+      (is-true (mentions expansion 'elmtui.app:defapplication))
+      (is-true (mentions expansion 'elmtui.app.api:make-runtime-app-spec)))))
+
+(test deftea-view-unwraps-root-viewport
+  (is (equal '(:text :id :a)
+             (elmtui.app.tea-core::%unwrap-root-viewport
+              '(:root-viewport :id :r :children ((:text :id :a))))))
+  (is (equal '(:container :id :tea-view :children ((:text :id :a) (:text :id :b)))
+             (elmtui.app.tea-core::%unwrap-root-viewport
+              '(:root-viewport :id :r :children ((:text :id :a) (:text :id :b))))))
+  (is (equal '(:text :id :a)
+             (elmtui.app.tea-core::%unwrap-root-viewport '(:text :id :a)))))
+
 (defun run-api-contract-tests ()
   (let ((result (run 'api-contract-tests)))
     (explain! result)

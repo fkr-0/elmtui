@@ -5,8 +5,13 @@
   (:import-from :elmtui.core.event-channels
     #:make-message-channel)
   (:import-from :elmtui.app.api
-    #:run-application
-    #:make-runtime-app-spec)
+    #:make-runtime-app-spec
+    #:app-config-message-queue)
+  (:import-from :elmtui.app
+    #:defapplication
+    #:quit-requested-p)
+  (:import-from :elmtui.core.globals #:*applications*)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
   (:export
     #:deftea-app))
 
@@ -34,7 +39,9 @@ Signals an error for all other types."
                        view
                        subscriptions
                        command-processor
-                       (root-viewport-id :root-viewport))
+                       (root-viewport-id :root-viewport)
+                       (anchor :below-cursor)
+                       height)
   "Define a supported minimal direct-transition TEA application and RUN-NAME.
 
 DEFTEA-APP is intentionally the small/pedagogical constructor, not the normative
@@ -42,8 +49,11 @@ full application constructor for the next stable major version. Use
 ELMTUI.APP:DEFAPPLICATION for production application composition, component and
 root-viewport initialization, CL-STATE patch/context updates, CLI/binary
 configuration, keymaps, and selectable transaction semantics. DEFTEA-APP remains
-compatible for direct model-replacement programs and lowers through the same
-MAKE-RUNTIME-APP-SPEC INIT/TRANSITION/VIEW/SUBSCRIPTIONS vocabulary.
+compatible for direct model-replacement programs. It expands into
+DEFAPPLICATION with :STRICT-ELM state semantics, keeping the model under the
+:TEA-MODEL key of the application state, so both constructors share one runtime.
+Ctrl-C quits; so does a transition that returns a plist model with :SHOULD-QUIT
+true.
 
 Syntax:
 
@@ -54,7 +64,9 @@ Syntax:
     &key
       :subscriptions      SUBS-FN
       :command-processor  CMD-FN
-      :root-viewport-id   ROOT-ID)
+      :root-viewport-id   ROOT-ID
+      :anchor             ANCHOR      ; default :BELOW-CURSOR
+      :height             ROWS)       ; default: sized by the content
 
 Required arguments:
 
@@ -62,7 +74,7 @@ Required arguments:
     A non-keyword symbol naming the application. This is used to derive:
 
       * *NAME-APP-SPEC* — a DEFparameter holding the app spec plist
-      * RUN-NAME        — a function that hands the spec to RUN-APPLICATION
+      * RUN-NAME        — the DEFAPPLICATION runner for the application
 
   :INIT
     A function designator (symbol or lambda) called with no arguments:
@@ -144,28 +156,19 @@ Expansion / side effects:
 
   (deftea-app NAME ...) expands to:
 
-    - A DEFparameter
+    - Adapter functions %TEA-INIT-NAME, %TEA-UPDATE-NAME, %TEA-VIEW-NAME and
+      %TEA-SUBSCRIPTIONS-NAME that translate between the direct model and
+      the application state (the model is stored under :TEA-MODEL; a new
+      model becomes one patch). A view that returns a :ROOT-VIEWPORT tree is
+      unwrapped to its children, because the application owns the viewport.
 
-        *NAME-APP-SPEC*
+    - (DEFAPPLICATION NAME ...), which defines RUN-NAME:
 
-      containing a plist with at least:
+        (RUN-NAME &key (platform :tty) platform-options argv
+                       log-file log-buffer &allow-other-keys)
 
-        :name                NAME
-        :init-fn             INIT-FN
-        :update-fn           TRANSITION-FN  ; legacy internal runtime key
-        :view-fn             VIEW-FN
-        :subscriptions-fn    SUBS-FN-OR-DEFAULT
-        :command-processor-fn COMMAND-PROCESSOR
-        :message-queue       (MAKE-MESSAGE-CHANNEL :CAPACITY 20)
-        :root-viewport-id    ROOT-ID-KEYWORD
-
-    - A function
-
-        (defun RUN-NAME (&key (platform :terminal) platform-options &allow-other-keys)
-          ...)
-
-      which simply calls ELMTUI.APP.API:RUN-APPLICATION with the
-      constructed spec and the given backend options.
+    - A DEFparameter *NAME-APP-SPEC*: the MAKE-RUNTIME-APP-SPEC plist of the
+      generated application, for callers of ELMTUI.APP.API:RUN-APPLICATION.
 
 Contracts / validation:
 
@@ -197,29 +200,74 @@ Contracts / validation:
     (error "DEFTEA-APP ~S: :VIEW is required." name))
 
   (let* ((root-key (%ensure-root-keyword root-viewport-id))
-          (app-spec-var (intern (format nil "*~A-APP-SPEC*" name)
-                          (symbol-package name)))
-          (run-fn-name (intern (format nil "RUN-~A" name)
-                         (symbol-package name)))
-          ;; default subscriptions fn if none was provided
-          (subs-expr (or subscriptions
-                       '(lambda (model)
-                          (declare (ignore model))
-                          nil))))
+         (app-spec-var (intern (format nil "*~A-APP-SPEC*" name)
+                               (symbol-package name)))
+         ;; Names DEFAPPLICATION generates (interned in *PACKAGE*, as it does).
+         (init-fn-sym (intern (format nil "INITIALIZE-APP-STATE-~A" name)))
+         (proc-fn-sym (intern (format nil "PROCESS-MESSAGE-~A" name)))
+         (view-fn-sym (intern (format nil "WRAPPED-VIEW-~A" name)))
+         (tea-init (intern (format nil "%TEA-INIT-~A" name)))
+         (tea-update (intern (format nil "%TEA-UPDATE-~A" name)))
+         (tea-view (intern (format nil "%TEA-VIEW-~A" name)))
+         (tea-subscriptions (intern (format nil "%TEA-SUBSCRIPTIONS-~A" name)))
+         (subs-expr (or subscriptions
+                        '(lambda (model)
+                           (declare (ignore model))
+                           nil))))
     `(progn
        ;; --------------------------------------------------------------
-       ;; 1. Define the application specification plist
+       ;; 1. Adapters from the direct model to DEFAPPLICATION's state.
+       ;;    The model lives under :TEA-MODEL of the application state.
+       ;; --------------------------------------------------------------
+       (defun ,tea-init ()
+         (multiple-value-bind (model commands) (funcall ,init)
+           (values (list :tea-model model :should-quit nil) commands)))
+
+       (defun ,tea-update (message state)
+         (let ((model (state-ref state :tea-model)))
+           (multiple-value-bind (next commands) (funcall ,update message model)
+             (make-update-result
+              :patches (append
+                        (unless (eq next model) `(((:tea-model) ,next)))
+                        (when (or (quit-requested-p message)
+                                  (and (listp next) (getf next :should-quit)))
+                          '(((:should-quit) t))))
+              :commands commands))))
+
+       (defun ,tea-view (state)
+         (%unwrap-root-viewport (funcall ,view (state-ref state :tea-model))))
+
+       (defun ,tea-subscriptions (state)
+         (funcall ,subs-expr (state-ref state :tea-model)))
+
+       ;; --------------------------------------------------------------
+       ;; 2. The application itself; this defines RUN-NAME.
+       ;; --------------------------------------------------------------
+       (defapplication ,name
+         :root-viewport-id ,root-key
+         :root-component-dsl '(:root-viewport :id ,root-key :anchor ,anchor
+                               ,@(when height `(:height ,height))
+                               :child-dsl-spec (:view nil))
+         :initial-state-fn ',tea-init
+         :update-fn ',tea-update
+         :view-fn ',tea-view
+         :subscriptions-fn ,tea-subscriptions
+         ,@(when command-processor `(:command-processor-fn ,command-processor))
+         :state-semantics :strict-elm)
+
+       ;; --------------------------------------------------------------
+       ;; 3. The runtime spec, for callers of RUN-APPLICATION.
        ;; --------------------------------------------------------------
        (defparameter ,app-spec-var
          (make-runtime-app-spec
            :name ',name
-           :init ,init
-           :transition ,update
-           :view ,view
-           :subscriptions ,subs-expr
+           :init #',init-fn-sym
+           :transition #',proc-fn-sym
+           :view #',view-fn-sym
+           :subscriptions #',tea-subscriptions
            :state-semantics :strict-elm
            :command-processor ,command-processor
-           :message-queue (make-message-channel :capacity 20)
+           :message-queue (app-config-message-queue (gethash ',name *applications*))
            :root-viewport-id ',root-key)
          ,(format nil
             "Application spec for ~S.
@@ -229,7 +277,7 @@ platform driver.  It is generated by DEFTEA-APP and normally not
 modified directly at runtime." name))
 
        ;; --------------------------------------------------------------
-       ;; 2. Optional contract validation (if elmtui.contracts is around)
+       ;; 4. Optional contract validation (if elmtui.contracts is around)
        ;; --------------------------------------------------------------
        (when (fboundp 'elmtui.contracts:validate-elm-application)
          (elmtui.contracts:validate-elm-application
@@ -237,31 +285,17 @@ modified directly at runtime." name))
            ,view
            ,subs-expr))
 
-       ;; --------------------------------------------------------------
-       ;; 3. Public entry point: RUN-<NAME>
-       ;; --------------------------------------------------------------
-       (defun ,run-fn-name (&key (platform :tty) platform-options
-                             &allow-other-keys)
-         "Run the TEA application defined by DEFTEA-APP.
-
-Arguments:
-
-  :PLATFORM
-    Backend selector keyword understood by RUN-APPLICATION
-    (e.g. :TERMINAL).
-
-  :PLATFORM-OPTIONS
-    Implementation-specific plist passed through to the backend.
-
-Side effects:
-
-  Delegates to ELMTUI.APP.API:RUN-APPLICATION with the app spec
-  stored in *NAME-APP-SPEC*."
-         (run-application
-           ,app-spec-var
-           :backend-type platform
-           :platform-options platform-options))
-
        ',name)))
+
+(defun %unwrap-root-viewport (tree)
+  "Return the content of a view TREE whose root is a :ROOT-VIEWPORT node.
+DEFTEA-APP views may return the whole tree, root viewport included; the
+application already owns that viewport, so only its children are rendered."
+  (if (and (consp tree) (eq (first tree) :root-viewport))
+      (let ((children (getf (rest tree) :children)))
+        (if (and children (null (rest children)))
+            (first children)
+            `(:container :id :tea-view :children ,children)))
+      tree))
 
 ;;; == end/tea-core.lisp ==
