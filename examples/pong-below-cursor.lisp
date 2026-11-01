@@ -127,7 +127,7 @@
   :height     12
   :subscriptions (lambda (model)
                    (declare (ignore model))
-                   '(:timer (:interval 0.08 :message (:tick)))))
+                   '(:every (:seconds 0.08 :message (:tick)))))
 
 (defun run-pong-below-cursor (&key (backend-type :terminal))
   (log-info "pong-below-cursor: start backend=~S" backend-type)

@@ -33,12 +33,30 @@ The project follows semantic versioning from the first published release.
 - `resolve-style-class` exported from the `elmtui` facade for programmatic
   style lookup.
 - "Style Classes" section in `docs/USER_GUIDE.md`.
+- **Subscription types**: four new built-in subscription descriptors beyond
+  `:timer`:
+  - `:every` — cleaner timer alias supporting `:seconds` and `:ms` interval
+    units (e.g. `(:every (:seconds 0.5 :message (:tick)))`).
+  - `:window-resize` — delivers a message with `:width`/`:height` on terminal
+    resize via SIGWINCH
+    (e.g. `(:window-resize (:message (:resized)))`).
+  - `:file-watch` — polling-based file watcher that fires on
+    create/modify/delete events
+    (e.g. `(:file-watch (:path "/tmp/data.json" :message (:file-changed)))`).
+  - `:process` — runs an external process and delivers per-line output and
+    exit messages
+    (e.g. `(:process (:command ("tail" "-f" "log") :on-output (:line) :on-exit (:done)))`).
+- New example `examples/file-watcher.lisp` demonstrating `:file-watch` and
+  `:every` subscriptions.
+- Subscriptions section in `docs/USER_GUIDE.md`.
 
 ### Changed
 
 - Migrated simple examples to `deftea-app` to demonstrate the minimal application constructor.
 - Refactored `examples/neon-kit.lisp` to use `defstyle` and `:class`
   instead of repeating inline palette styles on every row.
+- `examples/pong-below-cursor.lisp` and `examples/game-of-life.lisp` now use
+  `:every` instead of `:timer` (both remain supported).
 
 ## [0.4.1] - 2026-11-01
 

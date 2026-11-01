@@ -35,4 +35,5 @@
                (:file "wifi-menu")
                (:file "wifi-inline")
                (:file "tea-counter-component")
-               (:file "tea-list-detail")))
+               (:file "tea-list-detail")
+               (:file "file-watcher")))

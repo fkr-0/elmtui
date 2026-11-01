@@ -357,6 +357,190 @@ Tips:
 - Focus change triggers keymap context activation via `:keymap-id` when present in widget models.
 - Utility functions: `set-focus`, `get-next-focusable`, `get-previous-focusable`, `tab-navigate`.
 
+## Subscriptions
+
+Subscriptions are declarative side-effect descriptors that the runtime
+manages automatically. Your application's `:subscriptions-fn` receives
+the current state and returns a list of subscription descriptors. The
+runtime diffs old and new descriptor lists each update cycle: new
+descriptors are started, removed ones are stopped, and unchanged ones
+continue undisturbed.
+
+```lisp
+;; subscriptions-fn signature:
+(defun my-subscriptions (state)
+  "Return a list of subscription descriptors based on STATE."
+  (when (state-ref state :watching)
+    (list '(:every (:seconds 1.0 :message (:tick))))))
+```
+
+### `:timer` — legacy periodic timer
+
+The original subscription type. Fires a message at a fixed interval.
+
+**Descriptor format:**
+```lisp
+(:timer (:interval SECONDS :message MESSAGE))
+;; or flat plist form:
+(:timer :interval SECONDS :message MESSAGE)
+```
+
+**Message delivered:** the literal MESSAGE value.
+
+**Example:**
+```lisp
+(:timer (:interval 0.1 :message (:tick)))
+;; Delivers (:tick) every 100ms
+```
+
+### `:every` — periodic timer (preferred)
+
+A clearer interface to periodic timers. Accepts `:seconds` or `:ms`
+(milliseconds) for the interval. Recommended over `:timer` for new code.
+
+**Descriptor format:**
+```lisp
+(:every (:seconds SECONDS :message MESSAGE))
+(:every (:ms MILLISECONDS :message MESSAGE))
+```
+
+**Message delivered:** the literal MESSAGE value.
+
+**Example:**
+```lisp
+;; Fire every half second
+(:every (:seconds 0.5 :message (:tick)))
+
+;; Fire every 200 milliseconds
+(:every (:ms 200 :message (:fast-tick)))
+```
+
+### `:window-resize` — terminal resize events
+
+Delivers a message when the terminal is resized (SIGWINCH). The message
+is enriched with the new terminal dimensions. At most one
+`:window-resize` subscription is active at a time; duplicates are
+deduplicated by the reconciler.
+
+**Descriptor format:**
+```lisp
+(:window-resize (:message MESSAGE))
+```
+
+**Message delivered:** MESSAGE with `:width` and `:height` appended.
+
+**Example:**
+```lisp
+(:window-resize (:message (:resized)))
+;; Delivers: (:resized :width 120 :height 40)
+```
+
+In your update function:
+```lisp
+(defun my-update (msg state)
+  (when (and (consp msg) (eq (first msg) :resized))
+    (let ((w (getf (rest msg) :width))
+          (h (getf (rest msg) :height)))
+      ;; handle resize
+      ...)))
+```
+
+### `:file-watch` — file change notifications
+
+Watches a file path for changes using periodic polling (default 500ms).
+Detects creation, modification, and deletion events. Two descriptors
+with the same `:path` are treated as the same subscription for
+reconciliation purposes.
+
+**Descriptor format:**
+```lisp
+(:file-watch (:path PATHNAME
+              :message MESSAGE
+              :interval SECONDS))  ;; optional, default 0.5
+```
+
+**Message delivered:** MESSAGE with `:path`, `:event` appended. The
+`:event` value is one of `:created`, `:modified`, or `:deleted`.
+
+**Example:**
+```lisp
+(:file-watch (:path "/tmp/config.json" :message (:config-changed)))
+;; On modification delivers:
+;; (:config-changed :path "/tmp/config.json" :event :modified)
+```
+
+**Note:** File modification detection relies on `file-write-date`, which
+has one-second granularity on most systems. Sub-second modifications may
+be coalesced into a single event.
+
+### `:process` — external process output
+
+Runs an external command and delivers messages for each line of stdout
+and on process exit. Two descriptors with the same `:command` list are
+treated as the same subscription.
+
+**Descriptor format:**
+```lisp
+(:process (:command (PROGRAM ARG...)
+           :on-output MESSAGE    ;; optional: fired per stdout line
+           :on-exit MESSAGE))    ;; optional: fired when process exits
+```
+
+At least one of `:on-output` or `:on-exit` must be provided.
+
+**Output message delivered:** MESSAGE with `:line` and `:pid` appended.
+
+**Exit message delivered:** MESSAGE with `:code` and `:pid` appended.
+On launch failure, `:error` is also included.
+
+**Example:**
+```lisp
+(:process (:command ("tail" "-f" "/var/log/syslog")
+           :on-output (:log-line)
+           :on-exit (:tail-exited)))
+
+;; Output delivers: (:log-line :line "Nov  1 12:00:00 ..." :pid 12345)
+;; Exit delivers:   (:tail-exited :code 0 :pid 12345)
+```
+
+When the subscription is removed by the reconciler, the process receives
+SIGTERM (and SIGKILL if it does not exit promptly).
+
+**Error handling:** If the command cannot be found or launched, an
+immediate `:on-exit` message is delivered with `:code -1` and an
+`:error` description. If the process exits with a non-zero code, the
+exit code is reported in `:code`.
+
+### Subscription identity and reconciliation
+
+The reconciler compares subscriptions by their _identity key_, not the
+full descriptor. This means you can change message payloads without
+restarting the underlying subscription:
+
+| Type             | Identity key                    |
+|------------------|---------------------------------|
+| `:timer`         | Full descriptor (type + config) |
+| `:every`         | Full descriptor (type + config) |
+| `:window-resize` | Singleton (`:window-resize`)    |
+| `:file-watch`    | Type + `:path`                  |
+| `:process`       | Type + `:command`               |
+
+### Combining subscriptions
+
+Return multiple descriptors as a list from your subscriptions function:
+
+```lisp
+(defun my-subscriptions (state)
+  (let ((subs nil))
+    (when (state-ref state :auto-refresh)
+      (push '(:every (:seconds 5.0 :message (:refresh))) subs))
+    (when (state-ref state :watch-config)
+      (push '(:file-watch (:path "/etc/myapp.conf"
+                           :message (:config-changed)))
+            subs))
+    subs))
+```
+
 ## Running Applications
 
 - Prefer the `defapplication`-generated runner: `(my-app:run-my-app :platform :terminal)`.
