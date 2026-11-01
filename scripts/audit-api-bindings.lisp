@@ -7,6 +7,9 @@
 ;;;; re-export audit (scripts/audit-facade-exports.py) cannot see these, because
 ;;;; it only inspects symbols whose home differs from the exporting package.
 ;;;;
+;;;; With ELMTUI_API_PHANTOM_MAX=N set, exit non-zero when more than N
+;;;; phantom exports exist (the release gate's ratchet).
+;;;;
 ;;;; Run from the repository root:
 ;;;;   clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
 ;;;;     --load scripts/audit-api-bindings.lisp
@@ -21,6 +24,8 @@
         ((macro-function symbol) :macro)
         ((fboundp symbol) :function)
         ((boundp symbol) :variable)
+        ;; DEFVAR without a value: a declared special variable, not a phantom.
+        ((eq (sb-int:info :variable :kind symbol) :special) :special-variable)
         ((find-class symbol nil) :class)
         ((ignore-errors (sb-ext:valid-type-specifier-p symbol)) :type)))
 
@@ -46,4 +51,13 @@
           (length (elmtui-packages)) total phantom-total (length rows))
   (dolist (row (sort rows #'> :key (lambda (r) (length (third r)))))
     (format t "~%~A (~D of ~D own exports unbound):~%  ~{~(~A~)~^ ~}~%"
-            (first row) (length (third row)) (second row) (third row))))
+            (first row) (length (third row)) (second row) (third row)))
+  (let ((limit (uiop:getenv "ELMTUI_API_PHANTOM_MAX")))
+    (when (and limit (plusp (length limit)))
+      (let ((max (parse-integer limit)))
+        (when (> phantom-total max)
+          (format t "~&API-BINDING-AUDIT FAIL: ~D phantom exports exceed the allowed ~D~%"
+                  phantom-total max)
+          (uiop:quit 1))
+        (format t "~&API-BINDING-AUDIT PASS: ~D phantom exports (allowed ~D)~%"
+                phantom-total max)))))
