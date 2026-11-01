@@ -1,11 +1,9 @@
-"""Opt-in black-box workbench tests on a *real* launched ElmTUI process.
+"""Black-box workbench tests on a *real* launched ElmTUI process.
 
-Configure only after W5 supplies its launcher:
-  ELMTUI_WORKBENCH_TEST_CMD='clpm bundle exec --with-client sbcl -- ...'
-and, if necessary, ELMTUI_WORKBENCH_READY_PATTERN.
-
-Unlike the fixture driver tests, these must NOT report green before the real
-application exists. Each missing-launcher test is explicitly skipped.
+The launcher defaults to the repository REPL (``./scripts/examples.sh run
+repl``); ELMTUI_WORKBENCH_TEST_CMD may point at another real launcher and
+ELMTUI_WORKBENCH_READY_PATTERN at its readiness text. A missing tmux or launcher
+fails the tests instead of skipping them.
 """
 import os
 import shlex
@@ -13,13 +11,17 @@ import unittest
 
 from pty_driver import PrivateTmuxPTY
 
-_COMMAND = os.environ.get("ELMTUI_WORKBENCH_TEST_CMD", "").strip()
+_COMMAND = (os.environ.get("ELMTUI_WORKBENCH_TEST_CMD", "").strip()
+            or "./scripts/examples.sh run repl")
 _READY = os.environ.get("ELMTUI_WORKBENCH_READY_PATTERN", r"CL-USER|Lisp Workbench")
 
 
-@unittest.skipUnless(_COMMAND, "W5 application launcher unavailable; set ELMTUI_WORKBENCH_TEST_CMD")
-@unittest.skipUnless(PrivateTmuxPTY.available(), "private tmux/stty unavailable")
 class ApplicationBlackBoxTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not PrivateTmuxPTY.available():
+            raise AssertionError("private tmux/stty are required for these tests")
+
     def open_workbench(self, cols, rows):
         session = PrivateTmuxPTY(shlex.split(_COMMAND), cols=cols, rows=rows)
         session.start()

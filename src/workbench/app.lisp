@@ -43,6 +43,7 @@
   (inspector-section :packages)
   inspector-snapshot
   (inspector-selected 0)
+  (inspector-page 0)
   (inspector-query "")
   (inspector-query-mode nil)
   inspector-package
@@ -52,7 +53,7 @@
 
 (defun %workbench-initial ()
   (let ((wb (%make-workbench
-             :editor (elmtui.workbench.editor:make-editor-state :columns 77)
+             :editor (elmtui.workbench.editor:make-editor-state :columns 76)
              :repl (elmtui.workbench.eval:make-repl-session)
              :inspector (elmtui.workbench.inspector:make-inspector-session)
              :completion-keys
@@ -148,13 +149,15 @@
 
 (defun %refresh-inspector (wb &optional (section (workbench-inspector-section wb)))
   (unless (eq section (workbench-inspector-section wb))
-    (setf (workbench-inspector-selected wb) 0))
+    (setf (workbench-inspector-selected wb) 0
+          (workbench-inspector-page wb) 0))
   (setf (workbench-inspector-section wb) section
         (workbench-inspector-snapshot wb)
         (elmtui.workbench.inspector:snapshot-image
          (workbench-inspector wb)
          (workbench-generation wb)
          :section section
+         :page (workbench-inspector-page wb)
          :package (%current-inspector-package wb)
          :query (workbench-inspector-query wb)
          :refresh t))
@@ -167,12 +170,25 @@
   (nth (workbench-inspector-selected wb) (%inspector-entries wb)))
 
 (defun %move-inspector-selection (wb delta)
-  (let ((entries (%inspector-entries wb)))
-    (when entries
-      (setf (workbench-inspector-selected wb)
-            (mod (+ (workbench-inspector-selected wb) delta)
-                 (length entries)))
-      t)))
+  (let* ((entries (%inspector-entries wb))
+         (selected (workbench-inspector-selected wb))
+         (page (workbench-inspector-page wb))
+         (next (+ selected delta)))
+    (cond
+      ((and (>= next (length entries)) (getf (workbench-inspector-snapshot wb) :has-more))
+       (incf (workbench-inspector-page wb))
+       (setf (workbench-inspector-selected wb) 0)
+       (%refresh-inspector wb)
+       t)
+      ((and (< next 0) (plusp page))
+       (decf (workbench-inspector-page wb))
+       (%refresh-inspector wb)
+       (setf (workbench-inspector-selected wb)
+             (max 0 (1- (length (%inspector-entries wb)))))
+       t)
+      (entries
+       (setf (workbench-inspector-selected wb) (mod next (length entries)))
+       t))))
 
 (defun %cycle-inspector-section (wb delta)
   (let* ((current (position (workbench-inspector-section wb)
@@ -433,7 +449,9 @@
      (cond
        ((eq key :escape)
         (setf (workbench-inspector-query-mode wb) nil
-              (workbench-inspector-query wb) "")
+              (workbench-inspector-query wb) ""
+              (workbench-inspector-page wb) 0
+              (workbench-inspector-selected wb) 0)
         (%refresh-inspector wb)
         (setf (workbench-status wb) "Inspector filter cleared")
         t)
@@ -447,6 +465,8 @@
           (when (plusp (length query))
             (setf (workbench-inspector-query wb)
                   (subseq query 0 (1- (length query)))))
+          (setf (workbench-inspector-page wb) 0
+                (workbench-inspector-selected wb) 0)
           (%refresh-inspector wb)
           (setf (workbench-status wb)
                 (format nil "Filter: ~A" (workbench-inspector-query wb))))
@@ -456,6 +476,8 @@
               (concatenate 'string
                            (workbench-inspector-query wb)
                            (string key)))
+        (setf (workbench-inspector-page wb) 0
+              (workbench-inspector-selected wb) 0)
         (%refresh-inspector wb)
         (setf (workbench-status wb)
               (format nil "Filter: ~A" (workbench-inspector-query wb)))
@@ -464,6 +486,8 @@
     ((char= (if (characterp key) key #\Null) #\/)
      (setf (workbench-inspector-query-mode wb) t
            (workbench-inspector-query wb) ""
+           (workbench-inspector-page wb) 0
+           (workbench-inspector-selected wb) 0
            (workbench-status wb) "Filter: ")
      (%refresh-inspector wb)
      t)
@@ -515,7 +539,9 @@
      (%refresh-inspector wb :diagnostics)
      t)
     ((eq key :page-up)
-     (incf (workbench-scroll wb) 5)
+     (setf (workbench-scroll wb)
+           (min (max 0 (1- (length (workbench-transcript wb))))
+                (+ (workbench-scroll wb) 5)))
      t)
     ((eq key :page-down)
      (setf (workbench-scroll wb)
@@ -560,8 +586,8 @@
     (cond
       ((and (consp message)
             (member (car message) '(:terminal-resized :terminalresized)))
-       (setf (workbench-width wb) (max 24 (getf (cdr message) :width 80))
-             (workbench-height wb) (max 8 (getf (cdr message) :height 24)))
+       (setf (workbench-width wb) (max 1 (getf (cdr message) :width 80))
+             (workbench-height wb) (max 1 (getf (cdr message) :height 24)))
        (elmtui.workbench.editor:editor-resize
         (workbench-editor wb)
         (max 1
@@ -629,8 +655,7 @@
 
 (defun workbench-view (app-state)
   (let ((wb (state-ref app-state :workbench)))
-    (multiple-value-bind (rows style-map)
-        (elmtui.workbench.view:frame-lines
+    (elmtui.workbench.view:frame-view
          :width (workbench-width wb)
          :height (workbench-height wb)
          :source (elmtui.workbench.editor:editor-text
@@ -655,12 +680,7 @@
          (package-name
           (elmtui.workbench.eval:repl-session-package
            (workbench-repl wb)))
-         :scroll (workbench-scroll wb))
-      (elmtui.workbench.view:frame-dsl
-       rows
-       (workbench-width wb)
-       (workbench-height wb)
-       :style-map style-map))))
+         :scroll (workbench-scroll wb))))
 
 (defun workbench-subscriptions (state)
   "Poll only when evaluation, docs or live inspector watches need updates."

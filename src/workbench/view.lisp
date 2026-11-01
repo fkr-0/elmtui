@@ -1,32 +1,11 @@
 (defpackage :elmtui.workbench.view
   (:use :cl)
-  (:export :frame-lines :frame-dsl))
+  (:export :frame-view :frame-lines :frame-dsl))
 (in-package :elmtui.workbench.view)
 
-(defun %fit (value width)
-  (let ((str (princ-to-string (or value ""))))
-    (subseq str 0 (min (length str) (max 0 width)))))
-
-(defun %paint (screen row column value
-                        &optional width style-map style)
-  "Paint a bounded fragment and optionally record a semantic style span."
-  (when (and (<= 0 row) (< row (length screen)))
-    (let* ((line (aref screen row))
-           (start (max 0 column))
-           (value (princ-to-string value))
-           (skip (max 0 (- start column)))
-           (size (max 0 (min (- (length line) start)
-                              (- (length value) skip)
-                              (or width (length value))))))
-      (when (plusp size)
-        (replace line value
-                 :start1 start
-                 :start2 skip
-                 :end2 (+ skip size))
-        (when (and style-map style)
-          (push (list start (+ start size) (copy-list style))
-                (aref style-map row))))))
-  screen)
+(defun %single-line (value)
+  (map 'string (lambda (ch) (if (find ch '(#\Newline #\Return)) #\Space ch))
+       (princ-to-string (or value ""))))
 
 (defun %split-lines (source)
   (loop with start = 0
@@ -34,327 +13,242 @@
         collect (subseq source start (or end (length source)))
         while end do (setf start (1+ end))))
 
-(defun %candidate-line (candidate active)
-  (format nil "~A ~A  ~A" (if active ">" " ")
-          (elmtui.workbench.completion:completion-candidate-display candidate)
-          (elmtui.workbench.completion:completion-candidate-annotation candidate)))
+(defun %text (id content width &optional (style '(:fg-color :white)))
+  (list :text :id (if (listp id) (format nil "~{~A~^-~}" id) id)
+        :content (elmtui.view.layout.size-utils:terminal-string-slice (%single-line content) 0)
+        :style (append (copy-list style)
+                       (list :width (max 0 width) :height 1 :flex-shrink 0))))
 
-(defun %single-line (value)
-  (let ((text (princ-to-string (or value ""))))
-    (map 'string
-         (lambda (character)
-           (if (member character '(#\Newline #\Return #\Tab)
-                       :test #'char=)
-               #\Space
-               character))
-         text)))
+(defun %box (id direction width height children &rest style)
+  (list :container :id (if (listp id) (format nil "~{~A~^-~}" id) id)
+        :style (append (list :display :flex :flex-direction direction
+                            :width (max 0 width) :height (max 0 height)
+                            :padding 0 :gap 0 :flex-shrink 0 :overflow :hidden)
+                       style)
+        :children children))
 
-(defun %inspector-row (entry &optional active)
-  (let ((name (or (getf entry :name)
-                  (getf entry :summary)
-                  (getf entry :preview)
-                  "?")))
-    (format nil "~A~A ~A~A"
-            (if active ">" " ")
-            (if (getf entry :changed) "!" " ")
-            name
-            (if (getf entry :boundp)
-                (format nil " = ~A" (or (getf entry :preview) "?"))
-                ""))))
+(defun %inspector-row (entry active)
+  (format nil "~A~A ~A~A" (if active ">" " ")
+          (if (getf entry :changed) "!" " ")
+          (or (getf entry :name) (getf entry :summary) (getf entry :preview) "?")
+          (if (getf entry :boundp)
+              (format nil " = ~A" (or (getf entry :preview) "?")) "")))
 
-(defun %inspector-entry-style (theme entry active)
-  (if active
-      (elmtui.workbench.inspector:inspector-style theme :selected)
-      (elmtui.workbench.inspector:inspector-style
-       theme
-       (or (getf entry :style-role) :normal))))
+(defun %inspector-pane (width height snapshot section selected query query-mode theme)
+  (let* ((entries (getf snapshot :entries))
+         (visible (max 0 (1- height)))
+         (start (max 0 (- selected (max 0 (1- visible))))))
+    (%box :workbench-inspector :column width height
+        (cons (%text :inspector-title
+                     (format nil "IMAGE / ~A~A" section
+                             (if (or query-mode (plusp (length query)))
+                                 (format nil " / ~A~A" query (if query-mode "_" "")) ""))
+                     width (elmtui.workbench.inspector:inspector-style theme :section-title))
+              (loop for entry in (nthcdr start entries)
+                    for i from start below (+ start visible)
+                    collect (%text (list :inspector-entry i)
+                                   (%inspector-row entry (= i selected)) width
+                                   (elmtui.workbench.inspector:inspector-style
+                                    theme (if (= i selected) :selected
+                                              (or (getf entry :style-role) :normal)))))))))
 
-(defun %paint-inspector-rows
-    (screen style-map entries start-row column end-row width selected theme)
-  (loop for entry in entries
-        for index from 0
-        for row from start-row below end-row
-        do (%paint screen row column
-                   (%fit (%inspector-row entry (= index selected)) width)
-                   width
-                   style-map
-                   (%inspector-entry-style
-                    theme entry (= index selected)))))
+(defun %completion-pane (width completion selected docs theme &optional available-height)
+  (let* ((candidates (and completion
+                          (elmtui.workbench.completion:completion-present-candidates
+                           completion :selected-index selected :theme theme)))
+         (signature (and (listp docs) (getf docs :signature)))
+         (documentation (if (stringp docs) docs
+                            (and (listp docs) (getf docs :documentation))))
+         (height (max 0 (or available-height
+                            (+ 6 (if signature 1 0) (if documentation 1 0))))))
+    (when (and candidates (plusp height))
+      ;; The selected candidate must stay inside the *actual* terminal viewport.
+      ;; With only one free row, prioritize it over the optional title.
+      (let* ((show-title (> height 1))
+             (capacity (min 5 (- height (if show-title 1 0))))
+             (start (max 0 (min selected (- (length candidates) capacity))))
+             (rows
+               (append
+                (when show-title
+                  (list (%text :completion-title "[ COMPLETION ]" width
+                               '(:fg-color :cyan :bold t))))
+                (loop for item in (nthcdr start candidates)
+                      for i from start below (+ start capacity)
+                      collect
+                      (%box (list :completion-row i) :row width 1
+                            (list (%text (list :completion-label i)
+                                         (format nil "~A~A"
+                                                 (if (getf item :selected-p) "> " "  ")
+                                                 (or (getf item :display) ""))
+                                         (min 23 width) (getf item :style))
+                                  (%text (list :completion-package i)
+                                         (getf item :package) (min 12 (max 0 (- width 23)))
+                                         (elmtui.workbench.completion:completion-style theme :package))
+                                  (%text (list :completion-annotation i)
+                                         (getf item :annotation) (max 0 (- width 35))
+                                         (elmtui.workbench.completion:completion-style theme :annotation)))))))
+             (remaining (- height (length rows))))
+        (when (and signature (plusp remaining))
+          (setf rows (append rows
+                             (list (%text :completion-signature
+                                          (format nil "SIG: ~A" (%single-line signature))
+                                          width (elmtui.workbench.completion:completion-style theme :signature))))
+                remaining (1- remaining)))
+        (when (and documentation (plusp remaining))
+          (setf rows (append rows
+                             (list (%text :completion-documentation
+                                          (format nil "DOC: ~A" (%single-line documentation))
+                                          width (elmtui.workbench.completion:completion-style theme :documentation))))))
+        (values (%box :workbench-completion :column width (length rows) rows)
+                (length rows))))))
 
-(defun %row-segments (row spans default-style)
-  (let* ((length (length row))
-         (styles (make-array length :initial-element default-style)))
-    (dolist (span (reverse spans))
-      (destructuring-bind (start end style) span
-        (loop for index from (max 0 start)
-              below (min length end)
-              do (setf (aref styles index) style))))
-    (loop with start = 0
-          while (< start length)
-          for style = (aref styles start)
-          for end = (loop for index from (1+ start) below length
-                          while (equal (aref styles index) style)
-                          finally (return index))
-          collect (list :content (subseq row start end)
-                        :style style)
-          do (setf start end))))
+(defun %editor-pane (width height source cursor focused)
+  (let* ((lines (%split-lines source))
+         (cursor (max 0 (min cursor (length source))))
+         (cursor-line (count #\Newline source :end cursor))
+         (line-start (1+ (or (position #\Newline source :end cursor :from-end t) -1)))
+         ;; Keep the cursor's logical line in the visible window.
+         (start (max 0 (- cursor-line (1- height))))
+         (end (min (length lines) (+ start height))))
+    (%box :workbench-editor :column width height
+          (loop for line in (subseq lines start end)
+                for line-number from start
+                for active = (and focused (= line-number cursor-line))
+                for before = (if active (subseq line 0 (- cursor line-start)) line)
+                for cells = (elmtui.view.layout.size-utils:terminal-string-width before)
+                for room = (max 0 (- width 3 (if active 1 0)))
+                for offset = (if active (max 0 (- cells room)) 0)
+                for prefix = (elmtui.view.layout.size-utils:terminal-string-slice before offset (+ offset room))
+                for prefix-width = (elmtui.view.layout.size-utils:terminal-string-width prefix)
+                collect
+                (%box (list :editor-line line-number) :row width 1
+                      (append
+                       (list (%text (list :editor-prompt line-number)
+                                    (if (= line-number start) " > " "   ") (min 3 width)
+                                    '(:fg-color :cyan :bold t))
+                             (%text (list :editor-before line-number) prefix prefix-width))
+                       (when active
+                         (list (%text :editor-cursor "|" 1 '(:fg-color :cyan :bold t))
+                               (%text :editor-after
+                                      (elmtui.view.layout.size-utils:terminal-string-slice line cells)
+                                      (max 0 (- width 4 prefix-width)))))))))))
 
-(defun frame-lines
+(defun frame-view
     (&key (width 80) (height 24) (source "") (cursor 0)
-       transcript completion (selected 0) docs
-       inspector (inspector-section :packages) (inspector-selected 0)
-       (inspector-query "") inspector-query-mode
-       (show-inspector t) (focus :editor) (status "Ready")
-       (package "CL-USER") (scroll 0)
+       transcript completion (selected 0) docs inspector
+       (inspector-section :packages) (inspector-selected 0)
+       (inspector-query "") inspector-query-mode (show-inspector t)
+       (focus :editor) (status "Ready") (package "CL-USER") (scroll 0)
        (completion-theme (elmtui.workbench.completion:make-completion-theme))
        (inspector-theme (elmtui.workbench.inspector:make-inspector-theme)))
-  "Produce screen rows plus semantic style spans without writing a terminal."
-  (let* ((w (max 24 (min 240 width)))
-         (h (max 8 (min 100 height)))
-         (wide (>= w 120))
-         (narrow-inspector
-           (and (not wide) show-inspector (eq focus :inspector)))
-         (main-w
-           (if (and wide show-inspector)
-               (floor (* w 68) 100)
-               w))
-         (screen (make-array h))
-         (style-map (make-array h :initial-element nil))
-         (logical-lines (%split-lines source))
-         (editor-height (min 6 (max 2 (length logical-lines))))
-         (editor-y (- h 3 editor-height))
-         (visible
-           (last logical-lines (min editor-height (length logical-lines))))
-         (offset (- (length logical-lines) (length visible)))
-         (cursor-line
-           (count #\Newline source :end (min cursor (length source))))
-         (cursor-start
-           (or (position #\Newline source
-                         :end (min cursor (length source))
-                         :from-end t)
-               -1))
-         (cursor-x
-           (+ 3 (min (- main-w 5)
-                     (- cursor (1+ cursor-start)))))
-         (cursor-y
-           (+ editor-y (max 0 (- cursor-line offset))))
-         (header-style '(:fg-color :cyan :bold t))
-         (footer-style '(:fg-color :gray))
-         (status-style '(:fg-color :yellow))
-         (separator-style '(:fg-color :gray)))
-    (dotimes (index h)
-      (setf (aref screen index)
-            (make-string w :initial-element #\Space)))
-    (%paint screen 0 0
-             (format nil " Lisp Workbench  [~A]  ~A"
-                     package
-                     (if wide "REPL  |  IMAGE" "REPL / IMAGE"))
-             nil style-map header-style)
-    (%paint screen (1- h) 0
-             (if (eq focus :inspector)
-                 " F2 Editor  Up/Down Select  Tab Section  w Watch  W Watches  / Filter  Esc Editor"
-                 " Ctrl+Enter Eval  Ctrl+Space Complete  F2 Inspector  F3 Docs  F4 Diagnostics  Ctrl+D Exit")
-             nil style-map footer-style)
-    (%paint screen (- h 2) 0
-             (format nil " ~A  |  ~D x ~D  |  ~A"
-                     status w h focus)
-             nil style-map status-style)
-    (if narrow-inspector
-        (progn
-          (%paint screen 2 2
-                   (format nil "IMAGE / ~A~A"
-                           inspector-section
-                           (if (plusp (length inspector-query))
-                               (format nil " / ~A~A"
-                                       inspector-query
-                                       (if inspector-query-mode "_" ""))
-                               (if inspector-query-mode " / _" "")))
-                   nil
-                   style-map
-                   (elmtui.workbench.inspector:inspector-style
-                    inspector-theme :section-title))
-          (%paint-inspector-rows
-           screen style-map (getf inspector :entries)
-           4 2 (- h 3) (- w 4)
-           inspector-selected inspector-theme))
-        (progn
-          (let* ((available (max 0 (- editor-y 2)))
-                 (ordered (reverse transcript))
-                 (end (max 0 (- (length ordered) (max 0 scroll))))
-                 (start (max 0 (- end available))))
-            (%paint screen 1 1
-                     (format nil "Transcript (~D)" (length transcript))
-                     nil style-map '(:fg-color :gray :bold t))
-            (loop for item in (subseq ordered start end)
-                  for row from 2
-                  do (%paint screen row 2
-                             (%fit item (- main-w 4))
-                             (- main-w 4)
-                             style-map
-                             '(:fg-color :white))))
-          (%paint screen (1- editor-y) 0
-                   (make-string (max 0 (1- main-w))
-                                :initial-element #\-)
-                   nil style-map separator-style)
-          (loop for line in visible
-                for row from editor-y
-                for first = (= row editor-y)
-                do (%paint screen row 0
-                           (if first " > " "   ")
-                           nil style-map
-                           (if first
-                               '(:fg-color :cyan :bold t)
-                               '(:fg-color :gray)))
-                   (%paint screen row 3
-                           (%fit line (- main-w 4))
-                           (- main-w 4)
-                           style-map
-                           '(:fg-color :white)))
-          (%paint screen
-                   (min (- h 4) cursor-y)
-                   (max 3 (min (- main-w 2) cursor-x))
-                   "|"
-                   1 style-map '(:fg-color :cyan :bold t))))
-    (when (and wide show-inspector)
-      (loop for row from 1 below (- h 2)
-            do (%paint screen row main-w "|"
-                       1 style-map separator-style))
-      (%paint screen 1 (+ main-w 2)
-               (format nil "IMAGE / ~A~A"
-                       inspector-section
-                       (if (plusp (length inspector-query))
-                           (format nil " / ~A~A"
-                                   inspector-query
-                                   (if inspector-query-mode "_" ""))
-                           (if inspector-query-mode " / _" "")))
-               nil
-               style-map
-               (elmtui.workbench.inspector:inspector-style
-                inspector-theme :section-title))
-      (%paint-inspector-rows
-       screen style-map (getf inspector :entries)
-       3 (+ main-w 2) (- h 3) (- w main-w 3)
-       inspector-selected inspector-theme))
-    (when (and completion
-               (not narrow-inspector)
-               (elmtui.workbench.completion:completion-result-candidates
-                completion))
-      (let* ((presented
-               (elmtui.workbench.completion:completion-present-candidates
-                completion
-                :selected-index selected
-                :theme completion-theme))
-             (limit (min 5 (length presented)))
-             (signature
-               (and (listp docs) (getf docs :signature)))
-             (documentation
-               (cond
-                 ((and (listp docs) (getf docs :documentation))
-                  (getf docs :documentation))
-                 ((stringp docs) docs)
-                 (t nil)))
-             (doc-rows (+ (if signature 1 0)
-                          (if documentation 1 0)))
-             (rows (+ 1 limit doc-rows))
-             (y (if (>= cursor-y (+ rows 1))
-                    (- cursor-y rows)
-                    (min (- h rows 3) (1+ cursor-y))))
-             (x (max 1 (min (- main-w 48)
-                            (max 1 cursor-x)))))
-        (setf y (max 1 y)
-              x (max 1 x))
-        (%paint screen y x "[ COMPLETION ]"
-                 nil style-map '(:fg-color :cyan :bold t))
-        (loop for row-data in presented
-              for index from 0 below limit
-              for row = (+ y index 1)
-              do (let* ((active (getf row-data :selected-p))
-                        (base-style (getf row-data :style))
-                        (marker (if active "> " "  "))
-                        (display (or (getf row-data :display) ""))
-                        (package-name (or (getf row-data :package) ""))
-                        (annotation (or (getf row-data :annotation) "")))
-                   (%paint screen row x
-                            (format nil "~A~A" marker display)
-                            23 style-map base-style)
-                   (%paint screen row (+ x 23)
-                            (%fit package-name 12)
-                            12 style-map
-                            (elmtui.workbench.completion:completion-style
-                             completion-theme :package))
-                   (%paint screen row (+ x 35)
-                            (%fit annotation 11)
-                            11 style-map
-                            (elmtui.workbench.completion:completion-style
-                             completion-theme :annotation))))
-        (let ((doc-row (+ y limit 1)))
-          (when signature
-            (%paint screen doc-row x
-                     (%fit (format nil "SIG: ~A"
-                                   (%single-line signature))
-                           46)
-                     46 style-map
-                     (elmtui.workbench.completion:completion-style
-                      completion-theme :signature))
-            (incf doc-row))
-          (when documentation
-            (%paint screen doc-row x
-                     (%fit (format nil "DOC: ~A"
-                                   (%single-line documentation))
-                           46)
-                     46 style-map
-                     (elmtui.workbench.completion:completion-style
-                      completion-theme :documentation))))))
-    (values (coerce screen 'list) style-map)))
+  "Return semantic ElmTUI panes. Layout, clipping and painting belong to ElmTUI."
+  (let* ((w (max 1 width)) (h (max 1 height))
+         (body-height (max 0 (- h 3)))
+         (wide (and (>= w 120) show-inspector))
+         (inspector-only (and show-inspector (not wide) (eq focus :inspector)))
+         (main-width (if wide (floor (* w 68) 100) w))
+         (editor-height (min (max 1 body-height) 6 (max 2 (length (%split-lines source))))))
+    (multiple-value-bind (completion-pane completion-height)
+        (%completion-pane main-width completion selected docs completion-theme
+                          (max 0 (- body-height editor-height 2)))
+      (let* ((transcript-height (max 0 (- body-height editor-height (or completion-height 0) 2)))
+             (ordered (reverse transcript))
+             (end (max 0 (- (length ordered) (max 0 scroll)))))
+        (%box :workbench-frame :column w h
+              (list
+               (%text :workbench-header
+                      (format nil " Lisp Workbench  [~A]  ~A" package
+                              (if (eq focus :editor) "REPL" "IMAGE"))
+                      w '(:fg-color :cyan :bold t))
+               (%box :workbench-body :row w body-height
+                     (if inspector-only
+                         (list (%inspector-pane w body-height inspector inspector-section inspector-selected
+                                                inspector-query inspector-query-mode inspector-theme))
+                         (append
+                          (list
+                           (%box :workbench-main :column main-width body-height
+                                 (append
+                                  (list (%text :transcript-title (format nil " Transcript (~D)" (length transcript))
+                                               main-width '(:fg-color :gray :bold t))
+                                        (%box :workbench-transcript :column main-width transcript-height
+                                              (loop for item in (subseq ordered (max 0 (- end transcript-height)) end)
+                                                    for i from 0 collect
+                                                    (%text (list :transcript-line i) (format nil "  ~A" item) main-width))))
+                                  (when (and completion-pane (plusp completion-height)) (list completion-pane))
+                                  (list (%text :editor-separator (make-string main-width :initial-element #\-)
+                                               main-width '(:fg-color :gray))
+                                        (%editor-pane main-width editor-height source cursor (eq focus :editor))))))
+                          (when wide
+                            (list (%text :inspector-divider "|" 1 '(:fg-color :gray))
+                                  (%inspector-pane (max 0 (- w main-width 1)) body-height inspector
+                                                   inspector-section inspector-selected inspector-query
+                                                   inspector-query-mode inspector-theme))))))
+               (%text :workbench-status (format nil " ~A  |  ~D x ~D  |  ~A" status w h focus)
+                      w '(:fg-color :yellow))
+               (%text :workbench-help
+                      (if (eq focus :inspector)
+                          " F2 Editor  Up/Down Select  Tab Section  w Watch  W Watches  / Filter  Esc Editor"
+                          " Ctrl+Enter Eval  Ctrl+Space Complete  F2 Inspector  F3 Docs  F4 Diagnostics  Ctrl+D Exit")
+                      w '(:fg-color :gray))))))))
+
+(defun %row-segments (row spans default)
+  (let ((offset 0) (column 0) (segments nil))
+    (dolist (grapheme (elmtui.view.layout.size-utils:terminal-graphemes row))
+      (let* ((original (car grapheme))
+             (tabp (string= original (string #\Tab)))
+             (cells (if tabp (- 8 (mod column 8)) (cdr grapheme)))
+             (cluster (if tabp (make-string cells :initial-element #\Space) original))
+             (style default))
+        (dolist (span (reverse spans))
+          (when (and (< (first span) (+ offset (length original)))
+                     (> (second span) offset))
+            (setf style (third span))))
+        (if (and segments (equal style (getf (first segments) :style)))
+            (setf (getf (first segments) :content)
+                  (concatenate 'string (getf (first segments) :content) cluster)
+                  (getf (first segments) :width) (+ cells (getf (first segments) :width)))
+            (push (list :content cluster :style style :width cells) segments))
+        (incf column cells)
+        (incf offset (length original))))
+    (nreverse segments)))
 
 (defun frame-dsl (rows width height &key style-map)
-  "Render semantic ASCII color spans as native ElmTUI flex text children.
-Do not pass :WHITE-SPACE here: the low-level terminal renderer accepts it,
-but the public style contract rejects it before layout. Explicit text
-widths preserve the intended single-row presentation without that property.
-Rows containing non-ASCII characters remain single text nodes until the
-framework's display-cell and grapheme geometry can be used end-to-end."
-  (list :container
-        :id :workbench-frame
-        :style (list :display :flex
-                     :flex-direction :column
-                     :width (max 24 width)
-                     :height (max 8 height)
-                     :padding 0 :gap 0)
-        :children
-        (loop for row in rows
-              for row-index from 0
-              for default-style = (if (zerop row-index)
-                                      '(:fg-color :cyan :bold t)
-                                      '(:fg-color :white))
-              for spans = (and style-map
-                               (< row-index (length style-map))
-                               (aref style-map row-index))
-              for segments = (%row-segments row spans default-style)
-              for row-id = (intern (format nil "WB-ROW-~D" row-index)
-                                   :keyword)
+  "Compatibility adapter for styled rows; all geometry uses ElmTUI display cells.
+STYLE-MAP spans use string indices, and style changes inside a grapheme apply to
+its whole cluster. The application uses FRAME-VIEW directly."
+  (%box :workbench-frame :column width height
+        (loop for row in rows for i from 0
+              for default = (if (zerop i) '(:fg-color :cyan :bold t) '(:fg-color :white))
+              for spans = (and style-map (< i (length style-map)) (aref style-map i))
               collect
-              (if (or (<= (length segments) 1)
-                      (not (every (lambda (ch) (< (char-code ch) 128)) row)))
-                  (list :text :id row-id :content row
-                        :style (append (copy-list
-                                        (or (getf (first segments) :style)
-                                            default-style))
-                                       (list :width (length row) :height 1)))
-                  (list :container :id row-id
-                        :style (list :display :flex :flex-direction :row
-                                     :width (length row) :height 1
-                                     :padding 0 :gap 0)
-                        :children
-                        (loop for segment in segments
-                              for index from 0
-                              for content = (getf segment :content)
-                              collect (list :text
-                                            :id (intern (format nil "WB-SEG-~D-~D"
-                                                                row-index index)
-                                                        :keyword)
-                                            :content content
-                                            :style (append
-                                                    (copy-list (getf segment :style))
-                                                    (list :width (length content)
-                                                          :height 1)))))))))
+              (if (null spans)
+                  (%text (list :wb-row i) row
+                         (elmtui.view.layout.size-utils:terminal-string-width row) default)
+                  (%box (list :wb-row i) :row
+                        (elmtui.view.layout.size-utils:terminal-string-width row) 1
+                        (loop for segment in (%row-segments row spans default)
+                              for j from 0 collect
+                              (%text (list :wb-segment i j) (getf segment :content)
+                                     (getf segment :width) (getf segment :style))))))))
+
+(defun frame-lines (&rest options &key (width 80) (height 24) &allow-other-keys)
+  "Compatibility snapshot of FRAME-VIEW rendered by ElmTUI, without terminal I/O.
+Applications should consume FRAME-VIEW; this helper returns text rows only."
+  (let* ((rect (elmtui.view.geo:make-rectangle
+                :pos (elmtui.view.geo:make-pos :x 0 :y 0)
+                :size (elmtui.view.geo:make-size :w width :h height)))
+         (tree (elmtui.view.tree-transforms:process-tree
+                (elmtui.view.base-elements:dsl->objects (apply #'frame-view options))
+                :ctx (elmtui.contracts:make-app-context :viewport-rect rect) :root-rect rect))
+         (buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer width height)))
+    (elmtui.platform.tree-renderer:render-laid-out-tree-to-buffer (list tree) :buffer buffer)
+    (values
+     (loop for row below height collect
+           (with-output-to-string (out)
+             (loop for col below width
+                   for cell = (elmtui.platform.backend.common.virtual-buffer:buffer-cell-at buffer row col)
+                   for ch = (elmtui.platform.backend.common.virtual-buffer:buffer-cell-char cell)
+                   unless (char= ch #\Null)
+                     do (write-string (or (elmtui.platform.backend.common.virtual-buffer:buffer-cell-grapheme cell)
+                                          (string ch)) out))))
+     nil)))

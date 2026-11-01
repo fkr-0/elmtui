@@ -78,7 +78,11 @@ class NativeReplPresentation(unittest.TestCase):
             terminal.wait_for("Lisp Workbench", timeout=30)
             terminal.send_text("(mapc")
             terminal.send_key("C-Space")
-            terminal.wait_for("MAPCAR", timeout=12)
+            completed = terminal.wait_for("MAPCAR", timeout=12)
+            rows = completed.splitlines()
+            popup_row = next(i for i, row in enumerate(rows) if "[ COMPLETION ]" in row)
+            editor_row = next(i for i, row in enumerate(rows) if "> (mapc|" in row)
+            self.assertLess(popup_row, editor_row)
             terminal.send_key("F2")
             terminal.wait_for(
                 lambda view: "IMAGE /" in view and "|  INSPECTOR" in view,
@@ -88,6 +92,33 @@ class NativeReplPresentation(unittest.TestCase):
             for _ in range(5):
                 terminal.send_key("BSpace")
             terminal.wait_for(lambda view: " > |" in view, timeout=12)
+            terminal.send_key("C-d")
+            code, restored = terminal.wait_for_exit(timeout=15)
+            self.assertEqual(0, code)
+            self.assertTrue(restored)
+
+    @unittest.skipUnless(PrivateTmuxPTY.available() and shutil.which("clpm"),
+                         "real private tmux and CLPM required")
+    def test_unicode_cursor_preserves_wide_and_combining_text(self):
+        with PrivateTmuxPTY(
+            ["./scripts/examples.sh", "run", "repl"],
+            cols=80, rows=24, timeout=30,
+        ) as terminal:
+            terminal.wait_for("Lisp Workbench", timeout=30)
+            terminal.send_text("界a")
+            terminal.send_key("Left")
+            terminal.wait_for("> 界|a", timeout=12)
+            terminal.send_key("End")
+            terminal.send_key("BSpace")
+            terminal.send_key("BSpace")
+            terminal.wait_for("> |", timeout=12)
+            terminal.send_text("a\u0301界x")
+            terminal.send_key("Left")
+            terminal.wait_for("> á界|x", timeout=12)
+            terminal.send_key("End")
+            for _ in range(3):
+                terminal.send_key("BSpace")
+            terminal.wait_for("> |", timeout=12)
             terminal.send_key("C-d")
             code, restored = terminal.wait_for_exit(timeout=15)
             self.assertEqual(0, code)
