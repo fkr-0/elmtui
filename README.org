@@ -6,6 +6,59 @@ building terminal user interfaces in Common Lisp. Applications run in the
 normal terminal screen below your prompt, and the terminal and its scrollback
 are restored exactly when they exit.
 
+#+HTML: <table><tr>
+#+HTML: <td width="33%"><img src="website/assets/tmux-glider.gif" alt="Tmux Glider"></td>
+#+HTML: <td width="34%"><img src="website/assets/workbench.gif" alt="Lisp Workbench"></td>
+#+HTML: <td width="33%"><img src="website/assets/neon-tetris.gif" alt="Neon Tetris"></td>
+#+HTML: </tr><tr>
+#+HTML: <td align="center"><em>tmux-glider</em></td>
+#+HTML: <td align="center"><em>workbench</em></td>
+#+HTML: <td align="center"><em>neon-tetris</em></td>
+#+HTML: </tr></table>
+
+#+name: counter-example
+#+begin_src lisp
+(uiop:define-package :counter
+  (:use :cl)
+  (:import-from :elmtui
+                #:defapplication #:make-update-result #:state-ref
+                #:key-pressed-p #:quit-requested-p)
+  (:export #:run-counter))
+(in-package :counter)
+
+(defun initial-state ()
+  (list :count 0 :should-quit nil))
+
+(defun update (message state)
+  (let ((count (state-ref state :count 0)))
+    (cond
+      ((key-pressed-p message :char #\+)
+       (make-update-result :patches `(((:count) ,(1+ count)))))
+      ((key-pressed-p message :char #\-)
+       (make-update-result :patches `(((:count) ,(1- count)))))
+      ((or (key-pressed-p message :char #\q) (quit-requested-p message))
+       (make-update-result :patches '(((:should-quit) t))))
+      (t (make-update-result)))))
+
+(defun view (state)
+  `(:container
+    :id :root
+    :style (:display :block :width 34 :height 3 :padding 1)
+    :children
+    ((:text :id :count
+      :content ,(format nil "Count: ~D   (+/- change, q quits)"
+                        (state-ref state :count 0))))))
+
+(defapplication counter
+  :root-component-dsl '(:root-viewport :id :counter-root
+                        :anchor :below-cursor :height 3
+                        :child-dsl-spec (:view nil))
+  :root-viewport-id :counter-root
+  :initial-state-fn #'initial-state
+  :update-fn #'update
+  :view-fn #'view)
+#+end_src
+
 * Status
 
 #+HTML: <a href="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fkr-0/elmtui/actions/workflows/ci.yml/badge.svg?branch=main"></a>
