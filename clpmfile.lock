@@ -9,8 +9,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :sources
-(:implicit-file :type :file-system :system-files ("elmtui-dev-tests.asd"))
-(:implicit-file :type :file-system :system-files ("elmtui-dev.asd"))
 (:implicit-file :type :file-system :system-files
  ("elmtui-widgets-enhanced-tests.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui-docs.asd"))
@@ -20,6 +18,12 @@
 (:implicit-file :type :file-system :system-files ("elmtui-tests.asd"))
 (:implicit-file :type :file-system :system-files
  ("elmtui-widgets-enhanced.asd"))
+(:implicit-file :type :file-system :system-files ("elmtui-dev-tests.asd"))
+(:implicit-file :type :file-system :system-files ("elmtui-dev.asd"))
+(:implicit-file :type :file-system :system-files
+ ("elmtui-api-contract-tests.asd"))
+(:implicit-file :type :file-system :system-files ("elmtui-core-slim-tests.asd"))
+(:implicit-file :type :file-system :system-files ("elmtui-example-widgets.asd"))
 (:implicit-file :type :file-system :system-files ("elmtui.asd"))
 (:implicit-file :type :file-system :system-files ("cl-state/cl-state.asd"))
 (:implicit-file :type :file-system :system-files ("cl-events/cl-events.asd"))
@@ -37,8 +41,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :requirements
-(:asd-file :name "elmtui-dev-tests.asd")
-(:asd-file :name "elmtui-dev.asd")
 (:asd-file :name "elmtui-widgets-enhanced-tests.asd")
 (:system :name "alexandria" :source "quicklisp")
 (:system :name "bordeaux-threads")
@@ -52,6 +54,11 @@
 (:asd-file :name "elmtui-examples.asd")
 (:asd-file :name "elmtui-tests.asd")
 (:asd-file :name "elmtui-widgets-enhanced.asd")
+(:asd-file :name "elmtui-dev-tests.asd")
+(:asd-file :name "elmtui-dev.asd")
+(:asd-file :name "elmtui-api-contract-tests.asd")
+(:asd-file :name "elmtui-core-slim-tests.asd")
+(:asd-file :name "elmtui-example-widgets.asd")
 (:asd-file :name "elmtui.asd")
 (:asd-file :name "cl-state/cl-state.asd")
 (:asd-file :name "cl-events/cl-events.asd")
@@ -77,12 +84,18 @@
  ("cl-state"))
 ("cl-styles/cl-styles.asd" :version :newest :source :implicit-file :systems
  ("cl-styles" "cl-styles/tests"))
+("elmtui-api-contract-tests.asd" :version :newest :source :implicit-file
+ :systems ("elmtui-api-contract-tests"))
+("elmtui-core-slim-tests.asd" :version :newest :source :implicit-file :systems
+ ("elmtui-core-slim-tests"))
 ("elmtui-dev-tests.asd" :version :newest :source :implicit-file :systems
  ("elmtui-dev-tests"))
 ("elmtui-dev.asd" :version :newest :source :implicit-file :systems
  ("elmtui-dev"))
 ("elmtui-docs.asd" :version :newest :source :implicit-file :systems
  ("elmtui-docs"))
+("elmtui-example-widgets.asd" :version :newest :source :implicit-file :systems
+ ("elmtui-example-widgets"))
 ("elmtui-examples-cli.asd" :version :newest :source :implicit-file :systems
  ("elmtui-examples-cli"))
 ("elmtui-examples.asd" :version :newest :source :implicit-file :systems
@@ -158,13 +171,31 @@
  ((:system :name "cl-styles/tests") (:system :name "cl-styles"))
  (t (:asd-file :name "cl-styles/cl-styles.asd")))
 
-("elmtui-dev-tests.asd" (t (:asd-file :name "elmtui-dev-tests.asd")))
+("elmtui-api-contract-tests.asd"
+ ((:system :name "elmtui-tests") (:system :name "elmtui-api-contract-tests"))
+ (t (:asd-file :name "elmtui-api-contract-tests.asd")))
+
+("elmtui-core-slim-tests.asd"
+ ((:system :name "elmtui-tests") (:system :name "elmtui-core-slim-tests"))
+ (t (:asd-file :name "elmtui-core-slim-tests.asd")))
+
+("elmtui-dev-tests.asd"
+ ((:system :name "elmtui-tests") (:system :name "elmtui-dev-tests"))
+ (t (:asd-file :name "elmtui-dev-tests.asd")))
 
 ("elmtui-dev.asd"
  ((:system :name "elmtui-dev-tests") (:system :name "elmtui-dev"))
  (t (:asd-file :name "elmtui-dev.asd")))
 
 ("elmtui-docs.asd" (t (:asd-file :name "elmtui-docs.asd")))
+
+("elmtui-example-widgets.asd"
+ ((:system :name "elmtui-examples-cli")
+  (:system :name "elmtui-example-widgets"))
+ ((:system :name "elmtui-examples") (:system :name "elmtui-example-widgets"))
+ ((:system :name "elmtui-core-slim-tests")
+  (:system :name "elmtui-example-widgets"))
+ (t (:asd-file :name "elmtui-example-widgets.asd")))
 
 ("elmtui-examples-cli.asd"
  ((:system :name "elmtui-tests") (:system :name "elmtui-examples-cli"))
@@ -195,14 +226,18 @@
  ((:system :name "elmtui-packager") (:system :name "elmtui"))
  ((:system :name "elmtui-examples-cli") (:system :name "elmtui"))
  ((:system :name "elmtui-examples") (:system :name "elmtui"))
+ ((:system :name "elmtui-example-widgets") (:system :name "elmtui"))
  ((:system :name "elmtui-docs") (:system :name "elmtui"))
  ((:system :name "elmtui-dev") (:system :name "elmtui"))
+ ((:system :name "elmtui-api-contract-tests") (:system :name "elmtui"))
  (t (:asd-file :name "elmtui.asd")))
 
 ("fiveam" ((:system :name "fiveam/test") (:system :name "fiveam"))
  ((:system :name "elmtui-widgets-enhanced-tests") (:system :name "fiveam"))
  ((:system :name "elmtui-tests") (:system :name "fiveam"))
  ((:system :name "elmtui-dev-tests") (:system :name "fiveam"))
+ ((:system :name "elmtui-core-slim-tests") (:system :name "fiveam"))
+ ((:system :name "elmtui-api-contract-tests") (:system :name "fiveam"))
  ((:system :name "cl-styles/tests") (:system :name "fiveam"))
  ((:system :name "cl-inputs/tests") (:system :name "fiveam"))
  ((:system :name "cl-inputs/events-tests") (:system :name "fiveam"))
