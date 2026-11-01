@@ -90,7 +90,7 @@
                      (alexandria:plist-hash-table
                       (list :tea-model ht)))))
     (declare (ignore _))
-    (is (eq ht (app-model app-state)))))
+    (is (equalp ht (app-model app-state)))))
 
 ;;; ===================================================================
 ;;; deftea-app initialization with components

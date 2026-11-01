@@ -244,12 +244,14 @@ STOP-FLAG is a cons whose car is checked each iteration."
 (defun %process-reader-thread-fn (process command on-output on-exit sender stop-flag)
   "Read stdout from PROCESS line by line, deliver ON-OUTPUT messages.
 When the process exits, deliver ON-EXIT with the exit code."
-  (let ((pid (ignore-errors
-               #+sbcl (sb-ext:process-pid process)
-               #-sbcl nil))
-        (stream (ignore-errors
-                  #+sbcl (sb-ext:process-output process)
-                  #-sbcl nil)))
+  (let ((pid (handler-case
+                 (#+sbcl sb-ext:process-pid #-sbcl (lambda (p) (declare (ignore p)) nil)
+                  process)
+               (error () nil)))
+        (stream (handler-case
+                    (#+sbcl sb-ext:process-output #-sbcl (lambda (p) (declare (ignore p)) nil)
+                     process)
+                  (error () nil))))
     (unwind-protect
          (when stream
            (handler-case

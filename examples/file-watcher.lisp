@@ -89,7 +89,7 @@
   :initial-state-fn #'%initial-state
   :update-fn #'file-watcher-update
   :view-fn #'file-watcher-view
-  :subscriptions-fn #'file-watcher-subscriptions)
+  :subscriptions-fn file-watcher-subscriptions)
 
 (defun run-file-watcher (&key (backend-type :terminal))
   (run-file-watcher-app :platform backend-type))
