@@ -1,5 +1,5 @@
 (asdf:defsystem "elmtui-dev-tests"
-  :version "0.3.2"
+  :version "0.4.0"
   :description "Diagnostics and benchmarks for optional ElmTUI developer tooling"
   :author "ElmTUI contributors" :license "MIT"
   :depends-on (#:elmtui-dev #:fiveam)

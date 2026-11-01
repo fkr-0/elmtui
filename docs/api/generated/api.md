@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1681 of 1859 bindings documented; 178 have no metadata (90.4% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1680 of 1858 bindings documented; 178 have no metadata (90.4% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -5517,26 +5517,6 @@ Kinds: function
 
 ```text
 Report whether a style value refers to a stylesheet variable.
-```
-
-## ELMTUI:DEV-MAIN
-
-Kinds: function
-
-```text
-Minimal development entrypoint placeholder.
-
-Keep this silent so loading or smoke-running the top-level system does not leak
-accidental debug text into automated test output.
-```
-
-## ELMTUI:USE-VALUE
-
-Kinds: function
-
-```text
-Transfer control and VALUE to a restart named USE-VALUE, or
-return NIL if none exists.
 ```
 
 ## ELMTUI.API:DSL-TYPE
@@ -11575,6 +11555,15 @@ Kinds: function
 Modifies the cell at (ROW, COL) with CHAR and STYLE.
 Signals INVALID-BUFFER-COORDINATES-ERROR if out of bounds.
 Returns the modified BUFFER.
+```
+
+## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:USE-VALUE
+
+Kinds: function
+
+```text
+Transfer control and VALUE to a restart named USE-VALUE, or
+return NIL if none exists.
 ```
 
 ## ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER:VIRTUAL-TERMINAL-BUFFER

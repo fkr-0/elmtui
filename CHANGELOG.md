@@ -6,6 +6,54 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+## [0.4.0] - 2026-11-01
+
+Breaking release that finishes the API review's export cleanup. Every exported
+ElmTUI symbol now names a binding (or a registered message/model schema), and
+the release gate keeps it so.
+
+### Changed (breaking)
+
+- The root `elmtui` package is a curated facade of the application API. It
+  imports and exports `defapplication`, `deftea-app`, `make-update-result`,
+  `state-ref`, `key-pressed-p`, `quit-requested-p`, `key-event`,
+  `key-event-p`, `key-event-key`, `key-event-char`, `key-event-modifiers`,
+  `dark-theme` and `light-theme`. Until now it used UIOP `:reexport`, which
+  exports by name only, so 127 of its 128 own exports (`elmtui:button`,
+  `elmtui:vbox`, `elmtui:with-terminal-lock`, ...) were fresh, unbound symbols;
+  those are gone, as is the re-exported `cl:use-value`.
+- Removed `elmtui:dev-main` (a silent placeholder; use `elmtui.dev:dev-main`)
+  and the `elmtui` system's program-op entry point that named it.
+- Removed 88 exported names that had no definition: `defmsg`'s
+  `<variant>-p` names (use the defined `<variant>-<message>-p` predicates),
+  `elmtui.state.msg:statechangemsg`, `elmtui.state.model:transaction-source`,
+  `elmtui.view.core:{accessible-p container get-prop has-prop-p hbox
+  merge-props remove-prop set-prop text update-children update-props vbox
+  widget}`, nine `elmtui.pipeline` stage names, eight `elmtui.view.geo` shape
+  names, six canvas names in `elmtui.platform.backend.terminal`, six
+  `elmtui.core.defaults` names, five `elmtui.view.styled` names,
+  `elmtui.ui.api:{add-command add-patch get-property layout-node}`,
+  `elmtui.view.api:{layout-view resolve-view stylable-id}`, and
+  `property-exists-p`, `make-scrollable-container-model`,
+  `compute-anchor-offset`, `make-listbox-model`, `grid-container`,
+  `request-stop-input-reader`, `clip-coordinates`, `terminal-color-kv`,
+  `with-terminal-output`, `interrupt-payload`, `message-p` and
+  `elmtui.backend.urxvt:initialize-backend`.
+
+### Migration
+
+- Code that used `elmtui:` names other than the 13 above was calling unbound
+  functions; use the defining packages (for example
+  `elmtui.platform.backend.terminal:with-terminal-lock`), whose symbols are
+  unchanged.
+- Replace `<variant>-p` message predicates with `<variant>-<message>-p`, e.g.
+  `keyevent-appmsg-p`.
+
+### Added
+
+- The `api_bindings` release gate allows no unbound exports; the audit
+  recognises symbol macros and registered message/model schema names.
+
 ## [0.3.2] - 2026-11-01
 
 ### Fixed

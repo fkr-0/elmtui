@@ -471,7 +471,7 @@
   t)
 
 (defmethod backend-name ((instance terminal-instance)) "Standard Terminal Backend")
-(defmethod backend-version ((instance terminal-instance)) "0.3.2")
+(defmethod backend-version ((instance terminal-instance)) "0.4.0")
 
 ;;;---------------------------------------------------------------
 ;;; Resize Handling

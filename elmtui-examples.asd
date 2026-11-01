@@ -1,6 +1,6 @@
 ;; Examples in a separate system to keep core load time minimal
 (asdf:defsystem "elmtui-examples"
-  :version "0.3.2"
+  :version "0.4.0"
   :description "ElmTUI maintained example applications"
   :author "ElmTUI contributors"
   :license "MIT"
