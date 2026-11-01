@@ -1,7 +1,7 @@
 ;;;; elmtui.view.api  ---  Public View-Pipeline Abstractions      -*- Lisp -*-
 ;;;
 ;;; This file is part of the *ElmTUI* project.
-;;; License: MIT  •  Version: 0.3.0  •  2025-06-05
+;;; License: MIT  •  Version: 0.3.1  •  2025-06-05
 ;;;
 ;;; This package defines:
 ;;;   • Generic functions constituting the canonical View-pipeline

@@ -21,9 +21,9 @@ public-docstring coverage metric. Generate the linked local
 trusted default-branch CI verification. See
 [[file:docs/reviews/coverage-improvement-20261026.md][coverage qualification evidence and limitations]].
 
-ElmTUI's main and examples ASDF systems declare =0.3.0=. Existing
+ElmTUI's main and examples ASDF systems declare =0.3.1=. Existing
 release tags (such as =v0.2.0=) are immutable and are never moved; a
-=v0.3.0= tag is cut only after the release gate passes on the final
+=v0.3.1= tag is cut only after the release gate passes on the final
 commit. The optional Workbench ASDF system still declares =0.1.0=;
 that component version is distinct and requires a packaging decision before
 public tagging. See the release checklist for the remaining gates.

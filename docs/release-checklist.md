@@ -1,4 +1,4 @@
-# ElmTUI 0.3.0 release checklist
+# ElmTUI 0.3.1 release checklist
 
 ## 2026-10-27 E5 release gate (supersedes earlier readiness assertions)
 
@@ -44,13 +44,13 @@ or outside tmux. They require the `tmux` binary and fail (never skip) without it
 
 ## Metadata and licensing
 
-- [x] Root ASDF version is `0.3.0`.
+- [x] Root ASDF version is `0.3.1`.
 - [x] Current root ASDF metadata and `LICENSE` identify **MIT**; all four reusable libraries are also MIT. Historic GPL-3.0-only ElmTUI revisions keep their earlier grants. Source/provenance/third-party attribution review remains a separate publication gate.
 - [x] Reusable library license identifiers are `MIT`.
 - [x] Placeholder author and maintainer values are removed.
 - [x] The fake source-control URL is removed.
 - [x] Root and reusable-library license texts are present.
-- [x] `CHANGELOG.md` contains a `0.3.0` release section.
+- [x] `CHANGELOG.md` contains a `0.3.1` release section.
 - [ ] Replace `Unreleased` with the publication date.
 - [x] Root `origin` points to the public `fkr-0/elmtui` GitHub repository.
 - [ ] Verify final source-control/homepage metadata and every submodule gitlink from an independent public clone; pinned `cl-inputs` `ea45ee1b` and `cl-state` `f95baab3` are **not yet available** from their public upstreams.

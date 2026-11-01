@@ -1,5 +1,5 @@
 (asdf:defsystem "elmtui-api-contract-tests"
-  :version "0.3.0"
+  :version "0.3.1"
   :description "Public ElmTUI utility contract regressions"
   :license "MIT"
   :depends-on (#:elmtui #:fiveam)

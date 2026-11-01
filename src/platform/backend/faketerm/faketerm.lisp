@@ -102,7 +102,7 @@
   "FakeTerm")
 
 (defmethod backend-version ((instance faketerm-instance))
-  "0.3.0")
+  "0.3.1")
 
 (defmethod elmtui.platform.api:backend-input-device ((instance faketerm-instance))
   (faketerm-instance-device instance))

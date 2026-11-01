@@ -56,7 +56,7 @@ clpm bundle exec --with-client sbcl -- \
 
 ## Explore the Workbench
 
-The flagship [Common Lisp Workbench](workbench.md) is a separately loadable terminal IDE / REPL. Its 0.3.0 release qualification is still underway.
+The flagship [Common Lisp Workbench](workbench.md) is a separately loadable terminal IDE / REPL. Its 0.3.1 release qualification is still underway.
 
 ```sh
 clpm bundle exec --with-client sbcl -- \
