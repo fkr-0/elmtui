@@ -18,8 +18,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "docs/architecture/facade-reexports.tsv"
 PREFIXES = ("ELMTUI", "CL-EVENTS", "CL-STATE", "CL-INPUTS", "CL-STYLES")
-LEGACY = {("ELMTUI", "COMMON-LISP", "USE-VALUE"),
-          ("ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER", "COMMON-LISP", "USE-VALUE")}
+LEGACY = {("ELMTUI.PLATFORM.BACKEND.COMMON.VIRTUAL-BUFFER", "COMMON-LISP", "USE-VALUE")}
 COLUMNS = ("exporter", "home", "symbol", "home_status", "identity", "review_status")
 LISP = r"""
 (require :asdf)

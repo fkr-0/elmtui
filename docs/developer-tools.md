@@ -29,8 +29,8 @@ clpm bundle exec --with-client sbcl
 | `elmtui.dev.benchmark:compare-benchmark-results` | Compare like-named, measurable rates | Ratio, comparison status and pass flag |
 | `elmtui.dev.benchmark:write-benchmark-baseline` / `read-benchmark-baseline` | Save/load local benchmark data | One readable Lisp value; reader evaluation disabled on input |
 
-The root `elmtui:dev-main` is a separate, silent compatibility entry point.
-Use `elmtui.dev:dev-main` for the actual diagnostics.
+Use `elmtui.dev:dev-main` for diagnostics. (The silent root placeholder
+`elmtui:dev-main` was removed in 0.4.0.)
 
 ## Capture runtime diagnostics
 

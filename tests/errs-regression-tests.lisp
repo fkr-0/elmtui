@@ -32,11 +32,15 @@
 (defun %patch-value-for (patches path)
   (second (find path patches :key #'first :test #'equal)))
 
-(test top-level-dev-main-is-silent
-  "The exported development entrypoint must not leak placeholder debug text."
-  (let ((output (with-output-to-string (*standard-output*)
-                  (elmtui:dev-main))))
-    (is (string= "" output))))
+(test root-package-exports-only-bound-framework-symbols
+  "The root ELMTUI facade exports the framework's own, bound symbols."
+  (is (eq 'elmtui:defapplication 'elmtui.app:defapplication))
+  (is (eq 'elmtui:state-ref 'elmtui.state.api:state-ref))
+  (do-external-symbols (symbol :elmtui)
+    (is (not (eq (symbol-package symbol) (find-package :elmtui)))
+        "~S is a fresh ELMTUI symbol, not a framework one" symbol)
+    (is (or (fboundp symbol) (boundp symbol) (find-class symbol nil))
+        "~S is exported but unbound" symbol)))
 
 (test drawable-content-update-accepts-standard-update-argument-order
   (let* ((component (make-drawable-content :id :content))

@@ -1,34 +1,36 @@
+;;;; elmtui.lisp: the root ELMTUI package, a curated facade of the
+;;;; application API.
+;;;;
+;;;; Every name exported here is the framework's own symbol (imported, not
+;;;; re-interned), so ELMTUI:DEFAPPLICATION is ELMTUI.APP:DEFAPPLICATION.
+;;;; Until 0.4.0 this package used UIOP :REEXPORT over eight packages, which
+;;;; only exports by name: it exported 127 fresh, unbound symbols. Extension
+;;;; and backend APIs live in their own packages (ELMTUI.UI.*, ELMTUI.PLATFORM.*,
+;;;; ELMTUI.STATE.API, ...); see docs/architecture/api-support-levels.md.
+
 (uiop:define-package :elmtui
-  (:use :cl
-   
-        :elmtui.style.presets )
-  ;; Removed all old widget exports (:button-widget, :label-widget, :input-widget, :form-widget, :list-widget)
-  (:export :dark-theme :light-theme) ; Export themes or other top-level items
-  (:nicknames :elmtui)
-  ;; Added re-export for all new widget packages
-  (:reexport 
-   :elmtui.view.core
-             :elmtui.platform.input
-   :elmtui.platform.driver
-             :elmtui.platform.backend.terminal
-   :elmtui.platform.backend.common.virtual-buffer
-             :elmtui.ui.widgets.button      ; Re-export new button symbols
-   :elmtui.ui.widgets.label       ; Re-export new label symbols
-             :elmtui.ui.widgets.textinput   ; Re-export new textinput symbols
-             ;; :elmtui.ui.widgets.form        ; Re-export new form symbols
-             ;; :elmtui.ui.widgets.listbox
-             ;;           :elmtui.examples.boxes-app :elmtui.examples.keymap-app
-             ;;           :elmtui.examples.colortext-app
-             ;; :elmtui.examples.rainbow-app
-             )    ; Re-export new listbox symbols
+  (:use :cl)
+  (:documentation "The ElmTUI application API.
 
-  (:export :message
-   :cmd :send-message :dev-main))
-
-(in-package :elmtui)
-(defun dev-main ()
-  "Minimal development entrypoint placeholder.
-
-Keep this silent so loading or smoke-running the top-level system does not leak
-accidental debug text into automated test output."
-  nil)
+Define an application with DEFAPPLICATION (patch-based updates) or DEFTEA-APP
+(direct model replacement). Update functions read state with STATE-REF,
+return MAKE-UPDATE-RESULT, and recognise input with KEY-PRESSED-P and
+QUIT-REQUESTED-P or the KEY-EVENT accessors.")
+  (:import-from :elmtui.app
+                #:defapplication #:key-pressed-p #:quit-requested-p)
+  (:import-from :elmtui.app.tea-core #:deftea-app)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.core.event-types
+                #:key-event #:key-event-p #:key-event-key #:key-event-char
+                #:key-event-modifiers)
+  (:import-from :elmtui.style.presets #:dark-theme #:light-theme)
+  (:export
+   ;; Defining applications
+   #:defapplication #:deftea-app
+   ;; Update functions
+   #:make-update-result #:state-ref
+   #:key-pressed-p #:quit-requested-p
+   #:key-event #:key-event-p #:key-event-key #:key-event-char
+   #:key-event-modifiers
+   ;; Style presets
+   #:dark-theme #:light-theme))
