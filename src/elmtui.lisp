@@ -19,18 +19,23 @@ QUIT-REQUESTED-P or the KEY-EVENT accessors.")
   (:import-from :elmtui.app
                 #:defapplication #:key-pressed-p #:quit-requested-p)
   (:import-from :elmtui.app.tea-core #:deftea-app)
-  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.state.api #:make-update-result #:state-ref
+                #:patch #:patch* #:quit-result)
   (:import-from :elmtui.core.event-types
                 #:key-event #:key-event-p #:key-event-key #:key-event-char
-                #:key-event-modifiers)
+                #:key-event-modifiers #:key-event-parts)
+  (:import-from :elmtui.core.async #:cmd-async)
   (:import-from :elmtui.style.presets #:dark-theme #:light-theme)
   (:export
    ;; Defining applications
    #:defapplication #:deftea-app
    ;; Update functions
    #:make-update-result #:state-ref
+   #:patch #:patch* #:quit-result
    #:key-pressed-p #:quit-requested-p
    #:key-event #:key-event-p #:key-event-key #:key-event-char
-   #:key-event-modifiers
+   #:key-event-modifiers #:key-event-parts
+   ;; Async commands
+   #:cmd-async
    ;; Style presets
    #:dark-theme #:light-theme))

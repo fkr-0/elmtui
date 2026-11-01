@@ -85,6 +85,8 @@
    #:command-event-args
    #:command-event-source
    #:command-event-timestamp
+   ;; Key-event convenience
+   #:key-event-parts
    ;; Validation and normalization functions
    #:valid-key-event-p
    #:valid-mouse-event-p
@@ -143,6 +145,27 @@
   (args nil)
   (source nil)
   (timestamp (get-internal-real-time) :type integer))
+
+;;;-----------------------------------------------------------------------------
+;;; Key-event convenience
+;;;-----------------------------------------------------------------------------
+
+(defun key-event-parts (message)
+  "Extract key event components from MESSAGE.
+Returns (values KEY CHAR MODIFIERS) for key events, or (values NIL NIL NIL)
+otherwise.  Handles both key-event structs and legacy (:keyevent ...) plist
+messages."
+  (cond
+    ((key-event-p message)
+     (values (key-event-key message)
+             (key-event-char message)
+             (key-event-modifiers message)))
+    ((and (consp message) (eq (first message) :keyevent))
+     (let ((plist (rest message)))
+       (values (getf plist :key)
+               (getf plist :char)
+               (getf plist :modifiers))))
+    (t (values nil nil nil))))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Validation and normalization functions

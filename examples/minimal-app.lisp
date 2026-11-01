@@ -1,15 +1,14 @@
 (uiop:define-package :elmtui.examples.minimal
   (:use :cl :log4cl)
-  (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
-  (:import-from :elmtui.core.event-types #:key-event)
+  (:import-from :elmtui.app.tea-core #:deftea-app)
+  (:import-from :elmtui.core.event-types
+                #:key-event #:key-event-parts)
   (:export #:run-minimal))
 
 (in-package :elmtui.examples.minimal)
 
-(defun minimal-view (state)
-
-  (let ((key (or (state-ref state :last-key) "-")))
+(defun minimal-view (model)
+  (let ((key (or (getf model :last-key) "-")))
     `(:container
        :id :root
        :style (:display :block :width 20 :height 3
@@ -19,36 +18,25 @@
        ((:text :id :label
           :content ,(format nil "Hello ~A" key))))))
 
-(defun minimal-update (msg app-state)
-  (declare (ignore app-state))
+(defun minimal-transition (msg model)
+  (multiple-value-bind (key char _mods) (key-event-parts msg)
+    (declare (ignore _mods))
+    (cond
+      ((or key char)
+       (let ((ch (or char key)))
+         (values (list* :last-key (if (characterp ch) (char-upcase ch) ch)
+                        model)
+                 nil)))
+      (t (values model nil)))))
 
-  (cond
-    ((and (consp msg) (eq (car msg) :keyevent))
-      (let ((ch (getf (cdr msg) :key "whoops")))
+(defun minimal-init ()
+  (values (list :last-key "slurp") nil))
 
-
-        (make-update-result :patches
-          `(((:last-key) ,(if (characterp ch) (char-upcase ch) ch))))))
-    ((typep msg 'key-event)
-      (let* ((ch (or (elmtui.core.event-types:key-event-char msg)
-                   (elmtui.core.event-types:key-event-key msg))))
-
-        (make-update-result :patches `(((:last-key) ,(if (characterp ch) (char-upcase ch) ch))))))
-    ((and (listp msg) (eq (first msg) :app-quit-requested))
-      (progn
-
-        (make-update-result :patches '(((:should-quit) t)))))
-    (t (make-update-result))))
-
-(defun %minimal-initial-state ()
-  (list :should-quit nil :last-key "slurp"))
-
-(defapplication minimal
-  :root-component-dsl
-  '(:root-viewport :id :minimal-root :anchor :below-cursor :height 3
-    :child-dsl-spec (:view nil))
-  :view-fn #'minimal-view
-  :update-fn #'minimal-update
+(deftea-app minimal
+  :init   #'minimal-init
+  :transition #'minimal-transition
+  :view   #'minimal-view
   :root-viewport-id :minimal-root
-  :initial-state-fn #'%minimal-initial-state)
+  :anchor :below-cursor
+  :height 3)
 

@@ -69,6 +69,7 @@
                                (:file "examples-smoke-tests")
                                (:file "wifi-inline-tests")
                                (:file "integration-adapters-tests")
+                               (:file "api-ergonomics-tests")
                                (:file "async-tests")
                                (:file "event-pipeline-tests")
                                (:file "style-tests")

@@ -438,15 +438,24 @@ Example:
   (let ((known '(:root-component-dsl :initial-state-plist :initial-state-fn
                   :update-fn :view-fn :command-processor-fn
                   :subscriptions-fn :root-viewport-id :platform-options
-                  :state-semantics
+                  :state-semantics :handle-quit
+                  :anchor :height
                   :binary :cli-options :args :configure-fn)))
     (multiple-value-bind (kw-plist other-keys) (%split-known-keys args known)
       (let* (;; Required
-                                        ; Should be the DSL form itself
               (root-vp-id (%kw (%required kw-plist :root-viewport-id name)))
-              (root-dsl   `,(maybe-wrap-with-root-viewport
-                              (%required kw-plist :root-component-dsl name)
-                              :root-id root-vp-id))
+              ;; Optional viewport defaults
+              (anchor (getf kw-plist :anchor :below-cursor))
+              (vp-height (getf kw-plist :height nil))
+              (handle-quit (getf kw-plist :handle-quit t))
+              ;; Root DSL: explicit wins; otherwise generate from anchor/height
+              (explicit-dsl (getf kw-plist :root-component-dsl nil))
+              (root-dsl (if explicit-dsl
+                            (maybe-wrap-with-root-viewport
+                              explicit-dsl :root-id root-vp-id)
+                            `'(:root-viewport :id ,root-vp-id :anchor ,anchor
+                              ,@(when vp-height `(:height ,vp-height))
+                              :child-dsl-spec (:view nil))))
               ;; Optional
               (initial-state-plist (getf kw-plist :initial-state-plist '()))
               (initial-state-fn (getf kw-plist :initial-state-fn nil))
@@ -609,6 +618,17 @@ Example:
                              :app-state state
                              :dispatch-fn #'dispatch))))
                   (values state nil))
+
+                 ;; -------------------------------------------------------------
+                 ;; Default quit handling (when :handle-quit is true)
+                 ;; -------------------------------------------------------------
+                 ,@(when handle-quit
+                     `(((quit-requested-p msg)
+                        (let* ((quit-ur (elmtui.state.api:quit-result))
+                               (next-state
+                                 (%commit-state-patches
+                                   state (ur-patches quit-ur) state-semantics)))
+                          (values next-state (ur-commands quit-ur))))))
 
                  ;; -------------------------------------------------------------
                  ;; Handle all other messages via the app's update function

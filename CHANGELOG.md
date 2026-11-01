@@ -6,6 +6,19 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+### Added
+
+- `patch` and `patch*` convenience constructors for flat-key update results.
+- `quit-result` shorthand for the universal quit response.
+- `key-event-parts` unified key-event destructuring (handles both struct and legacy plist forms).
+- `cmd-async` now exported from the `elmtui` facade package.
+- `defapplication` and `deftea-app` accept `:handle-quit` (default `t`) for automatic quit handling.
+- `defapplication` accepts `:anchor` and `:height` directly, generating the root viewport DSL when `:root-component-dsl` is omitted.
+
+### Changed
+
+- Migrated simple examples to `deftea-app` to demonstrate the minimal application constructor.
+
 ## [0.4.1] - 2026-11-01
 
 ### Documentation

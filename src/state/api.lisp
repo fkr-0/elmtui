@@ -31,6 +31,9 @@
     #:ur-has-command-p
     #:ur-add-command
     #:*update-contracts*
+    #:patch
+    #:patch*
+    #:quit-result
     #:plist-to-application-state
     #:pprinc-application-state))
 
@@ -126,3 +129,26 @@ callers can inspect the function designator, reason, and original values."
       :patches (append ctx-patches extra-patches)
       :commands (append ctx-commands extra-commands)
       :handled handled)))
+
+;;; ---------------------------------------------------------------------------
+;;; Convenience constructors
+;;; ---------------------------------------------------------------------------
+
+(defun patch (&rest key-value-pairs)
+  "Build an update-result from flat KEY VALUE pairs.
+Each KEY names a top-level state slot; VALUE is its new value.
+For nested paths or commands, use MAKE-UPDATE-RESULT directly."
+  (make-update-result
+    :patches (loop for (k v) on key-value-pairs by #'cddr
+                   collect (list (list k) v))))
+
+(defun patch* (key-value-plist &key commands)
+  "Like PATCH but also accepts :COMMANDS."
+  (make-update-result
+    :patches (loop for (k v) on key-value-plist by #'cddr
+                   collect (list (list k) v))
+    :commands commands))
+
+(defun quit-result ()
+  "Return an update-result that signals application shutdown."
+  (make-update-result :patches '(((:should-quit) t))))

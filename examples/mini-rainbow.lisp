@@ -7,11 +7,10 @@
 
 (uiop:define-package :elmtui.examples.mini-rainbow
   (:use :cl :alexandria :log4cl)
-  (:import-from :elmtui.app #:defapplication)
+  (:import-from :elmtui.app.tea-core #:deftea-app)
   (:import-from :cl-styles.api #:rgb #:defrule #:defstylesheet #:cls> #:type>)
   (:import-from :elmtui.core.event-types
-                #:key-event #:key-event-key #:key-event-char #:key-event-type)
-  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+                #:key-event #:key-event-parts)
   (:export #:run-mini-rainbow))
 
 (in-package :elmtui.examples.mini-rainbow)
@@ -85,42 +84,19 @@
     )
 
   "Stylesheet for the rainbow application.")
-(defun app-update (message app-state)
-  (labels ((quit-result ()
-             (make-update-result :patches '(((:should-quit) t)))))
-    (flet ((handle-key (key ch type)
-             (declare (ignore type))
-
-             (cond
-               ((or (member key '(:escape :q :Q))
-                    (member ch '(#\q #\Q)))
-                (quit-result))
-               ((or (eq key :space) (eql ch #\Space))
-                (let* ((current (state-ref app-state :orientation :row))
-                       (next (if (eq current :row) :column :row)))
-                  (make-update-result :patches `(((:orientation) ,next)))))
-               (t (make-update-result)))))
-      (cond
-        ((and (listp message) (eq (first message) :app-quit-requested))
-         (quit-result))
-        ((and (listp message) (eq (first message) :keyevent))
-         (let* ((payload (rest message))
-                (key (getf payload :key))
-                (char (or (getf payload :char)
-                          (let ((event (getf payload :event)))
-                            (when (typep event 'key-event)
-                              (key-event-char event)))))
-                (event (getf payload :event))
-                (etype (if (typep event 'key-event)
-                         (key-event-type event)
-                         :keyevent)))
-           (handle-key key char etype)))
-        ((typep message 'key-event)
-         (handle-key (key-event-key message)
-                     (key-event-char message)
-                     (key-event-type message)))
-        (t
-         (make-update-result))))))
+(defun app-transition (message model)
+  "Direct model-replacement transition for mini-rainbow."
+  (multiple-value-bind (key char _mods) (key-event-parts message)
+    (declare (ignore _mods))
+    (cond
+      ((or (member key '(:escape :q :Q))
+           (member char '(#\q #\Q)))
+       (values (list* :should-quit t model) nil))
+      ((or (eq key :space) (eql char #\Space))
+       (let* ((current (getf model :orientation :row))
+              (next (if (eq current :row) :column :row)))
+         (values (list* :orientation next model) nil)))
+      (t (values model nil)))))
 
 (defun rainbow-terminal-depth ()
   "Use RGB only when advertised; otherwise use 256 or basic terminal colors."
@@ -138,9 +114,9 @@
     (:indexed (list :256 (nth index '(196 208 226 46 27 54 201))))
     (:basic (nth index '(:red :yellow :white :green :blue :cyan :magenta)))))
 
-(defun view (state)
+(defun view (model)
   "Small deterministic rainbow with individually colored visible text runs."
-  (let ((orientation (state-ref state :orientation :row))
+  (let ((orientation (getf model :orientation :row))
         (palette '((:rgb 255 75 94) (:rgb 255 160 79) (:rgb 255 225 99)
                    (:rgb 88 220 150) (:rgb 65 175 255) (:rgb 135 118 255)
                    (:rgb 221 111 232))))
@@ -167,21 +143,16 @@
                                      :height 1
                                      :width ,(if (eq orientation :row) 7 48)))))))))
 
-(defun %mini-rainbow-initial-state ()
-  (list :current-stylesheet nil
-        :should-quit nil
-        :orientation :row
-        :switch-count 0))
+(defun mini-rainbow-init ()
+  (values (list :current-stylesheet nil
+                :orientation :row
+                :switch-count 0)
+          nil))
 
-(defapplication mini-rainbow
-  :root-component-dsl
-  '(:root-viewport :id :root :anchor :below-cursor :width 54 :height 12 :blank-on-exit t :child-dsl-spec (:view nil))
-  :update-fn 'app-update
-  ;; :stylesheet rainbow-stylesheet
-  :view-fn #'view
+(deftea-app mini-rainbow
+  :init       #'mini-rainbow-init
+  :transition #'app-transition
+  :view       #'view
   :root-viewport-id :root
-  :initial-state-fn #'%mini-rainbow-initial-state)
-
-;; (defun run-mini-rainbow ()
-;;   "Run the mini-rainbow example."
-;;   (elmtui.app.api:run-application (make-instance 'mini-rainbow)))
+  :anchor     :below-cursor
+  :height     12)

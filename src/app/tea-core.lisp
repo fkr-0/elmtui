@@ -41,7 +41,8 @@ Signals an error for all other types."
                        command-processor
                        (root-viewport-id :root-viewport)
                        (anchor :below-cursor)
-                       height)
+                       height
+                       (handle-quit t))
   "Define a supported minimal direct-transition TEA application and RUN-NAME.
 
 DEFTEA-APP is intentionally the small/pedagogical constructor, not the normative
@@ -66,7 +67,8 @@ Syntax:
       :command-processor  CMD-FN
       :root-viewport-id   ROOT-ID
       :anchor             ANCHOR      ; default :BELOW-CURSOR
-      :height             ROWS)       ; default: sized by the content
+      :height             ROWS        ; default: sized by the content
+      :handle-quit        BOOL)       ; default T; auto-handle :APP-QUIT-REQUESTED
 
 Required arguments:
 
@@ -253,6 +255,7 @@ Contracts / validation:
          :view-fn ',tea-view
          :subscriptions-fn ,tea-subscriptions
          ,@(when command-processor `(:command-processor-fn ,command-processor))
+         :handle-quit ,handle-quit
          :state-semantics :strict-elm)
 
        ;; --------------------------------------------------------------

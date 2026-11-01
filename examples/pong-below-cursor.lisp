@@ -1,14 +1,13 @@
 (uiop:define-package :elmtui.examples.pong-below-cursor
   (:use :cl :log4cl)
   (:import-from :alexandria #:clamp)
-  (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.app.api #:run-application)
-  (:import-from :elmtui.core.event-types #:key-event #:key-event-key)
-  (:import-from :elmtui.state.api #:state-ref #:make-update-result)
+  (:import-from :elmtui.app.tea-core #:deftea-app)
+  (:import-from :elmtui.core.event-types
+                #:key-event #:key-event-key #:key-event-parts)
   (:export #:run-pong-below-cursor
-           #:pong-update
+           #:pong-transition
            #:pong-view
-           #:%initial-state))
+           #:pong-init))
 
 (in-package :elmtui.examples.pong-below-cursor)
 
@@ -16,32 +15,35 @@
 (defconstant +field-height+ 7)
 (defconstant +paddle-half-width+ 2)
 
-(defun %initial-state ()
-  (list :ball-x 20
-        :ball-y 2
-        :vel-x 1
-        :vel-y 1
-        :paddle-x 20
-        :score 0
-        :should-quit nil))
+(defun pong-init ()
+  (values (list :ball-x 20
+                :ball-y 2
+                :vel-x 1
+                :vel-y 1
+                :paddle-x 20
+                :score 0)
+          nil))
 
-(defun %quit-result ()
-  (make-update-result :patches '(((:should-quit) t))))
-
-(defun %move-paddle (state delta)
-  (let* ((current (state-ref state :paddle-x 20))
+(defun %move-paddle (model delta)
+  (let* ((current (getf model :paddle-x 20))
          (next (clamp (+ current delta)
                       +paddle-half-width+
                       (- (1- +field-width+) +paddle-half-width+))))
-    (make-update-result :patches `(((:paddle-x) ,next)))))
+    (values (list :ball-x (getf model :ball-x)
+                  :ball-y (getf model :ball-y)
+                  :vel-x (getf model :vel-x)
+                  :vel-y (getf model :vel-y)
+                  :paddle-x next
+                  :score (getf model :score))
+            nil)))
 
-(defun %tick-update (state)
-  (let* ((x (state-ref state :ball-x 20))
-         (y (state-ref state :ball-y 2))
-         (vx (state-ref state :vel-x 1))
-         (vy (state-ref state :vel-y 1))
-         (paddle-x (state-ref state :paddle-x 20))
-         (score (state-ref state :score 0))
+(defun %tick-update (model)
+  (let* ((x (getf model :ball-x 20))
+         (y (getf model :ball-y 2))
+         (vx (getf model :vel-x 1))
+         (vy (getf model :vel-y 1))
+         (paddle-x (getf model :paddle-x 20))
+         (score (getf model :score 0))
          (next-x (+ x vx))
          (next-y (+ y vy))
          (next-vx vx)
@@ -60,31 +62,38 @@
                 score (1+ score))
           (setf lost t)))
     (if lost
-        (%quit-result)
-        (make-update-result :patches `(((:ball-x) ,next-x)
-                                       ((:ball-y) ,next-y)
-                                       ((:vel-x) ,next-vx)
-                                       ((:vel-y) ,next-vy)
-                                       ((:score) ,score))))))
+        (values (list* :should-quit t model) nil)
+        (values (list :ball-x next-x
+                      :ball-y next-y
+                      :vel-x next-vx
+                      :vel-y next-vy
+                      :paddle-x paddle-x
+                      :score score)
+                nil))))
 
-(defun pong-update (message app-state)
-  (cond
-    ((typep message 'key-event)
-     (let ((key (key-event-key message)))
-       (cond
-         ((member key '(:escape #\q #\Q #\Escape) :test #'eql) (%quit-result))
-         ((member key '(:arrow-left :left #\h #\H) :test #'eql) (%move-paddle app-state -1))
-         ((member key '(:arrow-right :right #\l #\L) :test #'eql) (%move-paddle app-state 1))
-         (t (make-update-result)))))
-    ((or (eql message :tick) (and (consp message) (eq (first message) :tick))) (%tick-update app-state))
-    ((and (consp message) (eq (first message) :app-quit-requested)) (%quit-result))
-    (t (make-update-result))))
+(defun pong-transition (message model)
+  ;; Timer ticks arrive as non-key messages; check them first.
+  (when (or (eql message :tick)
+            (and (consp message) (eq (first message) :tick)))
+    (return-from pong-transition (%tick-update model)))
+  (multiple-value-bind (key char _mods) (key-event-parts message)
+    (declare (ignore _mods))
+    (cond
+      ((or (member key '(:escape :esc) :test #'eq)
+           (member char '(#\q #\Q)))
+       (values (list* :should-quit t model) nil))
+      ((or (member key '(:arrow-left :left) :test #'eq)
+           (member char '(#\h #\H)))
+       (%move-paddle model -1))
+      ((or (member key '(:arrow-right :right) :test #'eq)
+           (member char '(#\l #\L)))
+       (%move-paddle model 1))
+      (t (values model nil)))))
 
-
-(defun %field-lines (state)
-  (let* ((ball-x (state-ref state :ball-x 0))
-         (ball-y (state-ref state :ball-y 0))
-         (paddle-x (state-ref state :paddle-x 20))
+(defun %field-lines (model)
+  (let* ((ball-x (getf model :ball-x 0))
+         (ball-y (getf model :ball-y 0))
+         (paddle-x (getf model :paddle-x 20))
          (rows (loop for _ from 0 below (1+ +field-height+)
                      collect (make-string +field-width+ :initial-element #\Space))))
     (when (and (<= 0 ball-y) (< ball-y (length rows))
@@ -96,8 +105,8 @@
             do (setf (char paddle-row x) #\=)))
     rows))
 
-(defun pong-view (state)
-  (let ((score (state-ref state :score 0)))
+(defun pong-view (model)
+  (let ((score (getf model :score 0)))
     `(:container
        :id :pong-content
        :style (:display :flex :flex-direction :column :width 60 :height 12 :padding 0)
@@ -105,24 +114,20 @@
        ((:text :content ,(format nil "pong | score: ~D" score))
         (:text :content "controls: left/right or h/l | q to quit")
         (:text :content ,(format nil "+~A+" (make-string +field-width+ :initial-element #\-)))
-        ,@(loop for row in (%field-lines state)
+        ,@(loop for row in (%field-lines model)
                 collect `(:text :content ,(format nil "|~A|" row)))
         (:text :content ,(format nil "+~A+" (make-string +field-width+ :initial-element #\-)))))))
 
-(defapplication pong-below-cursor-app
+(deftea-app pong-below-cursor-app
+  :init       #'pong-init
+  :transition #'pong-transition
+  :view       #'pong-view
   :root-viewport-id :pong-root
-  :root-component-dsl '(:root-viewport :id :pong-root
-                        :anchor :below-cursor
-                        :width 60
-                        :height 12
-                        :blank-on-exit t
-                        :child-dsl-spec (:view nil))
-  :initial-state-fn #'%initial-state
-  :update-fn #'pong-update
-  :view-fn #'pong-view
-  :subscriptions-fn (lambda (_state)
-                      (declare (ignore _state))
-                      '(:timer (:interval 0.08 :message (:tick)))))
+  :anchor     :below-cursor
+  :height     12
+  :subscriptions (lambda (model)
+                   (declare (ignore model))
+                   '(:timer (:interval 0.08 :message (:tick)))))
 
 (defun run-pong-below-cursor (&key (backend-type :terminal))
   (log-info "pong-below-cursor: start backend=~S" backend-type)

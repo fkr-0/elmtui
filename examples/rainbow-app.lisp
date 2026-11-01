@@ -7,18 +7,15 @@
 (uiop:define-package :elmtui.examples.rainbow-app
   (:use :cl :log4cl)
   (:import-from :log4cl #:log-info #:log-debug)
-  (:import-from :elmtui.app #:defapplication)
-  (:import-from :elmtui.app.api #:get-component-instance)
-  (:import-from :elmtui.ui.api #:update)
+  (:import-from :elmtui.app.tea-core #:deftea-app)
   (:import-from :cl-styles.api #:defrule #:defstylesheet #:rgb)
   (:import-from :cl-styles.selector #:cls> #:type>)
-  (:import-from :elmtui.core.event-types #:key-event)
-  (:import-from :elmtui.state.api #:make-update-result #:state-ref)
+  (:import-from :elmtui.core.event-types
+                #:key-event #:key-event-parts)
   (:export
     :run-rainbow-example-app
     :rainbow-content-view
-    :rainbow-stylesheet
-    :initialize-app-state-rainbow-example-app))
+    :rainbow-stylesheet))
 
 (in-package :elmtui.examples.rainbow-app)
 
@@ -69,30 +66,26 @@
 ;;;--------------------------------------------------------------
 ;;; Application Update Function
 ;;;--------------------------------------------------------------
-(defun app-update (message app-state)
-  "Handles updates to the application state based on messages."
-
-  (cond
-    ((and (typep message 'key-event)
-          (member (elmtui.core.event-types:key-event-key message)
-                  '(:q :escape :esc #\q #\Q) :test #'eql))
-      (make-update-result :patches '(((:should-quit) t))))
-    ((and (typep message 'key-event)
-          (or (eql (elmtui.core.event-types:key-event-char message) #\Space)
-              (eql (elmtui.core.event-types:key-event-key message) :space)))
-      (let* ((current-count (state-ref app-state :switch-count 0))
+(defun app-transition (message model)
+  "Direct model-replacement transition for rainbow-app."
+  (multiple-value-bind (key char _mods) (key-event-parts message)
+    (declare (ignore _mods))
+    (cond
+      ((or (member key '(:q :escape :esc) :test #'eq)
+           (member char '(#\q #\Q)))
+       (values (list* :should-quit t model) nil))
+      ((or (eq key :space) (eql char #\Space))
+       (let* ((current-count (getf model :switch-count 0))
               (new-count (1+ current-count)))
-        (if (>= new-count 15)
-          (make-update-result :patches `(((:should-quit) t)))
-          (let ((new-orientation (if (eql (state-ref app-state :orientation) :row)
-                                   :column
-                                   :row)))
-            (make-update-result :patches `(((:switch-count) ,new-count)
-                                            ((:orientation) ,new-orientation)))))))
-    ((and (listp message) (eq (first message) :app-quit-requested))
-      (make-update-result :patches `(((:should-quit) t))))
-    (t
-      (make-update-result))))
+         (if (>= new-count 15)
+             (values (list* :should-quit t model) nil)
+             (let ((new-orientation (if (eql (getf model :orientation) :row)
+                                        :column :row)))
+               (values (list :current-stylesheet (getf model :current-stylesheet)
+                             :orientation new-orientation
+                             :switch-count new-count)
+                       nil)))))
+      (t (values model nil)))))
 
 ;; (defun rainbow-content-view (app-state)
 ;;   "Defines the UI DSL for the rainbow app's content. The root viewport is set via :root-viewport-id in defapplication."
@@ -128,9 +121,9 @@
     (:indexed (list :256 (nth index '(196 208 226 46 27 54 201))))
     (:basic (nth index '(:red :yellow :white :green :blue :cyan :magenta)))))
 
-(defun rainbow-content-view (state)
+(defun rainbow-content-view (model)
   "Paint visible color bands rather than blank background-only cells."
-  (let ((orientation (state-ref state :orientation :row))
+  (let ((orientation (getf model :orientation :row))
         (colors (mapcar #'third rainbow-colors-with-names)))
     `(:container :id :rainbow-content
        :style (:display :flex :flex-direction :column :width 68 :height 14)
@@ -153,28 +146,23 @@
                                      :height ,(if (eq orientation :row) 10 1)
                                      :width ,(if (eq orientation :row) 6 60)))))))))
 
-(defun rainbow-app-subscriptions (model)
-  (declare (ignore model))
-  (log-debug "RAINBOW-APP: Subscriptions function called.")
-  nil)
 
 ;;;--------------------------------------------------------------
 ;;; Application Definition
 ;;;--------------------------------------------------------------
-(defun %rainbow-initial-state ()
-  (list :current-stylesheet nil
-        :should-quit nil
-        :orientation :row
-        :switch-count 0))
+(defun rainbow-init ()
+  (values (list :current-stylesheet nil
+                :orientation :row
+                :switch-count 0)
+          nil))
 
-(defapplication rainbow-example-app
+(deftea-app rainbow-example-app
+  :init       #'rainbow-init
+  :transition #'app-transition
+  :view       #'rainbow-content-view
   :root-viewport-id :rainbow-root-vp
-  :initial-state-fn #'%rainbow-initial-state
-  ;; :root-component-dsl `(:column)
-  :root-component-dsl '(:root-viewport :id :rainbow-root-vp :anchor :below-cursor :width 70 :height 14 :blank-on-exit t :child-dsl-spec (:view nil))
-
-  :update-fn 'app-update
-  :view-fn 'rainbow-content-view)
+  :anchor     :below-cursor
+  :height     14)
 
 ;; (elmtui.view.dsl:dsl->ui-node (elmtui.app::maybe-wrap-with-root-viewport
 ;;                                (funcall 'rainbow-content-view (elmtui.state:make-application-state)) :root-id
