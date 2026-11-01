@@ -35,6 +35,87 @@
     (is (string= (fourth result) (format nil "~C[0m" #\Escape)))
     (is (string= (fifth result) "!"))))
 
+(test tmux-capture-osc-terminators-do-not-leak-content
+  "Titles and hyperlink targets are controls, never captured visual text."
+  (let* ((bel (code-char 7))
+         (input (format nil
+                        "A~C]0;SECRET-PANE-TITLE~CB~C]8;;https://private.invalid/path~C~CC~C]8;;~C~CD"
+                        #\Escape bel #\Escape #\Escape #\\ #\Escape #\Escape #\\))
+         (segments (split-by-ansi-sequences input))
+         (runs (parse-ansi-string input)))
+    (is (= 7 (length segments)))
+    (is (equal '("A" "B" "C" "D") (mapcar #'car runs)))
+    (is (null (search "SECRET" (format nil "~{~A~}" (mapcar #'car runs)))))
+    (is (null (search "private.invalid" (format nil "~{~A~}" (mapcar #'car runs)))))))
+
+(test tmux-capture-strips-non-sgr-terminal-controls
+  "Cursors, clears, charset designation and DCS payload cannot reappear."
+  (let* ((input (format nil
+                        "START~C[?25l~C[2J~C(B~CPprivate-data~C~CEND~C[31mRED~C[0m!"
+                        #\Escape #\Escape #\Escape #\Escape #\Escape #\\
+                        #\Escape #\Escape))
+         (runs (parse-ansi-string input)))
+    (is (equal '("START" "END" "RED" "!") (mapcar #'car runs)))
+    (is (eq :red (getf (cdr (third runs)) :fg)))
+    (is (null (cdr (fourth runs))))))
+
+(test tmux-capture-incomplete-control-does-not-leak
+  "An unterminated OSC/DCS sequence drops its entire remaining payload."
+  (dolist (leader '("]0;PRIVATE_TITLE" "PPRIVATE_BLOB" "[?25l"))
+    (let* ((input (format nil "VISIBLE~C~A" #\Escape leader))
+           (runs (parse-ansi-string input)))
+      (is (equal '("VISIBLE") (mapcar #'car runs))))))
+
+(test tmux-capture-c1-control-streams-do-not-leak
+  "Eight-bit OSC/CSI/DCS controls must not become terminal cell characters."
+  (let* ((input (format nil "A~C0;SECRET~CB~C?25lC~CPPRIVATE~CD"
+                        (code-char #x9D) (code-char #x9C)
+                        (code-char #x9B) (code-char #x90) (code-char #x9C)))
+         (runs (parse-ansi-string input))
+         (buffer (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 8 1)))
+    (is (equal '("A" "B" "C" "D") (mapcar #'car runs)))
+    (elmtui.platform.tmux:prefill-buffer-from-styled-content buffer runs 8 1)
+    (is (char= #\A
+               (elmtui.platform.backend.common.virtual-buffer:buffer-char buffer 0 0)))
+    (is (char= #\D
+               (elmtui.platform.backend.common.virtual-buffer:buffer-char buffer 0 3)))))
+
+(test tmux-capture-strict-sgr-grammar
+  "Only complete, numeric CSI ... m sequences change capture styling."
+  (dolist (suffix '("31H" "31:4m" "3;xm" ";31m" "31;m" "31;;4m"))
+    (is (null (parse-ansi-sgr (format nil "~C[~A" #\Escape suffix)))))
+  (let ((runs (parse-ansi-string
+               (format nil "~C[31mRED~C[31:4mSTILL-RED~C[0mDEFAULT"
+                       #\Escape #\Escape #\Escape))))
+    (is (equal '("RED" "STILL-RED" "DEFAULT") (mapcar #'car runs)))
+    (is (eq :red (getf (cdr (second runs)) :fg)))
+    (is (null (cdr (third runs))))))
+
+(test tmux-capture-restore-resize-only-copies-known-cells
+  "A visible-pane snapshot cannot populate rows that never existed."
+  (let* ((saved (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 2 1))
+         (larger (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 4 2))
+         (smaller (elmtui.platform.backend.common.virtual-buffer:make-virtual-buffer 1 1)))
+    (unwind-protect
+         (progn
+           (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
+            saved 0 0 #\A nil)
+           (elmtui.platform.backend.common.virtual-buffer:set-buffer-cell-at
+            larger 1 3 #\Z nil)
+           (elmtui.platform.tmux:save-tmux-capture saved)
+           (is (eq larger (elmtui.platform.tmux:restore-to-tmux-capture larger)))
+           (is (char= #\A
+                      (elmtui.platform.backend.common.virtual-buffer:buffer-char
+                       larger 0 0)))
+           (is (char= #\Z
+                      (elmtui.platform.backend.common.virtual-buffer:buffer-char
+                       larger 1 3)))
+           (is (eq smaller (elmtui.platform.tmux:restore-to-tmux-capture smaller)))
+           (is (char= #\A
+                      (elmtui.platform.backend.common.virtual-buffer:buffer-char
+                       smaller 0 0))))
+      (elmtui.platform.tmux:clear-saved-tmux-capture))))
+
 (test parse-ansi-sgr-all-basic-colors
   "Parsing SGR sequences for all basic foreground colors"
   ;; Test codes 30-37 (black, red, green, yellow, blue, magenta, cyan, white)

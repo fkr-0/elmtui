@@ -281,7 +281,26 @@ This keeps compatibility with older examples that pass app instances."
 
 (defun %render-frame (ctx) (bt:with-lock-held (*frame-render-lock*) (let ((rendered (full-view-pipeline ctx))) (%record-normal-screen-paint rendered) rendered)))
 
-(defun %synchronize-resized-terminal-backend (message) "Apply real resize geometry before layout and before shutdown restoration." (when (and *backend* (consp message) (eq (first message) :terminalresized)) (let ((width (getf (rest message) :width)) (height (getf (rest message) :height))) (when (and (typep *backend* 'elmtui.platform.backend.terminal:terminal-instance) (integerp width) (integerp height) (plusp width) (plusp height) (or (/= width (term-w *backend*)) (/= height (term-h *backend*)))) (handle-backend-resize *backend* width height) (setf *previous-frame-buffer* nil)))) nil)
+(defun %synchronize-resized-terminal-backend (message)
+  "Apply real resize geometry before layout and before shutdown restoration.
+The backend's cached WIDTH/HEIGHT can already be current (the SIGWINCH handler
+refreshes them), so compare against the buffers themselves: a stale front
+buffer or previous frame would otherwise be diffed against the new geometry."
+  (when (and *backend* (consp message) (eq (first message) :terminalresized))
+    (let ((width (getf (rest message) :width))
+          (height (getf (rest message) :height)))
+      (when (and (typep *backend* 'elmtui.platform.backend.terminal:terminal-instance)
+                 (integerp width) (integerp height) (plusp width) (plusp height))
+        (flet ((stale-p (buffer)
+                 (and buffer
+                      (or (/= width (elmtui.platform.backend.common.virtual-buffer:buffer-width buffer))
+                          (/= height (elmtui.platform.backend.common.virtual-buffer:buffer-height buffer))))))
+          (when (or (/= width (term-w *backend*))
+                    (/= height (term-h *backend*))
+                    (stale-p (elmtui.platform.backend.terminal:terminal-instance-front-buffer *backend*)))
+            (handle-backend-resize *backend* width height)
+            (setf *previous-frame-buffer* nil))))))
+  nil)
 
 (defun initialize-app-model (app-spec)
   (declare (type list app-spec))
@@ -946,6 +965,9 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
          (use-alternate-screen (getf platform-options :use-alternate-screen nil)))
     (setf *preserve-underlay* (and prefill-from-tmux (tmux-available-p)))
     (setf *use-alternate-screen* use-alternate-screen)
+    ;; Own cleanup from the first backend-initialization step onward. A
+    ;; separate unwind-protect around only the main wait loop leaks raw TTY
+    ;; modes/cursor visibility if model setup signals an error.
     (unwind-protect
       (progn
         ;; 1. Start the event loop. This sets up channels and the consumer thread.
@@ -1066,7 +1088,7 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
             (force-render-current-frame app-spec))
           ;; Do not start recurring timers while the initial viewport state
           ;; transaction or forced presentation is still in flight.
-          (%refresh-app-subscriptions app-spec *current-app-model*)))
+          (%refresh-app-subscriptions app-spec *current-app-model*))
 
     ;; 5. Build the driver context and start the driver-managed input loop when the backend exposes cl-inputs handles.
     ;; Guarded by (when *backend* ...) so that a failed setup (nil backend) does not error here.
@@ -1092,19 +1114,18 @@ Failures are logged and returned as NIL so shutdown can remain best-effort."
 
                                   t)
                 *input-thread* (start-driver-input-loop ctx))
-          (log-info "Driver input loop started: ~A" *input-thread*)))))
+          (log-info "Driver input loop started: ~A" *input-thread*)))
 
-    ;; 6-7. Run application main loop with guaranteed terminal cleanup on any exit.
-    (unwind-protect
-      (progn
-        (when initial-commands
-          (process-initial-commands initial-commands app-spec))
-        (log:info "Initial commands processed. Starting main wait loop.")
-        ;; 7. Wait for shutdown signal through the shared runtime poller.
-        (poll-until (lambda () elmtui.core.loop:*shutdown-requested*)
-                    :interval 0.1)
-        (log:info "DRIVER: Shutdown signal received, exiting loop."))
-      ;; Cleanup: always executes even if an unhandled condition escapes the main loop.
+    ;; 6-7. Wait for main shutdown. This is part of the PROTECTED form: the
+    ;; cleanup below must run when setup or the wait loop is left, and must
+    ;; never itself wait for shutdown (it would block an error forever).
+    (when initial-commands
+      (process-initial-commands initial-commands app-spec))
+    (log:info "Initial commands processed. Starting main wait loop.")
+    (poll-until (lambda () elmtui.core.loop:*shutdown-requested*)
+                :interval 0.1)
+    (log:info "DRIVER: Shutdown signal received, exiting loop.")))
+      ;; Cleanup covers model/bootstrap errors and the normal main wait loop.
       (shutdown-platform)
       (elm-stop-loop)
       (log:info "DRIVER: Application ~A has shut down." (getf app-spec :name)))))

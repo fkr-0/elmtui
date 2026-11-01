@@ -1,6 +1,8 @@
 (uiop:define-package :elmtui.tests.tmux-integration
   (:use :cl :fiveam)
   (:import-from :elmtui.platform.tmux
+    #:*tmux-socket*
+    #:*tmux-target*
     #:tmux-available-p
     #:capture-pane-string
     #:capture-screen-string
@@ -31,64 +33,86 @@
 (in-suite tmux-integration-tests)
 
 ;;;----------------------------------------------------------------
-;;; Helper: Skip tests if tmux not available
+;;; Fixture: a private tmux server with known pane content
 ;;;----------------------------------------------------------------
+;;;
+;;; These tests never touch the tmux session (if any) that runs the suite.
+;;; Each one owns a throw-away server on its own socket, so they run the same
+;;; way inside tmux, outside tmux and in CI. A missing tmux binary is a broken
+;;; environment and FAILS, rather than silently skipping.
 
-(defun %truthy-env-p (name)
-  (member (string-downcase (or (uiop:getenv name) ""))
-          '("1" "true" "yes")
-          :test #'string=))
+(defparameter +fixture-marker+ "plain-text"
+  "Unstyled text printed after a red word, used to prove we captured our pane.")
 
-(defparameter *require-tmux-integration-tests*
-  (%truthy-env-p "ELMTUI_REQUIRE_TMUX")
-  "When true, tmux integration tests fail (instead of skip) if tmux is unavailable.")
+(defun %fixture-program ()
+  (format nil "printf '\\033[31mRED\\033[0m ~A\\n'; sleep 300" +fixture-marker+))
 
-(defparameter *run-tmux-integration-tests*
-  (or (%truthy-env-p "ELMTUI_RUN_TMUX_INTEGRATION")
-      *require-tmux-integration-tests*)
-  "When true, tests may probe and capture the live tmux pane.")
+(defun %private-tmux (socket &rest args)
+  "Run tmux against SOCKET with no user configuration; return stdout."
+  (uiop:run-program
+   (append (list "tmux" "-S" (namestring socket) "-f" "/dev/null") args)
+   :output :string :error-output :string :ignore-error-status t))
 
-(defmacro skip-unless-tmux (&body body)
-  "Run BODY only when live tmux integration is explicitly enabled and tmux exists."
-  `(cond
-     ((not *run-tmux-integration-tests*)
-      (skip "live tmux integration requires ELMTUI_RUN_TMUX_INTEGRATION=1"))
-     ((tmux-available-p)
-      (progn ,@body))
-     (*require-tmux-integration-tests*
-      (fail "tmux unavailable but ELMTUI_REQUIRE_TMUX requires live tmux integration"))
-     (t
-      (skip "tmux not available in this environment"))))
+(defun %fixture-ready-p ()
+  (let ((content (capture-pane-string)))
+    (and (stringp content) (search +fixture-marker+ content))))
+
+(defun call-with-private-tmux-pane (function)
+  "Call FUNCTION with the capture API pointed at a private, populated pane."
+  (if (not (zerop (nth-value 2 (uiop:run-program '("sh" "-c" "command -v tmux")
+                                                 :ignore-error-status t
+                                                 :output nil :error-output nil))))
+      (fail "tmux is a required test prerequisite but was not found on PATH")
+      (let* ((directory (ensure-directories-exist
+                         (merge-pathnames
+                          (format nil "elmtui-tmux-it-~36R/" (random (expt 36 8)))
+                          (uiop:temporary-directory))))
+             (socket (merge-pathnames "tmux.sock" directory)))
+        (unwind-protect
+             (progn
+               (%private-tmux socket "new-session" "-d" "-s" "elmtui-it"
+                              "-x" "80" "-y" "24" "sh" "-c" (%fixture-program))
+               (let ((*tmux-socket* (namestring socket))
+                     (*tmux-target* "elmtui-it"))
+                 (loop repeat 100
+                       until (%fixture-ready-p)
+                       do (sleep 0.05))
+                 (is (%fixture-ready-p) "private tmux pane never showed its fixture text")
+                 (funcall function)))
+          (%private-tmux socket "kill-server")
+          (uiop:delete-directory-tree directory :validate t :if-does-not-exist :ignore)))))
+
+(defmacro with-private-tmux-pane (() &body body)
+  `(call-with-private-tmux-pane (lambda () ,@body)))
 
 ;;;----------------------------------------------------------------
 ;;; Environment Detection Tests
 ;;;----------------------------------------------------------------
 
 (test tmux-available-detection
-  "tmux-available-p returns boolean indicating tmux availability when live tmux integration is enabled"
-  (skip-unless-tmux
-    (let ((result (tmux-available-p)))
-      (is (or (eq result t) (eq result nil))))))
+  "A private tmux socket makes tmux addressable without ambient tmux state"
+  (is (null *tmux-socket*) "the socket override must be off by default")
+  (with-private-tmux-pane ()
+    (is (eq t (tmux-available-p)))))
 
 ;;;----------------------------------------------------------------
 ;;; Capture Function Tests
 ;;;----------------------------------------------------------------
 
 (test capture-pane-string-basic
-  "capture-pane-string returns a string when tmux is available"
-  (skip-unless-tmux
+  "capture-pane-string returns the text shown in the targeted pane"
+  (with-private-tmux-pane ()
     (let ((result (capture-pane-string)))
       (is (stringp result))
-      (is (plusp (length result))))))
+      (is (search +fixture-marker+ result)))))
 
 (test capture-pane-string-contains-ansi
-  "Captured content may contain ANSI escape sequences"
-  (skip-unless-tmux
+  "Capture with -e preserves the SGR styling of the fixture's red word"
+  (with-private-tmux-pane ()
     (let ((result (capture-pane-string)))
-      ;; Just check we got something - actual ANSI content depends on terminal state.
-      ;; Keep the live capture silent so CI and bridge logs remain parseable.
       (is (stringp result))
-      (is (not (null result))))))
+      (is (find #\Escape result) "styled capture must keep escape sequences")
+      (is (search "RED" result)))))
 
 ;;;----------------------------------------------------------------
 ;;; ANSI Parsing Tests
@@ -201,12 +225,12 @@
     (is (virtual-terminal-buffer-p buffer))))
 
 ;;;----------------------------------------------------------------
-;;; Full Integration Test (requires tmux)
+;;; Full Integration Tests (private tmux server)
 ;;;----------------------------------------------------------------
 
 (test make-buffer-from-tmux-styled-basic
   "Create styled buffer from actual tmux capture"
-  (skip-unless-tmux
+  (with-private-tmux-pane ()
     (let ((buffer (make-buffer-from-tmux-styled 40 10)))
       (is (not (null buffer)))
       (when buffer
@@ -216,7 +240,7 @@
 
 (test end-to-end-capture-and-parse
   "Full end-to-end test: capture tmux, parse ANSI, create buffer"
-  (skip-unless-tmux
+  (with-private-tmux-pane ()
     ;; Step 1: Capture from tmux
     (let* ((content (capture-pane-string))
             ;; Step 2: Parse into styled runs
@@ -232,7 +256,7 @@
 
 (test end-to-end-capture-parse-save-restore-visible
   "Integration smoke: capture visible pane, parse, save snapshot, then restore into another buffer"
-  (skip-unless-tmux
+  (with-private-tmux-pane ()
     (let* ((width 40)
            (height 10)
            (content (capture-pane-string :mode :pane))

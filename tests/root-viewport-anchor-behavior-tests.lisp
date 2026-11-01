@@ -156,6 +156,24 @@
         "Viewport height patch recorded on resize")
       (is-true (has-render-cmd-p cmds :scroll-down)))))
 
+(test computed-viewport-size-follows-later-terminal-resizes
+  "A size the viewport derived itself must track live resizes; a stale size
+would clip every later frame to the geometry of the first resize."
+  (multiple-value-bind (rv idp o state) (init-root :below-cursor 24 8 1 1)
+    (declare (ignore o))
+    (upd rv idp state '(:terminalresized :width 24 :height 8))
+    (is (= 24 (state-ref state (append idp '(:width)))))
+    (upd rv idp state '(:terminalresized :width 40 :height 12))
+    (is (= 40 (state-ref state (append idp '(:width))))
+        "Width follows the terminal after growing")
+    (upd rv idp state '(:terminalresized :width 120 :height 40))
+    (is (= 120 (state-ref state (append idp '(:width)))))
+    (is (< 12 (state-ref state (append idp '(:height))))
+        "Height follows the terminal after growing")
+    (upd rv idp state '(:terminalresized :width 24 :height 8))
+    (is (= 24 (state-ref state (append idp '(:width))))
+        "Width follows the terminal after shrinking")))
+
 (test bottom-row-scroll-acknowledgment-reanchors-without-repeating
   "A bottom-row anchor must wait for scrolling and then use the shifted anchor."
   (multiple-value-bind (rv idp _ state) (init-root :below-cursor 20 10 10 1)
