@@ -25,6 +25,8 @@ The project follows semantic versioning from the first published release.
   renders when started on the terminal's last row.
 - The wifi-inline e2e script loads `elmtui-examples-cli` instead of the
   removed `elmtui-tools` system.
+- The tmux e2e harness traps SIGINT in its launch wrapper, so Ctrl-C quit
+  tests no longer lose the pane on systems whose `/bin/sh` is dash.
 - `scripts/examples.sh build` and `elmtui-packager` compress dumped cores only
   when SBCL was built with zstd (`:sb-core-compression`), instead of failing
   on runtimes without it.
