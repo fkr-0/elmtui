@@ -25,6 +25,45 @@
 
 (test benchmark-comparison-reports-ratio (let ((result (compare-benchmark-results (list :name :sample :ops-per-second 100.0d0) (list :name :sample :ops-per-second 95.0d0) :minimum-ratio 0.90d0))) (is (= 0.95d0 (getf result :ratio))) (is-true (getf result :passes))))
 
+(test benchmark-rejects-incomparable-or-unmeasurable-results
+  (signals error
+    (compare-benchmark-results '(:name :a :ops-per-second 10)
+                               '(:name :b :ops-per-second 10)))
+  (signals error
+    (compare-benchmark-results '(:name :a :ops-per-second -10)
+                               '(:name :a :ops-per-second 10)))
+  (let ((result (compare-benchmark-results '(:name :a :ops-per-second 0)
+                                          '(:name :a :ops-per-second 10))))
+    (is (eq :insufficient-resolution (getf result :status)))
+    (is-false (getf result :passes))))
+
+(test benchmark-records-clock-and-runtime-context
+  (let ((calls 0))
+    (let ((result (benchmark-thunk :count (lambda () (incf calls))
+                                   :iterations 20 :warmup-iterations 3)))
+      (is (= 23 calls))
+      (is (plusp (getf result :clock-resolution-seconds)))
+      (is (stringp (getf result :lisp-implementation)))
+      (is (numberp (getf result :cpu-seconds)))
+      (is (typep (getf result :measurement-valid-p) 'boolean)))))
+
+(test benchmark-baseline-is-data-only
+  (uiop:with-temporary-file (:pathname path :stream stream :direction :output)
+    (write-string "#.(error \"reader evaluation must be disabled\")" stream)
+    (finish-output stream)
+    (signals reader-error (read-benchmark-baseline path)))
+  (uiop:with-temporary-file (:pathname path :stream stream :direction :output)
+    (write-string "(:name :one) (:name :two)" stream)
+    (finish-output stream)
+    (signals error (read-benchmark-baseline path))))
+
 (test benchmark-stress-is-bounded (let ((result (stress-event-pipeline :rounds 2 :iterations 20))) (is (= 2 (getf result :rounds))) (is (= 2 (length (getf result :results)))) (is (numberp (getf result :median-ops-per-second)))))
+
+(test benchmark-context-mismatch-cannot-pass
+  (let ((result (compare-benchmark-results
+                 '(:name :sample :ops-per-second 100 :lisp-implementation "A")
+                 '(:name :sample :ops-per-second 200 :lisp-implementation "B"))))
+    (is (eq :context-mismatch (getf result :status)))
+    (is-false (getf result :passes))))
 
 (defun run-benchmark-tests () "Run optional benchmark-tool tests." (run! 'benchmark-test-suite))

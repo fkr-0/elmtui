@@ -4,7 +4,7 @@
   :description "ElmTUI maintained example applications"
   :author "ElmTUI contributors"
   :license "MIT"
-  :depends-on (:elmtui)
+  :depends-on (:elmtui :elmtui-example-widgets)
   :pathname "./examples/"
   :components ((:file "rainbow-app")
                (:file "key-tester")
