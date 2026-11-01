@@ -67,14 +67,13 @@ The latest release is [[https://github.com/fkr-0/elmtui/releases/tag/v0.4.0][0.4
 POSIX terminals; other Common Lisp implementations are not yet supported,
 because parts of the toolkit use SB-POSIX and SB-MOP. ElmTUI is pre-1.0:
 minor versions may change the API (see the [[file:CHANGELOG.md][changelog]]), and
-[[file:docs/reviews/api-review-20261101.md][the API review]] lists the known problems with the exported API and
-their fixes.
+the [[file:CHANGELOG.md][changelog]] describes the API cleanup and migration.
 
 The coverage badge shows SB-COVER expression coverage of the primary =elmtui=
 system. CI publishes it only from a fully green release gate on =main=;
 =scripts/run-coverage-warning-clean.sh= produces the same figure and a
 per-file report locally (see
-[[file:docs/reviews/coverage-improvement-20261026.md][coverage qualification evidence]]).
+the coverage gate).
 
 * Quickstart
 

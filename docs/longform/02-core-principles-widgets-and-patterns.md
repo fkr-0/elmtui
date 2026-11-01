@@ -30,15 +30,15 @@ A useful message vocabulary normally distinguishes:
 - component-local messages: `:button-click`, `:set-label`, `:focus`;
 - lifecycle messages such as shutdown.
 
-### 1.2 Update decides; effects execute elsewhere
+### 1.2 Transition decides; effects execute elsewhere
 
-In the strict TEA path:
+In the strict TEA path (the normative runtime name is *transition*):
 
 ```text
-update(message, model) -> next-model + commands
+transition(message, model) -> next-model + commands
 ```
 
-A command is a description of work to execute after the decision. It should be possible to test update by asserting command data without actually doing network, file, or terminal I/O.
+A command is a description of work to execute after the decision. It should be possible to test the transition by asserting command data without actually doing network, file, or terminal I/O.
 
 Intentionally incorrect (anti-pattern, **not** code to load):
 
@@ -172,9 +172,9 @@ Initialization creates the first model and optionally initial commands:
 
 Keep expensive startup I/O out of the returned model construction when it can be represented as an initial command instead.
 
-### 2.3 Update
+### 2.3 Transition (update)
 
-Update maps messages to state transitions and commands:
+The transition function maps messages to state changes and commands:
 
 ```lisp
 (defun update-counter (message model)

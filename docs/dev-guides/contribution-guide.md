@@ -1,57 +1,96 @@
-# Elmtui Contribution Guide
+# Contributing to ElmTUI
 
-Thank you for your interest in contributing to Elmtui! We welcome contributions of all kinds, from bug reports and documentation improvements to new features and code enhancements.
+Contributions are welcome — bug reports, documentation improvements, new
+features, examples, and test coverage.
 
-## Ways to Contribute
+## Getting started
 
-*   **Reporting Bugs:** If you find a bug, please submit an issue on our issue tracker (link to be provided). Include steps to reproduce, expected behavior, actual behavior, and relevant environment details.
-*   **Suggesting Enhancements:** Have an idea for a new feature or an improvement to an existing one? Open an issue to discuss it.
-*   **Improving Documentation:** Clear and accurate documentation is crucial. If you find errors, omissions, or areas that could be clearer, please submit a pull request or open an issue.
-*   **Writing Code:**
-    *   Fixing bugs.
-    *   Implementing new features or widgets.
-    *   Refactoring code for clarity or performance.
-*   **Adding Examples:** New examples showcasing Elmtui's features are always welcome.
-*   **Writing Tests:** Help us improve test coverage.
+1. **Set up your environment.** Follow the [setup guide](./setup.md).
+2. **Fork the repository** on
+   [GitHub](https://github.com/fkr-0/elmtui).
+3. **Create a branch** for your changes:
+   ```sh
+   git checkout -b feature/my-change
+   ```
+4. **Familiarise yourself with the architecture:**
+   - [Foundations: Elm architecture in Common Lisp](../longform/01-foundations-and-elm-architecture.md)
+   - [Library boundaries](../architecture/library-boundaries.md)
+   - [API documentation and verification](../api/README.md)
 
-## Getting Started with Code Contributions
+## Making changes
 
-1.  **Set up your Development Environment:** Follow the [Setup Guide](./setup.md).
-2.  **Fork the Repository:** Create your own fork of the Elmtui repository on (GitHub/GitLab/etc. - specify platform).
-3.  **Create a Branch:** Create a new branch in your fork for your changes (e.g., `git checkout -b feature/my-new-feature` or `fix/issue-123`).
-4.  **Understand the Codebase:**
-    *   Familiarize yourself with the [Core Concepts](../architecture/core-concepts.md) and [System Architecture](../architecture/system-overview.md).
-    *   Browse the relevant module documentation in `docs/modules/`.
-5.  **Follow Coding Standards:** Adhere to the project's [Coding Standards](./coding-standards.md).
-6.  **Write Tests:**
-    *   For bug fixes, add a test that reproduces the bug and verifies the fix.
-    *   For new features, write tests to cover the new functionality.
-    *   Ensure all tests pass before submitting.
-7.  **Write Clear Commit Messages:** Follow conventional commit message formats if applicable, or at least ensure your messages are descriptive.
-8.  **Keep Your Branch Up-to-Date:** Regularly rebase your branch on the latest `main` (or `develop`) branch of the upstream repository.
-    ```bash
-    git fetch upstream
-    git rebase upstream/main
-    ```
-9.  **Submit a Pull Request (PR):**
-    *   Push your changes to your fork.
-    *   Open a Pull Request against the `main` (or `develop`) branch of the upstream Elmtui repository.
-    *   Provide a clear description of your changes in the PR. Link to any relevant issues.
-    *   Be prepared to discuss your changes and make adjustments based on feedback from maintainers.
+### Code
 
-## Code Review Process
+- The four `cl-*` libraries are independent Git submodules. Changes to
+  their source go to their own repositories; ElmTUI pins them to a
+  specific commit.
+- Prefer the framework's existing packages and conventions. The
+  [library boundaries](../architecture/library-boundaries.md) doc
+  explains which package owns what.
+- Keep the distinction between reusable `cl-*` mechanics and ElmTUI UI
+  policy in `src/`.
 
-*   Maintainers will review your PR for correctness, style, and adherence to project goals.
-*   Constructive feedback may be provided. Please address any comments or suggestions.
-*   Once the PR is approved, it will be merged by a maintainer.
+### Tests
 
-## Community and Communication
+- For bug fixes, add a test that reproduces the bug.
+- For new features, write tests covering the new functionality.
+- Ensure all tests pass before submitting.
 
-*   **Issue Tracker:** (Link to issue tracker)
-*   **Mailing List / Forum:** (If applicable)
-*   **Chat (Discord/Slack/IRC):** (If applicable)
+Run the suites:
 
-We appreciate your contributions to making Elmtui better!
+```sh
+# Root integration suite
+clpm bundle exec --with-client sbcl -- \
+  --noinform --load scripts/run-tests-clpm.lisp
 
----
-*This guide will be updated with specific links and further details as the project's contribution infrastructure is formalized.*
+# Every reusable subsystem
+scripts/test-subsystems.sh
+
+# Complete release gate
+scripts/release-check.sh
+```
+
+The release gate checks repository topology, the tracked release
+manifest, whitespace, all four subsystem suites, the warning-clean full
+ElmTUI suite, documentation freshness, and API binding coverage.
+
+### Documentation
+
+- Docstrings are executable API metadata. Generated API references are
+  derived from live `DOCUMENTATION` calls; do not maintain a second
+  handwritten API source.
+- Run `scripts/check-docstrings.sh` to verify documentation coverage
+  does not regress.
+- Run `scripts/build-api-docs.sh` to regenerate
+  `docs/api/generated/api.md`.
+
+### Examples
+
+New examples should satisfy the [example contract](../../examples/README.md#example-contract):
+listed in an ASDF system, compilable during tests, stable runner export,
+no checked-in binaries, public APIs only.
+
+## Submitting a pull request
+
+1. Keep your branch up to date:
+   ```sh
+   git fetch origin
+   git rebase origin/main
+   ```
+2. Push and open a PR against `main`.
+3. Provide a clear description of the changes and link to related
+   issues.
+4. The CI runs `scripts/release-check.sh`; ensure it passes locally
+   first.
+
+## Code review
+
+Maintainers review PRs for correctness, style, and adherence to the
+project's architectural conventions. Address feedback and iterate.
+
+## Reporting issues
+
+File issues at
+[github.com/fkr-0/elmtui/issues](https://github.com/fkr-0/elmtui/issues)
+with steps to reproduce, expected vs. actual behavior, and environment
+details (SBCL version, OS, terminal).

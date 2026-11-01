@@ -22,7 +22,7 @@ terminal/device input
      message -------------------------------+
         |                                    |
         v                                    |
-  UPDATE(message, model)                     |
+  TRANSITION(message, model)                     |
         |                                    |
         +----> next model                    |
         |          |                         |
@@ -55,9 +55,9 @@ A message is data describing something that happened or something that should ha
 
 Messages being ordinary data is important. It keeps routing inspectable and makes tests able to drive update logic without a real terminal.
 
-### Update
+### Update (transition)
 
-Update is the decision function. In the strict TEA path it receives a message and the current model and returns a next model plus commands. It should not perform terminal rendering and should avoid performing effects directly.
+Update — called *transition* in the normative runtime vocabulary — is the decision function. In the strict TEA path it receives a message and the current model and returns a next model plus commands. It should not perform terminal rendering and should avoid performing effects directly.
 
 ### View
 
@@ -71,10 +71,10 @@ Commands describe effects to perform after update; subscriptions describe extern
 
 ## 2. Elm semantics are an observable contract, not a ban on machine mutation
 
-`src/app/tea-core.lisp` states the familiar transition contract directly:
+`src/app/tea-core.lisp` states the familiar transition contract directly (the normative runtime name is TRANSITION; the legacy internal key `:UPDATE-FN` is retained for the platform driver):
 
 ```text
-UPDATE-FN :: (MSG MODEL) -> (values NEXT-MODEL COMMANDS)
+TRANSITION :: (MSG MODEL) -> (values NEXT-MODEL COMMANDS)
 ```
 
 The driver installs the returned model:

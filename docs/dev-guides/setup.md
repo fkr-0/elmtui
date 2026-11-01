@@ -1,90 +1,109 @@
-# Elmtui Development Environment Setup Guide
-
-This guide provides instructions for setting up a development environment for working on the Elmtui library itself or building applications with Elmtui.
+# Development environment setup
 
 ## Prerequisites
 
-*   **Common Lisp Implementation:**
-    *   A modern Common Lisp implementation is required. We primarily test with/recommend:
-        *   **SBCL (Steel Bank Common Lisp):** (Provide version, e.g., 2.x.x or later)
-        *   (Mention other supported implementations if any, e.g., CCL)
-    *   Installation instructions for your Lisp implementation can typically be found on its official website.
-*   **Quicklisp:**
-    *   Quicklisp is a library manager for Common Lisp. If you don't have it, install it from [https://www.quicklisp.org/](https://www.quicklisp.org/).
-*   **ASDF (Another System Definition Facility):**
-    *   Usually comes bundled with modern Lisp implementations and Quicklisp.
-*   **Git:**
-    *   For cloning the Elmtui repository.
-*   **Text Editor/IDE with Lisp Support:**
-    *   **Emacs with SLIME or Sly:** Highly recommended for an interactive Lisp development experience.
-    *   **VS Code with Alive:** A good alternative for VS Code users.
-    *   (Other editors with Lisp plugins might also work).
+- **SBCL** (Steel Bank Common Lisp). ElmTUI is qualified on SBCL; other
+  implementations are not yet supported because parts of the toolkit use
+  `sb-posix` and `sb-mop`.
+- **[CLPM](https://www.clpm.dev/)** — the Common Lisp Package Manager.
+  ElmTUI uses CLPM for its locked dependency workflow.
+- **Git** — the four `cl-*` libraries are real Git submodules.
+- **A POSIX terminal** with ANSI support. tmux is optional but
+  recommended for the overlay examples.
 
-## Setting Up Elmtui
+### Recommended editor
 
-### 1. Clone the Repository
+- **Emacs with SLY** — ElmTUI's own development uses SLY/Slynk. The
+  `dev/clpmfile` contains the Slynk dependency.
+- **VS Code with Alive** — a workable alternative.
 
-```bash
-git clone <repository_url_for_elmtui> elmtui
+## Clone and install
+
+```sh
+git clone --recurse-submodules https://github.com/fkr-0/elmtui.git
 cd elmtui
+clpm bundle install
 ```
-*(Replace `<repository_url_for_elmtui>` with the actual URL)*
 
-### 2. Make Elmtui Discoverable by ASDF
+The `--recurse-submodules` flag is required. The four `cl-events`,
+`cl-inputs`, `cl-state`, and `cl-styles` libraries are Git submodules
+pinned to specific commits. Without them, ASDF cannot find the support
+systems.
 
-You need to tell ASDF where to find the Elmtui system definition. There are several ways to do this:
+If you already cloned without submodules:
 
-*   **Option A: Symlink to Quicklisp local-projects:**
-    ```bash
-    # Ensure this path is correct for your Quicklisp setup
-    ln -s "$(pwd)" ~/quicklisp/local-projects/elmtui
-    ```
+```sh
+git submodule update --init --recursive
+clpm bundle install
+```
 
-*   **Option B: Add to ASDF source registry:**
-    *   Add the path to the Elmtui directory to your Lisp implementation's ASDF source registry configuration. This is often done in `~/.config/common-lisp/source-registry.conf.d/` or a similar location.
-    *   Example for `source-registry.conf`:
-        ```lisp
-        (:tree "/path/to/your/elmtui/directory/")
-        ```
+## Load ElmTUI
 
-### 3. Install Dependencies (if using CLPM or a project-specific Quicklisp setup)
+Run all commands from the repository root so CLPM's bundle context is
+active:
 
-*   **Using CLPM:**
-    *   If a `clpmfile` is present and you use CLPM:
-        ```bash
-        clpm install
-        ```
-*   **Using Quicklisp:**
-    *   If dependencies are managed via Quicklisp, they should be automatically fetched when you load Elmtui, provided they are available in Quicklisp distributions.
-    *   For project-local dependencies not in Quicklisp, ensure they are also in `~/quicklisp/local-projects/`.
+```sh
+clpm bundle exec --with-client sbcl -- --noinform \
+  --eval '(require :asdf)' \
+  --eval '(asdf:load-system "elmtui")'
+```
 
-### 4. Load Elmtui in Your Lisp Environment
+## Run examples
 
-Start your Lisp REPL (e.g., `sbcl`, or via SLIME/Sly in Emacs).
+```sh
+scripts/examples.sh list
+scripts/examples.sh run neon-tetris
+scripts/examples.sh run repl
+```
+
+From a Lisp REPL:
 
 ```lisp
-;; Load Elmtui system
-(ql:quickload :elmtui)
-
-;; To load tests as well (if defined as a separate system or part of :elmtui)
-;; (ql:quickload :elmtui-tests) or (ql:quickload "elmtui/tests")
+(asdf:load-system "elmtui-examples")
+(elmtui.examples.minimal:run-minimal)
 ```
 
-### 5. Running Examples
+See [examples/README.md](../../examples/README.md) for the full catalog
+and entry points.
 
-*   Navigate to the `examples/` directory.
-*   Load and run specific example files as per their instructions. For example:
-    ```lisp
-    ;; In your Lisp REPL, after loading :elmtui
-    (load "examples/some-example.lisp")
-    (elmtui-examples:run-some-example) ;; Or whatever the example's entry point is
-    ```
+## Run tests
+
+Root integration suite:
+
+```sh
+clpm bundle exec --with-client sbcl -- \
+  --noinform --load scripts/run-tests-clpm.lisp
+```
+
+Every reusable subsystem independently:
+
+```sh
+scripts/test-subsystems.sh
+```
+
+Complete release gate:
+
+```sh
+scripts/release-check.sh
+```
+
+## Development with SLY
+
+SLY/Slynk is kept in a separate `dev/clpmfile` so the main lock contains
+no editor-server packages. Install it with:
+
+```sh
+cd dev && clpm bundle install && cd ..
+```
+
+Then start SBCL with the development bundle and connect SLY.
 
 ## Troubleshooting
 
-*   **System Not Found:** If ASDF cannot find `:elmtui`, double-check your ASDF source registry configuration or symlink in `local-projects`.
-*   **Dependency Issues:** Ensure all required libraries are installed and accessible. Check Quicklisp or CLPM messages.
-*   (Add more common setup issues and solutions as they become known).
+- **System not found** — make sure you cloned with `--recurse-submodules`
+  and ran `clpm bundle install`.
+- **Dependency missing** — run `clpm bundle install` again. Check that
+  `clpmfile.lock` is present.
+- **Submodule empty** — run `git submodule update --init --recursive`.
 
----
-*This guide will be updated with more specific instructions and troubleshooting tips.*
+See [troubleshooting.md](./troubleshooting.md) for more.

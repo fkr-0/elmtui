@@ -6,6 +6,26 @@ The project follows semantic versioning from the first published release.
 
 ## Unreleased
 
+## [0.4.1] - 2026-11-01
+
+### Documentation
+
+- Rewrote five developer guides (`creating-applications.md`,
+  `creating-widgets.md`, `setup.md`, `troubleshooting.md`,
+  `contribution-guide.md`) against the current source API, replacing
+  pre-0.2.0 placeholder content that referenced nonexistent constructs
+  (`defmodel`, `defwidget`, Quicklisp, `elmtui.ui:render`,
+  `elmtui.view:vstack`).
+- Updated `USER_GUIDE.md` to document both `defapplication` and
+  `deftea-app` constructors, fix the update function signature, correct
+  patch syntax, and replace removed scripts with current test commands.
+- Adopted the normative runtime vocabulary (INIT / TRANSITION / VIEW /
+  SUBSCRIPTIONS from `make-runtime-app-spec`) in the longform chapters,
+  website quickstart, widget inventory, and release page.
+- Fixed broken internal links in `README.org` and `website/release.md`
+  to quarantined review and checklist files.
+- Updated `examples/README.md` to remove stale references.
+
 ## [0.4.0] - 2026-11-01
 
 Breaking release that finishes the API review's export cleanup. Every exported

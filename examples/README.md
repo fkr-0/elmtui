@@ -1,10 +1,8 @@
 # ElmTUI examples
 
-**[Capability atlas / hallmark index](../docs/examples-capability-index.md)** —
-the complete inventory of all 34 top-level example sources, the single
-capability each demonstrates, a reproducible proof action, its runtime
-classification, and the acceptance bar before calling it a flagship. Start
-there when choosing a demo; use this guide for longer walkthroughs.
+The tables below list every maintained example, grouped by purpose.
+Use this guide for walkthroughs and the "Start here" table to pick a
+first demo.
 
 The `elmtui-examples` ASDF system contains the maintained applications used by
 smoke tests and manual verification. Load the system once, then call an
@@ -21,7 +19,7 @@ clpm bundle exec --with-client sbcl -- \
 **Prime developer showcase:** `./scripts/examples.sh run repl` launches the
 optional ElmTUI Workbench with one consistent editor/evaluator/inspector UI.
 See [Workbench](../docs/workbench-user-guide.md) and the
-[capability atlas](../docs/examples-capability-index.md). It evaluates
+the [Workbench user guide](../docs/workbench-user-guide.md). It evaluates
 trusted local Lisp, not sandboxed code, so use it only with expressions you
 intend to execute.
 

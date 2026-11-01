@@ -32,7 +32,7 @@ A widget is part of the application's message flow rather than an independent te
 
     message / key / resize
              ↓
-       UPDATE(model)
+    TRANSITION(message, model)
              ↓
       new model + commands
              ↓

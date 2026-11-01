@@ -8,43 +8,67 @@ This guide describes how to build TUI apps with ElmTUI’s current API, integrat
 - Load core: `clpm bundle exec --with-client sbcl -- --eval '(asdf:load-system :elmtui)'`
 - Load maintained examples (optional): `clpm bundle exec --with-client sbcl -- --eval '(asdf:load-system :elmtui-examples)'`
 
-## App Structure (defapplication)
+## App Structure
 
-- Define an app with `elmtui.app:defapplication`.
-- Required keywords:
-  - `:root-viewport-id`: unique ID for the root viewport.
-  - `:root-component-dsl`: quoted DSL for the root component subtree.
-  - `:update-fn`: function `(message app-state) -> update-result`.
-  - `:view-fn`: function `(app-state) -> DSL`; the generated wrapper adds the root viewport.
-- Optional: `:initial-state-plist` or `:initial-state-fn`, `:command-processor-fn`, `:subscriptions-fn`.
+ElmTUI provides two application constructors. Both lower to the same
+runtime specification.
 
-Example skeleton:
+### `defapplication` (production constructor)
+
+The normative full application constructor. Uses patch-based updates with
+`make-update-result` and reads state with `state-ref`.
+
+- Required: `:root-viewport-id`, `:root-component-dsl`.
+- Optional: `:initial-state-plist` or `:initial-state-fn`, `:update-fn`,
+  `:view-fn`, `:subscriptions-fn`, `:command-processor-fn`,
+  `:state-semantics` (`:transactional` or `:strict-elm`).
 
 ```lisp
-(defun my-update (message app-state)
-  (elmtui.state.api:make-update-result))
+(defun my-update (message state)
+  (cond
+    ((elmtui:quit-requested-p message)
+     (elmtui:make-update-result :patches '(((:should-quit) t))))
+    (t (elmtui:make-update-result))))
 
-(defun my-view (app-state &key root-id)
-  (declare (ignore app-state root-id))
+(defun my-view (state)
   '(:container :id :root :children ((:text :content "Hello"))))
 
-(elmtui.app:defapplication hello-app
+(elmtui:defapplication hello-app
   :root-viewport-id :root
-  :root-component-dsl '(:container :id :root)
+  :root-component-dsl '(:root-viewport :id :root :anchor :below-cursor
+                        :height 3 :child-dsl-spec (:view nil))
   :initial-state-plist '(:should-quit nil)
-  :update-fn 'my-update
-  :view-fn 'my-view)
+  :update-fn #'my-update
+  :view-fn #'my-view)
 ```
 
-Run it: `(hello-app:run-hello-app :platform :terminal)`; or through the driver: `elmtui.platform.driver:run-app-platform` with an app‑spec.
+Run it: `(hello-app:run-hello-app)`.
+
+### `deftea-app` (minimal direct-transition adapter)
+
+For small programs whose transition function returns a whole new model
+instead of patches:
+
+```lisp
+(elmtui:deftea-app hello-tea
+  :init       #'init
+  :transition #'transition
+  :view       #'view)
+```
+
+The normative runtime vocabulary is `INIT`, `TRANSITION`, `VIEW`, and
+`SUBSCRIPTIONS`. `deftea-app` expands into `defapplication` with
+`:strict-elm` state semantics.
 
 ## State and Updates
 
-- Use `elmtui.state.api:make-update-result` to return patches and commands.
-- Patches are plists replacing or setting keys in the model; commands are async tasks/messages.
+- Use `elmtui:make-update-result` to return patches and commands from
+  `defapplication` update functions.
+- Each patch is `(PATH NEW-VALUE)` where PATH is a list of keys.
+- Commands are async effect descriptors.
 
 ```lisp
-(make-update-result :patches '((:should-quit t)) :commands nil)
+(make-update-result :patches '(((:should-quit) t)) :commands nil)
 ```
 
 ## Rendering
@@ -104,19 +128,19 @@ Define a local keymap with both single keys and a multi-key sequence, attach it 
   :keymaps (list *editor-local*))
 
 ;; 2) Reference the context from your widget (focus activates it)
-(defun my-view (app-state &key root-id)
-  (declare (ignore app-state root-id))
+(defun my-view (model)
+  (declare (ignore model))
   '(:container :id :root :children
     ((:text :id :editor :focusable t :keymap-id :editor-context
        :style (:border t) :content "Edit here…"))))
 
-;; 3) Handle dispatched messages in your update
-(defun my-update (message app-state)
+;; 3) Handle dispatched messages in your transition
+(defun my-update (message model)
   (case (car message)
-    (:save (format t "Saved!~%") (elmtui.state.api:make-update-result))
-    (:quit (elmtui.state.api:make-update-result :patches '((:should-quit t))))
-    (:delete-last (elmtui.state.api:make-update-result))
-    (t (elmtui.state.api:make-update-result))))
+    (:save (format t "Saved!~%") (elmtui:make-update-result))
+    (:quit (elmtui:make-update-result :patches '(((:should-quit) t))))
+    (:delete-last (elmtui:make-update-result))
+    (t (elmtui:make-update-result))))
 
 ;; 4) Ensure keymaps are initialised once (driver does this for you)
 (elmtui.keymaps:initialise)
@@ -146,8 +170,10 @@ Tips:
 
 ## Testing
 
-- Run all tests: `./rt.sh`
-- Subsets: `./rt-input.sh`, `./rt-styles.sh`
+- Root integration suite:
+  `clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp`
+- Subsystem suites: `scripts/test-subsystems.sh`
+- Full release gate: `scripts/release-check.sh`
 
 ## Examples
 

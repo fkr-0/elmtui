@@ -1,89 +1,84 @@
-# Elmtui Troubleshooting Guide
+# Troubleshooting
 
-This guide provides solutions and debugging tips for common issues encountered while developing with or using the Elmtui library.
+## Setup issues
 
-## Common Setup Issues
+### System not found
 
-*   **Symptom:** System `:elmtui` not found by ASDF/Quicklisp.
-    *   **Cause:** Elmtui directory not correctly added to ASDF's source registry or `~/quicklisp/local-projects/`.
-    *   **Solution:** Review the [Setup Guide](./setup.md#2-make-elmtui-discoverable-by-asdf) and ensure paths are correct. Try `(asdf:clear-source-registry)` and reloading your Lisp image.
+ASDF reports `:elmtui` or a `cl-*` system as missing.
 
-*   **Symptom:** Dependency not found (e.g., `XYZ system not found`).
-    *   **Cause:** A required library is missing or not discoverable by Quicklisp/CLPM.
-    *   **Solution:**
-        *   If using Quicklisp, ensure the library is available in your Quicklisp distribution or `local-projects`. Try `(ql:update-all-dists)` if it's a Quicklisp library.
-        *   If using CLPM, ensure `clpm install` was successful and the library is listed in `clpmfile`.
+- Clone with `--recurse-submodules` (or run `git submodule update --init
+  --recursive`).
+- Run `clpm bundle install` from the repository root.
+- Run commands through `clpm bundle exec` so the CLPM context is active.
 
-## Runtime Issues
+### Dependency not found
 
-*   **Symptom:** Terminal output is garbled or looks incorrect.
-    *   **Cause:**
-        *   Incorrect terminal type (`$TERM` environment variable) or capabilities.
-        *   Unsupported terminal emulator features.
-        *   Bugs in the Elmtui rendering backend for your specific terminal.
-        *   Character encoding issues (ensure UTF-8).
-    *   **Debugging Steps:**
-        *   Try a different, well-supported terminal emulator (e.g., `xterm`, `gnome-terminal`).
-        *   Check your `$TERM` variable (e.g., `xterm-256color`).
-        *   Simplify your UI to isolate the problematic component or style.
-        *   Enable any Elmtui debug logging related to rendering (see [Logging Guide](../core/logging.md) - *placeholder link*).
+A CLPM-managed library is missing.
 
-*   **Symptom:** Application freezes or becomes unresponsive.
-    *   **Cause:**
-        *   Infinite loop in update logic or event handling.
-        *   Deadlock in concurrent operations.
-        *   Blocking call in the main event loop.
-    *   **Debugging Steps:**
-        *   Use the Lisp debugger to inspect the backtrace when the freeze occurs.
-        *   Add logging to trace event flow and state changes.
-        *   If using threads, check for deadlocks or race conditions.
+- Re-run `clpm bundle install`.
+- Check that `clpmfile.lock` is present and not gitignored.
+- If you added a new dependency, update `clpmfile` and regenerate the
+  lock.
 
-*   **Symptom:** Incorrect layout or component sizing.
-    *   **Cause:**
-        *   Incorrect flexbox/grid properties.
-        *   Intrinsic size of components conflicting with layout constraints.
-        *   Bugs in the Elmtui layout engine.
-    *   **Debugging Steps:**
-        *   Use any Elmtui layout debugging tools (if available, e.g., visual outlines).
-        *   Simplify the component tree to isolate the layout issue.
-        *   Experiment with different layout properties.
+## Runtime issues
 
-*   **Symptom:** Events (e.g., key presses) not being handled as expected.
-    *   **Cause:**
-        *   Incorrect keymap definitions.
-        *   Focus issues (the wrong component has focus).
-        *   Event propagation being stopped prematurely.
-        *   Bugs in event handling logic.
-    *   **Debugging Steps:**
-        *   Enable Elmtui event logging to see the event flow.
-        *   Check which component currently has focus.
-        *   Verify your keymap definitions and event handlers.
+### Terminal output is garbled
 
-## Performance Issues
+- Check `$TERM` (`xterm-256color` or similar).
+- Ensure UTF-8 locale (`$LANG`, `$LC_ALL`).
+- Try a different terminal emulator. ElmTUI is tested primarily on
+  `xterm`, `gnome-terminal`, `alacritty`, `kitty`, and tmux.
+- Simplify the UI tree to isolate the problem.
+- Enable framework logging: pass `:log-file "debug.log"` to the
+  generated runner.
 
-*   **Symptom:** Application is slow or laggy.
-    *   **Cause:**
-        *   Inefficient rendering (too many updates, complex diffs).
-        *   Expensive computations in the update logic or view function.
-        *   Too frequent state updates.
-    *   **Debugging Steps:**
-        *   Use Lisp profiling tools (e.g., `SB-PROFILE` in SBCL) to identify bottlenecks.
-        *   Enable Elmtui performance monitoring or benchmarking tools (if available).
-        *   Optimize your view functions and state update logic.
-        *   Consider memoization or other techniques to reduce re-computation.
+### Application freezes
 
-## Reporting Issues
+- Check for infinite loops in update or view logic.
+- Use the Lisp debugger to inspect the backtrace.
+- Enable `log4cl` tracing to follow event/message flow.
+- Check for deadlocks if using threads.
 
-If you encounter an issue not covered here or suspect a bug in Elmtui:
-1.  Try to create a minimal reproducible example.
-2.  Gather relevant information:
-    *   Elmtui version.
-    *   Common Lisp implementation and version.
-    *   Operating System and version.
-    *   Terminal emulator and version.
-    *   Relevant code snippets.
-    *   Error messages and backtraces.
-3.  Report the issue on the Elmtui project's issue tracker (provide link here).
+### Layout or sizing is wrong
 
----
-*This guide will be expanded with more specific issues and solutions as they are identified.*
+- Verify flex/grid style properties.
+- Simplify the component tree to isolate the issue.
+- Check terminal dimensions (`tput cols`, `tput lines`).
+- Use `elmtui-dev` diagnostics if loaded (`asdf:load-system
+  "elmtui-dev"`).
+
+### Key presses not handled
+
+- Confirm which component has focus.
+- Check keymap definitions — use
+  `elmtui.keymaps:list-active-keybindings` to inspect.
+- Verify the update function handles the expected message shapes.
+- Enable event logging to trace the input pipeline.
+
+## Performance issues
+
+- Use SBCL profiling (`sb-profile`) to identify bottlenecks.
+- Check whether view functions perform expensive computation on every
+  render.
+- Consider memoization for stable view subtrees.
+- The `elmtui-dev` system provides optional microbenchmarks; see the
+  [developer tools guide](../developer-tools.md).
+
+## Common conditions
+
+| Condition | Meaning |
+|---|---|
+| `invalid-dsl-form` | The DSL tree contains an improper, circular, or over-deep form. |
+| `state-mutation-forbidden` | A `:strict-elm` frozen snapshot was mutated through a supported API. |
+| `component-error` | A component signalled during init, update, or view. |
+
+Use `handler-bind` to inspect structured conditions and their restarts
+before they unwind. See the
+[foundations chapter](../longform/01-foundations-and-elm-architecture.md)
+for the condition/restart architecture.
+
+## Reporting issues
+
+1. Create a minimal reproducible example.
+2. Gather: ElmTUI version, SBCL version, OS, terminal, backtrace.
+3. Report at [github.com/fkr-0/elmtui/issues](https://github.com/fkr-0/elmtui/issues).

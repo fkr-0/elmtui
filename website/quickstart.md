@@ -89,18 +89,17 @@ How it fits together:
 - `view` is a pure function from state to a declarative UI tree (`:container`, `:text`, …) with CSS-like styles.
 - `defapplication` wires them together and defines `run-counter`. The root viewport is drawn below the cursor and needs an explicit `:height`. Framework logging is off while the application runs; pass `:log-file "counter.log"` to `run-counter` to keep it.
 
-The key contract is:
+The normative runtime contract is:
 
 ```text
-init  -> model
-view  <- model
-msg   -> update(model, msg) -> patches + commands
-commands -> results as messages -> update
+init        :: () -> (values model commands)
+transition  :: (message model) -> (values next-model commands)
+view        :: model -> dsl-tree
 ```
 
-The root `elmtui` package exports the application API used here. `defapplication` is the full application constructor; `deftea-app` is a smaller constructor for programs whose update function returns a whole new model instead of patches; it expands into `defapplication`.
+`defapplication` adapts patch-based updates (`:update-fn`) into this transition contract. `deftea-app` is a smaller constructor whose transition function returns a whole new model instead of patches; it expands into `defapplication`. Both share one runtime.
 
-The [foundations](guide/foundations.md) chapter explains the architecture, and the [counter and async tutorial](guide/tutorial.md) shows how to test update functions without a terminal.
+The [foundations](guide/foundations.md) chapter explains the architecture, and the [counter and async tutorial](guide/tutorial.md) shows how to test transition functions without a terminal.
 
 ## Explore the Workbench
 

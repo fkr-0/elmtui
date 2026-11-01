@@ -1,143 +1,237 @@
----
-ai_keywords: [Elmtui, Developer Guide, Onboarding, App Creation, defcomponent, defmodel, defapplication, State Models, Component Patterns, Configuration]
-ai_contexts: [development, guide, process]
-ai_relations: [
-  "../../ai-index/overview.md",
-  "../../architecture/app-creation-configuration.md",
-  "../modules/ui/component-lifecycle.md",
-  "../modules/tea-state/state-transactions.md",
-  "../modules/app/application-patterns.md",
-  "./coding-standards.md"
-]
----
-# Elmtui Developer Onboarding: Creating Applications
+# Creating ElmTUI applications
 
-This guide provides a step-by-step introduction for new developers to understand and effectively use Elmtui's three core systems: `defcomponent`, `defmodel`, and `defapplication`. It aims to flatten the steep learning curve identified in the architectural review and provide clear guidance for building robust TUI applications.
+This guide walks through building an ElmTUI application from scratch.
+It covers both constructors — `defapplication` (the full production
+surface) and `deftea-app` (the minimal direct-transition adapter) — and
+shows how the normative runtime vocabulary maps onto each.
 
-<!-- AI-IMPORTANCE:level=critical -->
-## 1. Understanding the Core Trio: `defcomponent`, `defmodel`, `defapplication`
+## The runtime contract
 
-Before diving into code, it's essential to grasp the roles of Elmtui's foundational macros.
+Every ElmTUI application lowers to the same runtime specification
+(`make-runtime-app-spec`). The normative vocabulary is:
 
-*   **`defapplication`**: The "main" function of your Elmtui app. It sets up the global environment, defines the root UI component, initializes the global state model, and manages the main event loop. Think of it as the orchestrator.
-*   **`defmodel`**: Manages your application's global state. This is where the data that drives your UI resides. `defmodel` provides a transactional system to update state safely and notify interested components of changes.
-*   **`defcomponent`**: Defines individual UI elements. Components are responsible for rendering a part of the UI based on their own local state and any data passed down from parent components or observed from the global model. They also handle user interactions (messages).
-
-<!-- AI-CONTEXT-START:type=guide -->
-## 2. Step-by-Step Application Creation
-
-Let's walk through creating a simple counter application.
-
-### Step 2.1: Define Your Application Model (`defmodel`)
-
-Start by defining the global state your application needs. For a counter, we just need a `count`.
-
-```lisp
-;; file: my-counter-app/src/model.lisp
-(in-package :my-counter-app)
-
-(elmtui.state:defmodel counter-model ()
-  ((count :initform 0 :accessor counter-count)))
+```text
+INIT        :: () -> (values MODEL COMMANDS)
+TRANSITION  :: (MESSAGE MODEL) -> (values NEXT-MODEL COMMANDS)
+VIEW        :: MODEL -> DSL-TREE
+SUBSCRIPTIONS :: MODEL -> SUBSCRIPTIONS
 ```
 
-### Step 2.2: Define Your UI Components (`defcomponent`)
+`defapplication` accepts `:update-fn` / `:view-fn` keywords that adapt
+the patch-based update contract into the runtime transition.
+`deftea-app` accepts `:transition` / `:view` keywords for a direct
+model-replacement style. Both share one runtime.
 
-Next, create the UI elements. A simple counter might have a display and two buttons.
+## Minimal application with `deftea-app`
 
-```lisp
-;; file: my-counter-app/src/components.lisp
-(in-package :my-counter-app)
-
-(elmtui.ui:defcomponent counter-display-component ()
-  ((app-model :initarg :app-model))) ; Component will receive the model
-
-(defmethod elmtui.ui:render ((component counter-display-component) &key)
-  (let ((current-count (counter-count (slot-value component 'app-model))))
-    (elmtui.view:text (format nil "Count: ~a" current-count))))
-
-(elmtui.ui:defcomponent counter-button-component ()
-  ((label :initarg :label)
-   (message :initarg :message)))
-
-(defmethod elmtui.ui:render ((component counter-button-component) &key)
-  (elmtui.view:button (slot-value component 'label) (slot-value component 'message)))
-
-(elmtui.ui:defcomponent main-counter-component ()
-  ((app-model :initarg :app-model)))
-
-(defmethod elmtui.ui:render ((component main-counter-component) &key)
-  (elmtui.view:vstack
-    (elmtui.ui:render (make-instance 'counter-display-component :app-model (slot-value component 'app-model)))
-    (elmtui.ui:render (make-instance 'counter-button-component :label "Increment" :message '(:type :increment)))
-    (elmtui.ui:render (make-instance 'counter-button-component :label "Decrement" :message '(:type :decrement)))))
-
-(defmethod elmtui.ui:handle-message ((component main-counter-component) (message (eql '(:type :increment))))
-  (elmtui.state:with-transaction ((model (slot-value component 'app-model)))
-    (incf (counter-count model)))
-  t)
-
-(defmethod elmtui.ui:handle-message ((component main-counter-component) (message (eql '(:type :decrement))))
-  (elmtui.state:with-transaction ((model (slot-value component 'app-model)))
-    (decf (counter-count model)))
-  t)
-```
-
-### Step 2.3: Define Your Application (`defapplication`)
-
-Finally, bring it all together in your application definition.
+`deftea-app` is the smallest path. Use it for pedagogical programs or
+small tools whose update function returns a whole new model.
 
 ```lisp
-;; file: my-counter-app/src/app.lisp
-(in-package :my-counter-app)
+(uiop:define-package :my-counter
+  (:use :cl)
+  (:import-from :elmtui
+                #:deftea-app)
+  (:export #:run-my-counter))
+(in-package :my-counter)
 
-(elmtui.app:defapplication my-counter-app ()
-  ((model :initform (make-instance 'counter-model))
-   (root-component :initform (make-instance 'main-counter-component :app-model (slot-value *application* 'model)))
-   (global-keymap :initform (elmtui.keymap:make-keymap
-                              #\q '(:type :quit)))))
+(defun init ()
+  (values '(:count 0) nil))
 
-(defmethod elmtui.app:handle-message ((app my-counter-app) (message (eql '(:type :quit))))
-  (elmtui.app:quit app))
+(defun transition (message model)
+  (let ((count (getf model :count 0)))
+    (cond
+      ((eql message :increment)
+       (values (list :count (1+ count)) nil))
+      ((eql message :decrement)
+       (values (list :count (1- count)) nil))
+      (t (values model nil)))))
+
+(defun view (model)
+  `(:text :id :display
+    :content ,(format nil "Count: ~D" (getf model :count 0))))
+
+(deftea-app my-counter
+  :init #'init
+  :transition #'transition
+  :view #'view
+  :root-viewport-id :counter-root
+  :anchor :below-cursor
+  :height 3)
 ```
 
-## 3. Decision Trees and Best Practices
+Run it:
 
-### 3.1. Choosing State Models: Contracts vs. Simple
+```sh
+clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+  --eval '(require :asdf)' --eval '(asdf:load-system "elmtui")' \
+  --load my-counter.lisp --eval '(my-counter:run-my-counter)'
+```
 
-<!-- AI-IMPORTANCE:level=high -->
-Elmtui's `defmodel` supports both simple plist-based state and more structured "contracted" state.
+Ctrl-C quits. Returning a model plist with `:should-quit t` from
+`transition` also ends the application.
 
-*   **Simple Plist State**:
-    *   **When to use**: For small, simple applications or parts of an application where state structure is unlikely to change frequently. Quick to set up.
-    *   **Trade-offs**: Less compile-time checking, easier to introduce inconsistencies.
-*   **Contracted State**:
-    *   **When to use**: For larger, more complex applications where state consistency and validation are critical. Provides compile-time checks and enforces structure.
-    *   **Trade-offs**: More verbose to define, slightly higher initial setup cost.
+### What `deftea-app` generates
 
-**Recommendation**: For new projects, start with simple plist state. As complexity grows, refactor critical parts of your model to use contracts for improved robustness.
+- Adapter functions that keep the model under `:tea-model` of the
+  application state.
+- A `defapplication` expansion with `:strict-elm` state semantics.
+- `run-my-counter` — the application runner.
+- `*my-counter-app-spec*` — a runtime spec plist for
+  `elmtui.app.api:run-application`.
 
-### 3.2. Component Patterns
+## Production application with `defapplication`
 
-*   **Container Components**: Manage state and logic, pass data down to presentational components.
-*   **Presentational Components**: Purely responsible for rendering UI based on props, no internal state or logic.
-*   **Higher-Order Components (HOCs)**: Functions that take a component and return a new component with enhanced functionality (e.g., adding logging, focus management).
+`defapplication` is the normative full application constructor. It owns
+the production surface: CL-STATE initialization, component/root-viewport
+wiring, context/patch-based updates, subscriptions, CLI and binary
+configuration, keymaps, and selectable `:transactional` / `:strict-elm`
+commit semantics.
 
-### 3.3. Configuration Options
+```lisp
+(uiop:define-package :my-app
+  (:use :cl)
+  (:import-from :elmtui
+                #:defapplication #:make-update-result #:state-ref
+                #:key-pressed-p #:quit-requested-p)
+  (:export #:run-my-app))
+(in-package :my-app)
 
-*   **Global Keymaps**: Define application-wide keyboard shortcuts in `defapplication`.
-*   **Platform Backends**: Choose the appropriate terminal backend for your target environment (e.g., `tty-backend` for standard terminals, `urxvt-backend` for URXVT).
-*   **Styling**: Utilize `elmtui.style` for consistent theming and visual presentation.
+(defun initial-state ()
+  (list :count 0 :should-quit nil))
 
-## 4. Troubleshooting and Debugging
+(defun update (message state)
+  (let ((count (state-ref state :count 0)))
+    (cond
+      ((key-pressed-p message :char #\+)
+       (make-update-result :patches `(((:count) ,(1+ count)))))
+      ((key-pressed-p message :char #\-)
+       (make-update-result :patches `(((:count) ,(1- count)))))
+      ((or (key-pressed-p message :char #\q) (quit-requested-p message))
+       (make-update-result :patches '(((:should-quit) t))))
+      (t (make-update-result)))))
 
-*   **Message Flow**: Use `log4cl` to trace message dispatch and state changes.
-*   **Macro Expansion**: Common Lisp's macro expansion tools (e.g., `macroexpand-1`, `macroexpand`) are invaluable for understanding what `defcomponent`, `defmodel`, and `defapplication` generate.
-*   **State Inspection**: During development, inspect the `model` slot of your `defapplication` instance to verify state.
+(defun view (state)
+  `(:container
+    :id :root
+    :style (:display :block :width 34 :height 3 :padding 1)
+    :children
+    ((:text :id :count
+      :content ,(format nil "Count: ~D   (+/- change, q quits)"
+                        (state-ref state :count 0))))))
 
-## Related Resources
+(defapplication my-app
+  :root-component-dsl '(:root-viewport :id :app-root
+                        :anchor :below-cursor :height 3
+                        :child-dsl-spec (:view nil))
+  :root-viewport-id :app-root
+  :initial-state-fn #'initial-state
+  :update-fn #'update
+  :view-fn #'view)
+```
 
-*   [App Creation and Configuration Architecture Guide](../../architecture/app-creation-configuration.md)
-*   [Component Lifecycle Documentation](../modules/ui/component-lifecycle.md)
-*   [State Transactions Guide](../modules/tea-state/state-transactions.md)
-*   [Application Patterns Documentation](../modules/app/application-patterns.md)
-*   [Elmtui Coding Standards](./coding-standards.md)
+### Key differences from `deftea-app`
+
+| | `deftea-app` | `defapplication` |
+|---|---|---|
+| Update contract | `(message model) -> (values next-model commands)` | `(message state) -> update-result` |
+| State access | Direct plist / structure access | `state-ref` reads from application state |
+| State changes | Return a replacement model | Return `make-update-result` with patches |
+| State semantics | Always `:strict-elm` | `:transactional` (default) or `:strict-elm` |
+| Key matching | Manual `case`/`cond` | `key-pressed-p`, `quit-requested-p` |
+| Root viewport | Optional `:anchor` / `:height` | Explicit `:root-component-dsl` |
+
+### Required keywords
+
+- `:root-viewport-id` — keyword identifying the root viewport.
+- `:root-component-dsl` — quoted DSL form for the root component tree.
+
+### Optional keywords
+
+- `:initial-state-plist` or `:initial-state-fn` — initial model. The
+  function form may return startup commands as a second value.
+- `:update-fn` — `(message state) -> update-result`. Read state with
+  `state-ref`; return `make-update-result` with `:patches` and
+  `:commands`.
+- `:view-fn` — `(state) -> dsl-tree`, rendered inside the root viewport.
+- `:subscriptions-fn` — `(state) -> subscriptions`.
+- `:command-processor-fn` — custom effect interpreter.
+- `:state-semantics` — `:transactional` (default) or `:strict-elm`.
+- `:cli-options` — CLI argument specifications.
+- `:binary` — standalone packaging configuration.
+
+### Generated runner
+
+`defapplication` defines `run-my-app`:
+
+```lisp
+(my-app:run-my-app &key platform platform-options argv
+                        log-file log-buffer)
+```
+
+Framework logging is silent while the application runs. Pass
+`:log-file "app.log"` to capture it.
+
+## State access
+
+`defapplication` update functions receive the application state (not a
+raw plist). Read values with `state-ref`:
+
+```lisp
+(state-ref state :count 0)        ; read :count with default 0
+(state-ref state :user :name)     ; nested path
+```
+
+Return changes as patches in `make-update-result`:
+
+```lisp
+(make-update-result
+ :patches `(((:count) ,(1+ current-count))
+            ((:status) :ready))
+ :commands (list (cmd-async ...)))
+```
+
+Each patch is `(PATH NEW-VALUE)` where PATH is a list of keys.
+
+## Effects and commands
+
+Update functions should not perform I/O directly. Return commands as
+data and let the runtime execute them:
+
+```lisp
+(elmtui.core.async:cmd-async #'fetch-data
+  :args '("query")
+  :on-complete (lambda (result) `(:data-arrived :data ,result))
+  :on-error    (lambda (condition) `(:data-failed :err ,condition))
+  :timeout     10)
+```
+
+Completion and error results re-enter the message loop. See the
+[widgets and patterns](../longform/02-core-principles-widgets-and-patterns.md)
+chapter for the complete effects API.
+
+## Choosing between constructors
+
+Use `deftea-app` when:
+
+- Building a small tool or teaching example.
+- The update function naturally returns a whole new model.
+- You do not need component state, CLI configuration, or transaction
+  semantics control.
+
+Use `defapplication` when:
+
+- Building a production application.
+- You need patch-based updates, component wiring, or keymaps.
+- You want selectable `:transactional` / `:strict-elm` commit semantics.
+- You need CLI argument parsing or binary packaging.
+
+Both constructors lower to the same runtime, so the transition from
+`deftea-app` to `defapplication` is straightforward.
+
+## Next steps
+
+- [Foundations: Elm architecture in Common Lisp](../longform/01-foundations-and-elm-architecture.md)
+- [Counter and async tutorial](../longform/03-hands-on-counter-and-async.md)
+- [Widgets and patterns](../longform/02-core-principles-widgets-and-patterns.md)
+- [Creating widgets](./creating-widgets.md)

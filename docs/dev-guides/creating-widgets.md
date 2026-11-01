@@ -1,98 +1,161 @@
-# Creating Widgets in Elmtui
+# Creating widgets in ElmTUI
 
-This guide explains how to create new widgets (also referred to as components) for use within the Elmtui framework.
+Widgets (also called components) are reusable UI building blocks with
+their own local state, message handlers, and view function. ElmTUI
+defines them with the `defcomponent` macro.
 
-*(Note: This guide will be significantly based on and aims to supersede/integrate content from `docs_old/widget-authoring-v2.md` and other relevant existing documentation during Phase 4 of the documentation system build-out.)*
-
-## Introduction to Elmtui Widgets
-
-*   **What is a Widget/Component?**
-    *   Reusable building blocks of the UI.
-    *   Encapsulates state, view logic, and event handling.
-*   **Core Principles:**
-    *   Declarative definition.
-    *   Composition over inheritance (usually).
-    *   Adherence to the Elmtui state management model.
-
-## Basic Widget Structure
-
-(This section will detail the typical structure of an Elmtui widget definition, likely involving `defwidget` or a similar macro if provided by Elmtui, or standard `defclass` and method specializations.)
+## `defcomponent` syntax
 
 ```lisp
-;; Hypothetical example - to be replaced with actual Elmtui syntax
-(elmtui:defwidget my-custom-widget (props state)
-  (:initial-state
-   (list :counter 0))
+(defcomponent widget-name (superclasses...)
+  (:state (slot-name initial-value &key type doc)
+          ...)
 
-  (:view (widget-props widget-state)
-   (elmtui:view
-     (elmtui:button :on-click (lambda () (elmtui:send-msg widget :increment))
-                    (format nil "Count: ~a" (getf widget-state :counter)))))
+  (:init (props self-id-path)
+    body...)
 
-  (:update (msg widget-props widget-state)
-    (case (getf msg :type)
-      (:increment (list (elmtui:update-state widget-state :counter (1+ (getf widget-state :counter)))
-                        nil)) ; No command
-      (otherwise (list widget-state nil)))))
+  (:update (message local-state app-state self-id-path)
+    (:message-keyword (args...)
+      (values patches commands))
+    ...)
+
+  (:view (local-state app-state self-id-path children)
+    dsl-tree))
 ```
 
-## Key Aspects of Widget Development
+### Clauses
 
-### 1. Defining Properties (`props`)
-*   How to define input properties that can be passed to a widget.
-*   Type checking or validation for props.
+- **`:state`** — declares local state slots with initial values and
+  optional type/documentation annotations.
+- **`:init`** — called with props and the component's ID path. Returns
+  `(values initial-local-state commands)`.
+- **`:update`** — dispatches on message keywords. Each handler receives
+  destructured arguments and returns `(values patches commands)`.
+  Patches update local state; commands are async effects.
+- **`:view`** — receives local state, application state, the ID path,
+  and children. Returns a DSL tree.
 
-### 2. Managing Internal State (`state`)
-*   Defining the initial state of a widget.
-*   How the widget's internal state is structured and accessed.
-*   The role of immutability if applicable.
+## Example: a label widget
 
-### 3. Defining the View Logic
-*   Using Elmtui's view DSL to describe the widget's appearance.
-*   How to render child widgets.
-*   Conditional rendering based on props or state.
-*   Applying styles.
+```lisp
+(defcomponent my-label ()
+  (:state (text "" :type string)
+          (style nil))
 
-### 4. Handling Events and Messages (`update` / `msg`)
-*   How widgets receive and process messages (e.g., user input, internal events).
-*   Updating the widget's state in response to messages.
-*   Emitting messages or commands to parent components or the application.
+  (:init (props self-id-path)
+    (list :text (getf props :text "")))
 
-### 5. Widget Lifecycle (if applicable)
-*   Methods or hooks for initialization, mounting, unmounting, etc.
+  (:update (message local-state app-state self-id-path)
+    (:set-text (new-text)
+      (values `(((:text) ,new-text)) nil)))
 
-### 6. Styling Widgets
-*   How to apply styles defined in the Elmtui styling system.
-*   Defining default styles for a widget.
-*   Allowing users to override styles.
+  (:view (local-state app-state self-id-path children)
+    `(:text :id :label
+      :content ,(getf local-state :text)
+      :style ,(getf local-state :style))))
+```
 
-### 7. Focus Management
-*   How widgets participate in focus management (if they are interactive).
-*   Making a widget focusable.
-*   Handling focus and blur events.
+Use it in a parent view by referencing its DSL type:
 
-### 8. Keymap Integration
-*   Defining local keymaps for a widget.
-*   How widget keymaps interact with global keymaps.
+```lisp
+'(:my-label :id :greeting :text "Hello, world!")
+```
 
-## Best Practices for Widget Development
+## Update handler contract
 
-*   **Keep Widgets Focused:** Each widget should have a clear, single responsibility.
-*   **Aim for Reusability:** Design widgets to be usable in different contexts.
-*   **Clear API:** Define clear and understandable properties for your widget.
-*   **Performance Considerations:** Be mindful of performance, especially for frequently updated or complex widgets.
-*   **Documentation:** Provide good docstrings for your widget and its properties.
-*   **Testing:** Write unit tests for your widget's functionality.
+Each handler branch under `:update` is keyed by a message keyword:
 
-## Example: A Simple Counter Widget
+```lisp
+(:update (message local-state app-state self-id-path)
+  (:increment (amount)
+    (values `(((:count) ,(+ (getf local-state :count 0) amount)))
+            nil))
+  (:reset ()
+    (values '(((:count) 0)) nil)))
+```
 
-(A step-by-step example of creating a basic widget, like a counter button, will be provided here, illustrating the concepts above.)
+Handlers return `(values patches commands)`:
 
-## Advanced Topics
+- **patches** — `((path new-value) ...)` applied to local state.
+- **commands** — async effect descriptors, or `nil`.
 
-*   Creating container widgets (widgets that manage children).
-*   Inter-widget communication.
-*   Asynchronous operations within widgets.
+The component never mutates `local-state` directly. Unhandled messages
+follow the `:on-unhandled-message` policy (default: `:no-op`).
 
----
-*This guide will be significantly expanded by integrating existing documentation and adding detailed examples based on Elmtui's specific APIs and conventions.*
+## View contract
+
+The view function returns a DSL tree describing the widget's appearance:
+
+```lisp
+(:view (local-state app-state self-id-path children)
+  `(:container :id ,(elmtui.ui.api:id-from-path self-id-path)
+    :children
+    ((:text :id :value :content ,(format nil "~D" (getf local-state :count 0)))
+     ,@children)))
+```
+
+Available DSL node types include `:container`, `:text`, `:button`,
+`:label`, and registered component types. Style is specified with a
+`:style` plist using CSS-like properties.
+
+## Built-in widgets
+
+ElmTUI ships several `defcomponent`-based widgets:
+
+| Widget | Package | Purpose |
+|---|---|---|
+| `label` | `elmtui.ui.widgets.label` | Read-only text display |
+| `button` | `elmtui.ui.widgets.button` | Clickable action trigger |
+| `scroll-panel` | `elmtui.ui.widgets.scroll-panel` | Scrollable content region |
+| `button-enhanced` | `elmtui.ui.widgets.button-enhanced` | Button with variant/size/tooltip |
+| `label-enhanced` | `elmtui.ui.widgets.label-enhanced` | Label with accessibility props |
+
+Some widgets follow an explicit TEA model pattern instead (e.g.
+`listbox` with `init-listbox` / `update-listbox` / `view-listbox`).
+Both styles coexist; prefer `defcomponent` for new work.
+
+## Widget authoring checklist
+
+A well-documented widget should cover:
+
+1. **Identity** — stable ID across renders, component path formation.
+2. **State** — which state is owned vs. supplied by the parent.
+3. **Init** — props, defaults, initial commands, error conditions.
+4. **Messages** — every supported message shape with examples.
+5. **Update** — whether the model is mutated, what is returned, which
+   commands can be emitted, which conditions can be signalled.
+6. **View** — rendered node types, focusability, accessibility props,
+   empty/disabled/loading/error states.
+7. **Focus and keymap** — focus entry/exit, activation keys, whether
+   application keymaps may override them.
+8. **Conditions/restarts** — do not hide failures behind
+   `ignore-errors`; expose recoverable conditions with `use-value` or
+   `skip` restarts where safe.
+
+## Testing widgets
+
+### Pure update test
+
+```lisp
+(multiple-value-bind (patches commands)
+    (funcall update-fn :increment local-state app-state id-path)
+  (assert (equal '(((:count) 1)) patches))
+  (assert (null commands)))
+```
+
+### View test
+
+Call the view with synthetic state and inspect the returned DSL — no
+terminal needed.
+
+### Component integration test
+
+Initialize, send messages, and assert the resulting local state and
+emitted commands through the component lifecycle.
+
+## Next steps
+
+- [Widgets and patterns](../longform/02-core-principles-widgets-and-patterns.md)
+  for the complete widget inventory and authoring contract.
+- [Creating applications](./creating-applications.md) for how widgets
+  compose into a full application.
