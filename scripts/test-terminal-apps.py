@@ -392,8 +392,10 @@ class FullTerminalApps(unittest.TestCase):
         # before run-application, this executes after backend initialization.
         # The harness must observe a nonzero exit but restored tty/cursor.
         expression = (
-            '(progn (setf (symbol-function '
-            '(quote elmtui.examples.minimal::%minimal-initial-state)) '
+            '(progn (assert (fboundp '
+            '(quote elmtui.examples.minimal::minimal-init))) '
+            '(setf (symbol-function '
+            '(quote elmtui.examples.minimal::minimal-init)) '
             '(lambda () (error "E2_INJECTED_INIT_FAILURE"))) '
             '(elmtui.examples.minimal:run-minimal :platform :terminal))')
         app = self.app('fault-init', expression, source='minimal-app.lisp',
