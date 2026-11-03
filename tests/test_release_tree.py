@@ -23,7 +23,7 @@ class ReleaseTreeTests(unittest.TestCase):
         root = [path for path in tracked if "/" not in path]
         expected = {
             ".gitignore", ".gitmodules", "CHANGELOG.md", "LICENSE",
-            "README.org", "bridge.yml", "clpmfile", "clpmfile.lock",
+            "README.org", "clpmfile", "clpmfile.lock",
             "mkdocs.yml",
             "cl-events", "cl-inputs", "cl-state", "cl-styles",
         }

@@ -72,7 +72,6 @@ required_files=(
   scripts/coverage.lisp
   scripts/run-slynk.lisp
   scripts/history-purge-paths.txt
-  bridge.yml
   clpmfile
   clpmfile.lock
   dev/clpmfile
@@ -88,7 +87,6 @@ required_files=(
   elmtui-examples-fzy.asd
   elmtui-widgets-enhanced.asd
   docs/architecture/library-boundaries.md
-  docs/release-checklist.md
   examples/README.md
   scripts/release-check.sh
   scripts/test-subsystems.sh
