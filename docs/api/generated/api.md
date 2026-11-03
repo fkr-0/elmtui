@@ -4,7 +4,7 @@ Generated from live Common Lisp DOCUMENTATION metadata.
 
 **Scope:** exported, live bindings in ElmTUI and its CL-EVENTS, CL-STATE, CL-INPUTS, CL-STYLES support packages. Re-exports appear once; each qualified name uses an exporting package.
 
-**Coverage:** 1680 of 1858 bindings documented; 178 have no metadata (90.4% documented). Missing entries are intentionally shown, not silently omitted.
+**Coverage:** 1695 of 1873 bindings documented; 178 have no metadata (90.5% documented). Missing entries are intentionally shown, not silently omitted.
 
 ## CL-EVENTS.ASYNC:ALL
 
@@ -3949,10 +3949,12 @@ Return validated patch records for each record or two-element shorthand in PATCH
 
 ## CL-STATE.PATCH:PATCH
 
-Kinds: type
+Kinds: function, type
 
 ```text
-Structured logical state mutation with path, operation, and value slots.
+Build an update-result from flat KEY VALUE pairs.
+Each KEY names a top-level state slot; VALUE is its new value.
+For nested paths or commands, use MAKE-UPDATE-RESULT directly.
 ```
 
 ## CL-STATE.PATCH:PATCH-OP
@@ -5897,6 +5899,28 @@ Kinds: function
 Validate CLI option SPECS and return them unchanged.
 ```
 
+## ELMTUI.APP.TEA-CORE:APP-MODEL
+
+Kinds: function
+
+```text
+Return the user model from a DEFTEA-APP application state.
+
+APP-STATE is the CL-STATE application-state object that components receive in
+their :UPDATE and :VIEW clauses. In a DEFTEA-APP application the user's model
+is stored under the :TEA-MODEL key; this function extracts it.
+
+Use this in DEFCOMPONENT :VIEW and :UPDATE clauses to read the app model
+without depending on the internal :TEA-MODEL key:
+
+  (:view (local-state app-state id-path children)
+    (let ((model (elmtui:app-model app-state)))
+      ...))
+
+Returns the user model object, or NIL if the key is absent (e.g. when the
+component is hosted by a DEFAPPLICATION that does not use :TEA-MODEL).
+```
+
 ## ELMTUI.APP.TEA-CORE:DEFTEA-APP
 
 Kinds: macro
@@ -5922,11 +5946,13 @@ Syntax:
     :transition TRANSITION-FN
     :view       VIEW-FN
     &key
-      :subscriptions      SUBS-FN
-      :command-processor  CMD-FN
-      :root-viewport-id   ROOT-ID
-      :anchor             ANCHOR      ; default :BELOW-CURSOR
-      :height             ROWS)       ; default: sized by the content
+      :subscriptions        SUBS-FN
+      :command-processor    CMD-FN
+      :root-viewport-id     ROOT-ID
+      :root-component-dsl   DSL         ; override auto-generated DSL
+      :anchor               ANCHOR      ; default :BELOW-CURSOR
+      :height               ROWS        ; default: sized by the content
+      :handle-quit          BOOL)       ; default T; auto-handle :APP-QUIT-REQUESTED
 
 Required arguments:
 
@@ -6003,6 +6029,20 @@ Optional keywords:
       APP-CONFIG — optional configuration object (may be NIL)
 
     For a minimal TEA app you can omit this entirely.
+
+  :ROOT-COMPONENT-DSL
+    An optional DSL tree that overrides the auto-generated root viewport
+    DSL. Use this to place DEFCOMPONENT children inside a DEFTEA-APP
+    application. When provided, the user's :VIEW function output is
+    ignored and the DSL tree governs the component layout. Components in
+    the tree receive the CL-STATE application state in their :UPDATE and
+    :VIEW clauses; use (ELMTUI:APP-MODEL APP-STATE) to read the user
+    model.
+
+    Example:
+      :root-component-dsl '(:root-viewport :id :root :anchor :below-cursor
+                            :height 5
+                            :children ((:my-display :id :display)))
 
   :ROOT-VIEWPORT-ID
     A symbol, keyword, or string naming the logical root viewport.
@@ -6784,7 +6824,9 @@ Validates message in strict mode - only typed messages allowed
 Kinds: function
 
 ```text
-Validates subscriptions list structure
+Validates subscriptions list structure.
+Accepts NIL, a single keyword-headed descriptor plist, a subscription struct,
+or a list of either form.
 ```
 
 ## ELMTUI.CONTRACTS:VALIDATE-TYPED-MESSAGE
@@ -6937,10 +6979,13 @@ Kinds: function
 Construct an asynchronous ElmTUI command around FUNCTION.
 
 Arguments:
-  FUNCTION receives a progress callback followed by ARGS. ON-COMPLETE maps a
-  successful result to an application message; ON-ERROR maps a failure to an
-  application message. TIMEOUT schedules promise cancellation after the given
-  seconds. CANCELLATION-FN is optional best-effort cancellation cleanup.
+  FUNCTION is called with ARGS by default. When PROGRESS is true, FUNCTION
+  receives a progress callback as its first argument followed by ARGS; the
+  callback sends (:ASYNC-PROGRESS-UPDATE ...) messages to the application.
+  ON-COMPLETE maps a successful result to an application message; ON-ERROR maps
+  a failure to an application message. TIMEOUT schedules promise cancellation
+  after the given seconds. CANCELLATION-FN is optional best-effort cancellation
+  cleanup.
 
 Returns:
   A command plist beginning with :ASYNC and containing the task, generated task
@@ -6963,10 +7008,19 @@ Restarts:
   construction may allocate a new task/promise pair.
 
 Example:
+  ;; Without progress (default):
+  (cmd-async (lambda (value) (1+ value))
+             :args '(41)
+             :on-complete
+             (lambda (result)
+               `(:lookup-succeeded :result ,result)))
+
+  ;; With progress opt-in:
   (cmd-async (lambda (progress value)
                (funcall progress '(:phase :working))
                (1+ value))
              :args '(41)
+             :progress t
              :on-complete
              (lambda (result)
                `(:lookup-succeeded :result ,result)))
@@ -7049,7 +7103,7 @@ Restarts:
 Example:
   (multiple-value-bind (task promise)
       (interpret-cmd
-       (cmd-async (lambda (_progress) :ready)))
+       (cmd-async (lambda () :ready)))
     (values task promise))
 ```
 
@@ -8511,6 +8565,17 @@ Kinds: variable
 
 ```text
 Key constant generated by DEFINE-KEY-CONSTANTS: ESCAPE
+```
+
+## ELMTUI.CORE.EVENT-TYPES:KEY-EVENT-PARTS
+
+Kinds: function
+
+```text
+Extract key event components from MESSAGE.
+Returns (values KEY CHAR MODIFIERS) for key events, or (values NIL NIL NIL)
+otherwise.  Handles both key-event structs and legacy (:keyevent ...) plist
+messages.
 ```
 
 ## ELMTUI.CORE.EVENT-TYPES:KEY-F
@@ -12699,6 +12764,14 @@ Kinds: function
 
 _No documentation metadata._
 
+## ELMTUI.STATE.API:PATCH*
+
+Kinds: function
+
+```text
+Like PATCH but also accepts :COMMANDS.
+```
+
 ## ELMTUI.STATE.API:PLIST-TO-APPLICATION-STATE
 
 Kinds: function
@@ -12713,6 +12786,14 @@ Kinds: function
 
 ```text
 Pretty print the application state.
+```
+
+## ELMTUI.STATE.API:QUIT-RESULT
+
+Kinds: function
+
+```text
+Return an update-result that signals application shutdown.
 ```
 
 ## ELMTUI.STATE.API:REMOVE-COMPONENT-AT-PATH
@@ -14027,16 +14108,51 @@ SYNTAX:
   (:init (props self-id-path)
     (values '(:slot1-name val1) nil))
 
+  ;; or with destructuring:
+  (:init ((label count &key style) self-id-path)
+    (values `(:label ,label :count ,count :style ,style) nil))
+
   (:update (msg state app-state id-path)
     (:increment (amount)
       (values `(:count ,(+ (getf state :count 0) amount)) nil)))
 
-  (:view (local-state-map app-state self-id-path)
+  (:view (local-state-map app-state self-id-path children)
     `(:label :id (elmtui.ui.api:id-from-path self-id-path)
              :text (getf local-state-map :text "Default Text View")))
 
   ...other-class-options...)
 
+```
+
+## ELMTUI.UI.DSL-RESOLUTION:*DSL-TYPE-REGISTRY*
+
+Kinds: variable
+
+```text
+Registry mapping DSL type keywords to their component class names.
+Consulted by KNOWN-DSL-TYPE-P to decide whether a keyword names a DSL
+node type (as opposed to a property key) during argument splitting.
+Entries are added at load time by REGISTER-DSL-TYPE, which is called
+automatically by defcomponent and defcomponent-dsl expansions.
+```
+
+## ELMTUI.UI.DSL-RESOLUTION:KNOWN-DSL-TYPE-P
+
+Kinds: function
+
+```text
+Return non-NIL if KEYWORD is a registered DSL node type.
+Returns the associated class (or T when no class was recorded), NIL otherwise.
+```
+
+## ELMTUI.UI.DSL-RESOLUTION:REGISTER-DSL-TYPE
+
+Kinds: function
+
+```text
+Register KEYWORD as a known DSL node type, optionally mapping to CLASS.
+Registration is idempotent: calling with the same KEYWORD and CLASS
+has no additional effect.
 ```
 
 ## ELMTUI.UI.DSL-RESOLUTION:RESOLVE-DSL-TYPE
@@ -14064,6 +14180,93 @@ Examples:
 When chaining, props are accumulated from right to left:
   (resolve-dsl-type '(:outer :inner)) calls
   (dsl-type :inner) then appends (:outer) to result
+```
+
+## ELMTUI.UI.STYLES:*STYLE-REGISTRY*
+
+Kinds: variable
+
+```text
+Global registry mapping keyword names to style property lists.
+Styles are typically registered at load time via DEFSTYLE.
+```
+
+## ELMTUI.UI.STYLES:APPLY-THEME
+
+Kinds: function
+
+```text
+Register a batch of named styles from a theme plist.
+
+THEME-STYLES is a plist of (NAME STYLE-PLIST ...) pairs.  Each NAME is
+registered as a style class, overwriting any previous definition with that
+name.
+
+Example:
+  (apply-theme '(:title  (:bold t :fg :cyan)
+                 :muted  (:dim t :fg :white)))
+```
+
+## ELMTUI.UI.STYLES:CLEAR-STYLE-REGISTRY
+
+Kinds: function
+
+```text
+Remove all entries from the style registry.  Intended for testing.
+```
+
+## ELMTUI.UI.STYLES:DEFSTYLE
+
+Kinds: macro
+
+```text
+Register a named style class.  NAME must be a keyword; STYLE-PLIST is a
+property list of style properties.
+
+Example:
+  (defstyle :flex-column (:display :flex :flex-direction :column))
+```
+
+## ELMTUI.UI.STYLES:MERGE-STYLES
+
+Kinds: function
+
+```text
+Merge class-resolved styles with inline styles.  Inline wins on conflict.
+
+Both arguments are property lists.  Returns a fresh property list.
+```
+
+## ELMTUI.UI.STYLES:RESOLVE-NODE-STYLES
+
+Kinds: function
+
+```text
+Given a DSL node's property list PROPS, resolve any :CLASS specification
+and merge it with the explicit :STYLE.  Returns a new property list where
+:STYLE contains the merged result and :CLASS has been consumed.
+
+If PROPS has no :CLASS key the property list is returned unchanged.
+```
+
+## ELMTUI.UI.STYLES:RESOLVE-STYLE-CLASS
+
+Kinds: function
+
+```text
+Look up a named style class.  Signals an error if NAME is not registered.
+```
+
+## ELMTUI.UI.STYLES:RESOLVE-STYLE-CLASSES
+
+Kinds: function
+
+```text
+Resolve a class specification to a merged style plist.
+
+CLASS-SPEC is either a keyword (single class) or a list of keywords.
+When multiple classes are given, later classes override earlier ones on
+property conflict.
 ```
 
 ## ELMTUI.UI.WIDGETS.BUTTON:BUTTON
