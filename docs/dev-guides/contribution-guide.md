@@ -40,8 +40,10 @@ Run the suites:
 
 ```sh
 # Root integration suite
-clpm bundle exec --with-client sbcl -- \
-  --noinform --load scripts/run-tests-clpm.lisp
+clpm bundle exec --with-client sbcl -- --noinform --load scripts/run-tests-clpm.lisp
+
+# Integration suite with unexpected compiler/runtime warnings rejected
+scripts/run-tests-warning-clean.sh
 
 # Every reusable subsystem
 scripts/test-subsystems.sh
@@ -53,6 +55,16 @@ scripts/release-check.sh
 The release gate checks repository topology, the tracked release
 manifest, whitespace, all four subsystem suites, the warning-clean full
 ElmTUI suite, documentation freshness, and API binding coverage.
+
+The non-interactive runner exits with the suite result. It routes `log4cl`
+application logging to `test-output/elmtui-tests.log`; the warning-clean
+wrapper retains stdout and stderr under `test-output/` for diagnosis.
+
+Terminal integration checks use a private tmux server, so they do not depend
+on or change an existing session. The simulated terminal checks in
+`tests/faketerm-tests.lisp` use `faketerm-run-to-quiescence` to drain input
+and wait for a stable screen; real terminal checks remain part of the
+complete release gate.
 
 ### Documentation
 

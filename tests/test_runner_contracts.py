@@ -164,7 +164,7 @@ def test_warning_clean_script_exists_and_fails_on_unexpected_warnings() -> None:
 
 
 def test_noninteractive_command_matrix_is_documented() -> None:
-    path = ROOT / "docs" / "dev-guides" / "noninteractive-verification.md"
+    path = ROOT / "docs" / "dev-guides" / "contribution-guide.md"
     assert path.exists(), "missing non-interactive verification command matrix"
     source = path.read_text(encoding="utf-8")
 
@@ -181,13 +181,12 @@ def test_noninteractive_command_matrix_is_documented() -> None:
     assert not missing, f"non-interactive verification docs missing: {missing}"
 
 
-def test_bridge_manifest_exposes_warning_clean_command() -> None:
-    path = ROOT / "bridge.yml"
+def test_release_gate_executes_warning_clean_command() -> None:
+    path = ROOT / "scripts" / "release-check.sh"
     source = path.read_text(encoding="utf-8")
 
-    assert "warning-clean:" in source, "bridge.yml must expose warning-clean as a named command"
-    assert "scripts/run-tests-warning-clean.sh" in source, (
-        "bridge warning-clean command must invoke the same executable warning-clean gate "
+    assert "run_gate warning_clean scripts/run-tests-warning-clean.sh" in source, (
+        "release gate must execute the same warning-clean gate "
         "documented for non-interactive review."
     )
 
@@ -273,7 +272,7 @@ def main() -> int:
         test_contracts_tests_muffle_intentional_non_typed_message_warnings,
         test_warning_clean_script_exists_and_fails_on_unexpected_warnings,
         test_noninteractive_command_matrix_is_documented,
-        test_bridge_manifest_exposes_warning_clean_command,
+        test_release_gate_executes_warning_clean_command,
         test_enhanced_widget_observers_do_not_write_to_stdout,
         test_enhanced_widget_describe_helpers_are_silent_by_default,
         test_contract_diagnostic_helpers_are_silent_by_default,
