@@ -48,7 +48,7 @@
     (is (eq (first view) :container))
     (is (= (length children) 22))
     (is (search "NEON CIRCUIT" (getf (rest (first children)) :content)))
-    (is (getf (getf (rest (first children)) :style) :fg-color))))
+    (is (getf (elmtui.ui.styles:resolve-style-class (getf (rest (first children)) :class)) :fg-color))))
 
 (test tetris-shapes-and-bounds
   (let ((well (elmtui.examples.neon-tetris::empty-well)))
