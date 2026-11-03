@@ -105,6 +105,7 @@
                 (:module "ui"
                   :serial t
                   :pathname "ui/"
+                  :depends-on ("ui/dsl-resolution")
                   :components (
                                 (:file "defcomponent")
                                 (:module "widgets"
