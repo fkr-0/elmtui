@@ -155,30 +155,18 @@
   ;; The defapplication macro generates a PROCESS-MESSAGE function that,
   ;; when :handle-quit is true, returns quit patches for :app-quit-requested
   ;; without calling the user's update function.
-  (let ((user-called nil))
-    ;; Define a test update that records whether it was called
-    (defun %test-quit-update (msg state)
-      (declare (ignore msg state))
-      (setf user-called t)
-      (make-update-result))
-    (defun %test-quit-view (state)
-      (declare (ignore state))
-      '(:text :content "test"))
-    ;; Expand defapplication and check the generated PROCESS-MESSAGE
-    ;; handles quit automatically by checking for the quit-requested-p clause
-    ;; in the macro expansion.
-    (let* ((expansion (macroexpand-1
-                        '(elmtui.app:defapplication %test-quit-app
-                           :root-viewport-id :test-root
-                           :root-component-dsl '(:root-viewport :id :test-root
-                                                  :child-dsl-spec (:view nil))
-                           :update-fn '%test-quit-update
-                           :view-fn '%test-quit-view
-                           :handle-quit t)))
-           (expansion-string (prin1-to-string expansion)))
-      ;; The expansion should contain quit-requested-p for auto handling
-      (is (search "QUIT-REQUESTED-P" expansion-string)
-          "Expansion with :handle-quit t should contain QUIT-REQUESTED-P check"))))
+  (let* ((expansion (macroexpand-1
+                      '(elmtui.app:defapplication %test-quit-app
+                         :root-viewport-id :test-root
+                         :root-component-dsl '(:root-viewport :id :test-root
+                                                :child-dsl-spec (:view nil))
+                         :update-fn '%test-quit-update
+                         :view-fn '%test-quit-view
+                         :handle-quit t)))
+         (expansion-string (prin1-to-string expansion)))
+    ;; The expansion should contain quit-requested-p for auto handling
+    (is (search "QUIT-REQUESTED-P" expansion-string)
+        "Expansion with :handle-quit t should contain QUIT-REQUESTED-P check")))
 
 (test defapplication-no-quit-handling
   "DEFAPPLICATION with :handle-quit nil omits the quit interception clause."
