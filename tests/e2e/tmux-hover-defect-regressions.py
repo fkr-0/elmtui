@@ -116,7 +116,7 @@ class HoverDefectsPTY(unittest.TestCase):
 
     def clean_exit(self,app):
         app.wait(lambda screen:"ELMTUI_E2E_SHELL_RESTORED" in screen,
-                 "terminal restored after exit")
+                 "terminal restored after exit", allow_exit=True)
         self.assertEqual((app.directory/"exit-code").read_text().strip(),"0")
         self.assertEqual((app.directory/"before.stty").read_text(),
                          (app.directory/"after.stty").read_text())

@@ -50,7 +50,7 @@ class MiniEditorSavePTY(unittest.TestCase):
             self.assertEqual(target.read_text(encoding="utf-8"), "a")
             app.key("C-q")
             app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen,
-                     "clean exit restores the shell")
+                     "clean exit restores the shell", allow_exit=True)
             self.assertEqual("0", (app.directory / "exit-code").read_text().strip())
             self.assertEqual(
                 (app.directory / "before.stty").read_text(),

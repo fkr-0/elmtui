@@ -81,7 +81,7 @@ class StyledTmuxUnderlayPTY(unittest.TestCase):
                     app.expect(visible)
                     app.key("q", literal=True)
                     app.wait(lambda s: "ELMTUI_E2E_SHELL_RESTORED" in s,
-                             "shell restored after overlay")
+                             "shell restored after overlay", allow_exit=True)
                     self.assertEqual((app.directory / "exit-code").read_text().strip(),
                                      "0")
                     self.assertEqual((app.directory / "before.stty").read_text(),

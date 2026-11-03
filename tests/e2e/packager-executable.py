@@ -89,7 +89,7 @@ class PackagerExecutable(unittest.TestCase):
         self.assertEqual(baseline, list(range(1, 71)))
         app.key("C-c")  # the minimal example quits on the interrupt key
         app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen,
-                 "packaged binary returned to the shell")
+                 "packaged binary returned to the shell", allow_exit=True)
         self.assertEqual((app.directory / "exit-code").read_text().strip(), "0",
                          (app.directory / "stderr.txt").read_text()[-1500:])
         self.assertEqual((app.directory / "before.stty").read_text(),

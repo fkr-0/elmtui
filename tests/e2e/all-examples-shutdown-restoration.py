@@ -106,7 +106,7 @@ class AllExamplesShutdownRestoration(unittest.TestCase):
             if (app.directory / "exit-code").exists() or time.monotonic() > deadline:
                 break
         app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen,
-                 f"{name} returned to the shell")
+                 f"{name} returned to the shell", allow_exit=True)
         self.assertEqual((app.directory / "exit-code").read_text().strip(), "0",
                          f"{name} exit status")
         self.assertEqual((app.directory / "before.stty").read_text(),

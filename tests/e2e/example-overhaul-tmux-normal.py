@@ -91,7 +91,7 @@ class NormalBufferInspector(unittest.TestCase):
         app.key("Right")
         app.expect("Cursor: (1, 0)")
         app.key("q", literal=True)
-        app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen, "shell restore")
+        app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen, "shell restore", allow_exit=True)
         after = app.tmux("capture-pane", "-p", "-S", "-", "-t", "app:0.0").stdout
         for n in range(1, 71):
             self.assertEqual(after.count(f"HISTORY-MARKER-{n:02d}"), 1)

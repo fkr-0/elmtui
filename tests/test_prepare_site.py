@@ -31,9 +31,20 @@ class RetargetLinksTests(unittest.TestCase):
             "[g](workbench-user-guide.md#top)")
 
     def test_link_to_unstaged_repo_file_becomes_blob_url(self):
-        self.assertEqual(
-            self.retarget("[a](../docs/examples-capability-index.md)"),
-            f"[a]({site.REPO_BLOB}docs/examples-capability-index.md)")
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "docs" / "source-only.md"
+            document.parent.mkdir()
+            document.write_text("# Source-only document\n")
+            with mock.patch.object(site, "ROOT", root):
+                self.assertEqual(
+                    site.retarget_links("[a](../docs/source-only.md)",
+                                        root / "examples" / "README.md",
+                                        root / "website" / "guide" / "catalog.md", {}),
+                    f"[a]({site.REPO_BLOB}docs/source-only.md)")
 
     def test_external_anchor_absolute_and_missing_links_are_untouched(self):
         for link in ("[x](https://example.org/a.md)", "[x](#section)",

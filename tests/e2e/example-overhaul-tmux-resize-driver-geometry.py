@@ -55,7 +55,7 @@ class PhysicalTmuxGeometry(unittest.TestCase):
                              str(end[0]), "-y", str(end[1]))
                     app.key("q", literal=True)
                     app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen,
-                             "shell restored")
+                             "shell restored", allow_exit=True)
                     stderr = (app.directory / "stderr.txt").read_text()
                     self.assertIn(f"RESIZE_RESTORE_GEOMETRY {end[0]}x{end[1]}", stderr)
                     self.assertEqual((app.directory / "exit-code").read_text().strip(), "0")

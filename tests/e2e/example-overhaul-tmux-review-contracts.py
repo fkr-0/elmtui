@@ -180,7 +180,7 @@ class PhysicalOverlayAndScrollbackAcceptance(unittest.TestCase):
             app.tmux("resize-window", "-t", "app:0", "-x", "80", "-y", "24")
             app.key("q", literal=True)
             app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen,
-                     "shell restored after reverse shrink")
+                     "shell restored after reverse shrink", allow_exit=True)
             restored = history()
             missing = [n for n in range(1, 71)
                        if restored.count(f"HISTORY-MARKER-{n:02d}") != 1]

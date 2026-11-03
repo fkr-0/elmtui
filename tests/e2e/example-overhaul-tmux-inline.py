@@ -62,7 +62,7 @@ class NormalBufferInspector(unittest.TestCase):
                         self.assertEqual(idle, (app.directory / "terminal.raw").read_bytes())
                         app.key("q", literal=True)
                         app.wait(lambda screen: "ELMTUI_E2E_SHELL_RESTORED" in screen,
-                                 "shell after inspector exit")
+                                 "shell after inspector exit", allow_exit=True)
                         trace = (app.directory / "terminal.raw").read_bytes()
                         for alt in (b"\x1b[?1049h", b"\x1b[?1049l",
                                     b"\x1b[?1047h", b"\x1b[?1047l",

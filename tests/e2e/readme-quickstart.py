@@ -81,7 +81,7 @@ class ReadmeQuickstart(unittest.TestCase):
         for noise in ("<INFO>", "<WARN>", "<ERROR>", "DRIVER:"):
             self.assertNotIn(noise, screen, "framework log output reached the screen")
         app.key("q", literal=True)
-        app.wait(lambda text: "ELMTUI_E2E_SHELL_RESTORED" in text, "quickstart app exited")
+        app.wait(lambda text: "ELMTUI_E2E_SHELL_RESTORED" in text, "quickstart app exited", allow_exit=True)
         self.assertEqual((app.directory / "exit-code").read_text().strip(), "0",
                          (app.directory / "stderr.txt").read_text()[-2000:])
         self.assertEqual((app.directory / "before.stty").read_text(),
