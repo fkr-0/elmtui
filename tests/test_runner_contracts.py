@@ -90,6 +90,33 @@ def test_terminal_app_uses_a_short_private_tmux_socket_path() -> None:
         assert Path(app.socket).parent == Path(tempfile.gettempdir())
 
 
+def test_shutdown_wait_accepts_screen_updates_after_process_exit() -> None:
+    import importlib.util
+    import tempfile
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    spec = importlib.util.spec_from_file_location(
+        "elmtui_shutdown_wait", ROOT / "scripts/test-terminal-apps.py")
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        runner.OPTIONS = SimpleNamespace(output=Path(temp_dir), terminal="tmux", timeout=1)
+        app = runner.TerminalApp("shutdown", "(quote t)")
+        (app.directory / "exit-code").write_text("0\n")
+        with patch.object(app, "screen", side_effect=["old frame", "shell restored"]), \
+                patch.object(runner.time, "sleep"):
+            assert app.wait(lambda screen: screen == "shell restored",
+                            "shutdown", allow_exit=True) == "shell restored"
+        with patch.object(app, "screen", return_value="old frame"):
+            try:
+                app.wait(lambda screen: False, "running frame")
+            except AssertionError as exc:
+                assert "App exited before" in str(exc)
+            else:
+                raise AssertionError("ordinary screen waits must still reject early exits")
+
+
 def test_widgets_enhanced_asdf_definitions_match_file_stem() -> None:
     path = ROOT / "elmtui-widgets-enhanced.asd"
     source = path.read_text(encoding="utf-8")
@@ -265,6 +292,7 @@ def main() -> int:
         test_clpm_runner_removes_stdout_log_appenders_before_running_tests,
         test_tmux_integration_tests_use_a_private_server_and_never_skip,
         test_terminal_app_uses_a_short_private_tmux_socket_path,
+        test_shutdown_wait_accepts_screen_updates_after_process_exit,
         test_widgets_enhanced_asdf_definitions_match_file_stem,
         test_focus_keymaps_contract_is_not_skipped_or_example_bound,
         test_focus_keymaps_fixture_suppresses_fixture_stdout,

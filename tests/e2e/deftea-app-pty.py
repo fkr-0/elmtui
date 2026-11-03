@@ -89,7 +89,9 @@ class DefteaAppPTY(unittest.TestCase):
         return app
 
     def assert_clean_exit(self, app):
-        app.wait(lambda text: "ELMTUI_E2E_SHELL_RESTORED" in text, "deftea app exited")
+        # The wrapper records exit status before tmux consumes its final output.
+        app.wait(lambda text: "ELMTUI_E2E_SHELL_RESTORED" in text,
+                 "deftea app exited", allow_exit=True)
         self.assertEqual((app.directory / "exit-code").read_text().strip(), "0",
                          (app.directory / "stderr.txt").read_text()[-2000:])
         self.assertEqual((app.directory / "before.stty").read_text(),

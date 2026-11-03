@@ -115,14 +115,14 @@ class TerminalApp:
     def screen(self):
         return self.tmux('capture-pane', '-p', '-t', 'app:0.0').stdout
 
-    def wait(self, predicate, description):
+    def wait(self, predicate, description, *, allow_exit=False):
         deadline = time.monotonic() + OPTIONS.timeout
         while time.monotonic() < deadline:
             screen = self.screen()
             if predicate(screen):
                 self.frames.append({'assertion': description, 'screen': screen})
                 return screen
-            if (self.directory / 'exit-code').exists():
+            if not allow_exit and (self.directory / 'exit-code').exists():
                 raise AssertionError('App exited before ' + description + '\n' + screen)
             time.sleep(.1)
         raise AssertionError('Timed out waiting for ' + description + '\n' + self.screen())
