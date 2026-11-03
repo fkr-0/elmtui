@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tarfile
@@ -96,6 +97,17 @@ def rewrite_archive(
 
 
 class ReleaseEngineeringTests(unittest.TestCase):
+    def test_preflight_manifest_only_requires_distributed_files(self):
+        script = (ROOT / "scripts/release-check.sh").read_text()
+        manifest = re.search(r"required_files=\((.*?)\n\)", script, re.S)
+        self.assertIsNotNone(manifest)
+        tracked = set(git(ROOT, "ls-files").splitlines())
+        for name in manifest.group(1).split():
+            with self.subTest(path=name):
+                self.assertTrue((ROOT / name).is_file(), name)
+                if name.split("/", 1)[0] not in release.LIBRARIES:
+                    self.assertIn(name, tracked)
+
     def test_remote_url_resolution(self):
         self.assertEqual(
             "https://github.com/fkr-0/cl-inputs.git",
