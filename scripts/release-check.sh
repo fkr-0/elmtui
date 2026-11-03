@@ -88,6 +88,7 @@ required_files=(
   elmtui-widgets-enhanced.asd
   docs/architecture/library-boundaries.md
   docs/architecture/facade-reexports.tsv
+  docs/assets/coverage-primary-sources.txt
   examples/README.md
   scripts/release-check.sh
   scripts/test-subsystems.sh
