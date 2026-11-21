@@ -1,0 +1,176 @@
+version: 1
+name: elmtui-clpm
+
+env:
+  CLPM_HOME: .cache/clpm
+
+default_track: clpm
+
+tracks:
+  clpm:
+    description: Run elmtui through the repository CLPM bundle
+    steps:
+      - name: ensure-bundle
+        run: |
+          mkdir -p .cache/clpm
+          clpm bundle install
+      - name: run-tests
+        run: |
+          clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp
+
+  clpm-dev:
+    description: Run ElmTUI development tools through the optional CLPM bundle
+    steps:
+      - name: ensure-dev-bundle
+        run: |
+          mkdir -p .cache/clpm
+          clpm bundle -f dev/clpmfile install
+
+commands:
+  test:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --load run-tests-clpm.lisp
+
+  test-neon:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+        --eval '(require :asdf)' \
+        --eval '(asdf:test-system "elmtui-neon-tests")'
+
+  test-neon-pty:
+    track: clpm
+    run: |
+      python3 tests/neon-pty.py
+
+  warning-clean:
+    track: clpm
+    run: |
+      scripts/run-tests-warning-clean.sh
+
+  test-subsystems:
+    track: clpm
+    run: |
+      scripts/test-subsystems.sh
+
+  release-check:
+    track: clpm
+    run: |
+      scripts/release-check.sh
+
+  repl:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --load run_clpm.lisp
+
+  slynk:
+    track: clpm-dev
+    run: |
+      clpm bundle -f dev/clpmfile exec --with-client sbcl -- --noinform --load run_clpm_slynk.lisp
+
+  coverage:
+    track: clpm
+    run: |
+      set -eu
+      mkdir -p test-output
+      log="test-output/coverage-warning-clean.log"
+      if ! clpm bundle exec --with-client sbcl -- --noinform --non-interactive --load coverage.lisp >"$log" 2>&1; then
+        cat "$log"
+        exit 1
+      fi
+      cat "$log"
+      test -s coverage/cover-index.html
+      if grep -nE '(^|[[:space:]])(STYLE-)?WARNING:' "$log"; then
+        echo "coverage: warning marker detected" >&2
+        exit 1
+      fi
+
+  examples-smoke:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+        --eval '(require :asdf)' \
+        --eval '(asdf:load-system "elmtui-tests")' \
+        --eval '(fiveam:run! '\''elmtui.tests.examples-smoke:examples-smoke-tests)'
+
+  benchmark:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+        --eval '(require :asdf)' \
+        --eval '(asdf:load-system "elmtui-dev")' \
+        --eval '(elmtui.dev.benchmark:run-benchmark-suite)'
+
+  benchmark-test:
+    track: clpm
+    run: |
+      clpm bundle exec --with-client sbcl -- --noinform --non-interactive \
+        --eval '(require :asdf)' \
+        --eval '(asdf:load-system "elmtui-dev-tests")' \
+        --eval '(elmtui.dev.benchmark.tests:run-benchmark-tests)'
+
+  docs:
+    track: clpm
+    run: |
+      scripts/build-api-docs.sh
+
+  doc-audit:
+    track: clpm
+    run: |
+      scripts/check-docstrings.sh
+
+  doc-audit-strict:
+    track: clpm
+    run: |
+      ELMTUI_DOCSTRING_STRICT=1 scripts/check-docstrings.sh
+
+agent_workflow:
+  version: '1.0'
+  project:
+    id: elmtui-clpm
+    title: elmtui-clpm
+    root: .
+    capacity:
+      max_active_workers: 4
+      max_reserved_packets: 8
+      max_reviewers: 2
+  defaults:
+    queue: managed
+    lease_policy: normal
+    mutation_policy: transactional
+    review_policy: independent-review
+    priority: 50
+  lease_policies:
+    normal: {}
+  mutation_policies:
+    transactional:
+      mode: transaction-required
+      stale_write_protection: sha256
+      capture_preimage: true
+      rollback_on_partial_failure: true
+  review_policies:
+    independent-review:
+      mode: required
+      reviewer:
+        independent: true
+        allow_author: false
+        allow_mutation: false
+      max_rounds: 2
+      on_timeout: blocked
+  queues:
+    managed:
+      title: Managed work
+      capacity: 4
+  opportunities: []
+  governance:
+    strict_validation: true
+    reject_unknown_fields: true
+    overrides:
+      allow_less_restrictive_mutation_policy: false
+      allow_review_bypass: false
+      allow_scope_expansion_at_runtime: false
+    recovery:
+      allow_dirty_requeue: false
+    derived_opportunities:
+      promotion: operator_gate
